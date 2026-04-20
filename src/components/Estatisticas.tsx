@@ -26,12 +26,24 @@ interface Props {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  novo: "oklch(0.65 0.15 200)",
-  andamento: "oklch(0.55 0.18 265)",
-  audiencia: "oklch(0.78 0.13 80)",
-  recurso: "oklch(0.6 0.18 25)",
-  concluido: "oklch(0.65 0.15 160)",
+  novo: "oklch(0.78 0.16 220)",
+  andamento: "oklch(0.7 0.22 305)",
+  audiencia: "oklch(0.82 0.2 60)",
+  recurso: "oklch(0.72 0.24 22)",
+  concluido: "oklch(0.78 0.18 160)",
 };
+
+const TOOLTIP_STYLE = {
+  backgroundColor: "oklch(0.21 0.025 260)",
+  border: "1px solid oklch(1 0 0 / 0.1)",
+  borderRadius: 12,
+  fontSize: 12,
+  color: "oklch(0.96 0.01 240)",
+  boxShadow: "0 8px 32px oklch(0 0 0 / 0.5)",
+} as const;
+
+const AXIS_COLOR = "oklch(0.7 0.03 245)";
+const GRID_COLOR = "oklch(1 0 0 / 0.06)";
 
 export function Estatisticas({ processos }: Props) {
   const dadosStatus = useMemo(
