@@ -27,6 +27,7 @@ import { KanbanBoard } from "@/components/KanbanBoard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { ProcessoDialog } from "@/components/ProcessoDialog";
 import { Estatisticas } from "@/components/Estatisticas";
+import { CalendarioPrazos } from "@/components/CalendarioPrazos";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
 
@@ -50,7 +51,7 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-type Aba = "mesa" | "consulta" | "arquivo" | "indicadores" | "equipe";
+type Aba = "mesa" | "prazos" | "consulta" | "arquivo" | "indicadores" | "equipe";
 type FiltroTipo = "todos" | "DU" | "PA";
 type Visao = "minha" | "setor";
 
@@ -132,14 +133,15 @@ function Index() {
     { id: "mesa", label: "Painel de Controle", icon: LayoutGrid, badge: ativosCount },
   ];
 
-  const navSec: { label: string; icon: typeof LayoutGrid }[] = [
-    { label: "Controle de Prazos", icon: Calendar },
-    { label: "Processos Antigos", icon: History },
+  const navSec: { id: Aba; label: string; icon: typeof LayoutGrid }[] = [
+    { id: "prazos", label: "Controle de Prazos", icon: Calendar },
+    { id: "arquivo", label: "Processos Antigos", icon: History },
   ];
 
   // Tabs principais (estilo AssJur)
   const tabs: { id: Aba; label: string }[] = [
     { id: "mesa", label: "Mesa de Trabalho" },
+    { id: "prazos", label: "Controle de Prazos" },
     { id: "consulta", label: "Consulta Geral" },
     { id: "arquivo", label: "Arquivo / Encerrados" },
     { id: "indicadores", label: "Indicadores de Gestão" },
@@ -217,10 +219,19 @@ function Index() {
 
             {navSec.map((item) => {
               const Icon = item.icon;
+              const active = aba === item.id;
               return (
                 <button
                   key={item.label}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                  onClick={() => {
+                    setAba(item.id);
+                    setSidebarOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${
+                    active
+                      ? "bg-[oklch(0.6_0.16_230)] text-white font-bold shadow-lg"
+                      : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                  }`}
                 >
                   <Icon className="h-4.5 w-4.5 shrink-0" />
                   <span className="flex-1 text-left">{item.label}</span>
@@ -487,6 +498,10 @@ function Index() {
                 />
               )}
             </>
+          )}
+
+          {aba === "prazos" && (
+            <CalendarioPrazos processos={processos} usuario={usuario} />
           )}
 
           {aba === "consulta" && (
