@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import type { Processo, StatusProcesso } from "@/types/processo";
 
-const STORAGE_KEY = "juris-board:processos";
+const STORAGE_KEY = "juris-board:processos:v2";
 
 function addDays(days: number): string {
   const d = new Date();
@@ -12,16 +12,39 @@ function addDays(days: number): string {
 const SEED: Processo[] = [
   {
     id: crypto.randomUUID(),
-    numero: "0012345-67.2024.8.26.0100",
-    cliente: "Maria Silva Santos",
-    vara: "2ª Vara Cível - SP",
-    parteContraria: "Banco Norte S/A",
-    tipoAcao: "Ação Revisional de Contrato",
-    responsavel: "Dr. Carlos Mendes",
+    numero: "1025202-57.2024.4.01.3200",
+    cliente: "Clube de Tiro do Amazonas - CTA",
+    vara: "2ª Vara Federal - AM",
+    parteContraria: "União Federal",
+    tipoAcao: "Interdição Clube de Tiro",
+    responsavel: "Ten Portela",
     prazo: addDays(-2),
-    descricao: "Contestação a ser protocolada com urgência. Cliente já enviou documentos.",
+    prazoFatal: addDays(3),
+    descricao: "Liminar deferida. Manifestação pendente sobre cumprimento.",
     status: "andamento",
     criadoEm: new Date().toISOString(),
+    tipo: "DU",
+    prioridade: "liminar",
+    secao: "SFPC",
+    origem: "E-mail",
+  },
+  {
+    id: crypto.randomUUID(),
+    numero: "1001085-12.2018.4.01.3200",
+    cliente: "Alciney Gomes Leite",
+    vara: "1ª Vara Federal",
+    parteContraria: "União",
+    tipoAcao: "Reintegrados - Parecer",
+    responsavel: "Ten Portela",
+    prazo: addDays(1),
+    prazoFatal: addDays(4),
+    descricao: "Parecer técnico em elaboração para subsidiar manifestação.",
+    status: "andamento",
+    criadoEm: new Date().toISOString(),
+    tipo: "DU",
+    prioridade: "normal",
+    secao: "SVP",
+    origem: "DiEx",
   },
   {
     id: crypto.randomUUID(),
@@ -32,9 +55,14 @@ const SEED: Processo[] = [
     tipoAcao: "Cobrança",
     responsavel: "Dra. Ana Lima",
     prazo: addDays(0),
+    prazoFatal: addDays(7),
     descricao: "Audiência de conciliação marcada. Preparar minuta de acordo.",
     status: "audiencia",
     criadoEm: new Date().toISOString(),
+    tipo: "PA",
+    prioridade: "urgente",
+    secao: "SFPC",
+    origem: "Ofício",
   },
   {
     id: crypto.randomUUID(),
@@ -45,9 +73,14 @@ const SEED: Processo[] = [
     tipoAcao: "Reclamação Trabalhista",
     responsavel: "Dr. Carlos Mendes",
     prazo: addDays(3),
+    prazoFatal: addDays(10),
     descricao: "Recurso ordinário em fase de elaboração.",
     status: "recurso",
     criadoEm: new Date().toISOString(),
+    tipo: "PA",
+    prioridade: "normal",
+    secao: "SVP",
+    origem: "Sistema",
   },
   {
     id: crypto.randomUUID(),
@@ -58,9 +91,14 @@ const SEED: Processo[] = [
     tipoAcao: "Mandado de Segurança",
     responsavel: "Dra. Ana Lima",
     prazo: addDays(15),
+    prazoFatal: addDays(30),
     descricao: "Aguardando designação de relator.",
     status: "novo",
     criadoEm: new Date().toISOString(),
+    tipo: "DU",
+    prioridade: "normal",
+    secao: "SFPC",
+    origem: "E-mail",
   },
   {
     id: crypto.randomUUID(),
@@ -71,9 +109,14 @@ const SEED: Processo[] = [
     tipoAcao: "Inventário",
     responsavel: "Dr. Roberto Souza",
     prazo: addDays(45),
+    prazoFatal: addDays(60),
     descricao: "Processo arquivado após partilha homologada.",
     status: "concluido",
     criadoEm: new Date().toISOString(),
+    tipo: "OUTRO",
+    prioridade: "normal",
+    secao: "SVP",
+    origem: "Sistema",
   },
 ];
 
