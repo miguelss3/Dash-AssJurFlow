@@ -58,13 +58,27 @@ export function ProcessoCard({ processo, onEdit, onDelete, onMove, overlay = fal
       onClick={overlay ? undefined : () => onEdit(processo)}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-mono text-muted-foreground truncate">
-            {processo.numero}
-          </p>
-          <h3 className="font-semibold text-sm text-foreground leading-tight mt-0.5 line-clamp-2">
-            {processo.cliente}
-          </h3>
+        <div className="flex items-start gap-1.5 flex-1 min-w-0">
+          {!overlay && (
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Arrastar processo"
+              className="shrink-0 -ml-1 mt-0.5 p-0.5 rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted cursor-grab active:cursor-grabbing touch-none transition-colors"
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
+          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-mono text-muted-foreground truncate">
+              {processo.numero}
+            </p>
+            <h3 className="font-semibold text-sm text-foreground leading-tight mt-0.5 line-clamp-2">
+              {processo.cliente}
+            </h3>
+          </div>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
