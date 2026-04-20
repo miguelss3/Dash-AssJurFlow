@@ -7,7 +7,6 @@ import {
   LayoutGrid,
   BarChart3,
   Bell,
-  Briefcase,
   Menu,
   X,
   Settings,
@@ -116,15 +115,17 @@ function Index() {
           <div className="px-5 py-5 border-b border-sidebar-border flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-accent blur-md opacity-60" />
-                <div className="relative h-9 w-9 rounded-xl bg-gradient-accent flex items-center justify-center shadow-glow">
-                  <Scale className="h-5 w-5 text-accent-foreground" />
+                <div className="absolute inset-0 bg-gradient-accent blur-md opacity-70" />
+                <div className="relative h-10 w-10 rounded-xl bg-gradient-accent flex items-center justify-center shadow-glow">
+                  <Scale className="h-5 w-5 text-primary-foreground" />
                 </div>
               </div>
               <div>
-                <h1 className="font-bold text-base tracking-tight leading-none">JurisBoard</h1>
-                <p className="text-[10px] text-sidebar-foreground/60 mt-0.5 tracking-wide uppercase">
-                  Premium Edition
+                <h1 className="font-bold text-base tracking-tight leading-none font-mono-tech">
+                  JURIS<span className="text-gradient-accent">BOARD</span>
+                </h1>
+                <p className="text-[9px] text-sidebar-foreground/50 mt-1 tracking-[0.25em] uppercase font-mono-tech">
+                  v2.0 · TECH CONSOLE
                 </p>
               </div>
             </div>
@@ -185,21 +186,31 @@ function Index() {
           </nav>
 
           {/* Footer card */}
-          <div className="p-3">
-            <div className="rounded-xl bg-gradient-to-br from-sidebar-accent to-sidebar-accent/30 p-4 border border-sidebar-border">
-              <div className="flex items-center gap-2 mb-2">
-                <Briefcase className="h-4 w-4 text-sidebar-primary" />
-                <p className="text-xs font-semibold">Resumo do dia</p>
-              </div>
-              <p className="text-[11px] text-sidebar-foreground/70 leading-relaxed">
-                <span className="font-bold text-sidebar-foreground">{ativosCount}</span> processos ativos
+          <div className="p-3 border-t border-sidebar-border">
+            <div className="rounded-xl bg-gradient-to-br from-sidebar-accent to-sidebar-accent/30 p-4 border border-sidebar-border relative overflow-hidden">
+              <div className="absolute inset-0 pattern-grid-sm opacity-40 pointer-events-none" />
+              <div className="relative">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.78_0.18_160)] shadow-[0_0_6px_oklch(0.78_0.18_160)] animate-pulse" />
+                  <p className="text-[10px] font-mono-tech uppercase tracking-wider text-sidebar-foreground/70">
+                    Sistema online
+                  </p>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold font-mono-tech text-sidebar-primary">
+                    {String(ativosCount).padStart(2, "0")}
+                  </span>
+                  <span className="text-[10px] text-sidebar-foreground/60 uppercase tracking-wider">
+                    ativos
+                  </span>
+                </div>
                 {vencidosCount > 0 && (
-                  <>
-                    {" • "}
-                    <span className="font-bold text-[oklch(0.78_0.16_45)]">{vencidosCount}</span> vencidos
-                  </>
+                  <p className="mt-1 text-[10px] font-mono-tech text-[oklch(0.72_0.24_22)] flex items-center gap-1">
+                    <span className="h-1 w-1 rounded-full bg-[oklch(0.72_0.24_22)] animate-pulse" />
+                    {vencidosCount} vencido{vencidosCount > 1 ? "s" : ""}
+                  </p>
                 )}
-              </p>
+              </div>
             </div>
           </div>
         </div>
@@ -229,13 +240,12 @@ function Index() {
             </Button>
 
             <div className="hidden sm:block">
-              <h2 className="font-bold text-lg sm:text-xl tracking-tight leading-none">
-                {aba === "quadro" ? "Quadro de Processos" : "Estatísticas & Resultados"}
+              <h2 className="font-bold text-lg sm:text-xl tracking-tight leading-none font-mono-tech">
+                {aba === "quadro" ? "// CONTROLE DE PROCESSOS" : "// ANALYTICS DASHBOARD"}
               </h2>
-              <p className="text-xs text-primary-foreground/70 mt-1">
-                {aba === "quadro"
-                  ? "Acompanhe seus processos em tempo real"
-                  : "Performance do escritório em números"}
+              <p className="text-[10px] text-primary-foreground/60 mt-1.5 font-mono-tech tracking-wider uppercase flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.78_0.18_160)] shadow-[0_0_6px_oklch(0.78_0.18_160)] animate-pulse" />
+                {aba === "quadro" ? "monitorando em tempo real" : "performance & metrics"}
               </p>
             </div>
 
@@ -246,8 +256,8 @@ function Index() {
                 <Input
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar processo, cliente..."
-                  className="pl-9 h-10 bg-white/10 border-white/20 text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:bg-white/15 focus-visible:ring-white/30"
+                  placeholder="$ buscar processo, parte..."
+                  className="pl-9 h-10 bg-white/5 border-white/15 text-primary-foreground placeholder:text-primary-foreground/40 placeholder:font-mono-tech focus-visible:bg-white/10 focus-visible:ring-primary/50 font-mono-tech text-xs"
                 />
               </div>
             </div>

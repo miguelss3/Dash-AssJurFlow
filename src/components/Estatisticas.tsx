@@ -26,12 +26,24 @@ interface Props {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  novo: "oklch(0.65 0.15 200)",
-  andamento: "oklch(0.55 0.18 265)",
-  audiencia: "oklch(0.78 0.13 80)",
-  recurso: "oklch(0.6 0.18 25)",
-  concluido: "oklch(0.65 0.15 160)",
+  novo: "oklch(0.78 0.16 220)",
+  andamento: "oklch(0.7 0.22 305)",
+  audiencia: "oklch(0.82 0.2 60)",
+  recurso: "oklch(0.72 0.24 22)",
+  concluido: "oklch(0.78 0.18 160)",
 };
+
+const TOOLTIP_STYLE = {
+  backgroundColor: "oklch(0.21 0.025 260)",
+  border: "1px solid oklch(1 0 0 / 0.1)",
+  borderRadius: 12,
+  fontSize: 12,
+  color: "oklch(0.96 0.01 240)",
+  boxShadow: "0 8px 32px oklch(0 0 0 / 0.5)",
+} as const;
+
+const AXIS_COLOR = "oklch(0.7 0.03 245)";
+const GRID_COLOR = "oklch(1 0 0 / 0.06)";
 
 export function Estatisticas({ processos }: Props) {
   const dadosStatus = useMemo(
@@ -50,22 +62,22 @@ export function Estatisticas({ processos }: Props) {
       {
         name: "Vencidos",
         value: ativos.filter((p) => statusPrazo(p.prazo) === "overdue").length,
-        fill: "oklch(0.58 0.22 27)",
+        fill: "oklch(0.72 0.24 22)",
       },
       {
         name: "Hoje",
         value: ativos.filter((p) => statusPrazo(p.prazo) === "today").length,
-        fill: "oklch(0.7 0.18 50)",
+        fill: "oklch(0.82 0.2 60)",
       },
       {
         name: "Em breve",
         value: ativos.filter((p) => statusPrazo(p.prazo) === "soon").length,
-        fill: "oklch(0.72 0.16 90)",
+        fill: "oklch(0.85 0.18 95)",
       },
       {
         name: "Em dia",
         value: ativos.filter((p) => statusPrazo(p.prazo) === "safe").length,
-        fill: "oklch(0.6 0.13 160)",
+        fill: "oklch(0.78 0.18 160)",
       },
     ];
   }, [processos]);
@@ -179,13 +191,13 @@ export function Estatisticas({ processos }: Props) {
                 paddingAngle={3}
               >
                 {dadosStatus.map((d, i) => (
-                  <Cell key={i} fill={d.fill} stroke="oklch(1 0 0)" strokeWidth={2} />
+                  <Cell key={i} fill={d.fill} stroke="oklch(0.21 0.025 260)" strokeWidth={2} />
                 ))}
               </Pie>
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "oklch(1 0 0)",
-                  border: "1px solid oklch(0.91 0.013 250)",
+                  backgroundColor: "oklch(0.21 0.025 260)",
+                  border: "1px solid oklch(1 0 0 / 0.1)",
                   borderRadius: 12,
                   fontSize: 12,
                   boxShadow: "var(--shadow-card-hover)",
@@ -207,14 +219,14 @@ export function Estatisticas({ processos }: Props) {
         >
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={dadosPrazos} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.013 250)" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: "oklch(0.5 0.03 255)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "oklch(0.5 0.03 255)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.06)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip
-                cursor={{ fill: "oklch(0.96 0.008 250)" }}
+                cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
                 contentStyle={{
-                  backgroundColor: "oklch(1 0 0)",
-                  border: "1px solid oklch(0.91 0.013 250)",
+                  backgroundColor: "oklch(0.21 0.025 260)",
+                  border: "1px solid oklch(1 0 0 / 0.1)",
                   borderRadius: 12,
                   fontSize: 12,
                   boxShadow: "var(--shadow-card-hover)",
@@ -239,22 +251,22 @@ export function Estatisticas({ processos }: Props) {
         >
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={dadosResponsavel} layout="vertical" margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.013 250)" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11, fill: "oklch(0.5 0.03 255)" }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "oklch(0.5 0.03 255)" }} axisLine={false} tickLine={false} width={110} />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.06)" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} width={110} />
               <Tooltip
-                cursor={{ fill: "oklch(0.96 0.008 250)" }}
+                cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
                 contentStyle={{
-                  backgroundColor: "oklch(1 0 0)",
-                  border: "1px solid oklch(0.91 0.013 250)",
+                  backgroundColor: "oklch(0.21 0.025 260)",
+                  border: "1px solid oklch(1 0 0 / 0.1)",
                   borderRadius: 12,
                   fontSize: 12,
                   boxShadow: "var(--shadow-card-hover)",
                 }}
               />
               <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
-              <Bar dataKey="ativos" stackId="a" fill="oklch(0.55 0.18 265)" radius={[0, 0, 0, 0]} name="Ativos" />
-              <Bar dataKey="concluidos" stackId="a" fill="oklch(0.65 0.15 160)" radius={[0, 8, 8, 0]} name="Concluídos" />
+              <Bar dataKey="ativos" stackId="a" fill="oklch(0.78 0.16 220)" radius={[0, 0, 0, 0]} name="Ativos" />
+              <Bar dataKey="concluidos" stackId="a" fill="oklch(0.78 0.18 160)" radius={[0, 8, 8, 0]} name="Concluídos" />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -268,17 +280,17 @@ export function Estatisticas({ processos }: Props) {
             <AreaChart data={dadosTimeline} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="oklch(0.55 0.18 265)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="oklch(0.55 0.18 265)" stopOpacity={0} />
+                  <stop offset="0%" stopColor="oklch(0.78 0.16 220)" stopOpacity={0.5} />
+                  <stop offset="100%" stopColor="oklch(0.78 0.16 220)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.013 250)" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: "oklch(0.5 0.03 255)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "oklch(0.5 0.03 255)" }} axisLine={false} tickLine={false} allowDecimals={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.06)" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 10, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} allowDecimals={false} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "oklch(1 0 0)",
-                  border: "1px solid oklch(0.91 0.013 250)",
+                  backgroundColor: "oklch(0.21 0.025 260)",
+                  border: "1px solid oklch(1 0 0 / 0.1)",
                   borderRadius: 12,
                   fontSize: 12,
                   boxShadow: "var(--shadow-card-hover)",
@@ -287,7 +299,7 @@ export function Estatisticas({ processos }: Props) {
               <Area
                 type="monotone"
                 dataKey="processos"
-                stroke="oklch(0.55 0.18 265)"
+                stroke="oklch(0.78 0.16 220)"
                 strokeWidth={2.5}
                 fill="url(#grad-area)"
               />
@@ -315,10 +327,14 @@ export function Estatisticas({ processos }: Props) {
                     <span className="font-medium text-foreground truncate pr-2">{d.name}</span>
                     <span className="tabular-nums text-muted-foreground shrink-0">{d.value}</span>
                   </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-2 rounded-full bg-muted overflow-hidden border border-border/50">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary-glow to-[oklch(0.45_0.14_270)] transition-all"
-                      style={{ width: `${pct}%`, animationDelay: `${i * 100}ms` }}
+                      className="h-full rounded-full bg-gradient-accent transition-all"
+                      style={{
+                        width: `${pct}%`,
+                        animationDelay: `${i * 100}ms`,
+                        boxShadow: "0 0 12px oklch(0.78 0.16 220 / 0.5)",
+                      }}
                     />
                   </div>
                 </div>
