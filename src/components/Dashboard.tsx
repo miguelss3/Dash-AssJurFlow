@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, CalendarRange, Briefcase } from "lucide-react";
+import { AlertTriangle, Clock, CalendarRange, Briefcase, TrendingUp, TrendingDown } from "lucide-react";
 import type { Processo, FiltroPrazo } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
 
@@ -16,71 +16,105 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
     const s = statusPrazo(p.prazo);
     return s === "today" || s === "soon";
   }).length;
+  const concluidos = processos.filter((p) => p.status === "concluido").length;
+  const taxaConclusao = processos.length > 0 ? Math.round((concluidos / processos.length) * 100) : 0;
 
   const cards: Array<{
     key: FiltroPrazo;
     label: string;
-    value: number;
+    value: number | string;
+    sub: string;
     icon: typeof AlertTriangle;
     accent: string;
-    bg: string;
+    iconBg: string;
+    glow: string;
+    trend?: { up: boolean; text: string };
   }> = [
     {
       key: "todos",
       label: "Total de processos",
       value: processos.length,
+      sub: `${ativos.length} em andamento`,
       icon: Briefcase,
-      accent: "text-primary",
-      bg: "bg-primary/10",
+      accent: "text-primary-glow",
+      iconBg: "bg-primary/10",
+      glow: "from-primary-glow/20",
+      trend: { up: true, text: `${taxaConclusao}% concluídos` },
     },
     {
       key: "vencidos",
       label: "Prazos vencidos",
       value: vencidos,
+      sub: "Requer ação imediata",
       icon: AlertTriangle,
       accent: "text-[var(--deadline-overdue)]",
-      bg: "bg-[var(--deadline-overdue-bg)]",
+      iconBg: "bg-[var(--deadline-overdue-bg)]",
+      glow: "from-[var(--deadline-overdue)]/20",
+      trend: vencidos > 0 ? { up: false, text: "Atenção urgente" } : undefined,
     },
     {
       key: "hoje",
       label: "Vencem hoje",
       value: hoje,
+      sub: hoje > 0 ? "Priorizar agenda" : "Nenhum prazo hoje",
       icon: Clock,
       accent: "text-[var(--deadline-today)]",
-      bg: "bg-[var(--deadline-today-bg)]",
+      iconBg: "bg-[var(--deadline-today-bg)]",
+      glow: "from-[var(--deadline-today)]/20",
     },
     {
       key: "semana",
       label: "Próximos 7 dias",
       value: semana,
+      sub: "Planejar a semana",
       icon: CalendarRange,
       accent: "text-[var(--deadline-soon)]",
-      bg: "bg-[var(--deadline-soon-bg)]",
+      iconBg: "bg-[var(--deadline-soon-bg)]",
+      glow: "from-[var(--deadline-soon)]/20",
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {cards.map((c) => {
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {cards.map((c, i) => {
         const Icon = c.icon;
         const active = filtro === c.key;
+        const Trend = c.trend?.up ? TrendingUp : TrendingDown;
         return (
           <button
             key={c.key}
             onClick={() => onFiltroChange(active ? "todos" : c.key)}
-            className={`text-left rounded-xl border bg-card p-4 transition-[var(--transition-smooth)] hover:shadow-[var(--shadow-card)] ${
-              active ? "border-primary ring-2 ring-primary/20" : "border-border"
+            style={{ animationDelay: `${i * 60}ms` }}
+            className={`group relative text-left rounded-2xl border bg-card p-4 sm:p-5 overflow-hidden transition-[var(--transition-smooth)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-0.5 animate-fade-in-up ${
+              active
+                ? "border-primary/60 ring-2 ring-primary/30 shadow-[var(--shadow-card-hover)]"
+                : "border-border shadow-[var(--shadow-card)]"
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className={`rounded-lg p-2 ${c.bg}`}>
-                <Icon className={`h-4 w-4 ${c.accent}`} />
+            {/* Glow decorativo */}
+            <div className={`pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-gradient-to-br ${c.glow} to-transparent blur-2xl opacity-70 transition-opacity group-hover:opacity-100`} />
+
+            <div className="relative flex items-start justify-between mb-3">
+              <span className={`rounded-xl p-2.5 ${c.iconBg}`}>
+                <Icon className={`h-5 w-5 ${c.accent}`} />
               </span>
-              <span className="text-2xl font-bold tabular-nums text-foreground">
-                {c.value}
-              </span>
+              {c.trend && (
+                <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${c.trend.up ? "text-[var(--deadline-safe)]" : "text-[var(--deadline-overdue)]"}`}>
+                  <Trend className="h-3 w-3" />
+                  {c.trend.text}
+                </span>
+              )}
             </div>
-            <p className="text-xs text-muted-foreground font-medium">{c.label}</p>
+
+            <div className="relative">
+              <div className="text-3xl sm:text-4xl font-bold tabular-nums text-foreground tracking-tight">
+                {c.value}
+              </div>
+              <p className="text-xs sm:text-sm text-foreground font-semibold mt-1">
+                {c.label}
+              </p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">{c.sub}</p>
+            </div>
           </button>
         );
       })}
