@@ -116,15 +116,17 @@ function Index() {
           <div className="px-5 py-5 border-b border-sidebar-border flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="relative">
-                <div className="absolute inset-0 bg-gradient-accent blur-md opacity-60" />
-                <div className="relative h-9 w-9 rounded-xl bg-gradient-accent flex items-center justify-center shadow-glow">
-                  <Scale className="h-5 w-5 text-accent-foreground" />
+                <div className="absolute inset-0 bg-gradient-accent blur-md opacity-70" />
+                <div className="relative h-10 w-10 rounded-xl bg-gradient-accent flex items-center justify-center shadow-glow">
+                  <Scale className="h-5 w-5 text-primary-foreground" />
                 </div>
               </div>
               <div>
-                <h1 className="font-bold text-base tracking-tight leading-none">JurisBoard</h1>
-                <p className="text-[10px] text-sidebar-foreground/60 mt-0.5 tracking-wide uppercase">
-                  Premium Edition
+                <h1 className="font-bold text-base tracking-tight leading-none font-mono-tech">
+                  JURIS<span className="text-gradient-accent">BOARD</span>
+                </h1>
+                <p className="text-[9px] text-sidebar-foreground/50 mt-1 tracking-[0.25em] uppercase font-mono-tech">
+                  v2.0 · TECH CONSOLE
                 </p>
               </div>
             </div>
