@@ -5,9 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * JurisBoard — Tech Dashboard Theme
- * Dark base + cyan/violet neon accents, grid patterns and glow effects.
- * All colors use oklch.
+ * JurisBoard — Clean Dashboard Theme
+ * Inspirado no AssJur Flow (sidebar navy + área branca) com acento verde-lima.
+ * Paleta clara, profissional, focada em legibilidade.
  */
 
 @theme inline {
@@ -54,88 +54,88 @@
 }
 
 :root {
-  --radius: 0.75rem;
+  --radius: 1rem;
 
-  /* === TECH DASHBOARD — DARK BASE === */
-  --background: oklch(0.16 0.02 260);            /* deep space navy */
-  --foreground: oklch(0.96 0.01 240);
-  --card: oklch(0.21 0.025 260);                 /* panel surface */
-  --card-foreground: oklch(0.96 0.01 240);
-  --popover: oklch(0.22 0.03 260);
-  --popover-foreground: oklch(0.96 0.01 240);
+  /* === SUPERFÍCIES CLARAS === */
+  --background: oklch(0.97 0.005 150);              /* off-white levemente esverdeado */
+  --foreground: oklch(0.22 0.03 255);               /* navy escuro p/ texto */
+  --card: oklch(1 0 0);                              /* branco puro */
+  --card-foreground: oklch(0.22 0.03 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.03 255);
 
-  /* primary = cyan neon */
-  --primary: oklch(0.78 0.16 220);
-  --primary-foreground: oklch(0.14 0.03 260);
-  --primary-glow: oklch(0.82 0.18 215);
+  /* primary = navy escuro (sidebar/header) */
+  --primary: oklch(0.22 0.05 258);
+  --primary-foreground: oklch(0.98 0.01 150);
+  --primary-glow: oklch(0.32 0.07 258);
 
-  --secondary: oklch(0.27 0.03 260);
-  --secondary-foreground: oklch(0.96 0.01 240);
+  /* accent = verde-lima vibrante (CTA / destaques) */
+  --accent: oklch(0.88 0.18 130);
+  --accent-foreground: oklch(0.18 0.04 258);
+  --accent-glow: oklch(0.92 0.2 132);
 
-  --muted: oklch(0.24 0.025 260);
-  --muted-foreground: oklch(0.7 0.03 245);
+  --secondary: oklch(0.95 0.01 240);
+  --secondary-foreground: oklch(0.22 0.03 255);
 
-  /* accent = violet/magenta */
-  --accent: oklch(0.7 0.22 305);
-  --accent-foreground: oklch(0.99 0.005 240);
-  --accent-glow: oklch(0.78 0.24 310);
+  --muted: oklch(0.95 0.005 240);
+  --muted-foreground: oklch(0.5 0.02 255);
 
-  --destructive: oklch(0.68 0.24 22);
+  --destructive: oklch(0.62 0.22 25);
   --destructive-foreground: oklch(0.99 0.003 247);
 
-  --border: oklch(1 0 0 / 0.08);
-  --input: oklch(1 0 0 / 0.1);
-  --ring: oklch(0.78 0.16 220);
+  --border: oklch(0.92 0.005 240);
+  --input: oklch(0.94 0.005 240);
+  --ring: oklch(0.88 0.18 130);
 
-  /* Status de prazo — neon variants para fundo escuro */
-  --deadline-overdue: oklch(0.72 0.24 22);
-  --deadline-overdue-bg: oklch(0.72 0.24 22 / 0.14);
-  --deadline-today: oklch(0.82 0.2 60);
-  --deadline-today-bg: oklch(0.82 0.2 60 / 0.14);
-  --deadline-soon: oklch(0.85 0.18 95);
-  --deadline-soon-bg: oklch(0.85 0.18 95 / 0.14);
-  --deadline-safe: oklch(0.78 0.18 160);
-  --deadline-safe-bg: oklch(0.78 0.18 160 / 0.14);
+  /* Status de prazo (cores claras com bg suave) */
+  --deadline-overdue: oklch(0.58 0.22 25);
+  --deadline-overdue-bg: oklch(0.58 0.22 25 / 0.1);
+  --deadline-today: oklch(0.7 0.17 50);
+  --deadline-today-bg: oklch(0.7 0.17 50 / 0.12);
+  --deadline-soon: oklch(0.78 0.16 90);
+  --deadline-soon-bg: oklch(0.78 0.16 90 / 0.14);
+  --deadline-safe: oklch(0.6 0.15 155);
+  --deadline-safe-bg: oklch(0.6 0.15 155 / 0.12);
 
-  /* Sombras + glows neon */
-  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.04) inset, 0 8px 24px oklch(0 0 0 / 0.3);
-  --shadow-card-hover: 0 1px 0 oklch(1 0 0 / 0.08) inset, 0 12px 40px oklch(0 0 0 / 0.45), 0 0 0 1px oklch(0.78 0.16 220 / 0.2);
-  --shadow-glow: 0 0 32px oklch(0.78 0.16 220 / 0.45);
-  --shadow-glow-accent: 0 0 32px oklch(0.7 0.22 305 / 0.4);
-  --shadow-elegant: 0 20px 60px -20px oklch(0 0 0 / 0.6);
+  /* Tipos (chips DU/PA do AssJur) */
+  --tipo-du: oklch(0.6 0.16 230);                   /* azul */
+  --tipo-du-bg: oklch(0.6 0.16 230 / 0.12);
+  --tipo-pa: oklch(0.62 0.22 305);                  /* roxo */
+  --tipo-pa-bg: oklch(0.62 0.22 305 / 0.12);
 
-  /* Gradientes tech */
-  --gradient-primary: linear-gradient(135deg, oklch(0.78 0.16 220) 0%, oklch(0.7 0.22 305) 100%);
-  --gradient-header: linear-gradient(120deg, oklch(0.18 0.04 260) 0%, oklch(0.22 0.06 270) 60%, oklch(0.2 0.08 290) 100%);
-  --gradient-accent: linear-gradient(135deg, oklch(0.78 0.16 220), oklch(0.7 0.22 305));
-  --gradient-success: linear-gradient(135deg, oklch(0.78 0.18 160), oklch(0.78 0.16 200));
-  --gradient-mesh:
-    radial-gradient(at 12% 8%, oklch(0.78 0.16 220 / 0.18) 0px, transparent 45%),
-    radial-gradient(at 88% 92%, oklch(0.7 0.22 305 / 0.16) 0px, transparent 45%),
-    radial-gradient(at 50% 50%, oklch(0.6 0.2 270 / 0.06) 0px, transparent 50%);
+  /* Sombras suaves (estilo card moderno) */
+  --shadow-card: 0 1px 2px oklch(0.22 0.05 258 / 0.04), 0 4px 12px oklch(0.22 0.05 258 / 0.05);
+  --shadow-card-hover: 0 4px 8px oklch(0.22 0.05 258 / 0.06), 0 16px 32px oklch(0.22 0.05 258 / 0.1);
+  --shadow-glow: 0 0 0 4px oklch(0.88 0.18 130 / 0.25);
+  --shadow-elegant: 0 20px 50px -20px oklch(0.22 0.05 258 / 0.25);
+
+  /* Gradientes */
+  --gradient-primary: linear-gradient(135deg, oklch(0.22 0.05 258) 0%, oklch(0.32 0.08 265) 100%);
+  --gradient-accent: linear-gradient(135deg, oklch(0.88 0.18 130) 0%, oklch(0.82 0.2 145) 100%);
+  --gradient-sidebar: linear-gradient(180deg, oklch(0.22 0.05 258) 0%, oklch(0.18 0.05 265) 100%);
+  --gradient-success: linear-gradient(135deg, oklch(0.65 0.18 150), oklch(0.6 0.15 165));
 
   --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-bounce: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 
   /* Charts */
-  --chart-1: oklch(0.78 0.16 220);
-  --chart-2: oklch(0.7 0.22 305);
-  --chart-3: oklch(0.78 0.18 160);
-  --chart-4: oklch(0.82 0.2 60);
-  --chart-5: oklch(0.72 0.24 22);
+  --chart-1: oklch(0.88 0.18 130);                  /* lime */
+  --chart-2: oklch(0.6 0.16 230);                   /* blue */
+  --chart-3: oklch(0.62 0.22 305);                  /* purple */
+  --chart-4: oklch(0.7 0.17 50);                    /* orange */
+  --chart-5: oklch(0.6 0.15 155);                   /* green */
 
-  /* Sidebar — slightly darker than panels */
-  --sidebar: oklch(0.13 0.025 260);
-  --sidebar-foreground: oklch(0.95 0.01 240);
-  --sidebar-primary: oklch(0.78 0.16 220);
-  --sidebar-primary-foreground: oklch(0.14 0.03 260);
-  --sidebar-accent: oklch(0.22 0.04 265);
+  /* Sidebar (navy escuro como AssJur) */
+  --sidebar: oklch(0.22 0.05 258);
+  --sidebar-foreground: oklch(0.97 0.01 150);
+  --sidebar-primary: oklch(0.88 0.18 130);          /* lime CTA */
+  --sidebar-primary-foreground: oklch(0.18 0.04 258);
+  --sidebar-accent: oklch(0.3 0.06 260);
   --sidebar-accent-foreground: oklch(0.98 0.005 240);
-  --sidebar-border: oklch(1 0 0 / 0.06);
-  --sidebar-ring: oklch(0.78 0.16 220);
+  --sidebar-border: oklch(1 0 0 / 0.08);
+  --sidebar-ring: oklch(0.88 0.18 130);
 }
 
-/* Dark = same as root (tech theme is inherently dark) */
 .dark {
   --background: oklch(0.16 0.02 260);
   --foreground: oklch(0.96 0.01 240);
@@ -156,14 +156,11 @@
 }
 
 @layer utilities {
-  .bg-mesh {
-    background-image: var(--gradient-mesh);
-  }
   .bg-gradient-primary {
     background-image: var(--gradient-primary);
   }
-  .bg-gradient-header {
-    background-image: var(--gradient-header);
+  .bg-gradient-sidebar {
+    background-image: var(--gradient-sidebar);
   }
   .bg-gradient-accent {
     background-image: var(--gradient-accent);
@@ -189,68 +186,30 @@
   .shadow-glow {
     box-shadow: var(--shadow-glow);
   }
-  .shadow-glow-accent {
-    box-shadow: var(--shadow-glow-accent);
+  .shadow-card {
+    box-shadow: var(--shadow-card);
   }
-  .glass {
-    background-color: oklch(0.21 0.025 260 / 0.7);
-    backdrop-filter: blur(14px) saturate(160%);
-    -webkit-backdrop-filter: blur(14px) saturate(160%);
-    border: 1px solid oklch(1 0 0 / 0.06);
-  }
-  .pattern-grid {
-    background-image:
-      linear-gradient(oklch(1 0 0 / 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, oklch(1 0 0 / 0.04) 1px, transparent 1px);
-    background-size: 32px 32px;
-  }
-  .pattern-grid-sm {
-    background-image:
-      linear-gradient(oklch(1 0 0 / 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, oklch(1 0 0 / 0.03) 1px, transparent 1px);
-    background-size: 16px 16px;
-  }
-  .pattern-dots {
-    background-image: radial-gradient(oklch(1 0 0 / 0.07) 1px, transparent 1px);
-    background-size: 16px 16px;
-  }
-  .neon-border {
-    box-shadow:
-      inset 0 0 0 1px oklch(0.78 0.16 220 / 0.4),
-      0 0 20px oklch(0.78 0.16 220 / 0.25);
-  }
-  .scanline::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-      180deg,
-      transparent 0%,
-      oklch(0.78 0.16 220 / 0.04) 50%,
-      transparent 100%
-    );
-    background-size: 100% 4px;
-    pointer-events: none;
-    mix-blend-mode: overlay;
+  .shadow-card-hover {
+    box-shadow: var(--shadow-card-hover);
   }
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: oklch(0.78 0.16 220 / 0.3) transparent;
+    scrollbar-color: oklch(0.22 0.05 258 / 0.2) transparent;
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: oklch(0.78 0.16 220 / 0.3);
+    background-color: oklch(0.22 0.05 258 / 0.2);
     border-radius: 3px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: oklch(0.78 0.16 220 / 0.5);
+    background-color: oklch(0.22 0.05 258 / 0.4);
   }
-  .font-mono-tech {
-    font-family: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-feature-settings: "calt" 1, "ss01" 1;
+  .font-display {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -263,12 +222,8 @@
   50% { opacity: 0.55; }
 }
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 oklch(0.72 0.24 22 / 0.6); }
-  50% { box-shadow: 0 0 0 8px oklch(0.72 0.24 22 / 0); }
-}
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0%, 100% { box-shadow: 0 0 0 0 oklch(0.58 0.22 25 / 0.5); }
+  50% { box-shadow: 0 0 0 8px oklch(0.58 0.22 25 / 0); }
 }
 .animate-fade-in-up {
   animation: fade-in-up 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
@@ -278,9 +233,4 @@
 }
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
-}
-.animate-shimmer {
-  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.06), transparent);
-  background-size: 200% 100%;
-  animation: shimmer 2.5s linear infinite;
 }

@@ -145,7 +145,7 @@ export function ProcessoDialog({ open, onOpenChange, processo, defaultStatus, on
               <Label htmlFor="numero">Número do processo *</Label>
               <Input
                 id="numero"
-                className="font-mono-tech"
+                className="font-mono"
                 value={form.numero}
                 onChange={(e) => setForm({ ...form, numero: e.target.value })}
                 placeholder="0000000-00.0000.0.00.0000"

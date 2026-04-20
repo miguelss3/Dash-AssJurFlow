@@ -46,11 +46,11 @@ interface ColunaProps {
 }
 
 const COLUNA_COLORS: Record<StatusProcesso, string> = {
-  novo: "oklch(0.78 0.16 220)",
-  andamento: "oklch(0.7 0.22 305)",
-  audiencia: "oklch(0.82 0.2 60)",
-  recurso: "oklch(0.72 0.24 22)",
-  concluido: "oklch(0.78 0.18 160)",
+  novo: "oklch(0.6 0.16 230)",
+  andamento: "oklch(0.62 0.22 305)",
+  audiencia: "oklch(0.7 0.17 50)",
+  recurso: "oklch(0.58 0.22 25)",
+  concluido: "oklch(0.6 0.15 155)",
 };
 
 function Coluna({
@@ -71,47 +71,34 @@ function Coluna({
   return (
     <div
       style={{ animationDelay: `${index * 80}ms` }}
-      className={`shrink-0 w-[88vw] sm:w-80 snap-start flex flex-col rounded-xl border bg-card/40 backdrop-blur transition-all animate-fade-in-up overflow-hidden ${
+      className={`shrink-0 w-[88vw] sm:w-80 snap-start flex flex-col rounded-3xl border bg-card transition-all animate-fade-in-up overflow-hidden shadow-card ${
         isOver
-          ? "border-primary/60 ring-2 ring-primary/30 shadow-glow"
+          ? "border-accent ring-2 ring-accent/50 shadow-card-hover"
           : "border-border"
       }`}
     >
-      {/* top accent bar */}
-      <div
-        className="h-0.5 w-full"
-        style={{ background: `linear-gradient(90deg, ${color}, transparent)` }}
-      />
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-card/60">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2.5 min-w-0">
           <span
-            className="h-2 w-2 rounded-full shrink-0"
-            style={{
-              backgroundColor: color,
-              boxShadow: `0 0 8px ${color}`,
-            }}
+            className="h-2.5 w-2.5 rounded-full shrink-0"
+            style={{ backgroundColor: color }}
           />
           <div className="min-w-0">
-            <h2 className="font-semibold text-[13px] text-foreground tracking-tight uppercase font-mono-tech leading-none">
+            <h2 className="font-bold text-sm text-foreground tracking-tight leading-none">
               {titulo}
             </h2>
-            <p className="text-[9px] text-muted-foreground/70 mt-0.5 truncate">{descricao}</p>
+            <p className="text-[10px] text-muted-foreground mt-1 truncate">{descricao}</p>
           </div>
           <span
-            className="ml-1 inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 rounded-md text-[10px] font-bold font-mono-tech tabular-nums"
-            style={{
-              color,
-              backgroundColor: `color-mix(in oklab, ${color} 15%, transparent)`,
-              border: `1px solid color-mix(in oklab, ${color} 35%, transparent)`,
-            }}
+            className="ml-1 inline-flex items-center justify-center min-w-[1.5rem] h-6 px-2 rounded-full text-[11px] font-bold tabular-nums bg-muted text-foreground"
           >
-            {String(itens.length).padStart(2, "0")}
+            {itens.length}
           </span>
         </div>
         <Button
           size="icon"
           variant="ghost"
-          className="h-7 w-7 shrink-0 hover:bg-primary/10 hover:text-primary"
+          className="h-8 w-8 shrink-0 rounded-full hover:bg-accent hover:text-accent-foreground"
           onClick={() => onAdd(status)}
           aria-label={`Adicionar em ${titulo}`}
         >
@@ -121,8 +108,8 @@ function Coluna({
 
       <div
         ref={setNodeRef}
-        className={`flex-1 p-2 space-y-2 min-h-[140px] max-h-[calc(100vh-22rem)] overflow-y-auto scrollbar-thin transition-colors ${
-          isOver ? "bg-primary/5" : ""
+        className={`flex-1 p-3 space-y-2.5 min-h-[140px] max-h-[calc(100vh-22rem)] overflow-y-auto scrollbar-thin transition-colors ${
+          isOver ? "bg-accent/10" : ""
         }`}
       >
         <SortableContext
@@ -132,13 +119,13 @@ function Coluna({
           {itens.length === 0 ? (
             <button
               onClick={() => onAdd(status)}
-              className={`w-full rounded-lg border-2 border-dashed py-8 text-xs transition-colors font-mono-tech uppercase tracking-wider ${
+              className={`w-full rounded-2xl border-2 border-dashed py-10 text-xs font-semibold transition-colors ${
                 isOver
-                  ? "border-primary text-primary bg-primary/5"
-                  : "border-border/50 text-muted-foreground/60 hover:border-primary/40 hover:text-primary"
+                  ? "border-accent text-accent-foreground bg-accent/10"
+                  : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
               }`}
             >
-              {isOver ? "▼ soltar aqui" : "+ adicionar"}
+              {isOver ? "Soltar aqui" : "+ Adicionar processo"}
             </button>
           ) : (
             itens.map((p) => (

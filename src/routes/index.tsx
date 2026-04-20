@@ -11,6 +11,9 @@ import {
   X,
   Settings,
   HelpCircle,
+  Calendar,
+  History,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,17 +28,17 @@ import { statusPrazo } from "@/lib/prazo";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "JurisBoard — Controle de Processos Jurídicos" },
+      { title: "JurisBoard — Painel de Controle Jurídico" },
       {
         name: "description",
         content:
-          "Plataforma premium para escritórios de advocacia: Kanban de processos, alertas de prazo e dashboard de resultados em tempo real.",
+          "Mesa de trabalho e acompanhamento de processos jurídicos com Kanban, alertas de prazo e dashboard de resultados.",
       },
-      { property: "og:title", content: "JurisBoard — Controle de Processos Jurídicos" },
+      { property: "og:title", content: "JurisBoard — Painel de Controle Jurídico" },
       {
         property: "og:description",
         content:
-          "Quadro Kanban para advogados com prazos coloridos, estatísticas e gráficos de performance do escritório.",
+          "Quadro Kanban para advogados com prazos coloridos, estatísticas e gráficos de performance.",
       },
     ],
   }),
@@ -43,6 +46,7 @@ export const Route = createFileRoute("/")({
 });
 
 type Aba = "quadro" | "estatisticas";
+type FiltroTipo = "todos" | "DU" | "PA";
 
 function Index() {
   const { processos, criar, atualizar, remover, moverStatus } = useProcessos();
@@ -50,12 +54,14 @@ function Index() {
   const [editing, setEditing] = useState<Processo | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<StatusProcesso>("novo");
   const [filtro, setFiltro] = useState<FiltroPrazo>("todos");
+  const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>("todos");
   const [busca, setBusca] = useState("");
   const [aba, setAba] = useState<Aba>("quadro");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const filtrados = useMemo(() => {
     return processos.filter((p) => {
+      if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
       if (busca.trim()) {
         const q = busca.toLowerCase();
         const hit =
@@ -74,7 +80,7 @@ function Index() {
       if (filtro === "semana") return s === "today" || s === "soon";
       return true;
     });
-  }, [processos, filtro, busca]);
+  }, [processos, filtro, busca, filtroTipo]);
 
   const ativosCount = processos.filter((p) => p.status !== "concluido").length;
   const vencidosCount = processos.filter(
@@ -97,35 +103,43 @@ function Index() {
     else criar(dados);
   };
 
-  const navItems: { id: Aba; label: string; icon: typeof LayoutGrid; badge?: number }[] = [
-    { id: "quadro", label: "Quadro Kanban", icon: LayoutGrid, badge: ativosCount },
-    { id: "estatisticas", label: "Estatísticas", icon: BarChart3 },
+  const navMain: { id: Aba; label: string; icon: typeof LayoutGrid; badge?: number }[] = [
+    { id: "quadro", label: "Painel de Controle", icon: LayoutGrid, badge: ativosCount },
+    { id: "estatisticas", label: "Indicadores", icon: BarChart3 },
+  ];
+
+  const navSec: { label: string; icon: typeof LayoutGrid }[] = [
+    { label: "Controle de Prazos", icon: Calendar },
+    { label: "Processos Antigos", icon: History },
+  ];
+
+  const subAbas: { id: FiltroTipo; label: string }[] = [
+    { id: "todos", label: "Visão do setor" },
+    { id: "DU", label: "DU" },
+    { id: "PA", label: "PA" },
   ];
 
   return (
-    <div className="min-h-screen bg-background bg-mesh">
+    <div className="min-h-screen bg-background">
       {/* ===================== SIDEBAR ===================== */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border transform transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-sidebar text-sidebar-foreground transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } pattern-grid`}
+        }`}
       >
         <div className="relative flex flex-col h-full">
           {/* Logo */}
-          <div className="px-5 py-5 border-b border-sidebar-border flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-accent blur-md opacity-70" />
-                <div className="relative h-10 w-10 rounded-xl bg-gradient-accent flex items-center justify-center shadow-glow">
-                  <Scale className="h-5 w-5 text-primary-foreground" />
-                </div>
+          <div className="px-6 py-7 flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-2xl bg-sidebar-primary flex items-center justify-center shadow-lg shrink-0">
+                <Scale className="h-6 w-6 text-sidebar-primary-foreground" />
               </div>
               <div>
-                <h1 className="font-bold text-base tracking-tight leading-none font-mono-tech">
-                  JURIS<span className="text-gradient-accent">BOARD</span>
+                <h1 className="font-bold text-xl tracking-tight leading-none font-display">
+                  JurisBoard
                 </h1>
-                <p className="text-[9px] text-sidebar-foreground/50 mt-1 tracking-[0.25em] uppercase font-mono-tech">
-                  v2.0 · TECH CONSOLE
+                <p className="text-[10px] text-sidebar-foreground/50 mt-1.5 tracking-[0.2em] uppercase font-semibold">
+                  Painel Jurídico
                 </p>
               </div>
             </div>
@@ -140,11 +154,8 @@ function Index() {
           </div>
 
           {/* Nav */}
-          <nav className="flex-1 px-3 py-4 space-y-1">
-            <p className="px-3 pb-2 text-[10px] uppercase tracking-wider text-sidebar-foreground/50 font-semibold">
-              Workspace
-            </p>
-            {navItems.map((item) => {
+          <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto scrollbar-thin">
+            {navMain.map((item) => {
               const Icon = item.icon;
               const active = aba === item.id;
               return (
@@ -154,17 +165,22 @@ function Index() {
                     setAba(item.id);
                     setSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-[var(--transition-smooth)] group relative ${
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm transition-[var(--transition-smooth)] ${
                     active
-                      ? "bg-gradient-to-r from-sidebar-accent to-sidebar-accent/40 text-sidebar-primary-foreground shadow-sm"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground font-bold shadow-lg"
+                      : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                   }`}
                 >
-                  {active && <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-sidebar-primary" />}
-                  <Icon className={`h-4 w-4 ${active ? "text-sidebar-primary" : ""}`} />
-                  <span className="flex-1 text-left font-medium">{item.label}</span>
+                  <Icon className="h-5 w-5 shrink-0" />
+                  <span className="flex-1 text-left">{item.label}</span>
                   {item.badge !== undefined && item.badge > 0 && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "bg-sidebar-accent text-sidebar-foreground"}`}>
+                    <span
+                      className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                        active
+                          ? "bg-sidebar-primary-foreground/15 text-sidebar-primary-foreground"
+                          : "bg-sidebar-accent text-sidebar-foreground"
+                      }`}
+                    >
                       {item.badge}
                     </span>
                   )}
@@ -172,45 +188,54 @@ function Index() {
               );
             })}
 
-            <p className="px-3 pt-6 pb-2 text-[10px] uppercase tracking-wider text-sidebar-foreground/50 font-semibold">
-              Geral
-            </p>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors">
-              <Settings className="h-4 w-4" />
-              <span className="font-medium">Configurações</span>
-            </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground transition-colors">
-              <HelpCircle className="h-4 w-4" />
-              <span className="font-medium">Ajuda</span>
-            </button>
+            {navSec.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.label}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                >
+                  <Icon className="h-5 w-5 shrink-0" />
+                  <span className="flex-1 text-left">{item.label}</span>
+                </button>
+              );
+            })}
+
+            <div className="pt-6 mt-2 border-t border-sidebar-border space-y-1.5">
+              <button className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+                <Settings className="h-4.5 w-4.5" />
+                <span>Configurações</span>
+              </button>
+              <button className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
+                <HelpCircle className="h-4.5 w-4.5" />
+                <span>Ajuda</span>
+              </button>
+            </div>
           </nav>
 
-          {/* Footer card */}
-          <div className="p-3 border-t border-sidebar-border">
-            <div className="rounded-xl bg-gradient-to-br from-sidebar-accent to-sidebar-accent/30 p-4 border border-sidebar-border relative overflow-hidden">
-              <div className="absolute inset-0 pattern-grid-sm opacity-40 pointer-events-none" />
-              <div className="relative">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.78_0.18_160)] shadow-[0_0_6px_oklch(0.78_0.18_160)] animate-pulse" />
-                  <p className="text-[10px] font-mono-tech uppercase tracking-wider text-sidebar-foreground/70">
-                    Sistema online
-                  </p>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold font-mono-tech text-sidebar-primary">
-                    {String(ativosCount).padStart(2, "0")}
-                  </span>
-                  <span className="text-[10px] text-sidebar-foreground/60 uppercase tracking-wider">
-                    ativos
-                  </span>
-                </div>
-                {vencidosCount > 0 && (
-                  <p className="mt-1 text-[10px] font-mono-tech text-[oklch(0.72_0.24_22)] flex items-center gap-1">
-                    <span className="h-1 w-1 rounded-full bg-[oklch(0.72_0.24_22)] animate-pulse" />
-                    {vencidosCount} vencido{vencidosCount > 1 ? "s" : ""}
-                  </p>
-                )}
+          {/* Footer status */}
+          <div className="p-4">
+            <div className="rounded-2xl bg-sidebar-accent p-4 border border-sidebar-border">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="h-2 w-2 rounded-full bg-sidebar-primary animate-pulse" />
+                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/70 font-bold">
+                  Sistema online
+                </p>
               </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-bold text-sidebar-primary font-display">
+                  {String(ativosCount).padStart(2, "0")}
+                </span>
+                <span className="text-[11px] text-sidebar-foreground/60 uppercase tracking-wider">
+                  ativos
+                </span>
+              </div>
+              {vencidosCount > 0 && (
+                <p className="mt-1.5 text-[11px] text-[oklch(0.78_0.16_50)] flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.78_0.16_50)] animate-pulse" />
+                  {vencidosCount} vencido{vencidosCount > 1 ? "s" : ""}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -225,91 +250,126 @@ function Index() {
       )}
 
       {/* ===================== MAIN ===================== */}
-      <div className="lg:pl-64">
-        {/* Header */}
-        <header className="sticky top-0 z-30 border-b border-border bg-gradient-header text-primary-foreground shadow-elegant">
-          <div className="absolute inset-0 pattern-grid opacity-50 pointer-events-none" />
-          <div className="relative px-4 sm:px-6 lg:px-8 py-4 flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden h-9 w-9 text-primary-foreground hover:bg-white/10"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
+      <div className="lg:pl-72">
+        {/* Header card branco — estilo AssJur */}
+        <header className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
+          <div className="bg-card rounded-3xl shadow-card border border-border p-4 sm:p-6">
+            <div className="flex items-start sm:items-center gap-3 flex-wrap">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden h-9 w-9 shrink-0"
+                onClick={() => setSidebarOpen(true)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
 
-            <div className="hidden sm:block">
-              <h2 className="font-bold text-lg sm:text-xl tracking-tight leading-none font-mono-tech">
-                {aba === "quadro" ? "// CONTROLE DE PROCESSOS" : "// ANALYTICS DASHBOARD"}
-              </h2>
-              <p className="text-[10px] text-primary-foreground/60 mt-1.5 font-mono-tech tracking-wider uppercase flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.78_0.18_160)] shadow-[0_0_6px_oklch(0.78_0.18_160)] animate-pulse" />
-                {aba === "quadro" ? "monitorando em tempo real" : "performance & metrics"}
-              </p>
-            </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-bold text-2xl sm:text-3xl tracking-tight leading-tight font-display text-foreground">
+                  {aba === "quadro" ? "Painel de Controle" : "Indicadores de Gestão"}
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1 hidden sm:block">
+                  {aba === "quadro"
+                    ? "Mesa de trabalho e acompanhamento dos processos em andamento"
+                    : "Análise de performance e métricas do setor"}
+                </p>
+              </div>
 
-            {/* Busca */}
-            <div className="flex-1 max-w-md ml-auto sm:ml-6">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-primary-foreground/60" />
-                <Input
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  placeholder="$ buscar processo, parte..."
-                  className="pl-9 h-10 bg-white/5 border-white/15 text-primary-foreground placeholder:text-primary-foreground/40 placeholder:font-mono-tech focus-visible:bg-white/10 focus-visible:ring-primary/50 font-mono-tech text-xs"
-                />
+              {/* Ações */}
+              <div className="flex items-center gap-2 ml-auto shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="relative h-11 w-11 rounded-full bg-muted hover:bg-secondary"
+                >
+                  <Bell className="h-4.5 w-4.5 text-foreground" />
+                  {vencidosCount > 0 && (
+                    <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-card animate-pulse-soft" />
+                  )}
+                </Button>
+
+                <Button
+                  onClick={() => handleAdd("novo")}
+                  className="h-11 rounded-full bg-primary text-primary-foreground hover:bg-primary-glow font-semibold px-5 shadow-md"
+                >
+                  <Plus className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Novo Processo</span>
+                </Button>
               </div>
             </div>
-
-            {/* Notificações + CTA */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="relative h-10 w-10 text-primary-foreground hover:bg-white/10 shrink-0"
-            >
-              <Bell className="h-4.5 w-4.5" />
-              {vencidosCount > 0 && (
-                <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[oklch(0.78_0.18_50)] ring-2 ring-[oklch(0.2_0.06_258)] animate-pulse-soft" />
-              )}
-            </Button>
-
-            <Button
-              onClick={() => handleAdd("novo")}
-              className="bg-gradient-accent text-accent-foreground hover:shadow-glow hover:scale-[1.02] active:scale-100 transition-all font-semibold shrink-0 shadow-md"
-            >
-              <Plus className="h-4 w-4 sm:mr-1.5" />
-              <span className="hidden sm:inline">Novo processo</span>
-            </Button>
-          </div>
-
-          {/* Tabs (mobile) */}
-          <div className="relative flex sm:hidden border-t border-white/10 px-4">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = aba === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => setAba(item.id)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium border-b-2 transition-colors ${
-                    active
-                      ? "border-accent text-primary-foreground"
-                      : "border-transparent text-primary-foreground/60"
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  {item.label.split(" ")[0]}
-                </button>
-              );
-            })}
           </div>
         </header>
 
         {/* Content */}
-        <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-[1600px] mx-auto">
+        <main className="px-4 sm:px-6 lg:px-8 py-5 space-y-5 max-w-[1600px] mx-auto">
           {aba === "quadro" ? (
             <>
+              {/* Sub-abas DU/PA + busca (estilo AssJur) */}
+              <div className="bg-card rounded-3xl shadow-card border border-border p-4 sm:p-5 space-y-4">
+                {/* Tabs DU/PA */}
+                <div className="flex gap-2 overflow-x-auto scrollbar-thin">
+                  {subAbas.map((s) => {
+                    const active = filtroTipo === s.id;
+                    const isDU = s.id === "DU";
+                    const isPA = s.id === "PA";
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => setFiltroTipo(s.id)}
+                        className={`shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
+                          active
+                            ? s.id === "todos"
+                              ? "bg-card text-foreground shadow-card border border-border"
+                              : isDU
+                                ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border border-[var(--tipo-du)]/30"
+                                : "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border border-[var(--tipo-pa)]/30"
+                            : "text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Busca + chips */}
+                <div className="flex gap-2 items-center">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={busca}
+                      onChange={(e) => setBusca(e.target.value)}
+                      placeholder="Buscar processo, parte, assunto..."
+                      className="pl-11 h-12 rounded-full bg-muted border-transparent focus-visible:bg-card focus-visible:border-border focus-visible:ring-accent text-sm"
+                    />
+                  </div>
+                  <div className="hidden sm:flex gap-1.5 shrink-0">
+                    {(["todos", "DU", "PA"] as FiltroTipo[]).map((t) => {
+                      const active = filtroTipo === t;
+                      const isDU = t === "DU";
+                      const isPA = t === "PA";
+                      return (
+                        <button
+                          key={t}
+                          onClick={() => setFiltroTipo(t)}
+                          className={`px-4 h-12 rounded-full text-sm font-bold transition-all border ${
+                            active
+                              ? t === "todos"
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : isDU
+                                  ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border-[var(--tipo-du)]/30"
+                                  : "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border-[var(--tipo-pa)]/30"
+                              : "bg-card text-muted-foreground border-border hover:border-foreground/30"
+                          }`}
+                        >
+                          {t === "todos" ? "Todos" : t}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
               <Dashboard
                 processos={processos}
                 filtro={filtro}
@@ -318,14 +378,14 @@ function Index() {
 
               {filtro !== "todos" && (
                 <div className="flex items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">Filtro ativo:</span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium border border-primary/20">
+                  <span className="text-muted-foreground">Filtro de prazo:</span>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent/30 text-accent-foreground font-bold border border-accent">
                     {filtro === "vencidos" && "Vencidos"}
                     {filtro === "hoje" && "Vencem hoje"}
                     {filtro === "semana" && "Próximos 7 dias"}
                     <button
                       onClick={() => setFiltro("todos")}
-                      className="hover:bg-primary/20 rounded-full p-0.5 -mr-1"
+                      className="hover:bg-foreground/10 rounded-full p-0.5 -mr-1"
                       aria-label="Limpar filtro"
                     >
                       <X className="h-3 w-3" />
