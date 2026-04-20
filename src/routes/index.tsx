@@ -10,16 +10,19 @@ import {
   Menu,
   X,
   Settings,
-  HelpCircle,
+  LogOut,
   Calendar,
   History,
-  ChevronDown,
+  FolderArchive,
+  Users,
+  ListFilter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProcessos } from "@/hooks/useProcessos";
 import { Dashboard } from "@/components/Dashboard";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { ProcessoDialog } from "@/components/ProcessoDialog";
 import { Estatisticas } from "@/components/Estatisticas";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
@@ -28,25 +31,26 @@ import { statusPrazo } from "@/lib/prazo";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "JurisBoard — Painel de Controle Jurídico" },
+      { title: "AssJur Flow — 12ª Região Militar" },
       {
         name: "description",
         content:
-          "Mesa de trabalho e acompanhamento de processos jurídicos com Kanban, alertas de prazo e dashboard de resultados.",
+          "Sistema de Assessoria Jurídica da 12ª Região Militar — gestão de DU, PA, prazos e indicadores.",
       },
-      { property: "og:title", content: "JurisBoard — Painel de Controle Jurídico" },
+      { property: "og:title", content: "AssJur Flow — 12ª Região Militar" },
       {
         property: "og:description",
         content:
-          "Quadro Kanban para advogados com prazos coloridos, estatísticas e gráficos de performance.",
+          "Mesa de trabalho jurídica com Kanban por assessor, controle de prazos e indicadores de gestão.",
       },
     ],
   }),
   component: Index,
 });
 
-type Aba = "quadro" | "estatisticas";
+type Aba = "mesa" | "consulta" | "arquivo" | "indicadores" | "equipe";
 type FiltroTipo = "todos" | "DU" | "PA";
+type Visao = "minha" | "setor";
 
 function Index() {
   const { processos, criar, atualizar, remover, moverStatus } = useProcessos();
@@ -56,12 +60,20 @@ function Index() {
   const [filtro, setFiltro] = useState<FiltroPrazo>("todos");
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>("todos");
   const [busca, setBusca] = useState("");
-  const [aba, setAba] = useState<Aba>("quadro");
+  const [aba, setAba] = useState<Aba>("mesa");
+  const [visao, setVisao] = useState<Visao>("setor");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Usuário logado (mock)
+  const usuario = { posto: "Maj", nome: "Miguel", role: "MAJ - ADMIN UNIVERSAL" };
 
   const filtrados = useMemo(() => {
     return processos.filter((p) => {
       if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
+      if (visao === "minha" && p.responsavel !== `${usuario.posto} ${usuario.nome}`) {
+        // "Minha mesa" - mock: só mostra os do próprio usuário
+        return false;
+      }
       if (busca.trim()) {
         const q = busca.toLowerCase();
         const hit =
@@ -80,11 +92,15 @@ function Index() {
       if (filtro === "semana") return s === "today" || s === "soon";
       return true;
     });
-  }, [processos, filtro, busca, filtroTipo]);
+  }, [processos, filtro, busca, filtroTipo, visao, usuario.posto, usuario.nome]);
 
   const ativosCount = processos.filter((p) => p.status !== "concluido").length;
   const vencidosCount = processos.filter(
     (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
+  ).length;
+  const minhaMesaCount = processos.filter(
+    (p) =>
+      p.responsavel === `${usuario.posto} ${usuario.nome}` && p.status !== "concluido",
   ).length;
 
   const handleEdit = (p: Processo) => {
@@ -103,9 +119,9 @@ function Index() {
     else criar(dados);
   };
 
+  // Sidebar nav
   const navMain: { id: Aba; label: string; icon: typeof LayoutGrid; badge?: number }[] = [
-    { id: "quadro", label: "Painel de Controle", icon: LayoutGrid, badge: ativosCount },
-    { id: "estatisticas", label: "Indicadores", icon: BarChart3 },
+    { id: "mesa", label: "Painel de Controle", icon: LayoutGrid, badge: ativosCount },
   ];
 
   const navSec: { label: string; icon: typeof LayoutGrid }[] = [
@@ -113,33 +129,36 @@ function Index() {
     { label: "Processos Antigos", icon: History },
   ];
 
-  const subAbas: { id: FiltroTipo; label: string }[] = [
-    { id: "todos", label: "Visão do setor" },
-    { id: "DU", label: "DU" },
-    { id: "PA", label: "PA" },
+  // Tabs principais (estilo AssJur)
+  const tabs: { id: Aba; label: string }[] = [
+    { id: "mesa", label: "Mesa de Trabalho" },
+    { id: "consulta", label: "Consulta Geral" },
+    { id: "arquivo", label: "Arquivo / Encerrados" },
+    { id: "indicadores", label: "Indicadores de Gestão" },
+    { id: "equipe", label: "Gestão da Equipe" },
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      {/* ===================== SIDEBAR ===================== */}
+      {/* ===================== SIDEBAR (estilo AssJur Flow) ===================== */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-gradient-sidebar text-sidebar-foreground transform transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-sidebar text-sidebar-foreground transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="relative flex flex-col h-full">
-          {/* Logo */}
-          <div className="px-6 py-7 flex items-start justify-between">
+          {/* Logo AssJur Flow */}
+          <div className="px-5 py-6 flex items-start justify-between border-b border-sidebar-border">
             <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-2xl bg-sidebar-primary flex items-center justify-center shadow-lg shrink-0">
-                <Scale className="h-6 w-6 text-sidebar-primary-foreground" />
+              <div className="h-10 w-10 rounded-xl bg-[oklch(0.6_0.16_230)] flex items-center justify-center shadow-lg shrink-0">
+                <Scale className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="font-bold text-xl tracking-tight leading-none font-display">
-                  JurisBoard
+                <h1 className="font-bold text-lg tracking-tight leading-none font-display text-white">
+                  AssJur Flow
                 </h1>
-                <p className="text-[10px] text-sidebar-foreground/50 mt-1.5 tracking-[0.2em] uppercase font-semibold">
-                  Painel Jurídico
+                <p className="text-[9px] text-[oklch(0.78_0.18_145)] mt-1 tracking-[0.2em] uppercase font-bold">
+                  12ª Região Militar
                 </p>
               </div>
             </div>
@@ -154,10 +173,10 @@ function Index() {
           </div>
 
           {/* Nav */}
-          <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto scrollbar-thin">
+          <nav className="flex-1 px-3 pt-4 space-y-1 overflow-y-auto scrollbar-thin">
             {navMain.map((item) => {
               const Icon = item.icon;
-              const active = aba === item.id;
+              const active = aba === "mesa";
               return (
                 <button
                   key={item.id}
@@ -165,19 +184,19 @@ function Index() {
                     setAba(item.id);
                     setSidebarOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm transition-[var(--transition-smooth)] ${
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-[var(--transition-smooth)] ${
                     active
-                      ? "bg-sidebar-primary text-sidebar-primary-foreground font-bold shadow-lg"
+                      ? "bg-[oklch(0.6_0.16_230)] text-white font-bold shadow-lg"
                       : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                   }`}
                 >
-                  <Icon className="h-5 w-5 shrink-0" />
+                  <Icon className="h-4.5 w-4.5 shrink-0" />
                   <span className="flex-1 text-left">{item.label}</span>
                   {item.badge !== undefined && item.badge > 0 && (
                     <span
-                      className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                      className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
                         active
-                          ? "bg-sidebar-primary-foreground/15 text-sidebar-primary-foreground"
+                          ? "bg-white/20 text-white"
                           : "bg-sidebar-accent text-sidebar-foreground"
                       }`}
                     >
@@ -193,49 +212,37 @@ function Index() {
               return (
                 <button
                   key={item.label}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors"
                 >
-                  <Icon className="h-5 w-5 shrink-0" />
+                  <Icon className="h-4.5 w-4.5 shrink-0" />
                   <span className="flex-1 text-left">{item.label}</span>
                 </button>
               );
             })}
-
-            <div className="pt-6 mt-2 border-t border-sidebar-border space-y-1.5">
-              <button className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
-                <Settings className="h-4.5 w-4.5" />
-                <span>Configurações</span>
-              </button>
-              <button className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground transition-colors">
-                <HelpCircle className="h-4.5 w-4.5" />
-                <span>Ajuda</span>
-              </button>
-            </div>
           </nav>
 
-          {/* Footer status */}
-          <div className="p-4">
-            <div className="rounded-2xl bg-sidebar-accent p-4 border border-sidebar-border">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="h-2 w-2 rounded-full bg-sidebar-primary animate-pulse" />
-                <p className="text-[10px] uppercase tracking-wider text-sidebar-foreground/70 font-bold">
-                  Sistema online
+          {/* Footer com usuário (estilo AssJur) */}
+          <div className="border-t border-sidebar-border p-3">
+            <div className="flex items-center gap-3 px-2 py-2">
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[oklch(0.6_0.16_230)] to-[oklch(0.5_0.18_240)] flex items-center justify-center text-white font-bold text-sm shadow-md">
+                {usuario.nome[0]}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-white leading-tight truncate">
+                  {usuario.posto} {usuario.nome}
+                </p>
+                <p className="text-[9px] text-[oklch(0.78_0.18_145)] tracking-wider uppercase font-bold truncate">
+                  {usuario.role}
                 </p>
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-sidebar-primary font-display">
-                  {String(ativosCount).padStart(2, "0")}
-                </span>
-                <span className="text-[11px] text-sidebar-foreground/60 uppercase tracking-wider">
-                  ativos
-                </span>
+              <div className="flex flex-col gap-1">
+                <button className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-white transition-colors">
+                  <Settings className="h-3.5 w-3.5" />
+                </button>
+                <button className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-white transition-colors">
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
               </div>
-              {vencidosCount > 0 && (
-                <p className="mt-1.5 text-[11px] text-[oklch(0.78_0.16_50)] flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.78_0.16_50)] animate-pulse" />
-                  {vencidosCount} vencido{vencidosCount > 1 ? "s" : ""}
-                </p>
-              )}
             </div>
           </div>
         </div>
@@ -250,123 +257,172 @@ function Index() {
       )}
 
       {/* ===================== MAIN ===================== */}
-      <div className="lg:pl-72">
-        {/* Header card branco — estilo AssJur */}
-        <header className="px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-          <div className="bg-card rounded-3xl shadow-card border border-border p-4 sm:p-6">
-            <div className="flex items-start sm:items-center gap-3 flex-wrap">
+      <div className="lg:pl-64">
+        {/* Header */}
+        <header className="px-4 sm:px-6 lg:px-8 pt-5">
+          <div className="flex items-start sm:items-center gap-3 flex-wrap">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden h-9 w-9 shrink-0"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+
+            <div className="min-w-0 flex-1">
+              <h2 className="font-bold text-2xl sm:text-3xl tracking-tight leading-tight font-display text-foreground">
+                Painel de Controle
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Mesa de trabalho e acompanhamento dos processos em andamento
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 ml-auto shrink-0">
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden h-9 w-9 shrink-0"
-                onClick={() => setSidebarOpen(true)}
+                className="relative h-10 w-10 rounded-full bg-card border border-border hover:bg-muted"
               >
-                <Menu className="h-5 w-5" />
+                <Bell className="h-4 w-4 text-foreground" />
+                {vencidosCount > 0 && (
+                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive ring-2 ring-card animate-pulse-soft" />
+                )}
               </Button>
 
-              <div className="min-w-0 flex-1">
-                <h2 className="font-bold text-2xl sm:text-3xl tracking-tight leading-tight font-display text-foreground">
-                  {aba === "quadro" ? "Painel de Controle" : "Indicadores de Gestão"}
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1 hidden sm:block">
-                  {aba === "quadro"
-                    ? "Mesa de trabalho e acompanhamento dos processos em andamento"
-                    : "Análise de performance e métricas do setor"}
-                </p>
-              </div>
-
-              {/* Ações */}
-              <div className="flex items-center gap-2 ml-auto shrink-0">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative h-11 w-11 rounded-full bg-muted hover:bg-secondary"
-                >
-                  <Bell className="h-4.5 w-4.5 text-foreground" />
-                  {vencidosCount > 0 && (
-                    <span className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-destructive ring-2 ring-card animate-pulse-soft" />
-                  )}
-                </Button>
-
-                <Button
-                  onClick={() => handleAdd("novo")}
-                  className="h-11 rounded-full bg-primary text-primary-foreground hover:bg-primary-glow font-semibold px-5 shadow-md"
-                >
-                  <Plus className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Novo Processo</span>
-                </Button>
-              </div>
+              <Button
+                onClick={() => handleAdd("novo")}
+                className="h-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary-glow font-semibold px-4 shadow-md"
+              >
+                <Plus className="h-4 w-4 sm:mr-1.5" />
+                <span className="hidden sm:inline">Novo Processo</span>
+              </Button>
             </div>
           </div>
         </header>
 
+        {/* Tabs principais — estilo AssJur (underline laranja) */}
+        <div className="px-4 sm:px-6 lg:px-8 mt-5 border-b border-border">
+          <div className="flex gap-1 overflow-x-auto scrollbar-thin">
+            {tabs.map((t) => {
+              const active = aba === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setAba(t.id)}
+                  className={`shrink-0 px-4 py-3 text-sm font-semibold relative transition-colors ${
+                    active
+                      ? "text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t.label}
+                  {active && (
+                    <span className="absolute bottom-0 left-2 right-2 h-1 rounded-t-full bg-[oklch(0.7_0.17_50)]" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Content */}
-        <main className="px-4 sm:px-6 lg:px-8 py-5 space-y-5 max-w-[1600px] mx-auto">
-          {aba === "quadro" ? (
+        <main className="px-4 sm:px-6 lg:px-8 py-5 space-y-5 max-w-[1700px] mx-auto">
+          {aba === "mesa" && (
             <>
-              {/* Sub-abas DU/PA + busca (estilo AssJur) */}
-              <div className="bg-card rounded-3xl shadow-card border border-border p-4 sm:p-5 space-y-4">
-                {/* Tabs DU/PA */}
-                <div className="flex gap-2 overflow-x-auto scrollbar-thin">
-                  {subAbas.map((s) => {
-                    const active = filtroTipo === s.id;
-                    const isDU = s.id === "DU";
-                    const isPA = s.id === "PA";
-                    return (
-                      <button
-                        key={s.id}
-                        onClick={() => setFiltroTipo(s.id)}
-                        className={`shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
-                          active
-                            ? s.id === "todos"
-                              ? "bg-card text-foreground shadow-card border border-border"
-                              : isDU
-                                ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border border-[var(--tipo-du)]/30"
-                                : "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border border-[var(--tipo-pa)]/30"
-                            : "text-muted-foreground hover:bg-muted"
-                        }`}
-                      >
-                        {s.label}
-                      </button>
-                    );
-                  })}
+              {/* Sub-controles: Minha Mesa | Visão do Setor | DU | PA + busca + filtros à direita */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1.5 bg-card border border-border rounded-full p-1 shrink-0">
+                  <button
+                    onClick={() => setVisao("minha")}
+                    className={`relative px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all ${
+                      visao === "minha"
+                        ? "bg-foreground text-background"
+                        : "text-foreground/80 hover:bg-muted"
+                    }`}
+                  >
+                    Minha Mesa
+                    {minhaMesaCount > 0 && (
+                      <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-destructive text-destructive-foreground">
+                        {minhaMesaCount}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setVisao("setor")}
+                    className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all ${
+                      visao === "setor"
+                        ? "bg-foreground text-background"
+                        : "text-foreground/80 hover:bg-muted"
+                    }`}
+                  >
+                    Visão do Setor
+                  </button>
+                  <button
+                    onClick={() => setFiltroTipo("DU")}
+                    className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase transition-all ${
+                      filtroTipo === "DU"
+                        ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border border-[var(--tipo-du)]/40"
+                        : "text-foreground/60 hover:bg-muted"
+                    }`}
+                  >
+                    DU
+                  </button>
+                  <button
+                    onClick={() => setFiltroTipo("PA")}
+                    className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase transition-all ${
+                      filtroTipo === "PA"
+                        ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border border-[var(--tipo-pa)]/40"
+                        : "text-foreground/60 hover:bg-muted"
+                    }`}
+                  >
+                    PA
+                  </button>
                 </div>
 
-                {/* Busca + chips */}
-                <div className="flex gap-2 items-center">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={busca}
-                      onChange={(e) => setBusca(e.target.value)}
-                      placeholder="Buscar processo, parte, assunto..."
-                      className="pl-11 h-12 rounded-full bg-muted border-transparent focus-visible:bg-card focus-visible:border-border focus-visible:ring-accent text-sm"
-                    />
-                  </div>
-                  <div className="hidden sm:flex gap-1.5 shrink-0">
-                    {(["todos", "DU", "PA"] as FiltroTipo[]).map((t) => {
-                      const active = filtroTipo === t;
-                      const isDU = t === "DU";
-                      const isPA = t === "PA";
-                      return (
-                        <button
-                          key={t}
-                          onClick={() => setFiltroTipo(t)}
-                          className={`px-4 h-12 rounded-full text-sm font-bold transition-all border ${
-                            active
-                              ? t === "todos"
-                                ? "bg-primary text-primary-foreground border-primary"
-                                : isDU
-                                  ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border-[var(--tipo-du)]/30"
-                                  : "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border-[var(--tipo-pa)]/30"
-                              : "bg-card text-muted-foreground border-border hover:border-foreground/30"
-                          }`}
-                        >
-                          {t === "todos" ? "Todos" : t}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <div className="relative flex-1 min-w-[240px]">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    placeholder="Buscar processo, parte, assunto..."
+                    className="pl-11 h-11 rounded-full bg-card border-border focus-visible:ring-accent text-sm"
+                  />
+                </div>
+
+                {/* Filtros tipo à direita */}
+                <div className="hidden sm:flex gap-1 shrink-0">
+                  <button
+                    onClick={() => setFiltroTipo("todos")}
+                    className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
+                      filtroTipo === "todos"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-muted-foreground border-border hover:border-foreground/30"
+                    }`}
+                  >
+                    Todos
+                  </button>
+                  <button
+                    onClick={() => setFiltroTipo("DU")}
+                    className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
+                      filtroTipo === "DU"
+                        ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border-[var(--tipo-du)]/40"
+                        : "bg-card text-muted-foreground border-border hover:border-foreground/30"
+                    }`}
+                  >
+                    DU
+                  </button>
+                  <button
+                    onClick={() => setFiltroTipo("PA")}
+                    className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
+                      filtroTipo === "PA"
+                        ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border-[var(--tipo-pa)]/40"
+                        : "bg-card text-muted-foreground border-border hover:border-foreground/30"
+                    }`}
+                  >
+                    PA
+                  </button>
                 </div>
               </div>
 
@@ -394,16 +450,55 @@ function Index() {
                 </div>
               )}
 
-              <KanbanBoard
-                processos={filtrados}
-                onEdit={handleEdit}
-                onDelete={remover}
-                onMove={moverStatus}
-                onAdd={handleAdd}
-              />
+              {/* Visão do setor: agrupado por assessor (estilo AssJur) */}
+              {visao === "setor" ? (
+                <MesaTrabalho
+                  processos={filtrados}
+                  filtroTipo={filtroTipo}
+                  onEdit={handleEdit}
+                  onDelete={remover}
+                  onMove={moverStatus}
+                />
+              ) : (
+                <KanbanBoard
+                  processos={filtrados}
+                  onEdit={handleEdit}
+                  onDelete={remover}
+                  onMove={moverStatus}
+                  onAdd={handleAdd}
+                />
+              )}
             </>
-          ) : (
-            <Estatisticas processos={processos} />
+          )}
+
+          {aba === "consulta" && (
+            <EmptyTab
+              icon={ListFilter}
+              title="Consulta Geral"
+              description="Pesquise no acervo completo de processos da 12ª RM, com filtros por seção, origem, encarregado e período."
+            />
+          )}
+
+          {aba === "arquivo" && (
+            <EmptyTab
+              icon={FolderArchive}
+              title="Arquivo / Encerrados"
+              description="Histórico de processos finalizados e arquivados."
+              processos={processos.filter((p) => p.status === "concluido")}
+              onEdit={handleEdit}
+              onDelete={remover}
+              onMove={moverStatus}
+            />
+          )}
+
+          {aba === "indicadores" && <Estatisticas processos={processos} />}
+
+          {aba === "equipe" && (
+            <EmptyTab
+              icon={Users}
+              title="Gestão da Equipe"
+              description="Distribuição de carga, performance individual e gestão dos assessores do setor."
+            />
           )}
         </main>
       </div>
@@ -415,6 +510,62 @@ function Index() {
         defaultStatus={defaultStatus}
         onSave={handleSave}
       />
+    </div>
+  );
+}
+
+function EmptyTab({
+  icon: Icon,
+  title,
+  description,
+  processos,
+  onEdit,
+  onDelete,
+  onMove,
+}: {
+  icon: typeof LayoutGrid;
+  title: string;
+  description: string;
+  processos?: Processo[];
+  onEdit?: (p: Processo) => void;
+  onDelete?: (id: string) => void;
+  onMove?: (id: string, status: StatusProcesso) => void;
+}) {
+  if (processos && processos.length > 0 && onEdit && onDelete && onMove) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-2xl bg-card border border-border p-5">
+          <div className="flex items-center gap-3 mb-1">
+            <span className="inline-flex h-10 w-10 rounded-xl bg-accent/40 items-center justify-center">
+              <Icon className="h-5 w-5 text-accent-foreground" />
+            </span>
+            <div>
+              <h3 className="font-bold text-lg text-foreground font-display">{title}</h3>
+              <p className="text-xs text-muted-foreground">{description}</p>
+            </div>
+          </div>
+        </div>
+        <KanbanBoard
+          processos={processos}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          onMove={onMove}
+          onAdd={() => {}}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-3xl bg-card border-2 border-dashed border-border p-12 text-center">
+      <span className="inline-flex h-14 w-14 rounded-2xl bg-accent/40 items-center justify-center mb-4">
+        <Icon className="h-6 w-6 text-accent-foreground" />
+      </span>
+      <h3 className="font-bold text-xl text-foreground font-display mb-2">{title}</h3>
+      <p className="text-sm text-muted-foreground max-w-md mx-auto">{description}</p>
+      <p className="text-xs text-muted-foreground/60 mt-4 italic">
+        Em desenvolvimento — disponível em breve.
+      </p>
     </div>
   );
 }
