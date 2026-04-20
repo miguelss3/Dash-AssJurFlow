@@ -327,10 +327,14 @@ export function Estatisticas({ processos }: Props) {
                     <span className="font-medium text-foreground truncate pr-2">{d.name}</span>
                     <span className="tabular-nums text-muted-foreground shrink-0">{d.value}</span>
                   </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-2 rounded-full bg-muted overflow-hidden border border-border/50">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-primary-glow to-[oklch(0.45_0.14_270)] transition-all"
-                      style={{ width: `${pct}%`, animationDelay: `${i * 100}ms` }}
+                      className="h-full rounded-full bg-gradient-accent transition-all"
+                      style={{
+                        width: `${pct}%`,
+                        animationDelay: `${i * 100}ms`,
+                        boxShadow: "0 0 12px oklch(0.78 0.16 220 / 0.5)",
+                      }}
                     />
                   </div>
                 </div>
