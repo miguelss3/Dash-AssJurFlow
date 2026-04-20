@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { SoldierAvatar } from "@/components/SoldierAvatar";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Scale,
   Plus,
@@ -53,6 +55,8 @@ type FiltroTipo = "todos" | "DU" | "PA";
 type Visao = "minha" | "setor";
 
 function Index() {
+  const navigate = useNavigate();
+  const { user, ready, logout } = useAuth();
   const { processos, criar, atualizar, remover, moverStatus } = useProcessos();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Processo | null>(null);
@@ -64,8 +68,12 @@ function Index() {
   const [visao, setVisao] = useState<Visao>("setor");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Usuário logado (mock)
-  const usuario = { posto: "Maj", nome: "Miguel", role: "MAJ - ADMIN UNIVERSAL" };
+  useEffect(() => {
+    if (ready && !user) navigate({ to: "/login" });
+  }, [ready, user, navigate]);
+
+  // Usuário logado (vem do auth, fallback enquanto carrega)
+  const usuario = user ?? { posto: "Maj", nome: "Miguel", role: "MAJ - ADMIN UNIVERSAL" };
 
   const filtrados = useMemo(() => {
     return processos.filter((p) => {
@@ -224,9 +232,7 @@ function Index() {
           {/* Footer com usuário (estilo AssJur) */}
           <div className="border-t border-sidebar-border p-3">
             <div className="flex items-center gap-3 px-2 py-2">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[oklch(0.6_0.16_230)] to-[oklch(0.5_0.18_240)] flex items-center justify-center text-white font-bold text-sm shadow-md">
-                {usuario.nome[0]}
-              </div>
+              <SoldierAvatar size={40} className="shadow-md rounded-full" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-white leading-tight truncate">
                   {usuario.posto} {usuario.nome}
@@ -236,10 +242,22 @@ function Index() {
                 </p>
               </div>
               <div className="flex flex-col gap-1">
-                <button className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-white transition-colors">
+                <button
+                  type="button"
+                  title="Configurações"
+                  className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-white transition-colors"
+                >
                   <Settings className="h-3.5 w-3.5" />
                 </button>
-                <button className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-white transition-colors">
+                <button
+                  type="button"
+                  title="Sair"
+                  onClick={() => {
+                    logout();
+                    navigate({ to: "/login" });
+                  }}
+                  className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-white transition-colors"
+                >
                   <LogOut className="h-3.5 w-3.5" />
                 </button>
               </div>
