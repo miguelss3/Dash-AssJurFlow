@@ -10,22 +10,28 @@ export type Prioridade = "liminar" | "urgente" | "normal";
 
 export interface Processo {
   id: string;
-  numero: string;
-  cliente: string;        // Parte / cliente
+  numero: string;          // Nº processo OU Portaria Nr
+  cliente: string;         // Parte / interessado
   vara: string;
   parteContraria: string;
-  tipoAcao: string;
-  responsavel: string;
-  prazo: string;          // ISO — prazo INTERNO
-  prazoFatal?: string;    // ISO — prazo FATAL (limite final)
-  descricao: string;
+  tipoAcao: string;        // Assunto / objeto
+  responsavel: string;     // Assessor (Ten/Cap/Maj/TC...)
+  prazo: string;           // ISO — prazo INTERNO
+  prazoFatal?: string;     // ISO — prazo FATAL (limite final)
+  descricao: string;       // Último movimento
   status: StatusProcesso;
   criadoEm: string;
-  // Novos campos inspirados no AssJur Flow
+  // Campos AssJur Flow
   tipo: TipoProcesso;
   prioridade: Prioridade;
-  secao: string;          // Ex: SFPC, SVP, DiEx
-  origem: string;         // Ex: E-mail, Ofício, DiEx
+  secao: string;           // Ex: SFPC, SVP, DiEx, ICFEX
+  origem: string;          // Ex: E-mail, Ofício, DiEx, SAPIENS
+  // Específicos PA (Procedimento Apuratório)
+  subtipo?: string;        // IPM, Sindicância, Diligência
+  faseAtual?: string;      // Em diligência, Portaria assinada, Para assinatura, Atrasado, Prazo não iniciado
+  inicioPrazo?: string;    // ISO
+  finalPrazo?: string;     // ISO
+  entrada?: string;        // ISO data de entrada
 }
 
 export interface Coluna {
