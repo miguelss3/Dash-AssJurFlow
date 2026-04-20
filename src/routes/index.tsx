@@ -7,7 +7,6 @@ import {
   LayoutGrid,
   BarChart3,
   Bell,
-  Briefcase,
   Menu,
   X,
   Settings,
