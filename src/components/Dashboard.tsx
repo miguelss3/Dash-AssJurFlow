@@ -4,7 +4,6 @@ import {
   CalendarRange,
   Briefcase,
   TrendingUp,
-  Activity,
 } from "lucide-react";
 import type { Processo, FiltroPrazo } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
@@ -24,123 +23,152 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
     return s === "today" || s === "soon";
   }).length;
   const concluidos = processos.filter((p) => p.status === "concluido").length;
-  const taxaConclusao = processos.length > 0 ? Math.round((concluidos / processos.length) * 100) : 0;
+  const taxaConclusao =
+    processos.length > 0 ? Math.round((concluidos / processos.length) * 100) : 0;
+
+  type Tone = "primary" | "danger" | "warning" | "info";
 
   const cards: Array<{
     key: FiltroPrazo;
     label: string;
-    code: string;
-    value: number | string;
+    value: number;
     sub: string;
     icon: typeof AlertTriangle;
-    color: string;
+    tone: Tone;
     extra?: string;
+    isAccent?: boolean;
   }> = [
     {
       key: "todos",
-      label: "Total",
-      code: "TOT",
+      label: "Total de processos",
       value: processos.length,
       sub: `${ativos.length} ativos`,
       icon: Briefcase,
-      color: "oklch(0.78 0.16 220)",
+      tone: "primary",
       extra: `${taxaConclusao}% conclusão`,
+      isAccent: true,
     },
     {
       key: "vencidos",
       label: "Vencidos",
-      code: "OVR",
       value: vencidos,
       sub: vencidos > 0 ? "ação imediata" : "tudo em dia",
       icon: AlertTriangle,
-      color: "oklch(0.72 0.24 22)",
+      tone: "danger",
     },
     {
       key: "hoje",
-      label: "Hoje",
-      code: "TDY",
+      label: "Vencem hoje",
       value: hoje,
       sub: hoje > 0 ? "priorizar" : "sem prazos",
       icon: Clock,
-      color: "oklch(0.82 0.2 60)",
+      tone: "warning",
     },
     {
       key: "semana",
-      label: "7 dias",
-      code: "WK",
+      label: "Próximos 7 dias",
       value: semana,
       sub: "planejar semana",
       icon: CalendarRange,
-      color: "oklch(0.85 0.18 95)",
+      tone: "info",
     },
   ];
+
+  const toneStyles: Record<Tone, { bg: string; text: string; ring: string }> = {
+    primary: {
+      bg: "bg-accent",
+      text: "text-accent-foreground",
+      ring: "ring-accent",
+    },
+    danger: {
+      bg: "bg-[var(--deadline-overdue-bg)]",
+      text: "text-[var(--deadline-overdue)]",
+      ring: "ring-[var(--deadline-overdue)]",
+    },
+    warning: {
+      bg: "bg-[var(--deadline-today-bg)]",
+      text: "text-[var(--deadline-today)]",
+      ring: "ring-[var(--deadline-today)]",
+    },
+    info: {
+      bg: "bg-[var(--deadline-soon-bg)]",
+      text: "text-[var(--deadline-soon)]",
+      ring: "ring-[var(--deadline-soon)]",
+    },
+  };
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       {cards.map((c, i) => {
         const Icon = c.icon;
         const active = filtro === c.key;
+        const styles = toneStyles[c.tone];
+        const isAccent = c.isAccent;
         return (
           <button
             key={c.key}
             onClick={() => onFiltroChange(active ? "todos" : c.key)}
             style={{ animationDelay: `${i * 60}ms` }}
-            className={`group relative text-left rounded-xl border bg-card/60 backdrop-blur p-4 sm:p-5 overflow-hidden transition-[var(--transition-smooth)] hover:-translate-y-0.5 animate-fade-in-up ${
-              active
-                ? "border-primary/60 ring-2 ring-primary/30 shadow-glow"
-                : "border-border hover:border-primary/30 hover:shadow-[var(--shadow-card-hover)]"
-            }`}
+            className={`group text-left rounded-3xl border p-4 sm:p-5 transition-[var(--transition-smooth)] hover:-translate-y-0.5 hover:shadow-card-hover animate-fade-in-up ${
+              isAccent
+                ? "bg-accent border-accent text-accent-foreground"
+                : "bg-card border-border"
+            } ${active ? "ring-2 ring-offset-2 ring-offset-background ring-accent shadow-card-hover" : "shadow-card"}`}
           >
-            {/* Glow */}
-            <div
-              className="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full blur-3xl opacity-50 group-hover:opacity-80 transition-opacity"
-              style={{ background: `radial-gradient(circle, ${c.color} 0%, transparent 70%)` }}
-            />
-            {/* Grid pattern */}
-            <div className="pointer-events-none absolute inset-0 pattern-grid-sm opacity-30" />
-
-            {/* Top: code + icon */}
-            <div className="relative flex items-start justify-between mb-3">
+            <div className="flex items-start justify-between mb-3">
               <span
-                className="text-[10px] font-mono-tech font-bold tracking-[0.2em] uppercase"
-                style={{ color: c.color }}
+                className={`inline-flex h-10 w-10 rounded-2xl items-center justify-center ${
+                  isAccent ? "bg-accent-foreground/10" : styles.bg
+                }`}
               >
-                {c.code}_
+                <Icon
+                  className={`h-5 w-5 ${isAccent ? "text-accent-foreground" : styles.text}`}
+                />
               </span>
-              <span
-                className="rounded-lg p-2 border"
-                style={{
-                  backgroundColor: `color-mix(in oklab, ${c.color} 12%, transparent)`,
-                  borderColor: `color-mix(in oklab, ${c.color} 30%, transparent)`,
-                }}
-              >
-                <Icon className="h-4 w-4" style={{ color: c.color }} />
-              </span>
-            </div>
-
-            <div className="relative">
-              <div
-                className="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight font-mono-tech"
-                style={{ color: c.color, textShadow: `0 0 24px ${c.color}40` }}
-              >
-                {c.value}
-              </div>
-              <p className="text-[13px] text-foreground font-semibold mt-1">{c.label}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5 font-mono-tech uppercase tracking-wider">
-                {c.sub}
-              </p>
-              {c.extra && (
-                <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-1 text-[10px] text-muted-foreground">
-                  <TrendingUp className="h-3 w-3" style={{ color: c.color }} />
-                  <span>{c.extra}</span>
-                </div>
+              {active && (
+                <span
+                  className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${
+                    isAccent
+                      ? "bg-accent-foreground/15 text-accent-foreground"
+                      : "bg-foreground/10 text-foreground"
+                  }`}
+                >
+                  ativo
+                </span>
               )}
             </div>
 
-            {active && (
-              <div className="absolute top-2 right-2 flex items-center gap-1 text-[9px] font-mono-tech text-primary">
-                <Activity className="h-2.5 w-2.5 animate-pulse" />
-                LIVE
+            <div
+              className={`text-3xl sm:text-4xl font-bold tabular-nums tracking-tight font-display ${
+                isAccent ? "text-accent-foreground" : "text-foreground"
+              }`}
+            >
+              {c.value}
+            </div>
+            <p
+              className={`text-sm font-bold mt-1 ${
+                isAccent ? "text-accent-foreground" : "text-foreground"
+              }`}
+            >
+              {c.label}
+            </p>
+            <p
+              className={`text-[11px] mt-0.5 ${
+                isAccent ? "text-accent-foreground/70" : "text-muted-foreground"
+              }`}
+            >
+              {c.sub}
+            </p>
+            {c.extra && (
+              <div
+                className={`mt-3 pt-3 border-t flex items-center gap-1.5 text-[11px] font-semibold ${
+                  isAccent
+                    ? "border-accent-foreground/20 text-accent-foreground/80"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                <TrendingUp className="h-3 w-3" />
+                <span>{c.extra}</span>
               </div>
             )}
           </button>
