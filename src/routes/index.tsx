@@ -500,6 +500,10 @@ function Index() {
             </>
           )}
 
+          {aba === "prazos" && (
+            <CalendarioPrazos processos={processos} usuario={usuario} />
+          )}
+
           {aba === "consulta" && (
             <EmptyTab
               icon={ListFilter}
