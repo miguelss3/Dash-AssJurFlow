@@ -63,25 +63,42 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
+  /* Tema jurídico: azul-marinho profundo + dourado discreto */
+  --background: oklch(0.985 0.005 240);
+  --foreground: oklch(0.22 0.04 250);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
+  --card-foreground: oklch(0.22 0.04 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --popover-foreground: oklch(0.22 0.04 250);
+  --primary: oklch(0.32 0.08 255);
+  --primary-foreground: oklch(0.98 0.005 240);
+  --secondary: oklch(0.95 0.012 245);
+  --secondary-foreground: oklch(0.32 0.08 255);
+  --muted: oklch(0.96 0.008 245);
+  --muted-foreground: oklch(0.5 0.03 250);
+  --accent: oklch(0.78 0.12 80);
+  --accent-foreground: oklch(0.25 0.05 250);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0.003 247);
+  --border: oklch(0.91 0.013 250);
+  --input: oklch(0.93 0.013 250);
+  --ring: oklch(0.55 0.08 255);
+
+  /* Status de prazo */
+  --deadline-overdue: oklch(0.58 0.22 27);
+  --deadline-overdue-bg: oklch(0.96 0.05 27);
+  --deadline-today: oklch(0.7 0.18 50);
+  --deadline-today-bg: oklch(0.97 0.06 70);
+  --deadline-soon: oklch(0.75 0.15 90);
+  --deadline-soon-bg: oklch(0.98 0.05 95);
+  --deadline-safe: oklch(0.6 0.13 160);
+  --deadline-safe-bg: oklch(0.97 0.04 160);
+
+  /* Sombras e gradientes */
+  --shadow-card: 0 1px 2px oklch(0.22 0.04 250 / 0.06), 0 4px 12px oklch(0.22 0.04 250 / 0.06);
+  --shadow-card-hover: 0 4px 8px oklch(0.22 0.04 250 / 0.08), 0 12px 24px oklch(0.22 0.04 250 / 0.1);
+  --gradient-header: linear-gradient(135deg, oklch(0.28 0.07 255), oklch(0.36 0.09 255));
+  --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
