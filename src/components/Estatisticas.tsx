@@ -11,8 +11,6 @@ import {
   Pie,
   Cell,
   Legend,
-  LineChart,
-  Line,
   Area,
   AreaChart,
 } from "recharts";
@@ -26,24 +24,26 @@ interface Props {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  novo: "oklch(0.78 0.16 220)",
-  andamento: "oklch(0.7 0.22 305)",
-  audiencia: "oklch(0.82 0.2 60)",
-  recurso: "oklch(0.72 0.24 22)",
-  concluido: "oklch(0.78 0.18 160)",
+  novo: "oklch(0.6 0.16 230)",
+  andamento: "oklch(0.62 0.22 305)",
+  audiencia: "oklch(0.7 0.17 50)",
+  recurso: "oklch(0.58 0.22 25)",
+  concluido: "oklch(0.6 0.15 155)",
 };
 
 const TOOLTIP_STYLE = {
-  backgroundColor: "oklch(0.21 0.025 260)",
-  border: "1px solid oklch(1 0 0 / 0.1)",
+  backgroundColor: "oklch(1 0 0)",
+  border: "1px solid oklch(0.92 0.005 240)",
   borderRadius: 12,
   fontSize: 12,
-  color: "oklch(0.96 0.01 240)",
-  boxShadow: "0 8px 32px oklch(0 0 0 / 0.5)",
+  color: "oklch(0.22 0.03 255)",
+  boxShadow: "0 8px 32px oklch(0.22 0.05 258 / 0.15)",
 } as const;
 
-const AXIS_COLOR = "oklch(0.7 0.03 245)";
-const GRID_COLOR = "oklch(1 0 0 / 0.06)";
+const AXIS_COLOR = "oklch(0.5 0.02 255)";
+const GRID_COLOR = "oklch(0.92 0.005 240)";
+const ACCENT = "oklch(0.6 0.16 230)";
+const ACCENT_LIME = "oklch(0.78 0.18 145)";
 
 export function Estatisticas({ processos }: Props) {
   const dadosStatus = useMemo(
@@ -62,22 +62,22 @@ export function Estatisticas({ processos }: Props) {
       {
         name: "Vencidos",
         value: ativos.filter((p) => statusPrazo(p.prazo) === "overdue").length,
-        fill: "oklch(0.72 0.24 22)",
+        fill: "oklch(0.58 0.22 25)",
       },
       {
         name: "Hoje",
         value: ativos.filter((p) => statusPrazo(p.prazo) === "today").length,
-        fill: "oklch(0.82 0.2 60)",
+        fill: "oklch(0.7 0.17 50)",
       },
       {
         name: "Em breve",
         value: ativos.filter((p) => statusPrazo(p.prazo) === "soon").length,
-        fill: "oklch(0.85 0.18 95)",
+        fill: "oklch(0.78 0.16 90)",
       },
       {
         name: "Em dia",
         value: ativos.filter((p) => statusPrazo(p.prazo) === "safe").length,
-        fill: "oklch(0.78 0.18 160)",
+        fill: "oklch(0.6 0.15 155)",
       },
     ];
   }, [processos]);
@@ -109,15 +109,14 @@ export function Estatisticas({ processos }: Props) {
       .slice(0, 5);
   }, [processos]);
 
-  // Distribuição de prazos por faixa de dias (linha do tempo)
   const dadosTimeline = useMemo(() => {
     const bins = [
       { name: "Vencidos", min: -Infinity, max: -1 },
-      { name: "0-3 dias", min: 0, max: 3 },
-      { name: "4-7 dias", min: 4, max: 7 },
-      { name: "8-15 dias", min: 8, max: 15 },
-      { name: "16-30 dias", min: 16, max: 30 },
-      { name: "30+ dias", min: 31, max: Infinity },
+      { name: "0-3d", min: 0, max: 3 },
+      { name: "4-7d", min: 4, max: 7 },
+      { name: "8-15d", min: 8, max: 15 },
+      { name: "16-30d", min: 16, max: 30 },
+      { name: "30+d", min: 31, max: Infinity },
     ];
     return bins.map((b) => ({
       name: b.name,
@@ -132,12 +131,14 @@ export function Estatisticas({ processos }: Props) {
   const total = processos.length;
   const concluidos = processos.filter((p) => p.status === "concluido").length;
   const ativos = total - concluidos;
-  const vencidos = processos.filter((p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue").length;
+  const vencidos = processos.filter(
+    (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
+  ).length;
   const taxaSucesso = total ? Math.round((concluidos / total) * 100) : 0;
   const topResp = dadosResponsavel[0];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Hero KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiHero
@@ -153,6 +154,7 @@ export function Estatisticas({ processos }: Props) {
           value={ativos}
           sub="Em acompanhamento"
           tone="primary"
+          accent
         />
         <KpiHero
           icon={AlertTriangle}
@@ -166,13 +168,13 @@ export function Estatisticas({ processos }: Props) {
           label="Top advogado"
           value={topResp ? topResp.name.split(" ").slice(0, 2).join(" ") : "—"}
           sub={topResp ? `${topResp.ativos + topResp.concluidos} processos` : "Sem dados"}
-          tone="accent"
+          tone="info"
           isText
         />
       </div>
 
       {/* Gráficos linha 1 */}
-      <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid lg:grid-cols-2 gap-4 sm:gap-5">
         <ChartCard
           title="Distribuição por status"
           subtitle="Processos em cada fase do fluxo"
@@ -191,18 +193,10 @@ export function Estatisticas({ processos }: Props) {
                 paddingAngle={3}
               >
                 {dadosStatus.map((d, i) => (
-                  <Cell key={i} fill={d.fill} stroke="oklch(0.21 0.025 260)" strokeWidth={2} />
+                  <Cell key={i} fill={d.fill} stroke="oklch(1 0 0)" strokeWidth={2} />
                 ))}
               </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "oklch(0.21 0.025 260)",
-                  border: "1px solid oklch(1 0 0 / 0.1)",
-                  borderRadius: 12,
-                  fontSize: 12,
-                  boxShadow: "var(--shadow-card-hover)",
-                }}
-              />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Legend
                 verticalAlign="bottom"
                 iconType="circle"
@@ -219,19 +213,20 @@ export function Estatisticas({ processos }: Props) {
         >
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={dadosPrazos} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.06)" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip
-                cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
-                contentStyle={{
-                  backgroundColor: "oklch(0.21 0.025 260)",
-                  border: "1px solid oklch(1 0 0 / 0.1)",
-                  borderRadius: 12,
-                  fontSize: 12,
-                  boxShadow: "var(--shadow-card-hover)",
-                }}
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
               />
+              <YAxis
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip cursor={{ fill: "oklch(0.95 0 0 / 0.5)" }} contentStyle={TOOLTIP_STYLE} />
               <Bar dataKey="value" radius={[8, 8, 0, 0]}>
                 {dadosPrazos.map((d, i) => (
                   <Cell key={i} fill={d.fill} />
@@ -243,30 +238,44 @@ export function Estatisticas({ processos }: Props) {
       </div>
 
       {/* Gráficos linha 2 */}
-      <div className="grid lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid lg:grid-cols-2 gap-4 sm:gap-5">
         <ChartCard
           title="Performance por responsável"
           subtitle="Top 6 — ativos vs concluídos"
           icon={Award}
         >
           <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={dadosResponsavel} layout="vertical" margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.06)" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} width={110} />
-              <Tooltip
-                cursor={{ fill: "oklch(1 0 0 / 0.04)" }}
-                contentStyle={{
-                  backgroundColor: "oklch(0.21 0.025 260)",
-                  border: "1px solid oklch(1 0 0 / 0.1)",
-                  borderRadius: 12,
-                  fontSize: 12,
-                  boxShadow: "var(--shadow-card-hover)",
-                }}
+            <BarChart
+              data={dadosResponsavel}
+              layout="vertical"
+              margin={{ top: 10, right: 16, left: 0, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
+              <XAxis
+                type="number"
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
               />
+              <YAxis
+                type="category"
+                dataKey="name"
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
+                width={110}
+              />
+              <Tooltip cursor={{ fill: "oklch(0.95 0 0 / 0.5)" }} contentStyle={TOOLTIP_STYLE} />
               <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
-              <Bar dataKey="ativos" stackId="a" fill="oklch(0.78 0.16 220)" radius={[0, 0, 0, 0]} name="Ativos" />
-              <Bar dataKey="concluidos" stackId="a" fill="oklch(0.78 0.18 160)" radius={[0, 8, 8, 0]} name="Concluídos" />
+              <Bar dataKey="ativos" stackId="a" fill={ACCENT} name="Ativos" />
+              <Bar
+                dataKey="concluidos"
+                stackId="a"
+                fill={ACCENT_LIME}
+                radius={[0, 8, 8, 0]}
+                name="Concluídos"
+              />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -280,26 +289,28 @@ export function Estatisticas({ processos }: Props) {
             <AreaChart data={dadosTimeline} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="oklch(0.78 0.16 220)" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="oklch(0.78 0.16 220)" stopOpacity={0} />
+                  <stop offset="0%" stopColor={ACCENT_LIME} stopOpacity={0.6} />
+                  <stop offset="100%" stopColor={ACCENT_LIME} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="oklch(1 0 0 / 0.06)" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 11, fill: "oklch(0.7 0.03 245)" }} axisLine={false} tickLine={false} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "oklch(0.21 0.025 260)",
-                  border: "1px solid oklch(1 0 0 / 0.1)",
-                  borderRadius: 12,
-                  fontSize: 12,
-                  boxShadow: "var(--shadow-card-hover)",
-                }}
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 10, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
               />
+              <YAxis
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Area
                 type="monotone"
                 dataKey="processos"
-                stroke="oklch(0.78 0.16 220)"
+                stroke={ACCENT_LIME}
                 strokeWidth={2.5}
                 fill="url(#grad-area)"
               />
@@ -311,29 +322,30 @@ export function Estatisticas({ processos }: Props) {
       {/* Tipos de ação */}
       <ChartCard
         title="Tipos de ação mais comuns"
-        subtitle="Top 5 categorias do escritório"
+        subtitle="Top 5 categorias"
         icon={TrendingUp}
       >
         {dadosTipoAcao.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">Sem dados.</p>
         ) : (
-          <div className="space-y-3 py-2">
+          <div className="space-y-3.5 py-2">
             {dadosTipoAcao.map((d, i) => {
               const max = dadosTipoAcao[0].value;
               const pct = (d.value / max) * 100;
               return (
                 <div key={d.name}>
                   <div className="flex items-center justify-between text-xs mb-1.5">
-                    <span className="font-medium text-foreground truncate pr-2">{d.name}</span>
-                    <span className="tabular-nums text-muted-foreground shrink-0">{d.value}</span>
+                    <span className="font-semibold text-foreground truncate pr-2">{d.name}</span>
+                    <span className="tabular-nums text-muted-foreground shrink-0 font-bold">
+                      {d.value}
+                    </span>
                   </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden border border-border/50">
+                  <div className="h-2.5 rounded-full bg-muted overflow-hidden">
                     <div
                       className="h-full rounded-full bg-gradient-accent transition-all"
                       style={{
                         width: `${pct}%`,
                         animationDelay: `${i * 100}ms`,
-                        boxShadow: "0 0 12px oklch(0.78 0.16 220 / 0.5)",
                       }}
                     />
                   </div>
@@ -354,34 +366,57 @@ function KpiHero({
   sub,
   tone,
   isText,
+  accent,
 }: {
   icon: typeof TrendingUp;
   label: string;
   value: string | number;
   sub: string;
-  tone: "primary" | "success" | "danger" | "accent";
+  tone: "primary" | "success" | "danger" | "info";
   isText?: boolean;
+  accent?: boolean;
 }) {
   const tones = {
-    primary: { bg: "bg-primary/10", text: "text-primary-glow", glow: "from-primary-glow/20" },
-    success: { bg: "bg-[var(--deadline-safe-bg)]", text: "text-[var(--deadline-safe)]", glow: "from-[var(--deadline-safe)]/20" },
-    danger: { bg: "bg-[var(--deadline-overdue-bg)]", text: "text-[var(--deadline-overdue)]", glow: "from-[var(--deadline-overdue)]/20" },
-    accent: { bg: "bg-accent/15", text: "text-accent-foreground", glow: "from-accent/30" },
+    primary: { bg: "bg-[oklch(0.6_0.16_230_/_0.12)]", text: "text-[oklch(0.6_0.16_230)]" },
+    success: { bg: "bg-[var(--deadline-safe-bg)]", text: "text-[var(--deadline-safe)]" },
+    danger: { bg: "bg-[var(--deadline-overdue-bg)]", text: "text-[var(--deadline-overdue)]" },
+    info: { bg: "bg-[oklch(0.62_0.22_305_/_0.12)]", text: "text-[oklch(0.62_0.22_305)]" },
   }[tone];
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] animate-fade-in-up">
-      <div className={`pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-gradient-to-br ${tones.glow} to-transparent blur-2xl`} />
-      <div className="relative">
-        <span className={`inline-flex rounded-xl p-2.5 ${tones.bg} mb-3`}>
-          <Icon className={`h-5 w-5 ${tones.text}`} />
-        </span>
-        <div className={`font-bold text-foreground tracking-tight ${isText ? "text-xl truncate" : "text-3xl sm:text-4xl tabular-nums"}`}>
-          {value}
-        </div>
-        <p className="text-xs sm:text-sm text-foreground font-semibold mt-1">{label}</p>
-        <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+    <div
+      className={`rounded-3xl border p-5 shadow-card animate-fade-in-up ${
+        accent ? "bg-accent border-accent" : "bg-card border-border"
+      }`}
+    >
+      <span
+        className={`inline-flex h-11 w-11 rounded-2xl items-center justify-center mb-3 ${
+          accent ? "bg-accent-foreground/10" : tones.bg
+        }`}
+      >
+        <Icon className={`h-5 w-5 ${accent ? "text-accent-foreground" : tones.text}`} />
+      </span>
+      <div
+        className={`font-bold tracking-tight font-display ${
+          accent ? "text-accent-foreground" : "text-foreground"
+        } ${isText ? "text-xl truncate" : "text-3xl sm:text-4xl tabular-nums"}`}
+      >
+        {value}
       </div>
+      <p
+        className={`text-sm font-bold mt-1 ${
+          accent ? "text-accent-foreground" : "text-foreground"
+        }`}
+      >
+        {label}
+      </p>
+      <p
+        className={`text-[11px] mt-0.5 ${
+          accent ? "text-accent-foreground/70" : "text-muted-foreground"
+        }`}
+      >
+        {sub}
+      </p>
     </div>
   );
 }
@@ -398,14 +433,16 @@ function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] animate-fade-in-up">
+    <div className="rounded-3xl border border-border bg-card p-5 shadow-card animate-fade-in-up">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="font-semibold text-foreground text-base flex items-center gap-2">
-            <Icon className="h-4 w-4 text-primary-glow" />
+          <h3 className="font-bold text-foreground text-base flex items-center gap-2 font-display">
+            <span className="inline-flex h-7 w-7 rounded-lg bg-accent/30 items-center justify-center">
+              <Icon className="h-4 w-4 text-accent-foreground" />
+            </span>
             {title}
           </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
+          <p className="text-xs text-muted-foreground mt-1 ml-9">{subtitle}</p>
         </div>
       </div>
       {children}
