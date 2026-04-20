@@ -1,4 +1,11 @@
-import { AlertTriangle, Clock, CalendarRange, Briefcase, TrendingUp, TrendingDown } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock,
+  CalendarRange,
+  Briefcase,
+  TrendingUp,
+  Activity,
+} from "lucide-react";
 import type { Processo, FiltroPrazo } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
 
@@ -22,55 +29,49 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
   const cards: Array<{
     key: FiltroPrazo;
     label: string;
+    code: string;
     value: number | string;
     sub: string;
     icon: typeof AlertTriangle;
-    accent: string;
-    iconBg: string;
-    glow: string;
-    trend?: { up: boolean; text: string };
+    color: string;
+    extra?: string;
   }> = [
     {
       key: "todos",
-      label: "Total de processos",
+      label: "Total",
+      code: "TOT",
       value: processos.length,
-      sub: `${ativos.length} em andamento`,
+      sub: `${ativos.length} ativos`,
       icon: Briefcase,
-      accent: "text-primary-glow",
-      iconBg: "bg-primary/10",
-      glow: "from-primary-glow/20",
-      trend: { up: true, text: `${taxaConclusao}% concluídos` },
+      color: "oklch(0.78 0.16 220)",
+      extra: `${taxaConclusao}% conclusão`,
     },
     {
       key: "vencidos",
-      label: "Prazos vencidos",
+      label: "Vencidos",
+      code: "OVR",
       value: vencidos,
-      sub: "Requer ação imediata",
+      sub: vencidos > 0 ? "ação imediata" : "tudo em dia",
       icon: AlertTriangle,
-      accent: "text-[var(--deadline-overdue)]",
-      iconBg: "bg-[var(--deadline-overdue-bg)]",
-      glow: "from-[var(--deadline-overdue)]/20",
-      trend: vencidos > 0 ? { up: false, text: "Atenção urgente" } : undefined,
+      color: "oklch(0.72 0.24 22)",
     },
     {
       key: "hoje",
-      label: "Vencem hoje",
+      label: "Hoje",
+      code: "TDY",
       value: hoje,
-      sub: hoje > 0 ? "Priorizar agenda" : "Nenhum prazo hoje",
+      sub: hoje > 0 ? "priorizar" : "sem prazos",
       icon: Clock,
-      accent: "text-[var(--deadline-today)]",
-      iconBg: "bg-[var(--deadline-today-bg)]",
-      glow: "from-[var(--deadline-today)]/20",
+      color: "oklch(0.82 0.2 60)",
     },
     {
       key: "semana",
-      label: "Próximos 7 dias",
+      label: "7 dias",
+      code: "WK",
       value: semana,
-      sub: "Planejar a semana",
+      sub: "planejar semana",
       icon: CalendarRange,
-      accent: "text-[var(--deadline-soon)]",
-      iconBg: "bg-[var(--deadline-soon-bg)]",
-      glow: "from-[var(--deadline-soon)]/20",
+      color: "oklch(0.85 0.18 95)",
     },
   ];
 
@@ -79,42 +80,69 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
       {cards.map((c, i) => {
         const Icon = c.icon;
         const active = filtro === c.key;
-        const Trend = c.trend?.up ? TrendingUp : TrendingDown;
         return (
           <button
             key={c.key}
             onClick={() => onFiltroChange(active ? "todos" : c.key)}
             style={{ animationDelay: `${i * 60}ms` }}
-            className={`group relative text-left rounded-2xl border bg-card p-4 sm:p-5 overflow-hidden transition-[var(--transition-smooth)] hover:shadow-[var(--shadow-card-hover)] hover:-translate-y-0.5 animate-fade-in-up ${
+            className={`group relative text-left rounded-xl border bg-card/60 backdrop-blur p-4 sm:p-5 overflow-hidden transition-[var(--transition-smooth)] hover:-translate-y-0.5 animate-fade-in-up ${
               active
-                ? "border-primary/60 ring-2 ring-primary/30 shadow-[var(--shadow-card-hover)]"
-                : "border-border shadow-[var(--shadow-card)]"
+                ? "border-primary/60 ring-2 ring-primary/30 shadow-glow"
+                : "border-border hover:border-primary/30 hover:shadow-[var(--shadow-card-hover)]"
             }`}
           >
-            {/* Glow decorativo */}
-            <div className={`pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full bg-gradient-to-br ${c.glow} to-transparent blur-2xl opacity-70 transition-opacity group-hover:opacity-100`} />
+            {/* Glow */}
+            <div
+              className="pointer-events-none absolute -top-12 -right-12 h-32 w-32 rounded-full blur-3xl opacity-50 group-hover:opacity-80 transition-opacity"
+              style={{ background: `radial-gradient(circle, ${c.color} 0%, transparent 70%)` }}
+            />
+            {/* Grid pattern */}
+            <div className="pointer-events-none absolute inset-0 pattern-grid-sm opacity-30" />
 
+            {/* Top: code + icon */}
             <div className="relative flex items-start justify-between mb-3">
-              <span className={`rounded-xl p-2.5 ${c.iconBg}`}>
-                <Icon className={`h-5 w-5 ${c.accent}`} />
+              <span
+                className="text-[10px] font-mono-tech font-bold tracking-[0.2em] uppercase"
+                style={{ color: c.color }}
+              >
+                {c.code}_
               </span>
-              {c.trend && (
-                <span className={`inline-flex items-center gap-1 text-[10px] font-medium ${c.trend.up ? "text-[var(--deadline-safe)]" : "text-[var(--deadline-overdue)]"}`}>
-                  <Trend className="h-3 w-3" />
-                  {c.trend.text}
-                </span>
-              )}
+              <span
+                className="rounded-lg p-2 border"
+                style={{
+                  backgroundColor: `color-mix(in oklab, ${c.color} 12%, transparent)`,
+                  borderColor: `color-mix(in oklab, ${c.color} 30%, transparent)`,
+                }}
+              >
+                <Icon className="h-4 w-4" style={{ color: c.color }} />
+              </span>
             </div>
 
             <div className="relative">
-              <div className="text-3xl sm:text-4xl font-bold tabular-nums text-foreground tracking-tight">
+              <div
+                className="text-3xl sm:text-4xl font-bold tabular-nums tracking-tight font-mono-tech"
+                style={{ color: c.color, textShadow: `0 0 24px ${c.color}40` }}
+              >
                 {c.value}
               </div>
-              <p className="text-xs sm:text-sm text-foreground font-semibold mt-1">
-                {c.label}
+              <p className="text-[13px] text-foreground font-semibold mt-1">{c.label}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5 font-mono-tech uppercase tracking-wider">
+                {c.sub}
               </p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">{c.sub}</p>
+              {c.extra && (
+                <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <TrendingUp className="h-3 w-3" style={{ color: c.color }} />
+                  <span>{c.extra}</span>
+                </div>
+              )}
             </div>
+
+            {active && (
+              <div className="absolute top-2 right-2 flex items-center gap-1 text-[9px] font-mono-tech text-primary">
+                <Activity className="h-2.5 w-2.5 animate-pulse" />
+                LIVE
+              </div>
+            )}
           </button>
         );
       })}
