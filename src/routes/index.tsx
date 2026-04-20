@@ -241,13 +241,12 @@ function Index() {
             </Button>
 
             <div className="hidden sm:block">
-              <h2 className="font-bold text-lg sm:text-xl tracking-tight leading-none">
-                {aba === "quadro" ? "Quadro de Processos" : "Estatísticas & Resultados"}
+              <h2 className="font-bold text-lg sm:text-xl tracking-tight leading-none font-mono-tech">
+                {aba === "quadro" ? "// CONTROLE DE PROCESSOS" : "// ANALYTICS DASHBOARD"}
               </h2>
-              <p className="text-xs text-primary-foreground/70 mt-1">
-                {aba === "quadro"
-                  ? "Acompanhe seus processos em tempo real"
-                  : "Performance do escritório em números"}
+              <p className="text-[10px] text-primary-foreground/60 mt-1.5 font-mono-tech tracking-wider uppercase flex items-center gap-2">
+                <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.78_0.18_160)] shadow-[0_0_6px_oklch(0.78_0.18_160)] animate-pulse" />
+                {aba === "quadro" ? "monitorando em tempo real" : "performance & metrics"}
               </p>
             </div>
 
@@ -258,8 +257,8 @@ function Index() {
                 <Input
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
-                  placeholder="Buscar processo, cliente..."
-                  className="pl-9 h-10 bg-white/10 border-white/20 text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:bg-white/15 focus-visible:ring-white/30"
+                  placeholder="$ buscar processo, parte..."
+                  className="pl-9 h-10 bg-white/5 border-white/15 text-primary-foreground placeholder:text-primary-foreground/40 placeholder:font-mono-tech focus-visible:bg-white/10 focus-visible:ring-primary/50 font-mono-tech text-xs"
                 />
               </div>
             </div>
