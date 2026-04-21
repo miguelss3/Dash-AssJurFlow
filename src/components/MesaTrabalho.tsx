@@ -12,20 +12,30 @@ interface Props {
 
 export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove }: Props) {
   const grupos = useMemo(() => {
+    console.log("📊 MesaTrabalho - Total de processos recebidos:", processos.length);
+    
     const ativos = processos.filter((p) => p.status !== "concluido");
+    console.log("📊 Processos ativos (não concluídos):", ativos.length);
+    
     const tipos: TipoProcesso[] =
       filtroTipo === "todos" ? ["DU", "PA"] : [filtroTipo as TipoProcesso];
 
     const result: { tipo: TipoProcesso; assessores: { nome: string; itens: Processo[] }[] }[] = [];
 
     for (const tipo of tipos) {
-      const doTipo = ativos.filter((p) => p.tipo === tipo);
+      // Usa 'setor' se existir (Firebase), senão 'tipo' (dados locais)
+      const doTipo = ativos.filter((p) => (p.setor || p.tipo) === tipo);
+      console.log(`📊 Processos do tipo ${tipo}:`, doTipo.length);
+      
       const map = new Map<string, Processo[]>();
       doTipo.forEach((p) => {
         const r = p.responsavel || "Sem responsável";
         if (!map.has(r)) map.set(r, []);
         map.get(r)!.push(p);
       });
+      
+      console.log(`📊 Assessores encontrados para ${tipo}:`, Array.from(map.keys()));
+      
       const assessores = Array.from(map.entries())
         .map(([nome, itens]) => ({ nome, itens }))
         .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -33,6 +43,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove }
         result.push({ tipo, assessores });
       }
     }
+    
+    console.log("📊 Resultado final:", result);
     return result;
   }, [processos, filtroTipo]);
 

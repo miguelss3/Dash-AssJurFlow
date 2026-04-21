@@ -131,14 +131,19 @@ export function CalendarioPrazos({ processos, usuario }: Props) {
     processos
       .filter((p) => p.status !== "concluido")
       .forEach((p) => {
-        const k1 = p.prazo.slice(0, 10);
-        push(k1, {
-          tipo: "prazo-interno",
-          titulo: `${p.numero} • ${p.tipoAcao}`,
-          ref: p.numero,
-          responsavel: p.responsavel,
-          processo: p,
-        });
+        // Prazo interno (opcional)
+        if (p.prazo) {
+          const k1 = p.prazo.slice(0, 10);
+          push(k1, {
+            tipo: "prazo-interno",
+            titulo: `${p.numero} • ${p.tipoAcao}`,
+            ref: p.numero,
+            responsavel: p.responsavel,
+            processo: p,
+          });
+        }
+        
+        // Prazo fatal (opcional)
         if (p.prazoFatal) {
           const k2 = p.prazoFatal.slice(0, 10);
           push(k2, {

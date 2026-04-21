@@ -82,18 +82,33 @@ export function useAuth() {
         // Se autenticado no Firebase, carrega dados do localStorage
         const storedUser = readStored();
         if (storedUser) {
-          setUser({ ...storedUser, email: fbUser.email || undefined, uid: fbUser.uid });
+          const userData = { ...storedUser, email: fbUser.email || undefined, uid: fbUser.uid };
+          
+          // Se é admin, ajusta o role para refletir isso na UI
+          if (isAdmin(userData)) {
+            userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
+          }
+          
+          console.log("🔄 Dados carregados do localStorage:", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
+          setUser(userData);
         } else {
           // Fallback: cria um usuário básico
           const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
-          setUser({
+          const userData = {
             posto: "Maj",
             nome: fbUser.displayName || nomeExtraido,
             role: "ASSESSOR",
             secao: "AssJur",
             email: fbUser.email || undefined,
             uid: fbUser.uid,
-          });
+          };
+          
+          // Se é admin por email, ajusta o role
+          if (isAdmin(userData)) {
+            userData.role = "ADMIN UNIVERSAL";
+          }
+          
+          setUser(userData);
         }
       } else {
         setUser(null);

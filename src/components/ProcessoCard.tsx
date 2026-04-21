@@ -1,78 +1,241 @@
-import { Processo } from "@/hooks/useProcessos";
+import type { Processo, StatusProcesso } from "@/types/processo";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger,
-  DropdownMenuSeparator 
-} from "@/components/ui/dropdown-menu";
-import { MoreVertical, Clipboard, Edit, MessageSquare, Trash2 } from "lucide-react";
+  FileEdit, 
+  MessageSquare, 
+  Trash2, 
+  Send, 
+  CheckCircle,
+  Clock,
+  FileText,
+  User
+} from "lucide-react";
 import { toast } from "sonner";
+import { formatarData, diasRestantes } from "@/lib/prazo";
+import { AcoesDUModal } from "./modals/AcoesDUModal";
+import { AcoesPAModal } from "./modals/AcoesPAModal";
 
 interface ProcessoCardProps {
   processo: Processo;
+  onEdit?: (p: Processo) => void;
+  onDelete?: (id: string) => void;
+  onMove?: (id: string, status: StatusProcesso) => void;
+  showActions?: boolean;
 }
 
-export const ProcessoCard = ({ processo }: ProcessoCardProps) => {
+export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions = true }: ProcessoCardProps) => {
+  const p = processo;
+  const setor = p.setor || p.tipo;
+  const isDU = setor === "DU";
+  const isPA = setor === "PA";
   
-  // Função para a Clipboard API (SPED)
-  const copiarSPED = () => {
-    const texto = `NUP: ${processo.nup}\nInteressado: ${processo.interessado}\nAssunto: ${processo.assunto || "N/A"}`;
-    navigator.clipboard.writeText(texto);
-    toast.success("Dados copiados para o SPED!");
+  const [modalAcoesDU, setModalAcoesDU] = useState(false);
+  const [modalAcoesPA, setModalAcoesPA] = useState(false);
+  
+  // Função para abrir o chat do processo
+  const abrirChat = () => {
+    toast.info("Chat em desenvolvimento");
+    // TODO: Implementar modal de chat
+  };
+  
+  // Função para finalizar processo
+  const finalizarProcesso = () => {
+    if (window.confirm(`Deseja finalizar o processo ${p.numero}?`)) {
+      if (onMove) {
+        onMove(p.id, "concluido");
+        toast.success("Processo finalizado!");
+      }
+    }
+  };
+  
+  // Função de ações DU
+  const abrirAcoesDU = () => {
+    setModalAcoesDU(true);
+  };
+  
+  // Função de ações PA
+  const abrirAcoesPA = () => {
+    setModalAcoesPA(true);
   };
 
   return (
-    <Card className="p-4 bg-white shadow-sm border-l-4 border-l-sky-600 hover:shadow-md transition-shadow relative">
-      <div className="flex flex-col gap-2">
-        <div className="flex justify-between items-start">
-          <span className="text-[10px] font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded">
-            {processo.tipo || "PROCESSO"}
-          </span>
-          
-          {/* O Menu "⚡ Ação" que limpa a interface mobile */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <span className="sr-only">Abrir menu</span>
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40">
-              <DropdownMenuItem onClick={copiarSPED} className="cursor-pointer">
-                <Clipboard className="mr-2 h-4 w-4 text-sky-600" /> 📋 Copiar SPED
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
-                <Edit className="mr-2 h-4 w-4" /> Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
-                <MessageSquare className="mr-2 h-4 w-4" /> Chat
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600 cursor-pointer">
-                <Trash2 className="mr-2 h-4 w-4" /> Excluir
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <h4 className="font-bold text-sm text-slate-800 leading-tight">
-          {processo.nup}
-        </h4>
-        
-        <p className="text-xs text-slate-600 font-medium">
-          {processo.interessado}
-        </p>
-
-        {processo.prazoFatal && (
-          <div className="mt-2 pt-2 border-t border-slate-50 flex items-center justify-between">
-            <span className="text-[10px] text-slate-400 uppercase font-bold">Prazo Fatal</span>
-            <span className="text-[10px] font-bold text-red-600">{processo.prazoFatal}</span>
+    <>
+      <Card className="p-4 bg-white shadow-sm border-l-4 border-l-sky-600 hover:shadow-md transition-shadow relative group">
+        <div className="flex flex-col gap-3">
+          {/* Header com badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+              isDU ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
+            }`}>
+              {setor}
+            </span>
+            <span className="text-xs font-mono font-bold text-slate-500">{p.numero}</span>
           </div>
-        )}
-      </div>
-    </Card>
+
+          {/* Título - Assunto */}
+          <h4 className="font-bold text-sm text-slate-800 leading-tight line-clamp-2">
+            {p.tipoAcao}
+          </h4>
+          
+          {/* Informações principais */}
+          <div className="text-xs text-slate-600 space-y-1">
+            <p className="flex items-center gap-1">
+              <User className="w-3 h-3" />
+              <strong>Parte:</strong> {p.cliente}
+            </p>
+            {p.responsavel && (
+              <p className="flex items-center gap-1 text-sky-700 font-semibold">
+                <User className="w-3 h-3" />
+                Assessor: {p.responsavel}
+              </p>
+            )}
+          </div>
+
+          {/* Prazo Fatal */}
+          {p.prazoFatal && (
+            <div className={`mt-2 pt-2 border-t flex items-center justify-between ${
+              diasRestantes(p.prazoFatal) <= 5 ? 'border-red-200' : 'border-slate-100'
+            }`}>
+              <span className="text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                Prazo Fatal
+              </span>
+              <span className={`text-[10px] font-bold ${
+                diasRestantes(p.prazoFatal) <= 5 ? 'text-red-600 animate-pulse' : 'text-slate-600'
+              }`}>
+                {formatarData(p.prazoFatal)}
+                {diasRestantes(p.prazoFatal) > 0 && (
+                  <span className="ml-1">({diasRestantes(p.prazoFatal)}d)</span>
+                )}
+              </span>
+            </div>
+          )}
+
+          {/* Botões de Ação */}
+          {showActions && (
+            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100">
+              {/* Botão Ação (DU ou PA) */}
+              {isDU ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-sky-300 text-sky-700 hover:bg-sky-50 text-xs h-9"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    abrirAcoesDU();
+                  }}
+                >
+                  <Send className="w-3 h-3 mr-1" />
+                  Ação
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-purple-300 text-purple-700 hover:bg-purple-50 text-xs h-9"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    abrirAcoesPA();
+                  }}
+                >
+                  <FileText className="w-3 h-3 mr-1" />
+                  Ação
+                </Button>
+              )}
+
+              {/* Botão Editar */}
+              {onEdit && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-amber-300 text-amber-700 hover:bg-amber-50 text-xs h-9"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(p);
+                  }}
+                >
+                  <FileEdit className="w-3 h-3 mr-1" />
+                  Editar
+                </Button>
+              )}
+
+              {/* Botão Chat */}
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-slate-300 text-slate-600 hover:bg-slate-50 text-xs h-9"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  abrirChat();
+                }}
+              >
+                <MessageSquare className="w-3 h-3 mr-1" />
+                Chat
+              </Button>
+
+              {/* Botão Finalizar ou Excluir */}
+              {p.status !== "concluido" ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs h-9"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    finalizarProcesso();
+                  }}
+                >
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Finalizar
+                </Button>
+              ) : onDelete && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-9"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`Excluir processo ${p.numero}?`)) {
+                      onDelete(p.id);
+                    }
+                  }}
+                >
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  Excluir
+                </Button>
+              )}
+            </div>
+          )}
+
+          {/* Última movimentação */}
+          {p.descricao && (
+            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">
+                Último Movimento
+              </div>
+              <div className="text-xs text-slate-700 leading-snug line-clamp-2">
+                {p.descricao}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Modais de Ações */}
+      <AcoesDUModal
+        open={modalAcoesDU}
+        onOpenChange={setModalAcoesDU}
+        processoId={p.id}
+        numeroProcesso={p.numero}
+      />
+
+      <AcoesPAModal
+        open={modalAcoesPA}
+        onOpenChange={setModalAcoesPA}
+        processoId={p.id}
+        numeroProcesso={p.numero}
+      />
+    </>
   );
 };

@@ -514,13 +514,18 @@ function Index() {
 
               {/* Visão do setor: agrupado por assessor (estilo AssJur) */}
               {visao === "setor" ? (
-                <MesaTrabalho
-                  processos={filtrados}
-                  filtroTipo={filtroTipo}
-                  onEdit={handleEdit}
-                  onDelete={remover}
-                  onMove={moverStatus}
-                />
+                <>
+                  {console.log("🔍 Enviando para MesaTrabalho:", filtrados.length, "processos")}
+                  {console.log("🔍 FiltroTipo:", filtroTipo)}
+                  {console.log("🔍 Visão:", visao)}
+                  <MesaTrabalho
+                    processos={filtrados}
+                    filtroTipo={filtroTipo}
+                    onEdit={handleEdit}
+                    onDelete={remover}
+                    onMove={moverStatus}
+                  />
+                </>
               ) : (
                 <KanbanBoard
                   processos={filtrados}

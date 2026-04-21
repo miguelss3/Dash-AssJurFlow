@@ -23,6 +23,7 @@ export interface Processo {
   criadoEm: string;
   // Campos AssJur Flow
   tipo: TipoProcesso;
+  setor?: string;          // DU ou PA (vem do Firebase - sistema antigo)
   prioridade: Prioridade;
   secao: string;           // Ex: SFPC, SVP, DiEx, ICFEX
   origem: string;          // Ex: E-mail, Ofício, DiEx, SAPIENS

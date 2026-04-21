@@ -48,96 +48,135 @@ export function useProcessos() {
       console.log("🔍 Usuário regular. Carregando apenas processos de:", currentUser.email);
     }
 
-    // Aponta para a coleção "processos" real da 12ª RM no Firestore
+    // Estados internos para armazenar processos e distribuições separadamente
+    let processosCache: any[] = [];
+    let distribuicoesCache: any[] = [];
+
+    // Função para mesclar processos com distribuições
+    const mesclarProcessosComDistribuicoes = () => {
+      const listaProcessos: Processo[] = [];
+      
+      processosCache.forEach((procData) => {
+        // Busca a distribuição correspondente ao processo
+        const distribuicao = distribuicoesCache.find((d: any) => d.processoId === procData.id);
+        
+        // Mapeia status do sistema antigo para o novo
+        const statusMap: Record<string, StatusProcesso> = {
+          "Aguardando Distribuição": "novo",
+          "Distribuído": "andamento",
+          "Em Diligências": "andamento",
+          "Portaria Assinada": "andamento",
+          "Solução Concluída": "andamento",
+          "Aguardando Assinatura Cmt": "andamento",
+          "Pronto para Despacho Cmt": "andamento",
+          "Finalizado": "concluido"
+        };
+
+        const statusOriginal = procData.status || "andamento";
+        const statusMapeado: StatusProcesso = statusMap[statusOriginal] || "andamento";
+
+        // Pega a última mensagem do histórico como descrição
+        const historico = Array.isArray(procData.historico) ? procData.historico : [];
+        const ultimaMensagem = historico.length > 0 ? historico[historico.length - 1] : null;
+        const descricaoUltimoMovimento = ultimaMensagem?.texto || procData.ultimaAcaoDescricao || procData.descricao || "Sem movimentação";
+
+        const processoMapeado: Processo = {
+          id: procData.id,
+          // Mapeamento de campos Firebase → Interface Processo
+          numero: procData.numeroProcesso || procData.numero || "S/N",
+          cliente: procData.parte || procData.cliente || "Não informado",
+          vara: procData.vara || "N/A",
+          parteContraria: procData.parteContraria || "N/A",
+          tipoAcao: procData.assunto || procData.tipoAcao || "Sem assunto",
+          // IMPORTANTE: usa assessorNome da distribuição se existir, senão usa encarregado do processo
+          responsavel: distribuicao?.assessorNome || procData.encarregado || procData.responsavel || "Sem responsável",
+          prazo: procData.prazoInternoDU || procData.prazo,
+          prazoFatal: procData.prazoFatalDU || procData.prazoFatal,
+          descricao: descricaoUltimoMovimento,
+          status: statusMapeado,
+          criadoEm: procData.criadoEm || procData.dataEntrada || new Date().toISOString(),
+          // Campos específicos AssJur Flow
+          tipo: (procData.setor || procData.tipo || "OUTRO") as any,
+          setor: procData.setor,
+          prioridade: (procData.prioridade || "normal") as any,
+          secao: procData.secaoDU || procData.secao || "N/A",
+          origem: procData.origemDU || procData.origem || "N/A",
+          subtipo: procData.tipoPA || procData.subtipo,
+          faseAtual: procData.status || procData.faseAtual,
+          inicioPrazo: procData.dataInicialPrazo || procData.inicioPrazo,
+          finalPrazo: procData.prazoFatalDU || procData.finalPrazo,
+          entrada: procData.dataEntrada || procData.entrada,
+          userId: procData.userId || procData.criadoPorId,
+          userEmail: procData.userEmail
+        };
+        
+        listaProcessos.push(processoMapeado);
+      });
+      
+      // Debug
+      if (listaProcessos.length > 0) {
+        console.log("🔄 Mapeamento com distribuições:");
+        console.log(`  Total processos: ${listaProcessos.length}`);
+        console.log(`  Total distribuições: ${distribuicoesCache.length}`);
+        console.log("  Exemplo - responsável:", listaProcessos[0].responsavel);
+        console.log("  Exemplo - último movimento:", listaProcessos[0].descricao);
+        
+        const finalizados = listaProcessos.filter(p => p.status === "concluido").length;
+        const ativos = listaProcessos.length - finalizados;
+        console.log(`📊 Total: ${listaProcessos.length} | Ativos: ${ativos} | Finalizados: ${finalizados}`);
+      }
+      
+      setProcessos(listaProcessos);
+      setCarregando(false);
+      setErro(null);
+    };
+
+    // Aponta para as coleções do Firestore
     const processosRef = collection(db, "processos");
+    const distribuicoesRef = collection(db, "distribuicoes");
     
-    // Query condicional: 
+    // Query condicional para processos: 
     // - Admin: carrega TODOS os processos (sem filtro)
     // - Usuário regular: carrega apenas os processos dele (com filtro)
-    const q = ehAdmin 
+    const qProcessos = ehAdmin 
       ? query(processosRef)  // SEM filtro - carrega tudo
       : query(processosRef, where("userId", "==", currentUser.uid));  // COM filtro - apenas do usuário
 
-    // O onSnapshot fica "ouvindo" o banco. Qualquer mudança reflete na tela na hora.
-    const unsubscribe = onSnapshot(
-      q,
+    // Listener 1: Processos
+    const unsubProcessos = onSnapshot(
+      qProcessos,
       (snapshot) => {
-        const listaProcessos: Processo[] = [];
-        snapshot.forEach((docSnap) => {
-          listaProcessos.push({ id: docSnap.id, ...docSnap.data() } as Processo);
-        });
-        
-        setProcessos(listaProcessos);
-        
-        if (ehAdmin) {
-          console.log(`✅ ${listaProcessos.length} processos carregados (ADMIN - todos os processos)`);
-        } else {
-          console.log(`✅ ${listaProcessos.length} processos carregados para ${currentUser.email}`);
-        }
-        
-        setCarregando(false);
-        setErro(null);
+        processosCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log(`✅ ${processosCache.length} processos carregados do Firebase`);
+        mesclarProcessosComDistribuicoes();
       },
       (err) => {
-        console.error("❌ Erro ao buscar processos do Firebase:", err);
-        console.error("❌ Código do erro:", err.code);
-        console.error("❌ Mensagem:", err.message);
-        console.warn("⚠️ Configure as regras do Firestore. Ver FIREBASE_SETUP.md");
-        console.warn("⚠️ Usando dados mockados temporariamente...");
-        
-        // Dados mockados para desenvolvimento enquanto Firebase não está configurado
-        const nomeUsuario = currentUser?.displayName || (currentUser?.email ? currentUser.email.split("@")[0] : "Usuário");
-        const processosMock: Processo[] = [
-          {
-            id: "mock-1",
-            numero: "1234567-89.2026.4.01.3600",
-            cliente: "Sgt Silva",
-            vara: "1ª Vara Federal",
-            parteContraria: "União",
-            tipoAcao: "Mandado de Segurança",
-            responsavel: nomeUsuario,
-            prazo: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-            descricao: "Aguardando decisão liminar",
-            status: "andamento" as StatusProcesso,
-            criadoEm: new Date().toISOString(),
-            tipo: "DU" as const,
-            prioridade: "urgente" as const,
-            secao: "AssJur",
-            origem: "E-mail",
-            userId: currentUser?.uid,
-            userEmail: currentUser?.email || undefined
-          },
-          {
-            id: "mock-2",
-            numero: "IPM 001/2026",
-            cliente: "Cb Santos",
-            vara: "N/A",
-            parteContraria: "N/A",
-            tipoAcao: "Inquérito Policial Militar",
-            responsavel: nomeUsuario,
-            prazo: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-            descricao: "Em fase de diligências",
-            status: "andamento" as StatusProcesso,
-            criadoEm: new Date().toISOString(),
-            tipo: "PA" as const,
-            prioridade: "normal" as const,
-            secao: "SFPC",
-            origem: "Ofício",
-            subtipo: "IPM",
-            faseAtual: "Em diligência",
-            userId: currentUser?.uid,
-            userEmail: currentUser?.email || undefined
-          }
-        ];
-        
-        setProcessos(processosMock);
-        setErro(`Firebase: ${err.code || "erro desconhecido"}. Usando dados mock.`);
+        console.error("❌ Erro ao buscar processos:", err);
+        setErro("Erro ao carregar processos");
         setCarregando(false);
       }
     );
 
-    // Desliga o ouvinte quando o usuário sai da tela
-    return () => unsubscribe();
+    // Listener 2: Distribuições (sempre carrega todas para admin fazer o merge)
+    const unsubDistribuicoes = onSnapshot(
+      distribuicoesRef,
+      (snapshot) => {
+        distribuicoesCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log(`✅ ${distribuicoesCache.length} distribuições carregadas do Firebase`);
+        mesclarProcessosComDistribuicoes();
+      },
+      (err) => {
+        console.error("❌ Erro ao buscar distribuições:", err);
+        // Continua mesmo se falhar, apenas sem as distribuições
+        mesclarProcessosComDistribuicoes();
+      }
+    );
+
+    // Cleanup: desinscreve dos listeners ao desmontar
+    return () => {
+      unsubProcessos();
+      unsubDistribuicoes();
+    };
   }, [auth.currentUser?.uid]); // Recarrega quando o usuário muda
 
   // Função para criar novo processo
