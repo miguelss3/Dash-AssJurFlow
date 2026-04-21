@@ -179,11 +179,17 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     const tipos: TipoProcesso[] =
       filtroTipo === "todos" ? ["DU", "PA"] : [filtroTipo as TipoProcesso];
 
-    const result: { tipo: TipoProcesso; assessores: { nome: string; itens: Processo[] }[] }[] = [];
+    const result: {
+      tipo: TipoProcesso;
+      assessores: { nome: string; itensAtivos: Processo[]; itensConcluidos: Processo[] }[];
+    }[] = [];
 
     for (const tipo of tipos) {
       // Usa 'setor' se existir (Firebase), senão 'tipo' (dados locais)
       const doTipo = ativos.filter((p) => (p.setor || p.tipo) === tipo);
+      const concluidosDoTipo = processosEfetivos.filter(
+        (p) => (p.setor || p.tipo) === tipo && p.status === "concluido",
+      );
       // console.log(`📊 Processos do tipo ${tipo}:`, doTipo.length);
 
       const isPendenteChefia = (p: Processo) => {
@@ -197,10 +203,11 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       const pendenciasChefia = ehAdmin ? doTipo.filter(isPendenteChefia) : [];
       const doTipoSemPendenciasChefia = ehAdmin ? doTipo.filter((p) => !isPendenteChefia(p)) : doTipo;
       
-      const map = new Map<string, Processo[]>();
+      const mapAtivos = new Map<string, Processo[]>();
+      const mapConcluidos = new Map<string, Processo[]>();
 
       if (ehAdmin && pendenciasChefia.length > 0) {
-        map.set("MESA DO CHEFE", pendenciasChefia);
+        mapAtivos.set("MESA DO CHEFE", pendenciasChefia);
       }
       
       // Adiciona os processos aos seus responsáveis
@@ -210,27 +217,45 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         if (!responsavelKey || responsavelKey === "Sem responsável" || responsavelKey.trim() === "") {
           responsavelKey = "📥 Aguardando Distribuição";
         }
-        if (!map.has(responsavelKey)) map.set(responsavelKey, []);
-        map.get(responsavelKey)!.push(p);
+        if (!mapAtivos.has(responsavelKey)) mapAtivos.set(responsavelKey, []);
+        mapAtivos.get(responsavelKey)!.push(p);
+      });
+
+      concluidosDoTipo.forEach((p) => {
+        let responsavelKey = p.responsavel || "";
+        if (!responsavelKey || responsavelKey === "Sem responsável" || responsavelKey.trim() === "") {
+          responsavelKey = "📥 Aguardando Distribuição";
+        }
+        if (!mapConcluidos.has(responsavelKey)) mapConcluidos.set(responsavelKey, []);
+        mapConcluidos.get(responsavelKey)!.push(p);
       });
       
       // Adiciona todos os assessores do setor (mesmo sem processos)
       const assessoresDesteTipo = assessoresDoSetor.filter(a => a.setor === tipo);
       assessoresDesteTipo.forEach(assessor => {
-        if (!map.has(assessor.nome)) {
-          map.set(assessor.nome, []); // Coluna vazia
+        if (!mapAtivos.has(assessor.nome)) {
+          mapAtivos.set(assessor.nome, []); // Coluna vazia
+        }
+        if (!mapConcluidos.has(assessor.nome)) {
+          mapConcluidos.set(assessor.nome, []);
         }
       });
       
       // console.log(`📊 Assessores com colunas para ${tipo}:`, Array.from(map.keys()));
       
       // Ordena: "Aguardando Distribuição" primeiro (SE houver processos), depois ordem alfabética
-      const assessores = Array.from(map.entries())
-        .map(([nome, itens]) => ({ nome, itens }))
-        .filter(({ nome, itens }) => {
+      const nomesAssessores = Array.from(new Set([...mapAtivos.keys(), ...mapConcluidos.keys()]));
+
+      const assessores = nomesAssessores
+        .map((nome) => ({
+          nome,
+          itensAtivos: mapAtivos.get(nome) || [],
+          itensConcluidos: mapConcluidos.get(nome) || [],
+        }))
+        .filter(({ nome, itensAtivos, itensConcluidos }) => {
           // Só mostra "Aguardando Distribuição" se tiver processos
           if (nome.includes("📥 Aguardando")) {
-            return itens.length > 0;
+            return itensAtivos.length > 0 || itensConcluidos.length > 0;
           }
           return true; // Outros assessores sempre aparecem
         })
@@ -293,7 +318,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                     key={`${grupo.tipo}-${a.nome}`}
                     responsavel={a.nome}
                     tipo={grupo.tipo}
-                    processos={a.itens}
+                    processos={a.itensAtivos}
+                    processosConcluidos={a.itensConcluidos}
                     ehAdmin={ehAdmin}
                     onEdit={onEdit}
                     onDelete={onDelete}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SoldierAvatar } from "@/components/SoldierAvatar";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
@@ -22,17 +22,26 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProcessos } from "@/hooks/useProcessos";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, getDoc, getDocs, query, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
 import { Dashboard } from "@/components/Dashboard";
-import { KanbanBoard } from "@/components/KanbanBoard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
-import { CadastroProcessoModal } from "@/components/CadastroProcessoModal";
-import { Estatisticas } from "@/components/Estatisticas";
-import { CalendarioPrazos } from "@/components/CalendarioPrazos";
-import { GestaoEquipe } from "@/components/GestaoEquipe";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
+
+const KanbanBoard = lazy(() =>
+  import("@/components/KanbanBoard").then((m) => ({ default: m.KanbanBoard })),
+);
+const CadastroProcessoModal = lazy(() =>
+  import("@/components/CadastroProcessoModal").then((m) => ({ default: m.CadastroProcessoModal })),
+);
+const Estatisticas = lazy(() =>
+  import("@/components/Estatisticas").then((m) => ({ default: m.Estatisticas })),
+);
+const CalendarioPrazos = lazy(() =>
+  import("@/components/CalendarioPrazos").then((m) => ({ default: m.CalendarioPrazos })),
+);
+const GestaoEquipe = lazy(() =>
+  import("@/components/GestaoEquipe").then((m) => ({ default: m.GestaoEquipe })),
+);
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -203,6 +212,9 @@ function Index() {
   }, [user]);
 
   const registrarMovimentacao = async (processoId: string, texto: string) => {
+    const { db } = await import("@/lib/firebase");
+    const { collection, addDoc, doc, getDoc, setDoc, Timestamp } = await import("firebase/firestore");
+
     const agoraISO = new Date().toISOString();
     const autor = nomeMilitarAtual;
     const autorId = user?.uid || "sistema";
@@ -278,6 +290,9 @@ function Index() {
 
   const handleRedistribuir = async (processoId: string, novoResponsavel: string) => {
     try {
+      const { db } = await import("@/lib/firebase");
+      const { collection, addDoc, getDocs, query, updateDoc, where } = await import("firebase/firestore");
+
       console.log("📦 Redistribuindo processo:", processoId, "→", novoResponsavel || "Aguardando Distribuição");
       
       const processo = processos.find((p) => p.id === processoId);
@@ -701,7 +716,9 @@ function Index() {
           )}
 
           {aba === "prazos" && (
-            <CalendarioPrazos processos={processos} usuario={usuario} />
+            <Suspense fallback={<TabLoading label="Carregando controle de prazos..." />}>
+              <CalendarioPrazos processos={processos} usuario={usuario} />
+            </Suspense>
           )}
 
           {aba === "arquivo" && (
@@ -720,21 +737,41 @@ function Index() {
             />
           )}
 
-          {aba === "indicadores" && <Estatisticas processos={processos} />}
+          {aba === "indicadores" && (
+            <Suspense fallback={<TabLoading label="Carregando indicadores..." />}>
+              <Estatisticas processos={processos} />
+            </Suspense>
+          )}
 
-          {aba === "equipe" && <GestaoEquipe />}
+          {aba === "equipe" && (
+            <Suspense fallback={<TabLoading label="Carregando gestão da equipe..." />}>
+              <GestaoEquipe />
+            </Suspense>
+          )}
         </main>
       </div>
 
-      <CadastroProcessoModal
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        processo={editing}
-        onSuccess={() => {
-          setDialogOpen(false);
-          setEditing(null);
-        }}
-      />
+      {dialogOpen && (
+        <Suspense fallback={null}>
+          <CadastroProcessoModal
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            processo={editing}
+            onSuccess={() => {
+              setDialogOpen(false);
+              setEditing(null);
+            }}
+          />
+        </Suspense>
+      )}
+    </div>
+  );
+}
+
+function TabLoading({ label }: { label: string }) {
+  return (
+    <div className="rounded-2xl bg-card border border-border p-6 text-sm text-muted-foreground">
+      {label}
     </div>
   );
 }
@@ -770,13 +807,15 @@ function EmptyTab({
             </div>
           </div>
         </div>
-        <KanbanBoard
-          processos={processos}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onMove={onMove}
-          onAdd={() => {}}
-        />
+        <Suspense fallback={<TabLoading label="Carregando quadro de processos..." />}>
+          <KanbanBoard
+            processos={processos}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onMove={onMove}
+            onAdd={() => {}}
+          />
+        </Suspense>
       </div>
     );
   }

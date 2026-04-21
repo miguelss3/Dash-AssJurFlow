@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Processo } from "@/types/processo";
 import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -24,7 +24,7 @@ interface CadastroProcessoModalProps {
 
 const TIPOS_PA = ["IPM", "Sindicância", "Conselho de Disciplina", "Conselho de Justificação", "Investigação Preliminar", "Outros"];
 const ASSUNTOS_SINDICANCIA = ["Falta Injustificada", "Embriaguez", "Deserção", "Outros"];
-const ORIGENS_DU = ["SAPIENS", "Ofício", "E-mail", "Whatsapp", "Presencial", "Outros"];
+const ORIGENS_DU = ["SAPIENS", "Email", "MPF", "Justiça Federal", "Justiça Estadual", "Outros"];
 const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 
 // LOG DE VERIFICAÇÃO - ESTE LOG DEVE APARECER SEMPRE
@@ -32,6 +32,11 @@ const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 
 export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess }: CadastroProcessoModalProps) {
   const { user } = useAuth();
+  const ehAdminOuChefe = isAdmin(user);
+  const setorUsuarioNormalizado = (user?.setor || "").toString().trim().toUpperCase();
+  const podeCadastrarDU = ehAdminOuChefe || setorUsuarioNormalizado === "DU";
+  const podeCadastrarPA = ehAdminOuChefe || setorUsuarioNormalizado === "PA";
+  const setorPadraoPermitido: "DU" | "PA" | "" = podeCadastrarDU ? "DU" : (podeCadastrarPA ? "PA" : "");
   
   // console.log("🔐 CadastroProcessoModal - User logado:", user?.email || "Nenhum usuário");
   // console.log("🔐 Modal open?", open);
@@ -78,7 +83,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
   }, [open, processo]);
 
   const resetForm = () => {
-    setSetor("");
+    setSetor(setorPadraoPermitido);
     setNumeroProcesso("");
     setParte("");
     setAssunto("");
@@ -210,6 +215,18 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       // console.log("❌ VALIDAÇÃO FALHOU: setor vazio");
       toast.error("Selecione o setor.");
       return;
+    }
+
+    // Regra de negócio: assessor DU só cadastra DU; assessor PA só cadastra PA.
+    if (!ehAdminOuChefe) {
+      if (setor === "DU" && !podeCadastrarDU) {
+        toast.error("Seu perfil não permite cadastrar processos DU.");
+        return;
+      }
+      if (setor === "PA" && !podeCadastrarPA) {
+        toast.error("Seu perfil não permite cadastrar processos PA.");
+        return;
+      }
     }
     if (!numeroProcesso.trim()) {
       // console.log("❌ VALIDAÇÃO FALHOU: numeroProcesso vazio");
@@ -557,15 +574,25 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
                 // console.log("🔄 Setor selecionado:", v);
                 setSetor(v as "DU" | "PA");
               }}
+              disabled={!ehAdminOuChefe}
             >
               <SelectTrigger id="setor">
                 <SelectValue placeholder="Selecione o Setor" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="DU">Defesa de Usuários (DU)</SelectItem>
-                <SelectItem value="PA">Processos Administrativos (PA)</SelectItem>
+                {podeCadastrarDU && (
+                  <SelectItem value="DU">Defesa de Usuários (DU)</SelectItem>
+                )}
+                {podeCadastrarPA && (
+                  <SelectItem value="PA">Processos Administrativos (PA)</SelectItem>
+                )}
               </SelectContent>
             </Select>
+            {!ehAdminOuChefe && (
+              <p className="text-xs text-muted-foreground">
+                Seu perfil permite cadastro apenas no setor {setorPadraoPermitido || "vinculado"}.
+              </p>
+            )}
           </div>
 
           {/* Tipo PA */}

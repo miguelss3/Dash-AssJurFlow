@@ -82,27 +82,43 @@ export function useProcessos() {
         // Busca a distribuição correspondente ao processo
         const distribuicao = distribuicoesCache.find((d: any) => d.processoId === procData.id);
         
-        // Mapeia status do sistema antigo para o novo
-        const statusMap: Record<string, StatusProcesso> = {
-          "Aguardando Distribuição": "novo",
-          "Distribuído": "andamento",
-          "Em Diligências": "andamento",
-          "Portaria Assinada": "andamento",
-          "Solução Concluída": "andamento",
-          "Aguardando Assinatura Cmt": "andamento",
-          "Pronto para Despacho Cmt": "andamento",
-          "Finalizado": "concluido"
+        // Mapeia status do sistema antigo/novo para o formato canônico da aplicação.
+        const statusOriginalRaw = (procData.status || "").toString();
+        const statusOriginalNorm = statusOriginalRaw
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .trim();
+
+        const statusMapLegacy: Record<string, StatusProcesso> = {
+          "aguardando distribuicao": "novo",
+          "distribuido": "andamento",
+          "em diligencias": "andamento",
+          "portaria assinada": "andamento",
+          "solucao concluida": "andamento",
+          "aguardando assinatura cmt": "andamento",
+          "pronto para despacho cmt": "andamento",
+          "finalizado": "concluido",
+          "concluido": "concluido",
+          "novo": "novo",
+          "andamento": "andamento",
+          "audiencia": "audiencia",
+          "recurso": "recurso",
         };
 
-        // Verifica se está finalizado (campo finalizado=true OU status="Finalizado")
-        const estaFinalizado = procData.finalizado === true || procData.status === "Finalizado";
+        // Verifica se está finalizado (compatível com dados legados e novos)
+        const estaFinalizado =
+          procData.finalizado === true ||
+          statusOriginalNorm === "finalizado" ||
+          statusOriginalNorm === "concluido";
         
         // if (estaFinalizado) {
         //   console.log(`⚠️ PROCESSO FINALIZADO: ${procData.numeroProcesso} (finalizado=${procData.finalizado}, status="${procData.status}")`);
         // }
         
-        const statusOriginal = procData.status || "andamento";
-        const statusMapeado: StatusProcesso = estaFinalizado ? "concluido" : (statusMap[statusOriginal] || "andamento");
+        const statusMapeado: StatusProcesso = estaFinalizado
+          ? "concluido"
+          : (statusMapLegacy[statusOriginalNorm] || "andamento");
 
         // Pega a última mensagem do histórico como descrição
         // Prioriza o array historico (sistema antigo), depois tenta outros campos

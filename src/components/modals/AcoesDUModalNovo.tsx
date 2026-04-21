@@ -50,6 +50,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
   // Estados para Registrar Resposta
   const [numeroOficio, setNumeroOficio] = useState("");
   const [numeroDiexResposta, setNumeroDiexResposta] = useState("");
+  const [destinoDocumentoResposta, setDestinoDocumentoResposta] = useState("");
   const [dataEnvio, setDataEnvio] = useState(new Date().toISOString().split("T")[0]);
   const [observacoesResposta, setObservacoesResposta] = useState("");
   const [tipoDestinoAtual, setTipoDestinoAtual] = useState<"interno" | "externo" | "">("");
@@ -88,6 +89,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     setObservacoesSubsidio("");
     setNumeroOficio("");
     setNumeroDiexResposta("");
+    setDestinoDocumentoResposta("");
     setDataEnvio(new Date().toISOString().split("T")[0]);
     setObservacoesResposta("");
   };
@@ -237,6 +239,11 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       return;
     }
 
+    if (!destinoDocumentoResposta.trim()) {
+      toast.error("Informe o destino do documento.");
+      return;
+    }
+
     try {
       const agoraISO = new Date().toISOString();
       const processoRef = doc(db, "processos", processoId);
@@ -248,6 +255,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       const respostaDU = {
         numeroOficio: numeroOficio.trim() || "",
         numeroDiex: numeroDiexResposta.trim() || "",
+        destinoDocumento: destinoDocumentoResposta.trim(),
         dataEnvio,
         observacoes: observacoesResposta.trim() || "",
         situacao: isAdmin(user) ? "processada_chefia" : "enviada_chefia",
@@ -255,7 +263,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         registradoPorNome: autorMilitar,
       };
 
-      let msgHistorico = `📤 Resposta enviada à chefia (Ofício: ${numeroOficio || "—"}, DIEx: ${numeroDiexResposta || "—"}) por ${autorMilitar}.`;
+      let msgHistorico = `📤 Resposta enviada à chefia (Ofício: ${numeroOficio || "—"}, DIEx: ${numeroDiexResposta || "—"}, Destino: ${destinoDocumentoResposta.trim()}) por ${autorMilitar}.`;
       let statusDestino = isAdmin(user) ? "Aguardando CHEM" : "Aguardando Conferência";
       let patchPedidoSubsidios: any = null;
 
@@ -340,7 +348,8 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
 
       await updateDoc(processoRef, {
         "respostaDU.situacao": "assinada_chem",
-        status: "Concluído",
+        status: "concluido",
+        finalizado: true,
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: user.email || "Sistema",
@@ -742,6 +751,15 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                 value={numeroDiexResposta} 
                 onChange={(e) => setNumeroDiexResposta(e.target.value)}
                 placeholder="Ex: DIEx Nr 123-AsseApAssJur" 
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Destino do Documento *</Label>
+              <Input
+                value={destinoDocumentoResposta}
+                onChange={(e) => setDestinoDocumentoResposta(e.target.value)}
+                placeholder="Ex: CHEM, Assessoria Jurídica, OM solicitante..."
               />
             </div>
 
