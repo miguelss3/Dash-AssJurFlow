@@ -25,7 +25,7 @@ import { useProcessos } from "@/hooks/useProcessos";
 import { Dashboard } from "@/components/Dashboard";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
-import { ProcessoDialog } from "@/components/ProcessoDialog";
+import { CadastroProcessoModal } from "@/components/CadastroProcessoModal";
 import { Estatisticas } from "@/components/Estatisticas";
 import { CalendarioPrazos } from "@/components/CalendarioPrazos";
 import { GestaoEquipe } from "@/components/GestaoEquipe";
@@ -568,12 +568,14 @@ function Index() {
         </main>
       </div>
 
-      <ProcessoDialog
+      <CadastroProcessoModal
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         processo={editing}
-        defaultStatus={defaultStatus}
-        onSave={handleSave}
+        onSuccess={() => {
+          setDialogOpen(false);
+          setEditing(null);
+        }}
       />
     </div>
   );

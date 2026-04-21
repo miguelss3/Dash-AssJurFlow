@@ -78,7 +78,25 @@ export function useProcessos() {
         // Pega a última mensagem do histórico como descrição
         const historico = Array.isArray(procData.historico) ? procData.historico : [];
         const ultimaMensagem = historico.length > 0 ? historico[historico.length - 1] : null;
-        const descricaoUltimoMovimento = ultimaMensagem?.texto || procData.ultimaAcaoDescricao || procData.descricao || "Sem movimentação";
+        const descricaoUltimoMovimento = ultimaMensagem?.texto 
+          || procData.ultimaAtualizacaoDescricao 
+          || procData.ultimaAcaoDescricao 
+          || procData.descricao 
+          || "Sem movimentação";
+
+        // Debug para processos sem último movimento
+        if (!ultimaMensagem && historico.length === 0 && procData.id) {
+          console.log(`⚠️ Processo ${procData.numeroProcesso || procData.id} sem histórico:`, {
+            temHistorico: !!procData.historico,
+            tipoHistorico: typeof procData.historico,
+            tamanho: historico.length,
+            procData: { 
+              ultimaAtualizacaoDescricao: procData.ultimaAtualizacaoDescricao,
+              ultimaAcaoDescricao: procData.ultimaAcaoDescricao,
+              descricao: procData.descricao
+            }
+          });
+        }
 
         const processoMapeado: Processo = {
           id: procData.id,
@@ -107,7 +125,16 @@ export function useProcessos() {
           finalPrazo: procData.prazoFatalDU || procData.finalPrazo,
           entrada: procData.dataEntrada || procData.entrada,
           userId: procData.userId || procData.criadoPorId,
-          userEmail: procData.userEmail
+          userEmail: procData.userEmail,
+          // Campos DU e PA específicos
+          origemDU: procData.origemDU,
+          secaoDU: procData.secaoDU,
+          isMS: procData.isMS || false,
+          dataEntrada: procData.dataEntrada,
+          observacoes: procData.observacoes,
+          tipoPA: procData.tipoPA,
+          encarregado: procData.encarregado,
+          atualizadoEm: procData.atualizadoEm
         };
         
         listaProcessos.push(processoMapeado);

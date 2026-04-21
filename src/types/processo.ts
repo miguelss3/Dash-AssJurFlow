@@ -21,13 +21,22 @@ export interface Processo {
   descricao: string;       // Último movimento
   status: StatusProcesso;
   criadoEm: string;
+  atualizadoEm?: string;
   // Campos AssJur Flow
   tipo: TipoProcesso;
   setor?: string;          // DU ou PA (vem do Firebase - sistema antigo)
   prioridade: Prioridade;
   secao: string;           // Ex: SFPC, SVP, DiEx, ICFEX
   origem: string;          // Ex: E-mail, Ofício, DiEx, SAPIENS
+  // Campos DU específicos
+  origemDU?: string;       // SAPIENS, Ofício, E-mail, Whatsapp, Presencial
+  secaoDU?: string;        // SVP, SJUR, SAJ
+  isMS?: boolean;          // É Mandado de Segurança / Urgente
+  dataEntrada?: string;    // ISO data de entrada
+  observacoes?: string;    // Observações adicionais
   // Específicos PA (Procedimento Apuratório)
+  tipoPA?: string;         // IPM, Sindicância, Conselho de Disciplina
+  encarregado?: string;    // Encarregado do PA
   subtipo?: string;        // IPM, Sindicância, Diligência
   faseAtual?: string;      // Em diligência, Portaria assinada, Para assinatura, Atrasado, Prazo não iniciado
   inicioPrazo?: string;    // ISO

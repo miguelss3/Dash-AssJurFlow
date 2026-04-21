@@ -2,6 +2,7 @@ import type { Processo, StatusProcesso } from "@/types/processo";
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
   FileEdit, 
   MessageSquare, 
@@ -10,12 +11,17 @@ import {
   CheckCircle,
   Clock,
   FileText,
-  User
+  User,
+  Calendar,
+  Mail,
+  Building2,
+  AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatarData, diasRestantes } from "@/lib/prazo";
 import { AcoesDUModal } from "./modals/AcoesDUModal";
 import { AcoesPAModal } from "./modals/AcoesPAModal";
+import { DetalhesProcessoModal } from "./DetalhesProcessoModal";
 
 interface ProcessoCardProps {
   processo: Processo;
@@ -33,6 +39,7 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
   
   const [modalAcoesDU, setModalAcoesDU] = useState(false);
   const [modalAcoesPA, setModalAcoesPA] = useState(false);
+  const [modalDetalhes, setModalDetalhes] = useState(false);
   
   // Função para abrir o chat do processo
   const abrirChat = () => {
@@ -62,16 +69,48 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
 
   return (
     <>
-      <Card className="p-4 bg-white shadow-sm border-l-4 border-l-sky-600 hover:shadow-md transition-shadow relative group">
+      <Card 
+        className="p-4 bg-white shadow-sm border-l-4 border-l-sky-600 hover:shadow-md transition-shadow relative group cursor-pointer"
+        onClick={() => setModalDetalhes(true)}
+      >
         <div className="flex flex-col gap-3">
           {/* Header com badges */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-              isDU ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
-            }`}>
-              {setor}
-            </span>
-            <span className="text-xs font-mono font-bold text-slate-500">{p.numero}</span>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                isDU ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
+              }`}>
+                {setor}
+              </span>
+              <span className="text-xs font-mono font-bold text-slate-500">{p.numero}</span>
+              
+              {/* Badge Prioridade/MS */}
+              {p.isMS && (
+                <Badge variant="destructive" className="text-[10px] h-5">
+                  <AlertCircle className="w-3 h-3 mr-1" />
+                  MS
+                </Badge>
+              )}
+              {p.prioridade === "urgente" && !p.isMS && (
+                <Badge variant="destructive" className="text-[10px] h-5">URGENTE</Badge>
+              )}
+              {p.prioridade === "normal" && (
+                <Badge variant="outline" className="text-[10px] h-5">Normal</Badge>
+              )}
+            </div>
+            
+            {/* Botão Limpar (só aparece no hover) */}
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-2 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+              onClick={(e) => {
+                e.stopPropagation();
+                toast.info("Função Limpar em desenvolvimento");
+              }}
+            >
+              Limpar
+            </Button>
           </div>
 
           {/* Título - Assunto */}
@@ -79,39 +118,69 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
             {p.tipoAcao}
           </h4>
           
+          {/* Badges de Prazos */}
+          <div className="flex items-center gap-3 text-[11px]">
+            {p.prazo && (
+              <div className="flex items-center gap-1 text-blue-600">
+                <Clock className="w-3 h-3" />
+                <span className="font-semibold">Interno:</span>
+                <span>{formatarData(p.prazo)}</span>
+              </div>
+            )}
+            {p.prazoFatal && (
+              <div className={`flex items-center gap-1 ${
+                diasRestantes(p.prazoFatal) <= 5 ? 'text-red-600 font-bold' : 'text-orange-600'
+              }`}>
+                <AlertCircle className="w-3 h-3" />
+                <span className="font-semibold">Fatal:</span>
+                <span>{formatarData(p.prazoFatal)}</span>
+              </div>
+            )}
+          </div>
+          
           {/* Informações principais */}
           <div className="text-xs text-slate-600 space-y-1">
             <p className="flex items-center gap-1">
               <User className="w-3 h-3" />
               <strong>Parte:</strong> {p.cliente}
             </p>
+            
+            {/* Entrada */}
+            {p.dataEntrada && (
+              <p className="flex items-center gap-1 text-slate-500">
+                <Calendar className="w-3 h-3" />
+                <strong>Entrada:</strong> {formatarData(p.dataEntrada)}
+              </p>
+            )}
+            
+            {/* DU - Seção e Origem */}
+            {isDU && (
+              <div className="flex items-center gap-3">
+                {p.secaoDU && (
+                  <p className="flex items-center gap-1">
+                    <Building2 className="w-3 h-3" />
+                    <strong>Seção:</strong> {p.secaoDU}
+                  </p>
+                )}
+                {p.origemDU && (
+                  <p className="flex items-center gap-1">
+                    <Mail className="w-3 h-3" />
+                    <strong>Origem:</strong> {p.origemDU}
+                  </p>
+                )}
+              </div>
+            )}
+            
+            {/* Responsável/Assessor */}
             {p.responsavel && (
               <p className="flex items-center gap-1 text-sky-700 font-semibold">
                 <User className="w-3 h-3" />
-                Assessor: {p.responsavel}
+                {isDU ? 'Assessor:' : 'Encarregado:'} {p.responsavel}
               </p>
             )}
           </div>
 
-          {/* Prazo Fatal */}
-          {p.prazoFatal && (
-            <div className={`mt-2 pt-2 border-t flex items-center justify-between ${
-              diasRestantes(p.prazoFatal) <= 5 ? 'border-red-200' : 'border-slate-100'
-            }`}>
-              <span className="text-[10px] text-slate-400 uppercase font-bold flex items-center gap-1">
-                <Clock className="w-3 h-3" />
-                Prazo Fatal
-              </span>
-              <span className={`text-[10px] font-bold ${
-                diasRestantes(p.prazoFatal) <= 5 ? 'text-red-600 animate-pulse' : 'text-slate-600'
-              }`}>
-                {formatarData(p.prazoFatal)}
-                {diasRestantes(p.prazoFatal) > 0 && (
-                  <span className="ml-1">({diasRestantes(p.prazoFatal)}d)</span>
-                )}
-              </span>
-            </div>
-          )}
+
 
           {/* Botões de Ação */}
           {showActions && (
@@ -235,6 +304,13 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
         onOpenChange={setModalAcoesPA}
         processoId={p.id}
         numeroProcesso={p.numero}
+      />
+
+      {/* Modal de Detalhes */}
+      <DetalhesProcessoModal
+        open={modalDetalhes}
+        onOpenChange={setModalDetalhes}
+        processo={p}
       />
     </>
   );
