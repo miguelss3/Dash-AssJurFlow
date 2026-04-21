@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProcessos } from "@/hooks/useProcessos";
 import { db } from "@/lib/firebase";
-import { collection, addDoc, doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, doc, getDoc, getDocs, query, setDoc, Timestamp, updateDoc, where } from "firebase/firestore";
 import { Dashboard } from "@/components/Dashboard";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
@@ -226,6 +226,77 @@ function Index() {
     else criar(dados);
   };
 
+  const nomeMilitarAtual = useMemo(() => {
+    if (!user) return "Sistema";
+    const nomeBase = user.nomeGuerra || user.nome || user.email?.split("@")[0] || "Usuário";
+    return user.posto ? `${user.posto} ${nomeBase}`.trim() : nomeBase;
+  }, [user]);
+
+  const registrarMovimentacao = async (processoId: string, texto: string) => {
+    const agoraISO = new Date().toISOString();
+    const autor = nomeMilitarAtual;
+    const autorId = user?.uid || "sistema";
+
+    const historicoRef = collection(db, `processos/${processoId}/historico`);
+    await addDoc(historicoRef, {
+      autor,
+      autorId,
+      texto,
+      timestamp: Timestamp.now(),
+    });
+
+    const mensagensRef = doc(db, "mensagens", processoId);
+    const mensagensSnap = await getDoc(mensagensRef);
+    const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
+    await setDoc(mensagensRef, {
+      historico: [...historicoExistente, {
+        id: crypto.randomUUID(),
+        autor,
+        autorId,
+        texto,
+        timestamp: agoraISO,
+      }]
+    });
+  };
+
+  const gerarNumeroClone = (numeroOriginal: string) => {
+    const sufixo = Math.floor(1000 + Math.random() * 9000);
+    return `${numeroOriginal}-CL${sufixo}`;
+  };
+
+  const handleClonarProcesso = async (processoId: string) => {
+    try {
+      const processoOriginal = processos.find((p) => p.id === processoId);
+      if (!processoOriginal) {
+        console.error("❌ Processo não encontrado para clonar:", processoId);
+        return;
+      }
+
+      const { id, criadoEm, userId, userEmail, ...dadosBase } = processoOriginal;
+      const agoraISO = new Date().toISOString();
+      const novoNumero = gerarNumeroClone(processoOriginal.numero);
+      const msgHistorico = `Processo clonado de ${processoOriginal.numero}`;
+
+      const novoProcessoId = await criar({
+        ...dadosBase,
+        numero: novoNumero,
+        status: "novo",
+        responsavel: "",
+        encarregado: "",
+        descricao: msgHistorico,
+        atualizadoEm: agoraISO,
+        atualizadoPorNome: nomeMilitarAtual,
+      });
+
+      // Garante que a clonagem apareça no chat/histórico do novo processo
+      await registrarMovimentacao(novoProcessoId, msgHistorico);
+
+      console.log("✅ Processo clonado com sucesso:", novoNumero);
+    } catch (error) {
+      console.error("❌ Erro ao clonar processo:", error);
+    }
+  };
+
   const handleRedistribuir = async (processoId: string, novoResponsavel: string) => {
     try {
       console.log("📦 Redistribuindo processo:", processoId, "→", novoResponsavel || "Aguardando Distribuição");
@@ -236,12 +307,17 @@ function Index() {
         return;
       }
       
-      const msgHistorico = novoResponsavel 
-        ? `Processo redistribuído para ${novoResponsavel}`
-        : "Processo retornado para Aguardando Distribuição";
+      const tinhaResponsavelAntes = !!processo.responsavel?.trim();
+      const vaiParaAguardando = !novoResponsavel?.trim();
+
+      const msgHistorico = vaiParaAguardando
+        ? "Processo retornado para Aguardando Distribuição"
+        : tinhaResponsavelAntes
+          ? `Processo redistribuído para ${novoResponsavel}`
+          : `Processo distribuído para ${novoResponsavel}`;
       
       const agoraISO = new Date().toISOString();
-      const autorNome = user?.email || "Sistema";
+      const autorNome = nomeMilitarAtual;
       
       // Atualiza o processo com responsável, data e autor
       await atualizar(processoId, {
@@ -250,33 +326,63 @@ function Index() {
         atualizadoEm: agoraISO,
         atualizadoPorNome: autorNome,
       });
+
+      // Mantém a coleção de distribuições em sincronia com o responsável atual.
+      // O board usa assessorNome dessa coleção para decidir a coluna de cada card.
+      const distribuicoesRef = collection(db, "distribuicoes");
+      const qDistrib = query(distribuicoesRef, where("processoId", "==", processoId));
+      const distribSnapshot = await getDocs(qDistrib);
+
+      if (distribSnapshot.empty) {
+        await addDoc(distribuicoesRef, {
+          processoId,
+          assessorId: "manual",
+          assessorNome: novoResponsavel,
+          prazo: "",
+          prioridade: "Normal",
+          dataDistribuicao: agoraISO,
+          atualizadoEm: agoraISO,
+        });
+      } else {
+        const updates = distribSnapshot.docs.map((docSnap) =>
+          updateDoc(docSnap.ref, {
+            assessorNome: novoResponsavel,
+            dataDistribuicao: agoraISO,
+            atualizadoEm: agoraISO,
+          })
+        );
+        await Promise.all(updates);
+      }
       
-      // Adicionar ao histórico (subcoleção)
-      const historicoRef = collection(db, `processos/${processoId}/historico`);
-      await addDoc(historicoRef, {
-        autor: user?.email?.split("@")[0] || "Sistema",
-        autorId: user?.uid || "sistema",
-        texto: msgHistorico,
-        timestamp: agoraISO,
-      });
-      
-      // Também salvar na coleção mensagens (compatibilidade)
-      const mensagensRef = doc(db, "mensagens", processoId);
-      const mensagensSnap = await getDoc(mensagensRef);
-      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
-      await setDoc(mensagensRef, {
-        historico: [...historicoExistente, {
-          id: crypto.randomUUID(),
-          autor: user?.email?.split("@")[0] || "Sistema",
-          autorId: user?.uid || "sistema",
-          texto: msgHistorico,
-          timestamp: agoraISO,
-        }]
-      });
+      await registrarMovimentacao(processoId, msgHistorico);
       
       console.log("✅ Processo redistribuído com sucesso!");
     } catch (error) {
       console.error("❌ Erro ao redistribuir processo:", error);
+    }
+  };
+
+  const handleMoverStatus = async (processoId: string, novoStatus: StatusProcesso) => {
+    try {
+      await moverStatus(processoId, novoStatus);
+
+      const rotulosStatus: Record<StatusProcesso, string> = {
+        novo: "Triagem",
+        andamento: "Em Andamento",
+        audiencia: "Audiência",
+        recurso: "Recurso",
+        concluido: "Concluído",
+      };
+
+      const msgHistorico = `Status alterado para ${rotulosStatus[novoStatus]}.`;
+      await atualizar(processoId, {
+        descricao: msgHistorico,
+        atualizadoEm: new Date().toISOString(),
+        atualizadoPorNome: nomeMilitarAtual,
+      });
+      await registrarMovimentacao(processoId, msgHistorico);
+    } catch (error) {
+      console.error("❌ Erro ao mover status:", error);
     }
   };
 
@@ -658,7 +764,8 @@ function Index() {
                     filtroTipo={filtroTipo}
                     onEdit={handleEdit}
                     onDelete={remover}
-                    onMove={moverStatus}
+                    onMove={handleMoverStatus}
+                    onClone={handleClonarProcesso}
                     onRedistribuir={handleRedistribuir}
                     usuario={user || undefined}
                     ehAdmin={ehAdmin}
@@ -669,7 +776,7 @@ function Index() {
                   processos={filtrados}
                   onEdit={handleEdit}
                   onDelete={remover}
-                  onMove={moverStatus}
+                  onMove={handleMoverStatus}
                   onAdd={handleAdd}
                 />
               )}
@@ -692,7 +799,7 @@ function Index() {
               })()}
               onEdit={handleEdit}
               onDelete={remover}
-              onMove={moverStatus}
+              onMove={handleMoverStatus}
             />
           )}
 

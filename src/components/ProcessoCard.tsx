@@ -19,6 +19,7 @@ import {
   Trash2, 
   Send, 
   CheckCircle,
+  Copy,
   Clock,
   FileText,
   User,
@@ -42,11 +43,12 @@ interface ProcessoCardProps {
   onEdit?: (p: Processo) => void;
   onDelete?: (id: string) => void;
   onMove?: (id: string, status: StatusProcesso) => void;
+  onClone?: (id: string) => void;
   showActions?: boolean;
   isDragging?: boolean; // Flag para quando está sendo arrastado no overlay
 }
 
-export const ProcessoCard = ({ processo, p: pAntigo, onEdit, onDelete, onMove, showActions = true, isDragging = false }: ProcessoCardProps) => {
+export const ProcessoCard = ({ processo, p: pAntigo, onEdit, onDelete, onMove, onClone, showActions = true, isDragging = false }: ProcessoCardProps) => {
   const p = processo || pAntigo!;
   
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
@@ -285,8 +287,24 @@ export const ProcessoCard = ({ processo, p: pAntigo, onEdit, onDelete, onMove, s
                   Chat
                 </Button>
               </div>
+
+              {/* Linha 2: Clonar */}
+              {onClone && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full border-cyan-300 text-cyan-700 hover:bg-cyan-50 text-xs h-9"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClone(p.id);
+                  }}
+                >
+                  <Copy className="w-3 h-3 mr-1" />
+                  Clonar
+                </Button>
+              )}
               
-              {/* Linha 2: Finalizar (se não concluído) + Excluir */}
+              {/* Linha 3: Finalizar (se não concluído) + Excluir */}
               <div className={`grid gap-2 ${p.status !== "concluido" ? "grid-cols-2" : "grid-cols-1"}`}>
                 {/* Botão Finalizar (apenas se não estiver concluído) */}
                 {p.status !== "concluido" && (

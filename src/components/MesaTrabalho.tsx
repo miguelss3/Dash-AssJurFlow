@@ -5,14 +5,12 @@ import {
   DndContext,
   DragOverlay,
   pointerWithin,
-  rectIntersection,
   closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
   DragStartEvent,
   DragEndEvent,
-  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import { ProcessoCard } from "./ProcessoCard";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -25,15 +23,51 @@ interface Props {
   onEdit: (p: Processo) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, status: StatusProcesso) => void;
-  onRedistribuir?: (processoId: string, novoResponsavel: string) => void;
+  onClone?: (id: string) => void;
+  onRedistribuir?: (processoId: string, novoResponsavel: string) => void | Promise<void>;
   usuario?: AuthUser;
   ehAdmin?: boolean;
 }
 
-export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onRedistribuir, usuario, ehAdmin }: Props) {
+export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onClone, onRedistribuir, usuario, ehAdmin }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
+  const [responsaveisOtimizados, setResponsaveisOtimizados] = useState<Record<string, string>>({});
+
+  const processosEfetivos = useMemo(() => {
+    return processos.map((p) => {
+      if (!(p.id in responsaveisOtimizados)) return p;
+      return { ...p, responsavel: responsaveisOtimizados[p.id] };
+    });
+  }, [processos, responsaveisOtimizados]);
+
+  // Remove a otimização quando o snapshot real do Firestore já refletiu a mudança
+  useEffect(() => {
+    if (Object.keys(responsaveisOtimizados).length === 0) return;
+
+    setResponsaveisOtimizados((prev) => {
+      let mudou = false;
+      const next = { ...prev };
+
+      for (const [processoId, responsavelEsperado] of Object.entries(prev)) {
+        const processoReal = processos.find((p) => p.id === processoId);
+        if (!processoReal) {
+          delete next[processoId];
+          mudou = true;
+          continue;
+        }
+
+        const responsavelReal = (processoReal.responsavel || "").trim();
+        if (responsavelReal === (responsavelEsperado || "").trim()) {
+          delete next[processoId];
+          mudou = true;
+        }
+      }
+
+      return mudou ? next : prev;
+    });
+  }, [processos, responsaveisOtimizados]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -81,7 +115,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     setActiveId(active.id as string);
     
     // Encontra o processo sendo arrastado
-    const processo = processos.find((p) => p.id === active.id);
+    const processo = processosEfetivos.find((p) => p.id === active.id);
     setActiveProcesso(processo || null);
     
     // console.log("🖱️ Drag iniciado:", active.id);
@@ -101,6 +135,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     // O ID do 'over' é o responsável (nome do assessor ou "Aguardando Distribuição")
     const novoResponsavel = over.id as string;
     const processoId = active.id as string;
+    const processoAtual = processosEfetivos.find((p) => p.id === processoId);
+    const responsavelAnterior = processoAtual?.responsavel || "";
     
     // console.log("📦 Redistribuindo processo:", processoId, "para:", novoResponsavel);
     
@@ -108,7 +144,20 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     if (onRedistribuir) {
       // Se for "Aguardando Distribuição", passa string vazia
       const responsavelFinal = novoResponsavel.includes("📥 Aguardando") ? "" : novoResponsavel;
-      onRedistribuir(processoId, responsavelFinal);
+
+      // Atualização otimista: move o card imediatamente na UI
+      setResponsaveisOtimizados((prev) => ({
+        ...prev,
+        [processoId]: responsavelFinal,
+      }));
+
+      Promise.resolve(onRedistribuir(processoId, responsavelFinal)).catch(() => {
+        // Reverte visualmente em caso de erro de persistência
+        setResponsaveisOtimizados((prev) => ({
+          ...prev,
+          [processoId]: responsavelAnterior,
+        }));
+      });
     }
     
     setActiveId(null);
@@ -119,7 +168,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     // console.log("📊 MesaTrabalho - Total de processos recebidos:", processos.length);
     // console.log("📊 Assessores do setor carregados:", assessoresDoSetor.length);
     
-    const ativos = processos.filter((p) => p.status !== "concluido");
+    const ativos = processosEfetivos.filter((p) => p.status !== "concluido");
     // console.log("📊 Processos ativos (não concluídos):", ativos.length);
     
     const tipos: TipoProcesso[] =
@@ -177,7 +226,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     
     // console.log("📊 Resultado final:", result);
     return result;
-  }, [processos, filtroTipo, assessoresDoSetor]);
+  }, [processosEfetivos, filtroTipo, assessoresDoSetor]);
 
   if (grupos.length === 0) {
     return (
@@ -226,6 +275,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onMove={onMove}
+                    onClone={onClone}
                   />
                 ))}
               </div>

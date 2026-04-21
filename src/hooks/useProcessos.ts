@@ -21,6 +21,12 @@ export function useProcessos() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
+  const limparCamposUndefined = <T extends Record<string, any>>(obj: T): Partial<T> => {
+    return Object.fromEntries(
+      Object.entries(obj).filter(([, valor]) => valor !== undefined)
+    ) as Partial<T>;
+  };
+
   useEffect(() => {
     let unsubProcessos: (() => void) | null = null;
     let unsubDistribuicoes: (() => void) | null = null;
@@ -238,8 +244,10 @@ export function useProcessos() {
         userId: currentUser.uid,
         userEmail: currentUser.email || "",
       };
-      
-      await addDoc(processosRef, novoProcesso);
+
+      const novoProcessoLimpo = limparCamposUndefined(novoProcesso);
+      const novoDocRef = await addDoc(processosRef, novoProcessoLimpo);
+      return novoDocRef.id;
       // console.log("✅ Processo criado com sucesso para", currentUser.email);
     } catch (err: any) {
       console.error("❌ Erro ao criar processo:", err);
@@ -251,7 +259,11 @@ export function useProcessos() {
   const atualizar = async (id: string, dados: Partial<Processo>) => {
     try {
       const processoRef = doc(db, "processos", id);
-      await updateDoc(processoRef, dados);
+
+      const dadosLimpos = limparCamposUndefined(dados);
+      if (Object.keys(dadosLimpos).length === 0) return;
+
+      await updateDoc(processoRef, dadosLimpos);
       // console.log("✅ Processo atualizado com sucesso");
     } catch (err: any) {
       console.error("❌ Erro ao atualizar processo:", err);

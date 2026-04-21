@@ -85,6 +85,17 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
             console.warn("Erro ao carregar mensagens antigas:", error);
           }
         }
+
+        // Fallback final: se não houver histórico, exibe o último movimento salvo no próprio processo
+        if (msgs.length === 0 && processo?.descricao) {
+          msgs.push({
+            id: `fallback-${processo.id}`,
+            autor: processo.atualizadoPorNome || processo.criadoPorNome || "Sistema",
+            autorId: "",
+            texto: processo.descricao,
+            timestamp: processo.atualizadoEm || processo.criadoEm || new Date().toISOString(),
+          });
+        }
         
         setMensagens(msgs);
         setLoading(false);
@@ -105,11 +116,13 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
     try {
       const textoMensagem = novaMensagem.trim();
       const agoraISO = new Date().toISOString();
+      const nomeAutorBase = user.nomeGuerra || user.nome || user.email?.split("@")[0] || "Usuário";
+      const autorMilitar = user.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
       const historicoRef = collection(db, `processos/${processo.id}/historico`);
       
       // Salvar na subcoleção historico
       await addDoc(historicoRef, {
-        autor: user.nome || user.email?.split("@")[0] || "Usuário",
+        autor: autorMilitar,
         autorId: user.uid,
         texto: textoMensagem,
         timestamp: Timestamp.now(),
@@ -129,7 +142,7 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
       await setDoc(mensagensRef, {
         historico: [...historicoExistente, {
           id: crypto.randomUUID(),
-          autor: user.nome || user.email?.split("@")[0] || "Usuário",
+          autor: autorMilitar,
           autorId: user.uid,
           texto: textoMensagem,
           timestamp: agoraISO,
