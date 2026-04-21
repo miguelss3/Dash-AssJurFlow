@@ -37,6 +37,7 @@ export function useProcessos() {
         });
         
         setProcessos(listaProcessos);
+        console.log("Dados recebidos do Firebase:", listaProcessos);
         setCarregando(false);
       },
       (err) => {

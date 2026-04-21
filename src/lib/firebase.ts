@@ -4,13 +4,14 @@ import { getAuth } from "firebase/auth";
 
 // Configuração extraída do seu arquivo original
 const firebaseConfig = {
-  apiKey: "AIzaSyB0M6XpG-P9vXy6X-mX9X-X9X-X9X-X9X", // Chave de API do seu projeto
-  authDomain: "assjur-flow.firebaseapp.com",
-  projectId: "assjur-flow",
-  storageBucket: "assjur-flow.appspot.com",
-  messagingSenderId: "107471926639",
-  appId: "1:107471926639:web:b1d7d08404a7536f977c0e",
-  measurementId: "G-GVEJ77X8G3"
+  apiKey: "AIzaSyB2Pk4plzDbRJSrQdaIAu7P4fOPpvefAG0",
+  authDomain: "assjur-flow-12rm.firebaseapp.com",
+  projectId: "assjur-flow-12rm",
+  storageBucket: "assjur-flow-12rm.firebasestorage.app",
+  messagingSenderId: "441416018941",
+  appId: "1:441416018941:web:fc57211a142956f7854794",
+  measurementId: "G-YZCJ6KRDPQ"
+
 };
 
 // Inicializa o Firebase
