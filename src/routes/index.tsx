@@ -28,6 +28,7 @@ import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { ProcessoDialog } from "@/components/ProcessoDialog";
 import { Estatisticas } from "@/components/Estatisticas";
 import { CalendarioPrazos } from "@/components/CalendarioPrazos";
+import { GestaoEquipe } from "@/components/GestaoEquipe";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
 
@@ -558,13 +559,7 @@ function Index() {
 
           {aba === "indicadores" && <Estatisticas processos={processos} />}
 
-          {aba === "equipe" && (
-            <EmptyTab
-              icon={Users}
-              title="Gestão da Equipe"
-              description="Distribuição de carga, performance individual e gestão dos assessores do setor."
-            />
-          )}
+          {aba === "equipe" && <GestaoEquipe />}
         </main>
       </div>
 

@@ -146,7 +146,12 @@ export function useAuth() {
               telefone: userFirestoreData.telefone,
             };
             
-            console.log("✅ Dados do usuário carregados:", userData.nome, "|", userData.setor, "| Admin:", isAdmin(userData));
+            // Se é admin, ajusta o role para refletir isso na UI
+            if (isAdmin(userData)) {
+              userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
+            }
+            
+            console.log("✅ Dados do usuário carregados:", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
           } else {
             // Se não encontrou por email, tenta buscar por UID
             const qUid = query(usuariosRef, where("uid", "==", fbUser.uid));
@@ -171,7 +176,12 @@ export function useAuth() {
                 telefone: userFirestoreData.telefone,
               };
               
-              console.log("✅ Dados do usuário carregados (por UID):", userData.nome, "|", userData.setor, "| Admin:", isAdmin(userData));
+              // Se é admin, ajusta o role para refletir isso na UI
+              if (isAdmin(userData)) {
+                userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
+              }
+              
+              console.log("✅ Dados do usuário carregados (por UID):", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
             }
           }
         } catch (firestoreError) {
@@ -190,6 +200,11 @@ export function useAuth() {
             email: fbUser.email || email,
             uid: fbUser.uid,
           };
+          
+          // Se é admin por email, ajusta o role
+          if (isAdmin(userData)) {
+            userData.role = "ADMIN UNIVERSAL";
+          }
         }
         
         // Salva dados no localStorage
