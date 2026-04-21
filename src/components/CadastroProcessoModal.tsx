@@ -28,7 +28,6 @@ const ORIGENS_DU = ["SAPIENS", "Ofício", "E-mail", "Whatsapp", "Presencial", "O
 const SECOES_DU = ["SVP", "SJUR", "SAJ"];
 
 export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess }: CadastroProcessoModalProps) {
-  const { toast } = useToast();
   const { user } = useAuth();
 
   // Estado do formulário
@@ -101,6 +100,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     setNumeroProcesso(p.numero || "");
     setParte(p.cliente || "");
     setAssunto(p.tipoAcao || "");
+    setDataEntrada(p.dataEntrada || new Date().toISOString().split("T")[0]);
     setObservacoes(p.observacoes || "");
     
     if (p.setor === "DU") {
@@ -109,6 +109,44 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       setIsMS(p.isMS || false);
       setPrazoInternoDU(p.prazo || "");
       setPrazoFatalDU(p.prazoFatal || "");
+    }
+
+    if (p.setor === "PA") {
+      setTipoPA(p.tipoPA || "");
+      
+      // Determinar fluxo
+      const temDiligencia = p.faseAtual?.includes?.("diligencia") || p.faseAtual?.includes?.("Diligência");
+      const ehLegado = p.faseAtual?.includes?.("Antiga") || p.faseAtual?.includes?.("antiga");
+      
+      if (ehLegado) {
+        setFluxoIPM("Sindicância Antigo");
+      } else if (temDiligencia) {
+        setFluxoIPM("Diligência");
+      } else {
+        setFluxoIPM("Novo");
+      }
+
+      // Encarregado
+      if (p.encarregado) {
+        const partes = p.encarregado.split(" ");
+        if (partes.length > 1) {
+          setPostoEncarregado(partes[0]);
+          setNomeEncarregado(partes.slice(1).join(" "));
+        } else {
+          setNomeEncarregado(p.encarregado);
+        }
+      }
+
+      // Assunto sindicância
+      if (p.tipoPA === "Sindicância" && p.tipoAcao) {
+        const partes = p.tipoAcao.split(" - ");
+        if (partes.length > 1) {
+          setAssuntoSindicancia(partes[0]);
+          setEspecificidadesSindicancia(partes.slice(1).join(" - "));
+        } else {
+          setAssunto(p.tipoAcao);
+        }
+      }
     }
   };
 
@@ -153,23 +191,23 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
     // Validações
     if (!setor) {
-      toast({ title: "Erro", description: "Selecione o setor.", variant: "destructive" });
+      toast.error("Selecione o setor.");
       return;
     }
     if (!numeroProcesso.trim()) {
-      toast({ title: "Erro", description: "Informe o número do processo.", variant: "destructive" });
+      toast.error("Informe o número do processo.");
       return;
     }
     if (!parte.trim()) {
-      toast({ title: "Erro", description: "Informe a parte.", variant: "destructive" });
+      toast.error("Informe a parte.");
       return;
     }
     if (setor === "PA" && !tipoPA) {
-      toast({ title: "Erro", description: "Selecione o tipo de procedimento do PA.", variant: "destructive" });
+      toast.error("Selecione o tipo de procedimento do PA.");
       return;
     }
     if (setor === "DU" && !origemDU) {
-      toast({ title: "Erro", description: "Selecione a origem do processo DU.", variant: "destructive" });
+      toast.error("Selecione a origem do processo DU.");
       return;
     }
 
@@ -178,27 +216,27 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     const isSindicanciaAntiga = isSindicanciaPA && fluxoIPM === "Sindicância Antigo";
 
     if (isSindicanciaPA && !assuntoSindicancia) {
-      toast({ title: "Erro", description: "Selecione o assunto da Sindicância.", variant: "destructive" });
+      toast.error("Selecione o assunto da Sindicância.");
       return;
     }
     if (isSindicanciaPA && !especificidadesSindicancia.trim()) {
-      toast({ title: "Erro", description: "Preencha as especificidades do assunto da Sindicância.", variant: "destructive" });
+      toast.error("Preencha as especificidades do assunto da Sindicância.");
       return;
     }
     if (isDiligenciaPA && !postoEncarregado) {
-      toast({ title: "Erro", description: "Informe o encarregado da 1ª portaria para a diligência.", variant: "destructive" });
+      toast.error("Informe o encarregado da 1ª portaria para a diligência.");
       return;
     }
     if (isDiligenciaPA && mudouEncarregado && !postoEncarregadoAtual) {
-      toast({ title: "Erro", description: "Informe o encarregado atual quando houver mudança.", variant: "destructive" });
+      toast.error("Informe o encarregado atual quando houver mudança.");
       return;
     }
     if (isDiligenciaPA && mudouEncarregado && !novaPortaria.trim()) {
-      toast({ title: "Erro", description: "Informe a nova portaria quando houver mudança de encarregado.", variant: "destructive" });
+      toast.error("Informe a nova portaria quando houver mudança de encarregado.");
       return;
     }
     if (isSindicanciaAntiga && !anoLegado) {
-      toast({ title: "Erro", description: "Selecione o ano da Sindicância Antiga.", variant: "destructive" });
+      toast.error("Selecione o ano da Sindicância Antiga.");
       return;
     }
 
@@ -293,7 +331,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           timestamp: agoraISO,
         });
 
-        toast({ title: "Sucesso!", description: "Processo atualizado com sucesso!" });
+        toast.success("Processo atualizado com sucesso!");
       } else {
         const processoRef = await addDoc(collection(db, "processos"), dados);
 
@@ -337,19 +375,18 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           });
         }
 
-        toast({
-          title: "Sucesso!",
-          description: setor === "PA"
+        toast.success(
+          setor === "PA"
             ? (isSindicanciaAntiga ? "Sindicância antiga cadastrada no acervo!" : "PA Cadastrado e distribuído para a sua mesa!")
             : "Processo cadastrado com sucesso!"
-        });
+        );
       }
 
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error("Erro ao salvar processo:", error);
-      toast({ title: "Erro", description: "Erro ao salvar processo. Tente novamente.", variant: "destructive" });
+      toast.error("Erro ao salvar processo. Tente novamente.");
     } finally {
       setLoading(false);
     }

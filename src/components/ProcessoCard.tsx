@@ -22,6 +22,7 @@ import { formatarData, diasRestantes } from "@/lib/prazo";
 import { AcoesDUModal } from "./modals/AcoesDUModal";
 import { AcoesPAModal } from "./modals/AcoesPAModal";
 import { DetalhesProcessoModal } from "./DetalhesProcessoModal";
+import { ChatModal } from "./ChatModal";
 
 interface ProcessoCardProps {
   processo: Processo;
@@ -40,11 +41,11 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
   const [modalAcoesDU, setModalAcoesDU] = useState(false);
   const [modalAcoesPA, setModalAcoesPA] = useState(false);
   const [modalDetalhes, setModalDetalhes] = useState(false);
+  const [modalChat, setModalChat] = useState(false);
   
   // Função para abrir o chat do processo
   const abrirChat = () => {
-    toast.info("Chat em desenvolvimento");
-    // TODO: Implementar modal de chat
+    setModalChat(true);
   };
   
   // Função para finalizar processo
@@ -98,19 +99,6 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
                 <Badge variant="outline" className="text-[10px] h-5">Normal</Badge>
               )}
             </div>
-            
-            {/* Botão Limpar (só aparece no hover) */}
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 px-2 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
-              onClick={(e) => {
-                e.stopPropagation();
-                toast.info("Função Limpar em desenvolvimento");
-              }}
-            >
-              Limpar
-            </Button>
           </div>
 
           {/* Título - Assunto */}
@@ -310,6 +298,13 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
       <DetalhesProcessoModal
         open={modalDetalhes}
         onOpenChange={setModalDetalhes}
+        processo={p}
+      />
+
+      {/* Modal de Chat */}
+      <ChatModal
+        open={modalChat}
+        onOpenChange={setModalChat}
         processo={p}
       />
     </>
