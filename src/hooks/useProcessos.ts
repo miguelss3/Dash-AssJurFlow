@@ -76,6 +76,10 @@ export function useProcessos() {
         // Verifica se está finalizado (campo finalizado=true OU status="Finalizado")
         const estaFinalizado = procData.finalizado === true || procData.status === "Finalizado";
         
+        if (estaFinalizado) {
+          console.log(`⚠️ PROCESSO FINALIZADO: ${procData.numeroProcesso} (finalizado=${procData.finalizado}, status="${procData.status}")`);
+        }
+        
         const statusOriginal = procData.status || "andamento";
         const statusMapeado: StatusProcesso = estaFinalizado ? "concluido" : (statusMap[statusOriginal] || "andamento");
 
@@ -129,6 +133,7 @@ export function useProcessos() {
           atualizadoEm: procData.atualizadoEm
         };
         
+        console.log(`📦 Processo ${processoMapeado.numero}: status="${processoMapeado.status}", responsavel="${processoMapeado.responsavel}", setor=${processoMapeado.setor}, finalizado_firebase=${procData.finalizado}`);
         listaProcessos.push(processoMapeado);
       });
       

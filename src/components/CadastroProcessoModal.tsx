@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,8 +27,15 @@ const ASSUNTOS_SINDICANCIA = ["Falta Injustificada", "Embriaguez", "Deserção",
 const ORIGENS_DU = ["SAPIENS", "Ofício", "E-mail", "Whatsapp", "Presencial", "Outros"];
 const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 
+// LOG DE VERIFICAÇÃO - ESTE LOG DEVE APARECER SEMPRE
+console.log("🚀🚀🚀 ARQUIVO CadastroProcessoModal.tsx CARREGADO - VERSÃO NOVA COM LOGS! 🚀🚀🚀");
+
 export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess }: CadastroProcessoModalProps) {
   const { user } = useAuth();
+  
+  console.log("🔐 CadastroProcessoModal - User logado:", user?.email || "Nenhum usuário");
+  console.log("🔐 Modal open?", open);
+  console.log("🔐 Processo para editar?", processo?.id || "Não, é cadastro novo");
 
   // Estado do formulário
   const [setor, setSetor] = useState<"DU" | "PA" | "">("");
@@ -187,35 +194,57 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (loading) return;
+    console.log("🎯 handleSubmit INICIADO");
+    console.log("  - Setor:", setor);
+    console.log("  - Número:", numeroProcesso);
+    console.log("  - Parte:", parte);
+    console.log("  - Loading:", loading);
+    
+    if (loading) {
+      console.log("⚠️ ABORTADO: loading=true");
+      return;
+    }
 
     // Validações
     if (!setor) {
+      console.log("❌ VALIDAÇÃO FALHOU: setor vazio");
       toast.error("Selecione o setor.");
       return;
     }
     if (!numeroProcesso.trim()) {
+      console.log("❌ VALIDAÇÃO FALHOU: numeroProcesso vazio");
       toast.error("Informe o número do processo.");
       return;
     }
     if (!parte.trim()) {
+      console.log("❌ VALIDAÇÃO FALHOU: parte vazia");
       toast.error("Informe a parte.");
       return;
     }
     if (setor === "PA" && !tipoPA) {
+      console.log("❌ VALIDAÇÃO FALHOU: tipoPA vazio");
       toast.error("Selecione o tipo de procedimento do PA.");
       return;
     }
     if (setor === "DU" && !origemDU) {
+      console.log("❌ VALIDAÇÃO FALHOU: origemDU vazia");
       toast.error("Selecione a origem do processo DU.");
       return;
     }
+    if (setor === "DU" && !assunto.trim()) {
+      console.log("❌ VALIDAÇÃO FALHOU: assunto DU vazio");
+      toast.error("Preencha o assunto do processo.");
+      return;
+    }
 
+    console.log("✅ Todas validações passaram! Prosseguindo...");
+    
     const isSindicanciaPA = setor === "PA" && tipoPA === "Sindicância";
     const isDiligenciaPA = setor === "PA" && aceitaDiligencia(tipoPA) && fluxoIPM === "Diligência";
     const isSindicanciaAntiga = isSindicanciaPA && fluxoIPM === "Sindicância Antigo";
 
     if (isSindicanciaPA && !assuntoSindicancia) {
+      console.log("❌ VALIDAÇÃO FALHOU: assuntoSindicancia vazio");
       toast.error("Selecione o assunto da Sindicância.");
       return;
     }
@@ -236,10 +265,12 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       return;
     }
     if (isSindicanciaAntiga && !anoLegado) {
+      console.log("❌ VALIDAÇÃO FALHOU: anoLegado vazio");
       toast.error("Selecione o ano da Sindicância Antiga.");
       return;
     }
 
+    console.log("🚀 Iniciando cadastro no Firebase...");
     setLoading(true);
 
     try {
@@ -283,8 +314,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         finalizado: processo?.id ? (processo.status === "concluido") : false,
         criadoEm: processo?.id ? undefined : agora, // Não sobrescreve ao editar
         atualizadoEm: agora,
-        userId: user?.uid || null,
-        criadoPorNome: user?.email || null,
+        // CRITICAL: Firestore rules require userId and userEmail for create permission
+        userId: user!.uid,  // Garantido que existe pois modal só abre se logado
+        userEmail: user!.email,  // Campo exigido pelas rules
+        criadoPorNome: user?.email || null,  // Campo adicional para compatibilidade
       };
 
       if (setor === "DU") {
@@ -375,7 +408,14 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         
         console.log("📝 CRIANDO NOVO PROCESSO:", { setor, numeroProcesso, status: statusInicial });
         console.log("📝 Responsável/Encarregado:", dados.encarregado || "(nenhum - aguardando distribuição)");
-        console.log("📝 Dados completos do processo:", dados);
+        console.log("📝 Auth User:", { uid: user!.uid, email: user!.email });
+        console.log("📝 Dados que serão salvos no Firebase:", {
+          userId: dados.userId,
+          userEmail: dados.userEmail,
+          setor: dados.setor,
+          status: dados.status,
+          numeroProcesso: dados.numeroProcesso
+        });
         
         const processoRef = await addDoc(collection(db, "processos"), dados);
         
@@ -455,9 +495,21 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         console.log("🔄 Notificando parent component para atualizar lista de processos...");
         onSuccess();
       }
-    } catch (error) {
-      console.error("Erro ao salvar processo:", error);
-      toast.error("Erro ao salvar processo. Tente novamente.");
+    } catch (error: any) {
+      console.error("❌ ERRO ao salvar processo:", error);
+      console.error("❌ Código do erro:", error?.code);
+      console.error("❌ Mensagem:", error?.message);
+      console.error("❌ Stack:", error?.stack);
+      
+      // Erro específico de permissão
+      if (error?.code === "permission-denied") {
+        console.error("🔒 ERRO DE PERMISSÃO FIRESTORE!");
+        console.error("🔒 User UID:", user?.uid);
+        console.error("🔒 User Email:", user?.email);
+        toast.error("Sem permissão para criar processo. Verifique se está logado corretamente.");
+      } else {
+        toast.error(`Erro ao salvar: ${error?.message || "Erro desconhecido"}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -469,18 +521,42 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
   const mostrarMudancaEncarregado = setor === "PA" && aceitaDiligencia(tipoPA) && fluxoIPM === "Diligência";
   const mostrarAssuntoSindicancia = setor === "PA" && tipoPA === "Sindicância";
 
+  // Debug: verifica estado do botão
+  const botaoHabilitado = !(loading || !setor);
+  console.log("🔘 Estado do botão Submit:", { loading, setor, habilitado: botaoHabilitado });
+
+  // Debug: log quando modal abre
+  if (open) {
+    console.log("📂 Modal CadastroProcesso ABERTO", { setor, numeroProcesso, parte, user: user?.email });
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{processo ? "Editar Processo" : "Cadastrar Processo"}</DialogTitle>
+          <DialogDescription>
+            {processo ? "Atualize as informações do processo." : "Preencha os dados para cadastrar um novo processo."}
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form 
+          onSubmit={(e) => {
+            console.log("📋 FORM onSubmit disparado! Event:", e.type);
+            handleSubmit(e);
+          }} 
+          className="space-y-6"
+        >
           {/* Setor */}
           <div className="space-y-2">
             <Label htmlFor="setor" className="uppercase text-xs font-bold">Setor *</Label>
-            <Select value={setor} onValueChange={(v) => setSetor(v as "DU" | "PA")}>
+            <Select 
+              value={setor} 
+              onValueChange={(v) => {
+                console.log("🔄 Setor selecionado:", v);
+                setSetor(v as "DU" | "PA");
+              }}
+            >
               <SelectTrigger id="setor">
                 <SelectValue placeholder="Selecione o Setor" />
               </SelectTrigger>
@@ -571,7 +647,6 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
                     value={numeroProcesso}
                     onChange={(e) => setNumeroProcesso(e.target.value)}
                     placeholder={placeholderNumeroProcesso()}
-                    required
                   />
                 </div>
 
@@ -584,7 +659,6 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
                     value={parte}
                     onChange={(e) => setParte(e.target.value)}
                     placeholder="Nome"
-                    required
                   />
                 </div>
               </div>
@@ -627,7 +701,6 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
                 value={assunto}
                 onChange={(e) => setAssunto(e.target.value)}
                 placeholder="Descreva o assunto do processo"
-                required
               />
             </div>
           )
@@ -803,10 +876,31 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => {
+                console.log("❌ Botão CANCELAR clicado");
+                onOpenChange(false);
+              }}
+              disabled={loading}
+            >
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !setor}>
+            <Button 
+              type="submit" 
+              disabled={loading || !setor}
+              onMouseDown={() => console.log("� MouseDOWN no SALVAR", { setor, loading })}
+              onMouseUp={() => console.log("👆 MouseUP no SALVAR")}
+              onClick={(e) => {
+                console.log("🖱️ ONCLICK SALVAR DISPARADO!", { 
+                  loading, 
+                  setor,
+                  disabled: loading || !setor,
+                  defaultPrevented: e.defaultPrevented 
+                });
+              }}
+            >
               {loading ? "Salvando..." : (processo ? "Atualizar" : "Salvar Processo")}
             </Button>
           </DialogFooter>
@@ -815,3 +909,6 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     </Dialog>
   );
 }
+
+// Log quando componente é renderizado
+console.log("🎨 CadastroProcessoModal renderizado");
