@@ -45,6 +45,8 @@ export interface Processo {
   // Vínculo com usuário (Firebase Authentication)
   userId?: string;         // UID do Firebase do dono do processo
   userEmail?: string;      // Email do usuário para referência
+  criadoPorNome?: string;  // Nome/email de quem cadastrou
+  atualizadoPorNome?: string; // Nome/email de quem atualizou por último
 }
 
 export interface Coluna {

@@ -364,6 +364,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         await updateDoc(processoRef, { 
           ...dadosUpdate, 
           atualizadoEm: agora,
+          atualizadoPorNome: user?.email || "Sistema",
           descricao: msgAtualizacao // Atualiza último movimento
         });
 

@@ -53,6 +53,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         status: "Aguardando Assinatura",
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: user.email || "Sistema",
       });
 
       // Adicionar ao histórico
@@ -108,6 +109,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         status: "Em Instrução",
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: user.email || "Sistema",
       });
 
       // Adicionar ao histórico
@@ -172,6 +174,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         },
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: user.email || "Sistema",
       });
 
       // Adicionar ao histórico
@@ -224,6 +227,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         status: "Aguardando Início de Prazo",
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: user.email || "Sistema",
       });
 
       // Adicionar ao histórico

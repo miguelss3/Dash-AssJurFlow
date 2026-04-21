@@ -22,6 +22,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useProcessos } from "@/hooks/useProcessos";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, doc, getDoc, setDoc, Timestamp } from "firebase/firestore";
 import { Dashboard } from "@/components/Dashboard";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
@@ -193,6 +195,60 @@ function Index() {
   const handleSave = (dados: Omit<Processo, "id" | "criadoEm">) => {
     if (editing) atualizar(editing.id, dados);
     else criar(dados);
+  };
+
+  const handleRedistribuir = async (processoId: string, novoResponsavel: string) => {
+    try {
+      console.log("📦 Redistribuindo processo:", processoId, "→", novoResponsavel || "Aguardando Distribuição");
+      
+      const processo = processos.find((p) => p.id === processoId);
+      if (!processo) {
+        console.error("❌ Processo não encontrado:", processoId);
+        return;
+      }
+      
+      const msgHistorico = novoResponsavel 
+        ? `Processo redistribuído para ${novoResponsavel}`
+        : "Processo retornado para Aguardando Distribuição";
+      
+      const agoraISO = new Date().toISOString();
+      const autorNome = user?.email || "Sistema";
+      
+      // Atualiza o processo com responsável, data e autor
+      await atualizar(processoId, {
+        responsavel: novoResponsavel,
+        descricao: msgHistorico,
+        atualizadoEm: agoraISO,
+        atualizadoPorNome: autorNome,
+      });
+      
+      // Adicionar ao histórico (subcoleção)
+      const historicoRef = collection(db, `processos/${processoId}/historico`);
+      await addDoc(historicoRef, {
+        autor: user?.email?.split("@")[0] || "Sistema",
+        autorId: user?.uid || "sistema",
+        texto: msgHistorico,
+        timestamp: agoraISO,
+      });
+      
+      // Também salvar na coleção mensagens (compatibilidade)
+      const mensagensRef = doc(db, "mensagens", processoId);
+      const mensagensSnap = await getDoc(mensagensRef);
+      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
+      await setDoc(mensagensRef, {
+        historico: [...historicoExistente, {
+          id: crypto.randomUUID(),
+          autor: user?.email?.split("@")[0] || "Sistema",
+          autorId: user?.uid || "sistema",
+          texto: msgHistorico,
+          timestamp: agoraISO,
+        }]
+      });
+      
+      console.log("✅ Processo redistribuído com sucesso!");
+    } catch (error) {
+      console.error("❌ Erro ao redistribuir processo:", error);
+    }
   };
 
   // Sidebar nav
@@ -557,6 +613,7 @@ function Index() {
                     onEdit={handleEdit}
                     onDelete={remover}
                     onMove={moverStatus}
+                    onRedistribuir={handleRedistribuir}
                   />
                 </>
               ) : (

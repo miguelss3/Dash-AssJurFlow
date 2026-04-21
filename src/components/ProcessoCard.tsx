@@ -33,17 +33,30 @@ import { AcoesDUModalNovo } from "./modals/AcoesDUModalNovo";
 import { AcoesPAModalNovo } from "./modals/AcoesPAModalNovo";
 import { DetalhesProcessoModal } from "./DetalhesProcessoModal";
 import { ChatModal } from "./ChatModal";
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
 
 interface ProcessoCardProps {
-  processo: Processo;
+  processo?: Processo;
+  p?: Processo; // Compatibilidade com código antigo
   onEdit?: (p: Processo) => void;
   onDelete?: (id: string) => void;
   onMove?: (id: string, status: StatusProcesso) => void;
   showActions?: boolean;
+  isDragging?: boolean; // Flag para quando está sendo arrastado no overlay
 }
 
-export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions = true }: ProcessoCardProps) => {
-  const p = processo;
+export const ProcessoCard = ({ processo, p: pAntigo, onEdit, onDelete, onMove, showActions = true, isDragging = false }: ProcessoCardProps) => {
+  const p = processo || pAntigo!;
+  
+  const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
+    id: p.id,
+    disabled: isDragging, // Desabilita drag no overlay
+  });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+  };
   const setor = p.setor || p.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
@@ -91,8 +104,19 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
   return (
     <>
       <Card 
-        className="p-4 bg-white shadow-sm border-l-4 border-l-sky-600 hover:shadow-md transition-shadow relative group cursor-pointer"
-        onClick={() => setModalDetalhes(true)}
+        ref={setNodeRef}
+        style={style}
+        {...listeners}
+        {...attributes}
+        className={`p-4 bg-white shadow-sm border-l-4 border-l-sky-600 hover:shadow-md transition-all relative group cursor-grab active:cursor-grabbing ${
+          isBeingDragged ? "opacity-30 scale-95" : ""
+        }`}
+        onClick={(e) => {
+          // Só abre detalhes se não estiver arrastando
+          if (!isBeingDragged && !isDragging) {
+            setModalDetalhes(true);
+          }
+        }}
       >
         <div className="flex flex-col gap-3">
           {/* Header com badges */}

@@ -84,6 +84,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         pedidoSubsidios,
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: user.email || "Sistema",
       });
 
       // Adicionar ao histórico (subcoleção)
@@ -150,6 +151,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         status: isAdmin(user) ? "Aguardando CHEM" : "Aguardando Conferência",
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: user.email || "Sistema",
       });
 
       // Adicionar ao histórico (subcoleção)
@@ -199,6 +201,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         status: "Concluído",
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: user.email || "Sistema",
       });
 
       // Adicionar ao histórico

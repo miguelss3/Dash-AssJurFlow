@@ -176,27 +176,71 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
             <>
               <Separator />
               <div>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">Último Movimento</h4>
-                <div className="text-sm text-slate-700 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  {processo.descricao}
+                <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-2">Último Movimento</h4>
+                <div className="text-sm text-slate-700 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                  <p className="leading-relaxed">{processo.descricao}</p>
+                  {(processo.atualizadoPorNome || processo.atualizadoEm) && (
+                    <div className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-200">
+                      {processo.atualizadoPorNome && <span>por {processo.atualizadoPorNome.split('@')[0]}</span>}
+                      {processo.atualizadoPorNome && processo.atualizadoEm && <span> • </span>}
+                      {processo.atualizadoEm && (
+                        <span>
+                          {new Date(processo.atualizadoEm).toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </>
           )}
 
           {/* Informações de Sistema */}
-          <Separator />
-          <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
-            {processo.criadoEm && (
-              <div>
-                <span className="font-semibold">Cadastrado em:</span> {formatarData(processo.criadoEm)}
-              </div>
-            )}
-            {processo.atualizadoEm && (
-              <div>
-                <span className="font-semibold">Atualizado em:</span> {formatarData(processo.atualizadoEm)}
-              </div>
-            )}
+          <Separator className="my-4" />
+          <div className="space-y-2">
+            <h4 className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Sistema</h4>
+            <div className="grid grid-cols-2 gap-3 text-[11px]">
+              {processo.criadoEm && (
+                <div className="space-y-0.5">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wide">Cadastrado</div>
+                  <div className="text-slate-600 font-medium">
+                    {new Date(processo.criadoEm).toLocaleString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  {processo.criadoPorNome && (
+                    <div className="text-[10px] text-slate-400">por {processo.criadoPorNome.split('@')[0]}</div>
+                  )}
+                </div>
+              )}
+              {processo.atualizadoEm && (
+                <div className="space-y-0.5">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wide">Atualizado</div>
+                  <div className="text-slate-600 font-medium">
+                    {new Date(processo.atualizadoEm).toLocaleString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  {processo.atualizadoPorNome && (
+                    <div className="text-[10px] text-slate-400">por {processo.atualizadoPorNome.split('@')[0]}</div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -1,5 +1,6 @@
 import { ProcessoCard } from "./ProcessoCard";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
+import { useDroppable } from "@dnd-kit/core";
 
 interface Props {
   responsavel: string;
@@ -11,6 +12,10 @@ interface Props {
 }
 
 export function AssessorGroup({ responsavel, tipo, processos, onEdit, onDelete, onMove }: Props) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: responsavel, // ID único para esta coluna (nome do assessor)
+  });
+
   const isDU = tipo === "DU";
   const isAguardandoDistribuicao = responsavel.includes("📥 Aguardando");
   
@@ -24,7 +29,12 @@ export function AssessorGroup({ responsavel, tipo, processos, onEdit, onDelete, 
   const borderClass = isAguardandoDistribuicao ? "border-orange-300" : tipoBorder;
 
   return (
-    <div className="shrink-0 w-[88vw] sm:w-[340px] snap-start flex flex-col rounded-3xl bg-card border border-border shadow-card overflow-hidden">
+    <div 
+      ref={setNodeRef}
+      className={`shrink-0 w-[88vw] sm:w-[340px] snap-start flex flex-col rounded-3xl bg-card border shadow-card overflow-hidden transition-all ${
+        isOver ? "border-blue-500 border-2 ring-2 ring-blue-200 scale-[1.02]" : "border-border"
+      }`}
+    >
       {/* Header do assessor */}
       <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
         <span
