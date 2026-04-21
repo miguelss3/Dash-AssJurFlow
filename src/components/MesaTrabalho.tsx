@@ -190,7 +190,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
         const statusNorm = (p.status || "").toString().toLowerCase();
         return ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(situacaoFluxo)
-          || statusNorm.includes("aguardando assinatura");
+          || statusNorm.includes("aguardando assinatura")
+          || statusNorm.includes("aguardando chem");
       };
 
       const pendenciasChefia = ehAdmin ? doTipo.filter(isPendenteChefia) : [];

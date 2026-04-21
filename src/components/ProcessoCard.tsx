@@ -65,9 +65,15 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const isPA = setor === "PA";
   const situacaoSubsidio = p.pedidoSubsidios?.situacaoFluxo;
   const statusNormalizado = (p.status || "").toString().trim().toLowerCase();
-  const bloqueioPorStatus = statusNormalizado.includes("aguardando assinatura");
+  const bloqueioPorStatus = statusNormalizado.includes("aguardando assinatura") || statusNormalizado.includes("aguardando chem");
   const bloqueioPorFluxo = ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(situacaoSubsidio || "");
   const acaoDUBloqueada = !ehAdmin && isDU && (bloqueioPorFluxo || bloqueioPorStatus);
+  const badgeAcaoChefia = (() => {
+    if (situacaoSubsidio === "aguardando_assinatura_secao") return "Assinatura do Chefe de Seção";
+    if (situacaoSubsidio === "aguardando_aprovacao_externa") return "Envio para aprovação do CHEM";
+    if (situacaoSubsidio === "aprovado_externo_enviado_chem" || statusNormalizado.includes("aguardando chem")) return "Saída pelo CHEM";
+    return null;
+  })();
   
   const [modalAcoesDU, setModalAcoesDU] = useState(false);
   const [modalAcoesPA, setModalAcoesPA] = useState(false);
@@ -156,6 +162,16 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
               )}
               {p.prioridade === "normal" && (
                 <Badge variant="outline" className="text-[10px] h-5">Normal</Badge>
+              )}
+              {badgeAcaoChefia && (
+                <Badge variant="outline" className="text-[10px] h-5 border-amber-300 text-amber-700 bg-amber-50">
+                  {badgeAcaoChefia}
+                </Badge>
+              )}
+              {(p.pedidoSubsidios?.reiteracoes || 0) > 0 && (
+                <Badge variant="outline" className="text-[10px] h-5 border-indigo-300 text-indigo-700 bg-indigo-50">
+                  Reiterações: {p.pedidoSubsidios?.reiteracoes}
+                </Badge>
               )}
             </div>
           </div>
@@ -370,10 +386,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
         onOpenChange={setModalAcoesDU}
         processoId={p.id}
         numeroProcesso={p.numero}
-        onSuccess={() => {
-          // Recarrega a página ou atualiza os dados
-          window.location.reload();
-        }}
+        onSuccess={() => {}}
       />
 
       <AcoesPAModalNovo
@@ -381,10 +394,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
         onOpenChange={setModalAcoesPA}
         processoId={p.id}
         numeroProcesso={p.numero}
-        onSuccess={() => {
-          // Recarrega a página ou atualiza os dados
-          window.location.reload();
-        }}
+        onSuccess={() => {}}
       />
 
       {/* Modal de Detalhes */}

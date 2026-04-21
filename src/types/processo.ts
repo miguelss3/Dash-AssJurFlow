@@ -9,15 +9,18 @@ export type TipoProcesso = "DU" | "PA" | "OUTRO";
 export type Prioridade = "liminar" | "urgente" | "normal";
 
 export interface PedidoSubsidios {
+  tipoSolicitacao?: "primeira_vez" | "reiteracao";
   tipoDestino?: "interno" | "externo";
   secaoInterna?: string;
   omExterna?: string;
   numeroDiex?: string;
+  numeroDiexHistorico?: string[];
   prazoResposta?: string;
   observacoes?: string;
   situacaoFluxo?: string;
   solicitadoEm?: string;
   solicitadoPorNome?: string;
+  reiteracoes?: number;
 }
 
 export interface Processo {

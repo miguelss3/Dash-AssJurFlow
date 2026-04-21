@@ -114,7 +114,8 @@ function Index() {
     const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
     const statusNorm = (p.status || "").toString().toLowerCase();
     return ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(situacaoFluxo)
-      || statusNorm.includes("aguardando assinatura");
+      || statusNorm.includes("aguardando assinatura")
+      || statusNorm.includes("aguardando chem");
   };
 
   // Todos operam na Visão do Setor
@@ -241,24 +242,33 @@ function Index() {
         return;
       }
 
-      const { id, criadoEm, userId, userEmail, ...dadosBase } = processoOriginal;
-      const agoraISO = new Date().toISOString();
       const novoNumero = gerarNumeroClone(processoOriginal.numero);
-      const msgHistorico = `Processo clonado de ${processoOriginal.numero}`;
 
-      const novoProcessoId = await criar({
-        ...dadosBase,
+      // Clona apenas dados de cadastro, limpando todo o trâmite para nascer como processo novo.
+      await criar({
         numero: novoNumero,
+        cliente: processoOriginal.cliente,
+        vara: processoOriginal.vara,
+        parteContraria: processoOriginal.parteContraria,
+        tipoAcao: processoOriginal.tipoAcao,
+        prazo: processoOriginal.prazo,
+        prazoFatal: processoOriginal.prazoFatal,
+        tipo: processoOriginal.tipo,
+        setor: processoOriginal.setor,
+        prioridade: processoOriginal.prioridade,
+        secao: processoOriginal.secao,
+        origem: processoOriginal.origem,
+        origemDU: processoOriginal.origemDU,
+        secaoDU: processoOriginal.secaoDU,
+        isMS: processoOriginal.isMS,
+        dataEntrada: processoOriginal.dataEntrada,
+        observacoes: processoOriginal.observacoes,
+        tipoPA: processoOriginal.tipoPA,
         status: "novo",
         responsavel: "",
         encarregado: "",
-        descricao: msgHistorico,
-        atualizadoEm: agoraISO,
-        atualizadoPorNome: nomeMilitarAtual,
+        descricao: "Sem movimentação",
       });
-
-      // Garante que a clonagem apareça no chat/histórico do novo processo
-      await registrarMovimentacao(novoProcessoId, msgHistorico);
 
       console.log("✅ Processo clonado com sucesso:", novoNumero);
     } catch (error) {
