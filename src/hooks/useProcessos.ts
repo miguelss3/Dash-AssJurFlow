@@ -43,11 +43,11 @@ export function useProcessos() {
 
     const ehAdmin = isAdmin(userData);
     
-    if (ehAdmin) {
-      console.log("👑 ADMIN detectado! Carregando TODOS os processos...");
-    } else {
-      console.log("👤 Assessor detectado. Carregando todos os processos (filtro por setor no frontend)...");
-    }
+    // if (ehAdmin) {
+    //   console.log("👑 ADMIN detectado! Carregando TODOS os processos...");
+    // } else {
+    //   console.log("👤 Assessor detectado. Carregando todos os processos (filtro por setor no frontend)...");
+    // }
 
     // Estados internos para armazenar processos e distribuições separadamente
     let processosCache: any[] = [];
@@ -76,9 +76,9 @@ export function useProcessos() {
         // Verifica se está finalizado (campo finalizado=true OU status="Finalizado")
         const estaFinalizado = procData.finalizado === true || procData.status === "Finalizado";
         
-        if (estaFinalizado) {
-          console.log(`⚠️ PROCESSO FINALIZADO: ${procData.numeroProcesso} (finalizado=${procData.finalizado}, status="${procData.status}")`);
-        }
+        // if (estaFinalizado) {
+        //   console.log(`⚠️ PROCESSO FINALIZADO: ${procData.numeroProcesso} (finalizado=${procData.finalizado}, status="${procData.status}")`);
+        // }
         
         const statusOriginal = procData.status || "andamento";
         const statusMapeado: StatusProcesso = estaFinalizado ? "concluido" : (statusMap[statusOriginal] || "andamento");
@@ -133,36 +133,36 @@ export function useProcessos() {
           atualizadoEm: procData.atualizadoEm
         };
         
-        console.log(`📦 Processo ${processoMapeado.numero}: status="${processoMapeado.status}", responsavel="${processoMapeado.responsavel}", setor=${processoMapeado.setor}, finalizado_firebase=${procData.finalizado}`);
+        // console.log(`📦 Processo ${processoMapeado.numero}: status="${processoMapeado.status}", responsavel="${processoMapeado.responsavel}", setor=${processoMapeado.setor}, finalizado_firebase=${procData.finalizado}`);
         listaProcessos.push(processoMapeado);
       });
       
       // Debug
-      if (listaProcessos.length > 0) {
-        console.log("🔄 Mapeamento com distribuições:");
-        console.log(`  Total processos: ${listaProcessos.length}`);
-        console.log(`  Total distribuições: ${distribuicoesCache.length}`);
-        console.log("  Exemplo - responsável:", listaProcessos[0].responsavel);
-        console.log("  Exemplo - último movimento:", listaProcessos[0].descricao);
-        console.log("  Exemplo - setor:", listaProcessos[0].setor);
-        console.log("  Exemplo - tipo:", listaProcessos[0].tipo);
-        
-        // Lista setores de todos os processos
-        const setoresUnicos = [...new Set(listaProcessos.map(p => p.setor || p.tipo))];
-        console.log("  Setores encontrados:", setoresUnicos);
-        
-        const finalizados = listaProcessos.filter(p => p.status === "concluido");
-        const ativos = listaProcessos.length - finalizados.length;
-        console.log(`📊 Total: ${listaProcessos.length} | Ativos: ${ativos} | Finalizados: ${finalizados.length}`);
-        
-        // Debug detalhado de processos finalizados
-        if (finalizados.length > 0) {
-          console.log("✅ Processos finalizados carregados:");
-          finalizados.forEach(p => {
-            console.log(`  - ${p.numero}: status="${p.status}"`);
-          });
-        }
-      }
+      // if (listaProcessos.length > 0) {
+      //   console.log("🔄 Mapeamento com distribuições:");
+      //   console.log(`  Total processos: ${listaProcessos.length}`);
+      //   console.log(`  Total distribuições: ${distribuicoesCache.length}`);
+      //   console.log("  Exemplo - responsável:", listaProcessos[0].responsavel);
+      //   console.log("  Exemplo - último movimento:", listaProcessos[0].descricao);
+      //   console.log("  Exemplo - setor:", listaProcessos[0].setor);
+      //   console.log("  Exemplo - tipo:", listaProcessos[0].tipo);
+      //   
+      //   // Lista setores de todos os processos
+      //   const setoresUnicos = [...new Set(listaProcessos.map(p => p.setor || p.tipo))];
+      //   console.log("  Setores encontrados:", setoresUnicos);
+      //   
+      //   const finalizados = listaProcessos.filter(p => p.status === "concluido");
+      //   const ativos = listaProcessos.length - finalizados.length;
+      //   console.log(`📊 Total: ${listaProcessos.length} | Ativos: ${ativos} | Finalizados: ${finalizados.length}`);
+      //   
+      //   // Debug detalhado de processos finalizados
+      //   if (finalizados.length > 0) {
+      //     console.log("✅ Processos finalizados carregados:");
+      //     finalizados.forEach(p => {
+      //       console.log(`  - ${p.numero}: status="${p.status}"`);
+      //     });
+      //   }
+      // }
       
       setProcessos(listaProcessos);
       setCarregando(false);
@@ -183,7 +183,7 @@ export function useProcessos() {
       qProcessos,
       (snapshot) => {
         processosCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log(`✅ ${processosCache.length} processos carregados do Firebase`);
+        // console.log(`✅ ${processosCache.length} processos carregados do Firebase`);
         mesclarProcessosComDistribuicoes();
       },
       (err) => {
@@ -198,7 +198,7 @@ export function useProcessos() {
       distribuicoesRef,
       (snapshot) => {
         distribuicoesCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        console.log(`✅ ${distribuicoesCache.length} distribuições carregadas do Firebase`);
+        // console.log(`✅ ${distribuicoesCache.length} distribuições carregadas do Firebase`);
         mesclarProcessosComDistribuicoes();
       },
       (err) => {
@@ -232,7 +232,7 @@ export function useProcessos() {
       };
       
       await addDoc(processosRef, novoProcesso);
-      console.log("✅ Processo criado com sucesso para", currentUser.email);
+      // console.log("✅ Processo criado com sucesso para", currentUser.email);
     } catch (err: any) {
       console.error("❌ Erro ao criar processo:", err);
       throw err;
@@ -244,7 +244,7 @@ export function useProcessos() {
     try {
       const processoRef = doc(db, "processos", id);
       await updateDoc(processoRef, dados);
-      console.log("✅ Processo atualizado com sucesso");
+      // console.log("✅ Processo atualizado com sucesso");
     } catch (err: any) {
       console.error("❌ Erro ao atualizar processo:", err);
       throw err;
@@ -254,7 +254,7 @@ export function useProcessos() {
   // Função para remover processo e todos os dados relacionados
   const remover = async (id: string) => {
     try {
-      console.log(`🗑️ Iniciando exclusão do processo ${id}...`);
+      // console.log(`🗑️ Iniciando exclusão do processo ${id}...`);
       
       // 1. Remove mensagens da subcoleção historico
       try {
@@ -262,7 +262,7 @@ export function useProcessos() {
         const historicoSnapshot = await getDocs(historicoRef);
         const deleteHistoricoPromises = historicoSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
         await Promise.all(deleteHistoricoPromises);
-        console.log(`✅ ${historicoSnapshot.size} mensagens do histórico removidas`);
+        // console.log(`✅ ${historicoSnapshot.size} mensagens do histórico removidas`);
       } catch (err) {
         console.warn("⚠️ Erro ao remover histórico:", err);
       }
@@ -274,7 +274,7 @@ export function useProcessos() {
         const distribSnapshot = await getDocs(qDistrib);
         const deleteDistribPromises = distribSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
         await Promise.all(deleteDistribPromises);
-        console.log(`✅ ${distribSnapshot.size} distribuições removidas`);
+        // console.log(`✅ ${distribSnapshot.size} distribuições removidas`);
       } catch (err) {
         console.warn("⚠️ Erro ao remover distribuições:", err);
       }
@@ -283,7 +283,7 @@ export function useProcessos() {
       try {
         const mensagemRef = doc(db, "mensagens", id);
         await deleteDoc(mensagemRef);
-        console.log(`✅ Mensagens antigas removidas`);
+        // console.log(`✅ Mensagens antigas removidas`);
       } catch (err) {
         // Ignora se não existir
         console.warn("⚠️ Mensagens antigas não encontradas");
@@ -292,9 +292,9 @@ export function useProcessos() {
       // 4. Remove o documento principal do processo
       const processoRef = doc(db, "processos", id);
       await deleteDoc(processoRef);
-      console.log("✅ Processo principal removido com sucesso");
+      // console.log("✅ Processo principal removido com sucesso");
       
-      console.log(`✅ Processo ${id} e todos os dados relacionados foram excluídos permanentemente`);
+      // console.log(`✅ Processo ${id} e todos os dados relacionados foram excluídos permanentemente`);
     } catch (err: any) {
       console.error("❌ Erro ao remover processo:", err);
       throw err;
@@ -305,7 +305,7 @@ export function useProcessos() {
   const moverStatus = async (id: string, novoStatus: StatusProcesso) => {
     try {
       await atualizar(id, { status: novoStatus });
-      console.log(`✅ Processo movido para: ${novoStatus}`);
+      // console.log(`✅ Processo movido para: ${novoStatus}`);
     } catch (err: any) {
       console.error("❌ Erro ao mover processo:", err);
       throw err;

@@ -35,7 +35,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
   
   // console.log("🔐 CadastroProcessoModal - User logado:", user?.email || "Nenhum usuário");
   // console.log("🔐 Modal open?", open);
-  console.log("🔐 Processo para editar?", processo?.id || "Não, é cadastro novo");
+  // console.log("🔐 Processo para editar?", processo?.id || "Não, é cadastro novo");
 
   // Estado do formulário
   const [setor, setSetor] = useState<"DU" | "PA" | "">("");
@@ -194,57 +194,57 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("🎯 handleSubmit INICIADO");
-    console.log("  - Setor:", setor);
-    console.log("  - Número:", numeroProcesso);
-    console.log("  - Parte:", parte);
-    console.log("  - Loading:", loading);
+    // console.log("🎯 handleSubmit INICIADO");
+    // console.log("  - Setor:", setor);
+    // console.log("  - Número:", numeroProcesso);
+    // console.log("  - Parte:", parte);
+    // console.log("  - Loading:", loading);
     
     if (loading) {
-      console.log("⚠️ ABORTADO: loading=true");
+      // console.log("⚠️ ABORTADO: loading=true");
       return;
     }
 
     // Validações
     if (!setor) {
-      console.log("❌ VALIDAÇÃO FALHOU: setor vazio");
+      // console.log("❌ VALIDAÇÃO FALHOU: setor vazio");
       toast.error("Selecione o setor.");
       return;
     }
     if (!numeroProcesso.trim()) {
-      console.log("❌ VALIDAÇÃO FALHOU: numeroProcesso vazio");
+      // console.log("❌ VALIDAÇÃO FALHOU: numeroProcesso vazio");
       toast.error("Informe o número do processo.");
       return;
     }
     if (!parte.trim()) {
-      console.log("❌ VALIDAÇÃO FALHOU: parte vazia");
+      // console.log("❌ VALIDAÇÃO FALHOU: parte vazia");
       toast.error("Informe a parte.");
       return;
     }
     if (setor === "PA" && !tipoPA) {
-      console.log("❌ VALIDAÇÃO FALHOU: tipoPA vazio");
+      // console.log("❌ VALIDAÇÃO FALHOU: tipoPA vazio");
       toast.error("Selecione o tipo de procedimento do PA.");
       return;
     }
     if (setor === "DU" && !origemDU) {
-      console.log("❌ VALIDAÇÃO FALHOU: origemDU vazia");
+      // console.log("❌ VALIDAÇÃO FALHOU: origemDU vazia");
       toast.error("Selecione a origem do processo DU.");
       return;
     }
     if (setor === "DU" && !assunto.trim()) {
-      console.log("❌ VALIDAÇÃO FALHOU: assunto DU vazio");
+      // console.log("❌ VALIDAÇÃO FALHOU: assunto DU vazio");
       toast.error("Preencha o assunto do processo.");
       return;
     }
 
-    console.log("✅ Todas validações passaram! Prosseguindo...");
+    // console.log("✅ Todas validações passaram! Prosseguindo...");
     
     const isSindicanciaPA = setor === "PA" && tipoPA === "Sindicância";
     const isDiligenciaPA = setor === "PA" && aceitaDiligencia(tipoPA) && fluxoIPM === "Diligência";
     const isSindicanciaAntiga = isSindicanciaPA && fluxoIPM === "Sindicância Antigo";
 
     if (isSindicanciaPA && !assuntoSindicancia) {
-      console.log("❌ VALIDAÇÃO FALHOU: assuntoSindicancia vazio");
+      // console.log("❌ VALIDAÇÃO FALHOU: assuntoSindicancia vazio");
       toast.error("Selecione o assunto da Sindicância.");
       return;
     }
@@ -265,12 +265,12 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       return;
     }
     if (isSindicanciaAntiga && !anoLegado) {
-      console.log("❌ VALIDAÇÃO FALHOU: anoLegado vazio");
+      // console.log("❌ VALIDAÇÃO FALHOU: anoLegado vazio");
       toast.error("Selecione o ano da Sindicância Antiga.");
       return;
     }
 
-    console.log("🚀 Iniciando cadastro no Firebase...");
+    // console.log("🚀 Iniciando cadastro no Firebase...");
     setLoading(true);
 
     try {
@@ -354,7 +354,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       }
 
       if (processo?.id) {
-        console.log("✏️ EDITANDO PROCESSO EXISTENTE:", processo.id, "| Status atual:", processo.status, "| Finalizado:", processo.status === "concluido");
+        // console.log("✏️ EDITANDO PROCESSO EXISTENTE:", processo.id, "| Status atual:", processo.status, "| Finalizado:", processo.status === "concluido");
         const processoRef = doc(db, "processos", processo.id);
         const msgAtualizacao = "Dados do processo atualizados.";
         
@@ -407,20 +407,20 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         // Adiciona descricao ao documento principal
         dados.descricao = msgFinal;
         
-        console.log("📝 CRIANDO NOVO PROCESSO:", { setor, numeroProcesso, status: statusInicial });
-        console.log("📝 Responsável/Encarregado:", dados.encarregado || "(nenhum - aguardando distribuição)");
-        console.log("📝 Auth User:", { uid: user!.uid, email: user!.email });
-        console.log("📝 Dados que serão salvos no Firebase:", {
-          userId: dados.userId,
-          userEmail: dados.userEmail,
-          setor: dados.setor,
-          status: dados.status,
-          numeroProcesso: dados.numeroProcesso
-        });
+        // console.log("📝 CRIANDO NOVO PROCESSO:", { setor, numeroProcesso, status: statusInicial });
+        // console.log("📝 Responsável/Encarregado:", dados.encarregado || "(nenhum - aguardando distribuição)");
+        // console.log("📝 Auth User:", { uid: user!.uid, email: user!.email });
+        // console.log("📝 Dados que serão salvos no Firebase:", {
+        //   userId: dados.userId,
+        //   userEmail: dados.userEmail,
+        //   setor: dados.setor,
+        //   status: dados.status,
+        //   numeroProcesso: dados.numeroProcesso
+        // });
         
         const processoRef = await addDoc(collection(db, "processos"), dados);
         
-        console.log("✅ Processo criado com sucesso! ID:", processoRef.id);
+        // console.log("✅ Processo criado com sucesso! ID:", processoRef.id);
 
         const historicoCol = collection(db, "processos", processoRef.id, "historico");
         await addDoc(historicoCol, {
@@ -490,10 +490,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         );
       }
 
-      console.log("✅ Cadastro concluído! Fechando modal...");
+      // console.log("✅ Cadastro concluído! Fechando modal...");
       onOpenChange(false);
       if (onSuccess) {
-        console.log("🔄 Notificando parent component para atualizar lista de processos...");
+        // console.log("🔄 Notificando parent component para atualizar lista de processos...");
         onSuccess();
       }
     } catch (error: any) {
@@ -524,12 +524,12 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
   // Debug: verifica estado do botão
   const botaoHabilitado = !(loading || !setor);
-  console.log("🔘 Estado do botão Submit:", { loading, setor, habilitado: botaoHabilitado });
+  // console.log("🔘 Estado do botão Submit:", { loading, setor, habilitado: botaoHabilitado });
 
   // Debug: log quando modal abre
-  if (open) {
-    console.log("📂 Modal CadastroProcesso ABERTO", { setor, numeroProcesso, parte, user: user?.email });
-  }
+  // if (open) {
+  //   console.log("📂 Modal CadastroProcesso ABERTO", { setor, numeroProcesso, parte, user: user?.email });
+  // }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -543,7 +543,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
         <form 
           onSubmit={(e) => {
-            console.log("📋 FORM onSubmit disparado! Event:", e.type);
+            // console.log("📋 FORM onSubmit disparado! Event:", e.type);
             handleSubmit(e);
           }} 
           className="space-y-6"
@@ -554,7 +554,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
             <Select 
               value={setor} 
               onValueChange={(v) => {
-                console.log("🔄 Setor selecionado:", v);
+                // console.log("🔄 Setor selecionado:", v);
                 setSetor(v as "DU" | "PA");
               }}
             >
@@ -881,7 +881,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
               type="button" 
               variant="outline" 
               onClick={() => {
-                console.log("❌ Botão CANCELAR clicado");
+                // console.log("❌ Botão CANCELAR clicado");
                 onOpenChange(false);
               }}
               disabled={loading}
@@ -891,15 +891,15 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
             <Button 
               type="submit" 
               disabled={loading || !setor}
-              onMouseDown={() => console.log("� MouseDOWN no SALVAR", { setor, loading })}
-              onMouseUp={() => console.log("👆 MouseUP no SALVAR")}
+              // onMouseDown={() => console.log("👇 MouseDOWN no SALVAR", { setor, loading })}
+              // onMouseUp={() => console.log("👆 MouseUP no SALVAR")}
               onClick={(e) => {
-                console.log("🖱️ ONCLICK SALVAR DISPARADO!", { 
-                  loading, 
-                  setor,
-                  disabled: loading || !setor,
-                  defaultPrevented: e.defaultPrevented 
-                });
+                // console.log("🖱️ ONCLICK SALVAR DISPARADO!", { 
+                //   loading, 
+                //   setor,
+                //   disabled: loading || !setor,
+                //   defaultPrevented: e.defaultPrevented 
+                // });
               }}
             >
               {loading ? "Salvando..." : (processo ? "Atualizar" : "Salvar Processo")}

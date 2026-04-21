@@ -89,7 +89,7 @@ export function useAuth() {
             userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
           }
           
-          console.log("🔄 Dados carregados do localStorage:", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
+          // console.log("🔄 Dados carregados do localStorage:", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
           setUser(userData);
         } else {
           // Fallback: cria um usuário básico
@@ -122,20 +122,20 @@ export function useAuth() {
 
   const login = useCallback(async (email: string, senha: string) => {
     try {
-      console.log("🔐 Tentando login com:", email);
+      // console.log("🔐 Tentando login com:", email);
       
       try {
         // Tenta autenticar no Firebase
         const userCredential = await signInWithEmailAndPassword(auth, email, senha);
         const fbUser = userCredential.user;
         
-        console.log("✅ Firebase Auth bem-sucedido para:", fbUser.email);
+        // console.log("✅ Firebase Auth bem-sucedido para:", fbUser.email);
         
         // Busca dados do usuário na coleção "usuarios" (igual ao sistema antigo)
         let userData: AuthUser | null = null;
         
         try {
-          console.log("🔍 Buscando dados do usuário na coleção usuarios...");
+          // console.log("🔍 Buscando dados do usuário na coleção usuarios...");
           const usuariosRef = collection(db, "usuarios");
           
           // Busca por email
@@ -166,7 +166,7 @@ export function useAuth() {
               userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
             }
             
-            console.log("✅ Dados do usuário carregados:", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
+            // console.log("✅ Dados do usuário carregados:", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
           } else {
             // Se não encontrou por email, tenta buscar por UID
             const qUid = query(usuariosRef, where("uid", "==", fbUser.uid));
@@ -196,7 +196,7 @@ export function useAuth() {
                 userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
               }
               
-              console.log("✅ Dados do usuário carregados (por UID):", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
+              // console.log("✅ Dados do usuário carregados (por UID):", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
             }
           }
         } catch (firestoreError) {
@@ -226,7 +226,7 @@ export function useAuth() {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
         setUser(userData);
         
-        console.log("✅ Login concluído. Admin:", isAdmin(userData));
+        // console.log("✅ Login concluído. Admin:", isAdmin(userData));
         return;
       } catch (firebaseError: any) {
         // Se falhar (usuário não existe ou Firebase não configurado), usa modo local
@@ -246,7 +246,7 @@ export function useAuth() {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
         setUser(userData);
         
-        console.log("✅ Login local realizado com sucesso");
+        // console.log("✅ Login local realizado com sucesso");
       }
     } catch (error: any) {
       console.error("❌ Erro no login:", error.message);
@@ -259,7 +259,7 @@ export function useAuth() {
       await signOut(auth);
       window.localStorage.removeItem(STORAGE_KEY);
       setUser(null);
-      console.log("✅ Logout realizado");
+      // console.log("✅ Logout realizado");
     } catch (error: any) {
       console.error("❌ Erro no logout:", error);
       throw error;

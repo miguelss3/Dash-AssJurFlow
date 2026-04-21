@@ -112,6 +112,17 @@ function Index() {
   const usuario = user ?? { posto: "Maj", nome: "Miguel", role: "MAJ - ADMIN UNIVERSAL" };
   const ehAdmin = isAdmin(user);
 
+  // Assessores SEMPRE veem "Visão do Setor" (não podem alternar)
+  useEffect(() => {
+    if (!ehAdmin && visao !== "setor") {
+      setVisao("setor");
+    }
+    // Assessores veem apenas processos do seu setor (DU ou PA)
+    if (!ehAdmin && usuario.setor && filtroTipo === "todos") {
+      setFiltroTipo(usuario.setor as FiltroTipo);
+    }
+  }, [ehAdmin, visao, usuario.setor, filtroTipo]);
+
   const filtrados = useMemo(() => {
     // console.log("🔍 FILTRO - Iniciando filtragem de processos...");
     // console.log("  Total de processos:", processos.length);
@@ -511,53 +522,62 @@ function Index() {
             <>
               {/* Sub-controles: Minha Mesa | Visão do Setor | DU | PA + busca + filtros à direita */}
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1.5 bg-card border border-border rounded-full p-1 shrink-0">
-                  <button
-                    onClick={() => setVisao("minha")}
-                    className={`relative px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all ${
-                      visao === "minha"
-                        ? "bg-foreground text-background"
-                        : "text-foreground/80 hover:bg-muted"
-                    }`}
-                  >
-                    Minha Mesa
-                    {minhaMesaCount > 0 && (
-                      <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-destructive text-destructive-foreground">
-                        {minhaMesaCount}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setVisao("setor")}
-                    className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all ${
-                      visao === "setor"
-                        ? "bg-foreground text-background"
-                        : "text-foreground/80 hover:bg-muted"
-                    }`}
-                  >
-                    Visão do Setor
-                  </button>
-                  <button
-                    onClick={() => setFiltroTipo("DU")}
-                    className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase transition-all ${
-                      filtroTipo === "DU"
-                        ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border border-[var(--tipo-du)]/40"
-                        : "text-foreground/60 hover:bg-muted"
-                    }`}
-                  >
-                    DU
-                  </button>
-                  <button
-                    onClick={() => setFiltroTipo("PA")}
-                    className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase transition-all ${
-                      filtroTipo === "PA"
-                        ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border border-[var(--tipo-pa)]/40"
-                        : "text-foreground/60 hover:bg-muted"
-                    }`}
-                  >
-                    PA
-                  </button>
-                </div>
+                {/* Assessores veem apenas um label estático "Visão do Setor" */}
+                {!ehAdmin ? (
+                  <div className="flex items-center gap-1.5 bg-card border border-border rounded-full p-1 shrink-0">
+                    <div className="px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider bg-foreground text-background">
+                      Visão do Setor
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 bg-card border border-border rounded-full p-1 shrink-0">
+                    <button
+                      onClick={() => setVisao("minha")}
+                      className={`relative px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all ${
+                        visao === "minha"
+                          ? "bg-foreground text-background"
+                          : "text-foreground/80 hover:bg-muted"
+                      }`}
+                    >
+                      Minha Mesa
+                      {minhaMesaCount > 0 && (
+                        <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-destructive text-destructive-foreground">
+                          {minhaMesaCount}
+                        </span>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setVisao("setor")}
+                      className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all ${
+                        visao === "setor"
+                          ? "bg-foreground text-background"
+                          : "text-foreground/80 hover:bg-muted"
+                      }`}
+                    >
+                      Visão do Setor
+                    </button>
+                    <button
+                      onClick={() => setFiltroTipo("DU")}
+                      className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase transition-all ${
+                        filtroTipo === "DU"
+                          ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border border-[var(--tipo-du)]/40"
+                          : "text-foreground/60 hover:bg-muted"
+                      }`}
+                    >
+                      DU
+                    </button>
+                    <button
+                      onClick={() => setFiltroTipo("PA")}
+                      className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase transition-all ${
+                        filtroTipo === "PA"
+                          ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border border-[var(--tipo-pa)]/40"
+                          : "text-foreground/60 hover:bg-muted"
+                      }`}
+                    >
+                      PA
+                    </button>
+                  </div>
+                )}
 
                 <div className="relative flex-1 min-w-[240px]">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -569,39 +589,41 @@ function Index() {
                   />
                 </div>
 
-                {/* Filtros tipo à direita */}
-                <div className="hidden sm:flex gap-1 shrink-0">
-                  <button
-                    onClick={() => setFiltroTipo("todos")}
-                    className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
-                      filtroTipo === "todos"
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-card text-muted-foreground border-border hover:border-foreground/30"
-                    }`}
-                  >
-                    Todos
-                  </button>
-                  <button
-                    onClick={() => setFiltroTipo("DU")}
-                    className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
-                      filtroTipo === "DU"
-                        ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border-[var(--tipo-du)]/40"
-                        : "bg-card text-muted-foreground border-border hover:border-foreground/30"
-                    }`}
-                  >
-                    DU
-                  </button>
-                  <button
-                    onClick={() => setFiltroTipo("PA")}
-                    className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
-                      filtroTipo === "PA"
-                        ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border-[var(--tipo-pa)]/40"
-                        : "bg-card text-muted-foreground border-border hover:border-foreground/30"
-                    }`}
-                  >
+                {/* Filtros tipo à direita - APENAS ADMIN */}
+                {ehAdmin && (
+                  <div className="hidden sm:flex gap-1 shrink-0">
+                    <button
+                      onClick={() => setFiltroTipo("todos")}
+                      className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
+                        filtroTipo === "todos"
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card text-muted-foreground border-border hover:border-foreground/30"
+                      }`}
+                    >
+                      Todos
+                    </button>
+                    <button
+                      onClick={() => setFiltroTipo("DU")}
+                      className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
+                        filtroTipo === "DU"
+                          ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border-[var(--tipo-du)]/40"
+                          : "bg-card text-muted-foreground border-border hover:border-foreground/30"
+                      }`}
+                    >
+                      DU
+                    </button>
+                    <button
+                      onClick={() => setFiltroTipo("PA")}
+                      className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
+                        filtroTipo === "PA"
+                          ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border-[var(--tipo-pa)]/40"
+                          : "bg-card text-muted-foreground border-border hover:border-foreground/30"
+                      }`}
+                    >
                     PA
-                  </button>
-                </div>
+                    </button>
+                  </div>
+                )}
               </div>
 
               <Dashboard

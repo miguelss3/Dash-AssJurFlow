@@ -175,7 +175,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       }
     }
     
-    console.log("📊 Resultado final:", result);
+    // console.log("📊 Resultado final:", result);
     return result;
   }, [processos, filtroTipo, assessoresDoSetor]);
 
