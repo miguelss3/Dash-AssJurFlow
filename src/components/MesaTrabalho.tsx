@@ -4,12 +4,15 @@ import { AssessorGroup } from "./AssessorGroup";
 import {
   DndContext,
   DragOverlay,
+  pointerWithin,
+  rectIntersection,
   closestCenter,
   PointerSensor,
   useSensor,
   useSensors,
   DragStartEvent,
   DragEndEvent,
+  type UniqueIdentifier,
 } from "@dnd-kit/core";
 import { ProcessoCard } from "./ProcessoCard";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -43,34 +46,28 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   // Busca todos os assessores do setor (DU ou PA)
   useEffect(() => {
     const buscarAssessores = async () => {
-      if (!usuario || ehAdmin) return; // Admin vê todos, não precisa buscar
+      if (!usuario) return;
       
-      const setorParaBuscar = usuario.setor; // "DU" ou "PA"
-      if (!setorParaBuscar) return;
+      // Admin busca de ambos os setores; assessor busca apenas do seu setor
+      const setoresParaBuscar: string[] = ehAdmin ? ["DU", "PA"] : [usuario.setor || ""].filter(Boolean);
+      if (setoresParaBuscar.length === 0) return;
       
       try {
-        // console.log("🔍 Buscando assessores do setor:", setorParaBuscar);
         const usuariosRef = collection(db, "usuarios");
-        const q = query(usuariosRef, where("setor", "==", setorParaBuscar));
-        const snapshot = await getDocs(q);
+        const todosDocs: { nome: string; setor: string }[] = [];
         
-        const assessores = snapshot.docs.map(doc => {
-          const data = doc.data();
-          // Usa nomeGuerra para garantir que o nome da coluna bate com
-          // o campo responsavel dos processos (gravado como "Posto NomeGuerra")
-          const nomeExibicao = data.nomeGuerra || data.nome || data.email?.split("@")[0] || "Assessor";
-          const nomeCompleto = data.posto
-            ? `${data.posto} ${nomeExibicao}`.trim()
-            : nomeExibicao;
-          
-          return {
-            nome: nomeCompleto,
-            setor: data.setor || setorParaBuscar,
-          };
-        });
+        for (const setorParaBuscar of setoresParaBuscar) {
+          const q = query(usuariosRef, where("setor", "==", setorParaBuscar));
+          const snapshot = await getDocs(q);
+          snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const nomeExibicao = data.nomeGuerra || data.nome || data.email?.split("@")[0] || "Assessor";
+            const nomeCompleto = data.posto ? `${data.posto} ${nomeExibicao}`.trim() : nomeExibicao;
+            todosDocs.push({ nome: nomeCompleto, setor: data.setor || setorParaBuscar });
+          });
+        }
         
-        // console.log("✅ Assessores encontrados:", assessores);
-        setAssessoresDoSetor(assessores);
+        setAssessoresDoSetor(todosDocs);
       } catch (error) {
         console.error("❌ Erro ao buscar assessores:", error);
       }
@@ -195,7 +192,11 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={(args) => {
+          // Prefere pointerWithin (ponteiro dentro da área); fallback para closestCenter
+          const within = pointerWithin(args);
+          return within.length > 0 ? within : closestCenter(args);
+        }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >

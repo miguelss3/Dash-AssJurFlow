@@ -2,61 +2,34 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Função auxiliar: verifica se o usuário é admin
-    function isAdmin() {
-      // Admin universal por email
-      return request.auth.token.email == 'miguelss3@yahoo.com.br'
-             || (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) 
-                 && (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.setor == 'CHEFE ASSEAPASSJUR'
-                     || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.cargo == 'Admin Universal'
-                     || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isChefe == true
-                     || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isChefe == 'sim'));
-    }
+    // Sistema interno — qualquer usuário autenticado é um militar credenciado.
+    // A autorização por papel (admin/assessor/chefe) é feita no frontend.
     
     // Regras para a coleção de processos
     match /processos/{processoId} {
-      // Permite leitura para qualquer usuário autenticado
-      // O filtro de quem vê o quê acontece no frontend baseado em setor e distribuição
-      allow read: if request.auth != null;
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
       
-      // Permite criação apenas se o processo está sendo vinculado ao usuário autenticado
-      allow create: if request.auth != null && 
-                       request.resource.data.userId == request.auth.uid &&
-                       request.resource.data.userEmail == request.auth.token.email;
-      
-      // Permite atualização se é admin OU se o processo pertence ao usuário
-      allow update: if request.auth != null && 
-                       (isAdmin() || resource.data.userId == request.auth.uid);
-      
-      // Permite exclusão se é admin OU se o processo pertence ao usuário
-      allow delete: if request.auth != null && 
-                       (isAdmin() || resource.data.userId == request.auth.uid);
-      
-      // Subcoleção de histórico - permite leitura/escrita para todos autenticados
+      // Subcoleção de histórico
       match /historico/{mensagemId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
-        allow update: if request.auth != null;
-        allow delete: if request.auth != null && isAdmin();
+        allow read, write: if request.auth != null;
       }
     }
     
     // Regras para a coleção de usuários
     match /usuarios/{userId} {
-      // Qualquer usuário autenticado pode ler dados de usuários
-      // (necessário para busca por email/uid e para listar assessores na distribuição)
-      allow read: if request.auth != null;
-      
-      // Apenas admin pode criar/atualizar usuários
-      allow write: if request.auth != null && isAdmin();
+      allow read:  if request.auth != null;
+      // Escrita restrita: apenas o admin universal por email
+      allow write: if request.auth != null &&
+                      request.auth.token.email == 'miguelss3@yahoo.com.br';
     }
     
     // Regras para a coleção de distribuições
     match /distribuicoes/{distribuicaoId} {
-      // Permite leitura para todos os assessores (precisam ver distribuições para filtrar processos)
-      allow read: if request.auth != null;
-      // Apenas admin pode criar/atualizar/deletar distribuições
-      allow write: if request.auth != null && isAdmin();
+      allow read:  if request.auth != null;
+      allow write: if request.auth != null;
     }
     
     match /mensagens/{mensagemId} {

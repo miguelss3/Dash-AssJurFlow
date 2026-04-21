@@ -12,6 +12,7 @@ import {
   serverTimestamp 
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import type { Processo, StatusProcesso } from "@/types/processo";
 import { isAdmin, type AuthUser } from "./useAuth";
 
@@ -21,16 +22,21 @@ export function useProcessos() {
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => {
-    // Verifica se há usuário autenticado
-    const currentUser = auth.currentUser;
-    
-    if (!currentUser) {
-      console.warn("⚠️ Usuário não autenticado. Aguardando login...");
-      setCarregando(false);
-      return;
-    }
+    let unsubProcessos: (() => void) | null = null;
+    let unsubDistribuicoes: (() => void) | null = null;
 
-    // Busca dados do usuário do localStorage para verificar se é admin
+    // Aguarda o Firebase Auth resolver o estado de autenticação antes de inscrever os listeners
+    const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      // Cancela listeners anteriores se existirem
+      if (unsubProcessos) { unsubProcessos(); unsubProcessos = null; }
+      if (unsubDistribuicoes) { unsubDistribuicoes = null; }
+
+      if (!firebaseUser) {
+        setCarregando(false);
+        return;
+      }
+
+      // Busca dados do usuário do localStorage para verificar se é admin
     let userData: AuthUser | null = null;
     try {
       const stored = window.localStorage.getItem("assjur:auth");
@@ -179,7 +185,7 @@ export function useProcessos() {
     const qProcessos = query(processosRef);
 
     // Listener 1: Processos
-    const unsubProcessos = onSnapshot(
+    unsubProcessos = onSnapshot(
       qProcessos,
       (snapshot) => {
         processosCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -194,7 +200,7 @@ export function useProcessos() {
     );
 
     // Listener 2: Distribuições (sempre carrega todas para admin fazer o merge)
-    const unsubDistribuicoes = onSnapshot(
+    unsubDistribuicoes = onSnapshot(
       distribuicoesRef,
       (snapshot) => {
         distribuicoesCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -207,13 +213,15 @@ export function useProcessos() {
         mesclarProcessosComDistribuicoes();
       }
     );
+    }); // fecha onAuthStateChanged
 
-    // Cleanup: desinscreve dos listeners ao desmontar
+    // Cleanup: desinscreve de todos os listeners ao desmontar
     return () => {
-      unsubProcessos();
-      unsubDistribuicoes();
+      unsubAuth();
+      if (unsubProcessos) unsubProcessos();
+      if (unsubDistribuicoes) unsubDistribuicoes();
     };
-  }, [auth.currentUser?.uid]); // Recarrega quando o usuário muda
+  }, []); // executa uma vez — onAuthStateChanged cuida do ciclo de vida do auth
 
   // Função para criar novo processo
   const criar = async (dados: Omit<Processo, "id" | "criadoEm" | "userId" | "userEmail">) => {
