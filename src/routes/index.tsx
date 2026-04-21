@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SoldierAvatar } from "@/components/SoldierAvatar";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, isAdmin } from "@/hooks/useAuth";
 import {
   Scale,
   Plus,
@@ -108,13 +108,41 @@ function Index() {
 
   // Usuário logado (vem do auth, fallback enquanto carrega)
   const usuario = user ?? { posto: "Maj", nome: "Miguel", role: "MAJ - ADMIN UNIVERSAL" };
+  const ehAdmin = isAdmin(user);
 
   const filtrados = useMemo(() => {
+    console.log("🔍 FILTRO - Iniciando filtragem de processos...");
+    console.log("  Total de processos:", processos.length);
+    console.log("  Usuário:", usuario.nome);
+    console.log("  Setor do usuário:", usuario.setor);
+    console.log("  É admin?:", ehAdmin);
+    console.log("  Visão:", visao);
+    console.log("  Filtro tipo:", filtroTipo);
+    
     return processos.filter((p) => {
       if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
-      if (visao === "minha" && p.responsavel !== `${usuario.posto} ${usuario.nome}`) {
-        // "Minha mesa" - mock: só mostra os do próprio usuário
-        return false;
+      
+      // FILTRO "MINHA MESA": mostra apenas processos distribuídos para o assessor logado
+      if (visao === "minha") {
+        // Verifica se o responsável é o usuário atual (com ou sem posto)
+        const nomeComPosto = `${usuario.posto} ${usuario.nome}`;
+        const nomeCompleto = usuario.nome;
+        const responsavelMatch = p.responsavel === nomeComPosto || 
+                                p.responsavel === nomeCompleto ||
+                                p.responsavel?.includes(nomeCompleto);
+        if (!responsavelMatch) return false;
+      }
+      
+      // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
+      if (visao === "setor" && !ehAdmin && usuario.setor) {
+        console.log(`  Verificando processo ${p.numero}: setor=${p.setor}, tipo=${p.tipo}, usuarioSetor=${usuario.setor}`);
+        // Assessor de DU vê apenas processos de DU
+        // Assessor de PA vê apenas processos de PA
+        if (p.setor !== usuario.setor && p.tipo !== usuario.setor) {
+          console.log(`    ❌ Processo ${p.numero} filtrado (setor incompatível)`);
+          return false;
+        }
+        console.log(`    ✅ Processo ${p.numero} passa no filtro de setor`);
       }
       if (busca.trim()) {
         const q = busca.toLowerCase();
@@ -134,16 +162,22 @@ function Index() {
       if (filtro === "semana") return s === "today" || s === "soon";
       return true;
     });
-  }, [processos, filtro, busca, filtroTipo, visao, usuario.posto, usuario.nome]);
+  }, [processos, filtro, busca, filtroTipo, visao, usuario.posto, usuario.nome, usuario.setor, ehAdmin]);
 
   const ativosCount = processos.filter((p) => p.status !== "concluido").length;
   const vencidosCount = processos.filter(
     (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
   ).length;
-  const minhaMesaCount = processos.filter(
-    (p) =>
-      p.responsavel === `${usuario.posto} ${usuario.nome}` && p.status !== "concluido",
-  ).length;
+  
+  // Contador "Minha Mesa" - processos distribuídos para o assessor logado
+  const minhaMesaCount = processos.filter((p) => {
+    if (p.status === "concluido") return false;
+    const nomeComPosto = `${usuario.posto} ${usuario.nome}`;
+    const nomeCompleto = usuario.nome;
+    return p.responsavel === nomeComPosto || 
+           p.responsavel === nomeCompleto ||
+           p.responsavel?.includes(nomeCompleto);
+  }).length;
 
   const handleEdit = (p: Processo) => {
     setEditing(p);

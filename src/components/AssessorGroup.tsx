@@ -12,16 +12,23 @@ interface Props {
 
 export function AssessorGroup({ responsavel, tipo, processos, onEdit, onDelete, onMove }: Props) {
   const isDU = tipo === "DU";
+  const isAguardandoDistribuicao = responsavel.includes("📥 Aguardando");
+  
   const tipoBg = isDU ? "bg-[var(--tipo-du-bg)]" : "bg-[var(--tipo-pa-bg)]";
   const tipoText = isDU ? "text-[var(--tipo-du)]" : "text-[var(--tipo-pa)]";
   const tipoBorder = isDU ? "border-[var(--tipo-du)]/30" : "border-[var(--tipo-pa)]/30";
+  
+  // Se é "Aguardando Distribuição", usa cor laranja destacada
+  const bgClass = isAguardandoDistribuicao ? "bg-orange-50" : tipoBg;
+  const textClass = isAguardandoDistribuicao ? "text-orange-700" : tipoText;
+  const borderClass = isAguardandoDistribuicao ? "border-orange-300" : tipoBorder;
 
   return (
     <div className="shrink-0 w-[88vw] sm:w-[340px] snap-start flex flex-col rounded-3xl bg-card border border-border shadow-card overflow-hidden">
       {/* Header do assessor */}
       <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
         <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide border ${tipoBg} ${tipoText} ${tipoBorder}`}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide border ${bgClass} ${textClass} ${borderClass}`}
         >
           {tipo} • {responsavel}
         </span>

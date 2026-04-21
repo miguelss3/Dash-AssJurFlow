@@ -25,7 +25,7 @@ interface CadastroProcessoModalProps {
 const TIPOS_PA = ["IPM", "Sindicância", "Conselho de Disciplina", "Conselho de Justificação", "Investigação Preliminar", "Outros"];
 const ASSUNTOS_SINDICANCIA = ["Falta Injustificada", "Embriaguez", "Deserção", "Outros"];
 const ORIGENS_DU = ["SAPIENS", "Ofício", "E-mail", "Whatsapp", "Presencial", "Outros"];
-const SECOES_DU = ["SVP", "SJUR", "SAJ"];
+const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 
 export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess }: CadastroProcessoModalProps) {
   const { user } = useAuth();
@@ -279,8 +279,9 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         observacoes: observacoes.trim() || null,
         setor,
         status: statusInicial,
-        finalizado: false,
-        criadoEm: agora,
+        // IMPORTANTE: Preserva estado finalizado ao editar, força false ao criar novo
+        finalizado: processo?.id ? (processo.status === "concluido") : false,
+        criadoEm: processo?.id ? undefined : agora, // Não sobrescreve ao editar
         atualizadoEm: agora,
         userId: user?.uid || null,
         criadoPorNome: user?.email || null,
@@ -320,11 +321,15 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       }
 
       if (processo?.id) {
+        console.log("✏️ EDITANDO PROCESSO EXISTENTE:", processo.id, "| Status atual:", processo.status, "| Finalizado:", processo.status === "concluido");
         const processoRef = doc(db, "processos", processo.id);
         const msgAtualizacao = "Dados do processo atualizados.";
         
+        // Remove criadoEm do update para não sobrescrever
+        const { criadoEm: _, ...dadosUpdate } = dados;
+        
         await updateDoc(processoRef, { 
-          ...dados, 
+          ...dadosUpdate, 
           atualizadoEm: agora,
           descricao: msgAtualizacao // Atualiza último movimento
         });
@@ -368,7 +373,13 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         // Adiciona descricao ao documento principal
         dados.descricao = msgFinal;
         
+        console.log("📝 CRIANDO NOVO PROCESSO:", { setor, numeroProcesso, status: statusInicial });
+        console.log("📝 Responsável/Encarregado:", dados.encarregado || "(nenhum - aguardando distribuição)");
+        console.log("📝 Dados completos do processo:", dados);
+        
         const processoRef = await addDoc(collection(db, "processos"), dados);
+        
+        console.log("✅ Processo criado com sucesso! ID:", processoRef.id);
 
         const historicoCol = collection(db, "processos", processoRef.id, "historico");
         await addDoc(historicoCol, {
@@ -438,8 +449,12 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         );
       }
 
+      console.log("✅ Cadastro concluído! Fechando modal...");
       onOpenChange(false);
-      if (onSuccess) onSuccess();
+      if (onSuccess) {
+        console.log("🔄 Notificando parent component para atualizar lista de processos...");
+        onSuccess();
+      }
     } catch (error) {
       console.error("Erro ao salvar processo:", error);
       toast.error("Erro ao salvar processo. Tente novamente.");

@@ -3,6 +3,16 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   FileEdit, 
   MessageSquare, 
@@ -19,8 +29,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatarData, diasRestantes } from "@/lib/prazo";
-import { AcoesDUModal } from "./modals/AcoesDUModal";
-import { AcoesPAModal } from "./modals/AcoesPAModal";
+import { AcoesDUModalNovo } from "./modals/AcoesDUModalNovo";
+import { AcoesPAModalNovo } from "./modals/AcoesPAModalNovo";
 import { DetalhesProcessoModal } from "./DetalhesProcessoModal";
 import { ChatModal } from "./ChatModal";
 
@@ -42,6 +52,7 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
   const [modalAcoesPA, setModalAcoesPA] = useState(false);
   const [modalDetalhes, setModalDetalhes] = useState(false);
   const [modalChat, setModalChat] = useState(false);
+  const [alertExcluir, setAlertExcluir] = useState(false);
   
   // Função para abrir o chat do processo
   const abrirChat = () => {
@@ -66,6 +77,15 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
   // Função de ações PA
   const abrirAcoesPA = () => {
     setModalAcoesPA(true);
+  };
+  
+  // Função para excluir processo
+  const confirmarExclusao = () => {
+    if (onDelete) {
+      onDelete(p.id);
+      toast.success(`Processo ${p.numero} excluído com sucesso!`);
+      setAlertExcluir(false);
+    }
   };
 
   return (
@@ -179,96 +199,103 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
 
           {/* Botões de Ação */}
           {showActions && (
-            <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100">
-              {/* Botão Ação (DU ou PA) */}
-              {isDU ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-sky-300 text-sky-700 hover:bg-sky-50 text-xs h-9"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    abrirAcoesDU();
-                  }}
-                >
-                  <Send className="w-3 h-3 mr-1" />
-                  Ação
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-purple-300 text-purple-700 hover:bg-purple-50 text-xs h-9"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    abrirAcoesPA();
-                  }}
-                >
-                  <FileText className="w-3 h-3 mr-1" />
-                  Ação
-                </Button>
-              )}
+            <div className="space-y-2 mt-3 pt-3 border-t border-slate-100">
+              {/* Linha 1: Ação, Editar, Chat */}
+              <div className="grid grid-cols-3 gap-2">
+                {/* Botão Ação (DU ou PA) */}
+                {isDU ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-sky-300 text-sky-700 hover:bg-sky-50 text-xs h-9"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      abrirAcoesDU();
+                    }}
+                  >
+                    <Send className="w-3 h-3 mr-1" />
+                    Ação
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-purple-300 text-purple-700 hover:bg-purple-50 text-xs h-9"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      abrirAcoesPA();
+                    }}
+                  >
+                    <FileText className="w-3 h-3 mr-1" />
+                    Ação
+                  </Button>
+                )}
 
-              {/* Botão Editar */}
-              {onEdit && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-amber-300 text-amber-700 hover:bg-amber-50 text-xs h-9"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onEdit(p);
-                  }}
-                >
-                  <FileEdit className="w-3 h-3 mr-1" />
-                  Editar
-                </Button>
-              )}
+                {/* Botão Editar */}
+                {onEdit && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-300 text-amber-700 hover:bg-amber-50 text-xs h-9"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(p);
+                    }}
+                  >
+                    <FileEdit className="w-3 h-3 mr-1" />
+                    Editar
+                  </Button>
+                )}
 
-              {/* Botão Chat */}
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-slate-300 text-slate-600 hover:bg-slate-50 text-xs h-9"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  abrirChat();
-                }}
-              >
-                <MessageSquare className="w-3 h-3 mr-1" />
-                Chat
-              </Button>
-
-              {/* Botão Finalizar ou Excluir */}
-              {p.status !== "concluido" ? (
+                {/* Botão Chat */}
                 <Button
                   size="sm"
                   variant="outline"
-                  className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs h-9"
+                  className="border-slate-300 text-slate-600 hover:bg-slate-50 text-xs h-9"
                   onClick={(e) => {
                     e.stopPropagation();
-                    finalizarProcesso();
+                    abrirChat();
                   }}
                 >
-                  <CheckCircle className="w-3 h-3 mr-1" />
-                  Finalizar
+                  <MessageSquare className="w-3 h-3 mr-1" />
+                  Chat
                 </Button>
-              ) : onDelete && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-9"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm(`Excluir processo ${p.numero}?`)) {
-                      onDelete(p.id);
-                    }
-                  }}
-                >
-                  <Trash2 className="w-3 h-3 mr-1" />
-                  Excluir
-                </Button>
-              )}
+              </div>
+              
+              {/* Linha 2: Finalizar (se não concluído) + Excluir */}
+              <div className={`grid gap-2 ${p.status !== "concluido" ? "grid-cols-2" : "grid-cols-1"}`}>
+                {/* Botão Finalizar (apenas se não estiver concluído) */}
+                {p.status !== "concluido" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs h-9"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      finalizarProcesso();
+                    }}
+                  >
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Finalizar
+                  </Button>
+                )}
+                
+                {/* Botão Excluir (SEMPRE DISPONÍVEL) */}
+                {onDelete && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-9 font-semibold"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setAlertExcluir(true);
+                    }}
+                  >
+                    <Trash2 className="w-3 h-3 mr-1" />
+                    Excluir
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -287,18 +314,26 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
       </Card>
 
       {/* Modais de Ações */}
-      <AcoesDUModal
+      <AcoesDUModalNovo
         open={modalAcoesDU}
         onOpenChange={setModalAcoesDU}
         processoId={p.id}
         numeroProcesso={p.numero}
+        onSuccess={() => {
+          // Recarrega a página ou atualiza os dados
+          window.location.reload();
+        }}
       />
 
-      <AcoesPAModal
+      <AcoesPAModalNovo
         open={modalAcoesPA}
         onOpenChange={setModalAcoesPA}
         processoId={p.id}
         numeroProcesso={p.numero}
+        onSuccess={() => {
+          // Recarrega a página ou atualiza os dados
+          window.location.reload();
+        }}
       />
 
       {/* Modal de Detalhes */}
@@ -314,6 +349,41 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
         onOpenChange={setModalChat}
         processo={p}
       />
+      
+      {/* AlertDialog de Confirmação de Exclusão */}
+      <AlertDialog open={alertExcluir} onOpenChange={setAlertExcluir}>
+        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              Excluir Processo?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p className="font-semibold text-slate-900">Você está prestes a excluir permanentemente:</p>
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm">
+                <p><strong>Número:</strong> {p.numero}</p>
+                <p><strong>Tipo:</strong> {p.tipoAcao}</p>
+                <p><strong>Parte:</strong> {p.cliente}</p>
+                <p><strong>Responsável:</strong> {p.responsavel}</p>
+              </div>
+              <p className="text-red-600 font-semibold">⚠️ Esta ação não pode ser desfeita!</p>
+              <p className="text-sm text-slate-600">O processo será removido permanentemente do banco de dados.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.stopPropagation();
+                confirmarExclusao();
+              }}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Sim, Excluir Permanentemente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

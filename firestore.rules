@@ -15,11 +15,9 @@ service cloud.firestore {
     
     // Regras para a coleção de processos
     match /processos/{processoId} {
-      // Permite leitura se:
-      // 1. É admin (vê todos os processos)
-      // 2. OU o processo pertence ao usuário autenticado
-      allow read: if request.auth != null && 
-                     (isAdmin() || resource.data.userId == request.auth.uid);
+      // Permite leitura para qualquer usuário autenticado
+      // O filtro de quem vê o quê acontece no frontend baseado em setor e distribuição
+      allow read: if request.auth != null;
       
       // Permite criação apenas se o processo está sendo vinculado ao usuário autenticado
       allow create: if request.auth != null && 
@@ -54,9 +52,12 @@ service cloud.firestore {
       allow write: if request.auth != null && isAdmin();
     }
     
-    // Regras para outras coleções (distribuicoes, mensagens, etc.)
+    // Regras para a coleção de distribuições
     match /distribuicoes/{distribuicaoId} {
-      allow read, write: if request.auth != null && isAdmin();
+      // Permite leitura para todos os assessores (precisam ver distribuições para filtrar processos)
+      allow read: if request.auth != null;
+      // Apenas admin pode criar/atualizar/deletar distribuições
+      allow write: if request.auth != null && isAdmin();
     }
     
     match /mensagens/{mensagemId} {

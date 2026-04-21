@@ -29,16 +29,25 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove }
       
       const map = new Map<string, Processo[]>();
       doTipo.forEach((p) => {
-        const r = p.responsavel || "Sem responsável";
-        if (!map.has(r)) map.set(r, []);
-        map.get(r)!.push(p);
+        // Processos sem responsável ou com "Sem responsável" vão para "Aguardando Distribuição"
+        let responsavelKey = p.responsavel || "";
+        if (!responsavelKey || responsavelKey === "Sem responsável" || responsavelKey.trim() === "") {
+          responsavelKey = "📥 Aguardando Distribuição";
+        }
+        if (!map.has(responsavelKey)) map.set(responsavelKey, []);
+        map.get(responsavelKey)!.push(p);
       });
       
       console.log(`📊 Assessores encontrados para ${tipo}:`, Array.from(map.keys()));
       
+      // Ordena: "Aguardando Distribuição" primeiro, depois ordem alfabética
       const assessores = Array.from(map.entries())
         .map(([nome, itens]) => ({ nome, itens }))
-        .sort((a, b) => a.nome.localeCompare(b.nome));
+        .sort((a, b) => {
+          if (a.nome.includes("📥 Aguardando")) return -1;
+          if (b.nome.includes("📥 Aguardando")) return 1;
+          return a.nome.localeCompare(b.nome);
+        });
       if (assessores.length > 0) {
         result.push({ tipo, assessores });
       }

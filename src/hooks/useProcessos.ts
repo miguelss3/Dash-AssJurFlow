@@ -8,6 +8,7 @@ import {
   updateDoc, 
   deleteDoc, 
   doc,
+  getDocs,
   serverTimestamp 
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
@@ -43,9 +44,9 @@ export function useProcessos() {
     const ehAdmin = isAdmin(userData);
     
     if (ehAdmin) {
-      console.log("👑 ADMIN detectado! Carregando TODOS os processos do Firebase...");
+      console.log("👑 ADMIN detectado! Carregando TODOS os processos...");
     } else {
-      console.log("🔍 Usuário regular. Carregando apenas processos de:", currentUser.email);
+      console.log("👤 Assessor detectado. Carregando todos os processos (filtro por setor no frontend)...");
     }
 
     // Estados internos para armazenar processos e distribuições separadamente
@@ -97,7 +98,8 @@ export function useProcessos() {
           parteContraria: procData.parteContraria || "N/A",
           tipoAcao: procData.assunto || procData.tipoAcao || "Sem assunto",
           // IMPORTANTE: usa assessorNome da distribuição se existir, senão usa encarregado do processo
-          responsavel: distribuicao?.assessorNome || procData.encarregado || procData.responsavel || "Sem responsável",
+          // Se nenhum dos dois existir, deixa vazio (não coloca "Sem responsável")
+          responsavel: distribuicao?.assessorNome || procData.encarregado || procData.responsavel || "",
           prazo: procData.prazoInternoDU || procData.prazo,
           prazoFatal: procData.prazoFatalDU || procData.prazoFatal,
           descricao: descricaoUltimoMovimento,
@@ -137,6 +139,12 @@ export function useProcessos() {
         console.log(`  Total distribuições: ${distribuicoesCache.length}`);
         console.log("  Exemplo - responsável:", listaProcessos[0].responsavel);
         console.log("  Exemplo - último movimento:", listaProcessos[0].descricao);
+        console.log("  Exemplo - setor:", listaProcessos[0].setor);
+        console.log("  Exemplo - tipo:", listaProcessos[0].tipo);
+        
+        // Lista setores de todos os processos
+        const setoresUnicos = [...new Set(listaProcessos.map(p => p.setor || p.tipo))];
+        console.log("  Setores encontrados:", setoresUnicos);
         
         const finalizados = listaProcessos.filter(p => p.status === "concluido");
         const ativos = listaProcessos.length - finalizados.length;
@@ -160,12 +168,10 @@ export function useProcessos() {
     const processosRef = collection(db, "processos");
     const distribuicoesRef = collection(db, "distribuicoes");
     
-    // Query condicional para processos: 
-    // - Admin: carrega TODOS os processos (sem filtro)
-    // - Usuário regular: carrega apenas os processos dele (com filtro)
-    const qProcessos = ehAdmin 
-      ? query(processosRef)  // SEM filtro - carrega tudo
-      : query(processosRef, where("userId", "==", currentUser.uid));  // COM filtro - apenas do usuário
+    // Query para processos:
+    // Carrega TODOS os processos para admin E assessores
+    // O filtro de visibilidade (minha mesa vs setor) acontece no frontend em index.tsx
+    const qProcessos = query(processosRef);
 
     // Listener 1: Processos
     const unsubProcessos = onSnapshot(
@@ -240,12 +246,50 @@ export function useProcessos() {
     }
   };
 
-  // Função para remover processo
+  // Função para remover processo e todos os dados relacionados
   const remover = async (id: string) => {
     try {
+      console.log(`🗑️ Iniciando exclusão do processo ${id}...`);
+      
+      // 1. Remove mensagens da subcoleção historico
+      try {
+        const historicoRef = collection(db, "processos", id, "historico");
+        const historicoSnapshot = await getDocs(historicoRef);
+        const deleteHistoricoPromises = historicoSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+        await Promise.all(deleteHistoricoPromises);
+        console.log(`✅ ${historicoSnapshot.size} mensagens do histórico removidas`);
+      } catch (err) {
+        console.warn("⚠️ Erro ao remover histórico:", err);
+      }
+      
+      // 2. Remove distribuições relacionadas ao processo
+      try {
+        const distribuicoesRef = collection(db, "distribuicoes");
+        const qDistrib = query(distribuicoesRef, where("processoId", "==", id));
+        const distribSnapshot = await getDocs(qDistrib);
+        const deleteDistribPromises = distribSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+        await Promise.all(deleteDistribPromises);
+        console.log(`✅ ${distribSnapshot.size} distribuições removidas`);
+      } catch (err) {
+        console.warn("⚠️ Erro ao remover distribuições:", err);
+      }
+      
+      // 3. Remove mensagens antigas (compatibilidade com sistema antigo)
+      try {
+        const mensagemRef = doc(db, "mensagens", id);
+        await deleteDoc(mensagemRef);
+        console.log(`✅ Mensagens antigas removidas`);
+      } catch (err) {
+        // Ignora se não existir
+        console.warn("⚠️ Mensagens antigas não encontradas");
+      }
+      
+      // 4. Remove o documento principal do processo
       const processoRef = doc(db, "processos", id);
       await deleteDoc(processoRef);
-      console.log("✅ Processo removido com sucesso");
+      console.log("✅ Processo principal removido com sucesso");
+      
+      console.log(`✅ Processo ${id} e todos os dados relacionados foram excluídos permanentemente`);
     } catch (err: any) {
       console.error("❌ Erro ao remover processo:", err);
       throw err;
