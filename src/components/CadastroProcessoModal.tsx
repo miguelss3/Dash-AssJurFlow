@@ -321,23 +321,40 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
       if (processo?.id) {
         const processoRef = doc(db, "processos", processo.id);
-        await updateDoc(processoRef, { ...dados, atualizadoEm: agora });
+        const msgAtualizacao = "Dados do processo atualizados.";
+        
+        await updateDoc(processoRef, { 
+          ...dados, 
+          atualizadoEm: agora,
+          descricao: msgAtualizacao // Atualiza último movimento
+        });
 
         const historicoCol = collection(db, "processos", processo.id, "historico");
         await addDoc(historicoCol, {
           autor: user?.email || "Sistema",
           autorId: user?.uid || "sistema",
-          texto: "Dados do processo atualizados.",
+          texto: msgAtualizacao,
           timestamp: agoraISO,
         });
 
         toast.success("Processo atualizado com sucesso!");
       } else {
-        const processoRef = await addDoc(collection(db, "processos"), dados);
-
         const msgCadastro = (setor === "DU" && isMS)
           ? "🚨 Mandado de Segurança / Urgente cadastrado no sistema."
-          : (setor === "PA" ? `Processo cadastrado e atribuído a ${user?.email}.` : "Processo cadastrado no sistema.");
+          : (setor === "PA" ? `Processo cadastrado e atribuído a ${user?.email}.` : "Process cadastrado no sistema.");
+        
+        const msgFinal = setor === "PA" 
+          ? (isSindicanciaAntiga 
+              ? `🗂️ Sindicância antiga cadastrada no acervo com a portaria ${numeroFinal}.`
+              : (isDiligenciaPA
+                  ? `🔎 ${tipoPA} cadastrado em diligência${mudouEncarregado ? ` com nova portaria ${numeroFinal}` : " mantendo a mesma portaria"}. Aguardando assinatura do Cmt.`
+                  : "📋 Portaria cadastrada. Aguardando Assinatura do Cmt."))
+          : msgCadastro;
+
+        // Adiciona descricao ao documento principal
+        dados.descricao = msgFinal;
+        
+        const processoRef = await addDoc(collection(db, "processos"), dados);
 
         const historicoCol = collection(db, "processos", processoRef.id, "historico");
         await addDoc(historicoCol, {

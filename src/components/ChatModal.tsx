@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, X } from "lucide-react";
-import { collection, addDoc, query, orderBy, onSnapshot, Timestamp } from "firebase/firestore";
+import { collection, addDoc, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,13 +44,13 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
 
     setLoading(true);
     
-    // Listener em tempo real para o histórico (subcoleção do processo)
+    // Tenta carregar da subcoleção (sistema novo)
     const historicoRef = collection(db, `processos/${processo.id}/historico`);
     const q = query(historicoRef, orderBy("timestamp", "asc"));
 
     const unsubscribe = onSnapshot(
       q,
-      (snapshot) => {
+      async (snapshot) => {
         const msgs: Mensagem[] = [];
         snapshot.forEach((doc) => {
           const data = doc.data();
@@ -62,6 +62,30 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
             timestamp: data.timestamp?.toDate?.()?.toISOString() || data.timestamp || new Date().toISOString(),
           });
         });
+        
+        // Se não houver mensagens na subcoleção, tenta carregar da coleção mensagens (sistema antigo)
+        if (msgs.length === 0) {
+          try {
+            const mensagensDoc = await getDoc(doc(db, "mensagens", processo.id));
+            if (mensagensDoc.exists()) {
+              const historicoAntigo = mensagensDoc.data()?.historico || [];
+              if (Array.isArray(historicoAntigo)) {
+                historicoAntigo.forEach((msg: any) => {
+                  msgs.push({
+                    id: msg.id || crypto.randomUUID(),
+                    autor: msg.autor || "Sistema",
+                    autorId: msg.autorId || "",
+                    texto: msg.texto || "",
+                    timestamp: msg.timestamp || new Date().toISOString(),
+                  });
+                });
+              }
+            }
+          } catch (error) {
+            console.warn("Erro ao carregar mensagens antigas:", error);
+          }
+        }
+        
         setMensagens(msgs);
         setLoading(false);
       },
@@ -79,13 +103,21 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
     if (!novaMensagem.trim() || !processo?.id || !user) return;
 
     try {
+      const textoMensagem = novaMensagem.trim();
       const historicoRef = collection(db, `processos/${processo.id}/historico`);
       
       await addDoc(historicoRef, {
         autor: user.nome || user.email?.split("@")[0] || "Usuário",
         autorId: user.uid,
-        texto: novaMensagem.trim(),
+        texto: textoMensagem,
         timestamp: Timestamp.now(),
+      });
+
+      // Atualiza o campo descricao no documento principal para exibir último movimento
+      const processoRef = doc(db, "processos", processo.id);
+      await updateDoc(processoRef, {
+        descricao: textoMensagem,
+        atualizadoEm: Timestamp.now(),
       });
 
       setNovaMensagem("");

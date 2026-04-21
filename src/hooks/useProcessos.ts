@@ -72,10 +72,14 @@ export function useProcessos() {
           "Finalizado": "concluido"
         };
 
+        // Verifica se está finalizado (campo finalizado=true OU status="Finalizado")
+        const estaFinalizado = procData.finalizado === true || procData.status === "Finalizado";
+        
         const statusOriginal = procData.status || "andamento";
-        const statusMapeado: StatusProcesso = statusMap[statusOriginal] || "andamento";
+        const statusMapeado: StatusProcesso = estaFinalizado ? "concluido" : (statusMap[statusOriginal] || "andamento");
 
         // Pega a última mensagem do histórico como descrição
+        // Prioriza o array historico (sistema antigo), depois tenta outros campos
         const historico = Array.isArray(procData.historico) ? procData.historico : [];
         const ultimaMensagem = historico.length > 0 ? historico[historico.length - 1] : null;
         const descricaoUltimoMovimento = ultimaMensagem?.texto 
@@ -83,20 +87,6 @@ export function useProcessos() {
           || procData.ultimaAcaoDescricao 
           || procData.descricao 
           || "Sem movimentação";
-
-        // Debug para processos sem último movimento
-        if (!ultimaMensagem && historico.length === 0 && procData.id) {
-          console.log(`⚠️ Processo ${procData.numeroProcesso || procData.id} sem histórico:`, {
-            temHistorico: !!procData.historico,
-            tipoHistorico: typeof procData.historico,
-            tamanho: historico.length,
-            procData: { 
-              ultimaAtualizacaoDescricao: procData.ultimaAtualizacaoDescricao,
-              ultimaAcaoDescricao: procData.ultimaAcaoDescricao,
-              descricao: procData.descricao
-            }
-          });
-        }
 
         const processoMapeado: Processo = {
           id: procData.id,
@@ -148,9 +138,17 @@ export function useProcessos() {
         console.log("  Exemplo - responsável:", listaProcessos[0].responsavel);
         console.log("  Exemplo - último movimento:", listaProcessos[0].descricao);
         
-        const finalizados = listaProcessos.filter(p => p.status === "concluido").length;
-        const ativos = listaProcessos.length - finalizados;
-        console.log(`📊 Total: ${listaProcessos.length} | Ativos: ${ativos} | Finalizados: ${finalizados}`);
+        const finalizados = listaProcessos.filter(p => p.status === "concluido");
+        const ativos = listaProcessos.length - finalizados.length;
+        console.log(`📊 Total: ${listaProcessos.length} | Ativos: ${ativos} | Finalizados: ${finalizados.length}`);
+        
+        // Debug detalhado de processos finalizados
+        if (finalizados.length > 0) {
+          console.log("✅ Processos finalizados carregados:");
+          finalizados.forEach(p => {
+            console.log(`  - ${p.numero}: status="${p.status}"`);
+          });
+        }
       }
       
       setProcessos(listaProcessos);

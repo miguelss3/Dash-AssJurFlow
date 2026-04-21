@@ -546,7 +546,11 @@ function Index() {
               icon={FolderArchive}
               title="Arquivo / Encerrados"
               description="Histórico de processos finalizados e arquivados."
-              processos={processos.filter((p) => p.status === "concluido")}
+              processos={(() => {
+                const finalizados = processos.filter((p) => p.status === "concluido");
+                console.log(`📁 Aba Arquivo: ${finalizados.length} processos finalizados de ${processos.length} totais`);
+                return finalizados;
+              })()}
               onEdit={handleEdit}
               onDelete={remover}
               onMove={moverStatus}
