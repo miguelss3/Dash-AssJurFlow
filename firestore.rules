@@ -43,10 +43,9 @@ service cloud.firestore {
     
     // Regras para a coleção de usuários
     match /usuarios/{userId} {
-      // Admin pode ler todos os usuários
-      // Usuários regulares só podem ler o próprio documento
-      allow read: if request.auth != null && 
-                     (isAdmin() || request.auth.uid == userId);
+      // Qualquer usuário autenticado pode ler dados de usuários
+      // (necessário para busca por email/uid e para listar assessores na distribuição)
+      allow read: if request.auth != null;
       
       // Apenas admin pode criar/atualizar usuários
       allow write: if request.auth != null && isAdmin();

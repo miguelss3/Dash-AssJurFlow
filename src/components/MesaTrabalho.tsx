@@ -84,13 +84,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     const processo = processos.find((p) => p.id === active.id);
     setActiveProcesso(processo || null);
     
-    console.log("🖱️ Drag iniciado:", active.id);
+    // console.log("🖱️ Drag iniciado:", active.id);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     
-    console.log("🖱️ Drag finalizado:", { activeId: active.id, overId: over?.id });
+    // console.log("🖱️ Drag finalizado:", { activeId: active.id, overId: over?.id });
     
     if (!over || active.id === over.id) {
       setActiveId(null);
@@ -102,7 +102,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     const novoResponsavel = over.id as string;
     const processoId = active.id as string;
     
-    console.log("📦 Redistribuindo processo:", processoId, "para:", novoResponsavel);
+    // console.log("📦 Redistribuindo processo:", processoId, "para:", novoResponsavel);
     
     // Chama callback de redistribuição
     if (onRedistribuir) {

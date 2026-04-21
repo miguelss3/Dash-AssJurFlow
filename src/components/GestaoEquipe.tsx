@@ -96,7 +96,7 @@ export function GestaoEquipe() {
       if (editando?.id) {
         // Atualizar usuário existente
         await updateDoc(doc(db, "usuarios", editando.id), dadosUsuario);
-        console.log("✅ Usuário atualizado:", formData.email);
+        // console.log("✅ Usuário atualizado:", formData.email);
       } else {
         // Criar novo usuário
         if (!formData.senha || formData.senha.length < 6) {
@@ -117,7 +117,7 @@ export function GestaoEquipe() {
           
           // Salvar no Firestore
           await addDoc(collection(db, "usuarios"), dadosUsuario);
-          console.log("✅ Novo usuário criado:", formData.email);
+          // console.log("✅ Novo usuário criado:", formData.email);
         } catch (authError: any) {
           if (authError.code === "auth/email-already-in-use") {
             alert("Este email já está em uso!");
@@ -153,7 +153,7 @@ export function GestaoEquipe() {
       // Marcar como inativo ao invés de deletar
       await updateDoc(doc(db, "usuarios", usuario.id), { ativo: false });
       await carregarUsuarios();
-      console.log("✅ Usuário removido:", usuario.email);
+      // console.log("✅ Usuário removido:", usuario.email);
     } catch (error) {
       console.error("Erro ao remover usuário:", error);
       alert("Erro ao remover usuário.");

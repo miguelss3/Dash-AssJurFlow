@@ -95,7 +95,7 @@ export function useAuth() {
           // Fallback: cria um usuário básico
           const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
           const userData = {
-            posto: "Maj",
+            posto: "",
             nome: fbUser.displayName || nomeExtraido,
             role: "ASSESSOR",
             secao: "AssJur",
@@ -131,11 +131,10 @@ export function useAuth() {
         
         // console.log("✅ Firebase Auth bem-sucedido para:", fbUser.email);
         
-        // Busca dados do usuário na coleção "usuarios" (igual ao sistema antigo)
+        // Busca dados do usuário na coleção "usuarios" por email
         let userData: AuthUser | null = null;
         
         try {
-          // console.log("🔍 Buscando dados do usuário na coleção usuarios...");
           const usuariosRef = collection(db, "usuarios");
           
           // Busca por email
@@ -144,59 +143,53 @@ export function useAuth() {
           
           if (!snapshotEmail.empty) {
             const userDoc = snapshotEmail.docs[0];
-            const userFirestoreData = userDoc.data();
+            const d = userDoc.data();
             const nomeExtraido = email ? email.split("@")[0] : "Usuário";
             
             userData = {
-              posto: userFirestoreData.posto || "Maj",
-              nome: userFirestoreData.nome || fbUser.displayName || nomeExtraido,
-              role: userFirestoreData.role || "ASSESSOR",
-              secao: userFirestoreData.secao || userFirestoreData.setor || "AssJur",
+              posto: d.posto || "",
+              nome: d.nome || fbUser.displayName || nomeExtraido,
+              role: d.role || "ASSESSOR",
+              secao: d.secao || d.setor || "AssJur",
               email: fbUser.email || email,
               uid: fbUser.uid,
-              nomeGuerra: userFirestoreData.nomeGuerra,
-              setor: userFirestoreData.setor,
-              cargo: userFirestoreData.cargo,
-              isChefe: userFirestoreData.isChefe === true || userFirestoreData.isChefe === "sim",
-              telefone: userFirestoreData.telefone,
+              nomeGuerra: d.nomeGuerra,
+              setor: d.setor,
+              cargo: d.cargo,
+              isChefe: d.isChefe === true || d.isChefe === "sim",
+              telefone: d.telefone,
             };
             
-            // Se é admin, ajusta o role para refletir isso na UI
             if (isAdmin(userData)) {
               userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
             }
-            
-            // console.log("✅ Dados do usuário carregados:", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
           } else {
-            // Se não encontrou por email, tenta buscar por UID
+            // Fallback: busca por campo uid
             const qUid = query(usuariosRef, where("uid", "==", fbUser.uid));
             const snapshotUid = await getDocs(qUid);
             
             if (!snapshotUid.empty) {
               const userDoc = snapshotUid.docs[0];
-              const userFirestoreData = userDoc.data();
+              const d = userDoc.data();
               const nomeExtraido = email ? email.split("@")[0] : "Usuário";
               
               userData = {
-                posto: userFirestoreData.posto || "Maj",
-                nome: userFirestoreData.nome || fbUser.displayName || nomeExtraido,
-                role: userFirestoreData.role || "ASSESSOR",
-                secao: userFirestoreData.secao || userFirestoreData.setor || "AssJur",
+                posto: d.posto || "",
+                nome: d.nome || fbUser.displayName || nomeExtraido,
+                role: d.role || "ASSESSOR",
+                secao: d.secao || d.setor || "AssJur",
                 email: fbUser.email || email,
                 uid: fbUser.uid,
-                nomeGuerra: userFirestoreData.nomeGuerra,
-                setor: userFirestoreData.setor,
-                cargo: userFirestoreData.cargo,
-                isChefe: userFirestoreData.isChefe === true || userFirestoreData.isChefe === "sim",
-                telefone: userFirestoreData.telefone,
+                nomeGuerra: d.nomeGuerra,
+                setor: d.setor,
+                cargo: d.cargo,
+                isChefe: d.isChefe === true || d.isChefe === "sim",
+                telefone: d.telefone,
               };
               
-              // Se é admin, ajusta o role para refletir isso na UI
               if (isAdmin(userData)) {
                 userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
               }
-              
-              // console.log("✅ Dados do usuário carregados (por UID):", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
             }
           }
         } catch (firestoreError) {
@@ -208,7 +201,7 @@ export function useAuth() {
           console.warn("⚠️ Usuário não encontrado na coleção usuarios. Usando dados padrão.");
           const nomeUsuario = fbUser.displayName || (email ? email.split("@")[0] : "Usuário");
           userData = {
-            posto: "Maj",
+            posto: "",
             nome: nomeUsuario,
             role: "ASSESSOR",
             secao: "AssJur",
@@ -235,7 +228,7 @@ export function useAuth() {
         // Cria usuário local baseado no email
         const nomeLocal = email.split("@")[0] || "Usuário";
         const userData: AuthUser = {
-          posto: "Maj",
+          posto: "",
           nome: nomeLocal,
           role: "ASSESSOR",
           secao: "AssJur",
