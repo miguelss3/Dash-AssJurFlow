@@ -16,7 +16,7 @@ export interface Processo {
   parteContraria: string;
   tipoAcao: string;        // Assunto / objeto
   responsavel: string;     // Assessor (Ten/Cap/Maj/TC...)
-  prazo: string;           // ISO — prazo INTERNO
+  prazo?: string;          // ISO — prazo INTERNO (opcional)
   prazoFatal?: string;     // ISO — prazo FATAL (limite final)
   descricao: string;       // Último movimento
   status: StatusProcesso;
@@ -32,6 +32,9 @@ export interface Processo {
   inicioPrazo?: string;    // ISO
   finalPrazo?: string;     // ISO
   entrada?: string;        // ISO data de entrada
+  // Vínculo com usuário (Firebase Authentication)
+  userId?: string;         // UID do Firebase do dono do processo
+  userEmail?: string;      // Email do usuário para referência
 }
 
 export interface Coluna {

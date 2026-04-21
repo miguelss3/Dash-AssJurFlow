@@ -3,11 +3,17 @@ import { ptBR } from "date-fns/locale";
 
 export type StatusPrazo = "overdue" | "today" | "soon" | "safe";
 
-export function diasRestantes(prazoISO: string): number {
-  return differenceInCalendarDays(parseISO(prazoISO), new Date());
+export function diasRestantes(prazoISO: string | undefined | null): number {
+  if (!prazoISO) return 999; // Sem prazo = prazo distante
+  try {
+    return differenceInCalendarDays(parseISO(prazoISO), new Date());
+  } catch {
+    return 999; // Erro ao parsear = prazo distante
+  }
 }
 
-export function statusPrazo(prazoISO: string): StatusPrazo {
+export function statusPrazo(prazoISO: string | undefined | null): StatusPrazo {
+  if (!prazoISO) return "safe"; // Sem prazo = não tem urgência
   const d = diasRestantes(prazoISO);
   if (d < 0) return "overdue";
   if (d === 0) return "today";
@@ -15,7 +21,8 @@ export function statusPrazo(prazoISO: string): StatusPrazo {
   return "safe";
 }
 
-export function rotuloPrazo(prazoISO: string): string {
+export function rotuloPrazo(prazoISO: string | undefined | null): string {
+  if (!prazoISO) return "—";
   const d = diasRestantes(prazoISO);
   if (d < 0) return `−${Math.abs(d)}d`;
   if (d === 0) return "Hoje";
@@ -23,7 +30,8 @@ export function rotuloPrazo(prazoISO: string): string {
   return `+${d}d`;
 }
 
-export function rotuloPrazoLongo(prazoISO: string): string {
+export function rotuloPrazoLongo(prazoISO: string | undefined | null): string {
+  if (!prazoISO) return "Sem prazo definido";
   const d = diasRestantes(prazoISO);
   if (d < 0) return `Vencido há ${Math.abs(d)} ${Math.abs(d) === 1 ? "dia" : "dias"}`;
   if (d === 0) return "Vence hoje";
@@ -31,12 +39,22 @@ export function rotuloPrazoLongo(prazoISO: string): string {
   return `Faltam ${d} dias`;
 }
 
-export function formatarData(prazoISO: string): string {
-  return format(parseISO(prazoISO), "dd/MM/yyyy", { locale: ptBR });
+export function formatarData(prazoISO: string | undefined | null): string {
+  if (!prazoISO) return "—";
+  try {
+    return format(parseISO(prazoISO), "dd/MM/yyyy", { locale: ptBR });
+  } catch {
+    return "—";
+  }
 }
 
-export function formatarDataCurta(prazoISO: string): string {
-  return format(parseISO(prazoISO), "dd MMM", { locale: ptBR });
+export function formatarDataCurta(prazoISO: string | undefined | null): string {
+  if (!prazoISO) return "—";
+  try {
+    return format(parseISO(prazoISO), "dd MMM", { locale: ptBR });
+  } catch {
+    return "—";
+  }
 }
 
 export function classesPrazo(status: StatusPrazo): {

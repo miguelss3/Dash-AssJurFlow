@@ -49,6 +49,38 @@ export const Route = createFileRoute("/")({
     ],
   }),
   component: Index,
+  errorComponent: ({ error }) => {
+    console.error("❌ Erro na rota index:", error);
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-lg">
+          <div className="mb-4 text-red-500">
+            <svg className="mx-auto h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900">Erro ao Carregar Dashboard</h1>
+          <p className="mt-3 text-sm text-slate-600">
+            {error.message || "Ocorreu um erro ao carregar os dados. Verifique sua conexão e as regras do Firebase."}
+          </p>
+          <div className="mt-6 space-x-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              Tentar Novamente
+            </button>
+            <a
+              href="/login"
+              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              Voltar ao Login
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  },
 });
 
 type Aba = "mesa" | "prazos" | "consulta" | "arquivo" | "indicadores" | "equipe";

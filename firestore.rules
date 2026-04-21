@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Função auxiliar: verifica se o usuário é admin
+    function isAdmin() {
+      // Admin universal por email
+      return request.auth.token.email == 'miguelss3@yahoo.com.br'
+             || (exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) 
+                 && (get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.setor == 'CHEFE ASSEAPASSJUR'
+                     || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.cargo == 'Admin Universal'
+                     || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isChefe == true
+                     || get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.isChefe == 'sim'));
+    }
+    
+    // Regras para a coleção de processos
+    match /processos/{processoId} {
+      // Permite leitura se:
+      // 1. É admin (vê todos os processos)
+      // 2. OU o processo pertence ao usuário autenticado
+      allow read: if request.auth != null && 
+                     (isAdmin() || resource.data.userId == request.auth.uid);
+      
+      // Permite criação apenas se o processo está sendo vinculado ao usuário autenticado
+      allow create: if request.auth != null && 
+                       request.resource.data.userId == request.auth.uid &&
+                       request.resource.data.userEmail == request.auth.token.email;
+      
+      // Permite atualização se é admin OU se o processo pertence ao usuário
+      allow update: if request.auth != null && 
+                       (isAdmin() || resource.data.userId == request.auth.uid);
+      
+      // Permite exclusão se é admin OU se o processo pertence ao usuário
+      allow delete: if request.auth != null && 
+                       (isAdmin() || resource.data.userId == request.auth.uid);
+    }
+    
+    // Regras para a coleção de usuários
+    match /usuarios/{userId} {
+      // Admin pode ler todos os usuários
+      // Usuários regulares só podem ler o próprio documento
+      allow read: if request.auth != null && 
+                     (isAdmin() || request.auth.uid == userId);
+      
+      // Apenas admin pode criar/atualizar usuários
+      allow write: if request.auth != null && isAdmin();
+    }
+    
+    // Regras para outras coleções (distribuicoes, mensagens, etc.)
+    match /distribuicoes/{distribuicaoId} {
+      allow read, write: if request.auth != null && isAdmin();
+    }
+    
+    match /mensagens/{mensagemId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Regra padrão: negar acesso a outras coleções não especificadas
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

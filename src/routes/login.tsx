@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
-import { Shield, Lock, User, LogIn } from "lucide-react";
+import { Shield, Lock, Mail, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SoldierAvatar } from "@/components/SoldierAvatar";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -23,46 +24,48 @@ export const Route = createFileRoute("/login")({
   component: LoginPage,
 });
 
-const PERFIS = [
-  { posto: "Maj", nome: "Miguel", role: "MAJ - ADMIN UNIVERSAL", secao: "AssJur" },
-  { posto: "Ten", nome: "Becker", role: "TEN - ASSESSOR", secao: "SFPC" },
-  { posto: "TC", nome: "Perninha", role: "TC - ASSESSOR", secao: "SVP" },
-] as const;
-
 function LoginPage() {
   const navigate = useNavigate();
-  const [posto, setPosto] = useState("Maj");
-  const [nome, setNome] = useState("Miguel");
+  const { login } = useAuth();
+  const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     setErro(null);
-    if (!nome.trim() || !senha.trim()) {
-      setErro("Informe nome de guerra e senha.");
+    
+    if (!email.trim() || !senha.trim()) {
+      setErro("Informe o e-mail e senha.");
       return;
     }
+    
+    if (!email.includes("@")) {
+      setErro("E-mail inválido.");
+      return;
+    }
+    
     setLoading(true);
-    // Mock — qualquer senha autentica. Substituir por Lovable Cloud.
-    const perfil =
-      PERFIS.find((p) => p.nome.toLowerCase() === nome.trim().toLowerCase()) ?? {
-        posto,
-        nome: nome.trim(),
-        role: `${posto.toUpperCase()} - ASSESSOR`,
-        secao: "AssJur",
-      };
-    setTimeout(() => {
-      window.localStorage.setItem("assjur:auth", JSON.stringify({ ...perfil, posto }));
+    
+    try {
+      await login(email.trim(), senha);
       navigate({ to: "/" });
-    }, 400);
-  };
-
-  const escolherPerfil = (p: (typeof PERFIS)[number]) => {
-    setPosto(p.posto);
-    setNome(p.nome);
-    setSenha("12rm");
+    } catch (error: any) {
+      console.error("Erro no login:", error);
+      
+      if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
+        setErro("E-mail ou senha incorretos.");
+      } else if (error.code === "auth/user-not-found") {
+        setErro("Usuário não encontrado.");
+      } else if (error.code === "auth/too-many-requests") {
+        setErro("Muitas tentativas. Tente novamente mais tarde.");
+      } else {
+        setErro("Erro ao autenticar. Verifique suas credenciais.");
+      }
+      
+      setLoading(false);
+    }
   };
 
   return (
@@ -143,45 +146,29 @@ function LoginPage() {
                 </div>
               </div>
               <h3 className="mt-5 text-2xl font-bold text-foreground font-display">
-                Identificação Militar
+                Acesso ao Sistema
               </h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Acesse com seu posto e nome de guerra
+                Assessoria Jurídica da 12ª RM
               </p>
             </div>
 
             <form onSubmit={submit} className="space-y-4">
-              <div className="grid grid-cols-3 gap-3">
-                <div className="col-span-1">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">
-                    Posto
-                  </label>
-                  <select
-                    value={posto}
-                    onChange={(e) => setPosto(e.target.value)}
-                    className="h-11 w-full rounded-xl border border-input bg-transparent px-3 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    {["Cel", "TC", "Maj", "Cap", "Ten", "Sgt", "Cb", "Sd"].map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">
-                    Nome de Guerra
-                  </label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={nome}
-                      onChange={(e) => setNome(e.target.value)}
-                      placeholder="ex. Miguel"
-                      className="h-11 pl-9 rounded-xl"
-                      autoComplete="username"
-                    />
-                  </div>
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">
+                  E-mail
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="seu.email@12rm.eb.mil.br"
+                    className="h-11 pl-9 rounded-xl"
+                    autoComplete="email"
+                    disabled={loading}
+                  />
                 </div>
               </div>
 
@@ -198,6 +185,7 @@ function LoginPage() {
                     placeholder="••••••••"
                     className="h-11 pl-9 rounded-xl"
                     autoComplete="current-password"
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -218,29 +206,10 @@ function LoginPage() {
               </Button>
             </form>
 
-            {/* Perfis demo */}
-            <div className="mt-7 pt-6 border-t border-border">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3 text-center">
-                Acesso rápido (demo)
+            <div className="mt-6 text-center">
+              <p className="text-xs text-muted-foreground">
+                Para acesso, utilize suas credenciais do Firebase Authentication
               </p>
-              <div className="grid grid-cols-3 gap-2">
-                {PERFIS.map((p) => (
-                  <button
-                    key={p.nome}
-                    type="button"
-                    onClick={() => escolherPerfil(p)}
-                    className="flex flex-col items-center gap-1.5 p-2 rounded-xl border border-border hover:border-[oklch(0.88_0.18_130)] hover:bg-[oklch(0.88_0.18_130)]/5 transition-all group"
-                  >
-                    <SoldierAvatar size={32} />
-                    <span className="text-[10px] font-bold text-foreground">
-                      {p.posto} {p.nome}
-                    </span>
-                    <span className="text-[8px] uppercase tracking-wider text-muted-foreground">
-                      {p.secao}
-                    </span>
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
 

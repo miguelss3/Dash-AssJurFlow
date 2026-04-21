@@ -1,4 +1,4 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute, HeadContent, Scripts, ErrorComponent } from "@tanstack/react-router";
 
 import appCss from "../styles.css?url";
 
@@ -19,6 +19,48 @@ function NotFoundComponent() {
             Go home
           </Link>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function RootErrorComponent({ error }: { error: Error }) {
+  console.error("❌ Erro na aplicação:", error);
+  
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-4xl font-bold text-destructive">Erro na Aplicação</h1>
+        <h2 className="mt-4 text-xl font-semibold text-foreground">Algo deu errado</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {error.message || "Ocorreu um erro inesperado. Por favor, recarregue a página."}
+        </p>
+        <div className="mt-6 space-x-2">
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Recarregar página
+          </button>
+          <Link
+            to="/login"
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
+          >
+            Ir para Login
+          </Link>
+        </div>
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-8 text-left">
+            <details className="rounded-lg border border-border bg-muted p-4">
+              <summary className="cursor-pointer font-mono text-xs font-semibold">
+                Stack trace (dev only)
+              </summary>
+              <pre className="mt-2 overflow-auto text-xs text-muted-foreground">
+                {error.stack}
+              </pre>
+            </details>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -48,6 +90,7 @@ export const Route = createRootRoute({
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
+  errorComponent: RootErrorComponent,
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {
