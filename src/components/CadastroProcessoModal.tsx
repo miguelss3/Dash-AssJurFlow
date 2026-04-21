@@ -33,7 +33,22 @@ const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess }: CadastroProcessoModalProps) {
   const { user } = useAuth();
   const ehAdminOuChefe = isAdmin(user);
-  const setorUsuarioNormalizado = (user?.setor || "").toString().trim().toUpperCase();
+
+  const inferirSetorUsuario = () => {
+    const candidatos = [user?.setor, user?.role, user?.secao, user?.cargo]
+      .filter(Boolean)
+      .map((v) => v!.toString().toUpperCase());
+
+    if (candidatos.some((v) => v.includes("DU") || v.includes("DEFESA DE USU"))) {
+      return "DU";
+    }
+    if (candidatos.some((v) => v.includes("PA") || v.includes("PROCESSOS ADMIN"))) {
+      return "PA";
+    }
+    return "";
+  };
+
+  const setorUsuarioNormalizado = inferirSetorUsuario();
   const podeCadastrarDU = ehAdminOuChefe || setorUsuarioNormalizado === "DU";
   const podeCadastrarPA = ehAdminOuChefe || setorUsuarioNormalizado === "PA";
   const setorPadraoPermitido: "DU" | "PA" | "" = podeCadastrarDU ? "DU" : (podeCadastrarPA ? "PA" : "");
@@ -81,6 +96,14 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       resetForm();
     }
   }, [open, processo]);
+
+  useEffect(() => {
+    // Se o usuário carregar depois da abertura do modal, garante pré-seleção do setor permitido.
+    if (!open || processo) return;
+    if (setor) return;
+    if (!setorPadraoPermitido) return;
+    setSetor(setorPadraoPermitido);
+  }, [open, processo, setor, setorPadraoPermitido]);
 
   const resetForm = () => {
     setSetor(setorPadraoPermitido);
@@ -293,6 +316,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     try {
       const agora = Timestamp.now();
       const agoraISO = new Date().toISOString();
+      const nomeBaseAutor = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
+      const autorCadastro = user?.posto ? `${user.posto} ${nomeBaseAutor}`.trim() : nomeBaseAutor;
+      const autorIdCadastro = user?.uid || "sistema";
+      const autorEmailCadastro = user?.email || null;
 
       // Assunto final
       const assuntoFinal = isSindicanciaPA
@@ -334,7 +361,9 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         // CRITICAL: Firestore rules require userId and userEmail for create permission
         userId: user!.uid,  // Garantido que existe pois modal só abre se logado
         userEmail: user!.email,  // Campo exigido pelas rules
-        criadoPorNome: user?.email || null,  // Campo adicional para compatibilidade
+        criadoPorNome: autorCadastro,
+        criadoPorUid: autorIdCadastro,
+        criadoPorEmail: autorEmailCadastro,
       };
 
       if (setor === "DU") {
@@ -345,7 +374,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         dados.prazoFatalDU = prazoFatalDU || null;
         dados.notificacaoAdminPendente = true;
         dados.notificacaoAdminEm = agoraISO;
-        dados.notificacaoAdminPorNome = user?.email || null;
+        dados.notificacaoAdminPorNome = autorCadastro;
         dados.notificacaoAdminDescricao = "Novo processo DU aguardando distribuição.";
       }
 
@@ -381,14 +410,14 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         await updateDoc(processoRef, { 
           ...dadosUpdate, 
           atualizadoEm: agora,
-          atualizadoPorNome: user?.email || "Sistema",
+          atualizadoPorNome: autorCadastro,
           descricao: msgAtualizacao // Atualiza último movimento
         });
 
         const historicoCol = collection(db, "processos", processo.id, "historico");
         await addDoc(historicoCol, {
-          autor: user?.email || "Sistema",
-          autorId: user?.uid || "sistema",
+          autor: autorCadastro,
+          autorId: autorIdCadastro,
           texto: msgAtualizacao,
           timestamp: agoraISO,
         });
@@ -400,8 +429,8 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         await setDoc(mensagensRef, {
           historico: [...historicoExistente, {
             id: crypto.randomUUID(),
-            autor: user?.email || "Sistema",
-            autorId: user?.uid || "sistema",
+            autor: autorCadastro,
+            autorId: autorIdCadastro,
             texto: msgAtualizacao,
             timestamp: agoraISO,
           }]
@@ -409,17 +438,9 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
         toast.success("Processo atualizado com sucesso!");
       } else {
-        const msgCadastro = (setor === "DU" && isMS)
-          ? "🚨 Mandado de Segurança / Urgente cadastrado no sistema."
-          : (setor === "PA" ? `Processo cadastrado e atribuído a ${user?.email}.` : "Process cadastrado no sistema.");
+        const msgCadastro = `Processo Cadastrado por ${autorCadastro}.`;
         
-        const msgFinal = setor === "PA" 
-          ? (isSindicanciaAntiga 
-              ? `🗂️ Sindicância antiga cadastrada no acervo com a portaria ${numeroFinal}.`
-              : (isDiligenciaPA
-                  ? `🔎 ${tipoPA} cadastrado em diligência${mudouEncarregado ? ` com nova portaria ${numeroFinal}` : " mantendo a mesma portaria"}. Aguardando assinatura do Cmt.`
-                  : "📋 Portaria cadastrada. Aguardando Assinatura do Cmt."))
-          : msgCadastro;
+        const msgFinal = msgCadastro;
 
         // Adiciona descricao ao documento principal
         dados.descricao = msgFinal;
@@ -441,8 +462,8 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
         const historicoCol = collection(db, "processos", processoRef.id, "historico");
         await addDoc(historicoCol, {
-          autor: "Sistema",
-          autorId: "sistema",
+          autor: autorCadastro,
+          autorId: autorIdCadastro,
           texto: msgCadastro,
           timestamp: agoraISO,
         });
@@ -451,8 +472,8 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         await setDoc(doc(db, "mensagens", processoRef.id), {
           historico: [{
             id: crypto.randomUUID(),
-            autor: "Sistema",
-            autorId: "sistema",
+            autor: autorCadastro,
+            autorId: autorIdCadastro,
             texto: msgCadastro,
             timestamp: agoraISO,
           }]
@@ -470,8 +491,8 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           await setDoc(mensagensRef, {
             historico: [...historicoExistente, {
               id: crypto.randomUUID(),
-              autor: "Sistema",
-              autorId: "sistema",
+              autor: autorCadastro,
+              autorId: autorIdCadastro,
               texto: msgAdicional,
               timestamp: agoraISO,
             }]
@@ -482,8 +503,8 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
             msgAdicional = "📋 Portaria cadastrada. Aguardando Assinatura do Cmt.";
           }
           await addDoc(historicoCol, {
-            autor: "Sistema",
-            autorId: "sistema",
+            autor: autorCadastro,
+            autorId: autorIdCadastro,
             texto: msgAdicional,
             timestamp: agoraISO,
           });
@@ -493,7 +514,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           await addDoc(collection(db, "distribuicoes"), {
             processoId: processoRef.id,
             assessorId: user.uid,
-            assessorNome: user.email,
+            assessorNome: autorCadastro,
             prazo: "",
             prioridade: "Normal",
             dataDistribuicao: agoraISO,

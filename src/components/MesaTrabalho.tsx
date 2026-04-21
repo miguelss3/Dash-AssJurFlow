@@ -23,13 +23,12 @@ interface Props {
   onEdit: (p: Processo) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, status: StatusProcesso) => void;
-  onClone?: (id: string) => void;
   onRedistribuir?: (processoId: string, novoResponsavel: string) => void | Promise<void>;
   usuario?: AuthUser;
   ehAdmin?: boolean;
 }
 
-export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onClone, onRedistribuir, usuario, ehAdmin }: Props) {
+export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onRedistribuir, usuario, ehAdmin }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
@@ -324,7 +323,6 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onMove={onMove}
-                    onClone={onClone}
                   />
                 ))}
               </div>

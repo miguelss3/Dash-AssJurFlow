@@ -115,8 +115,8 @@ function Index() {
     if (ready && !user) navigate({ to: "/login" });
   }, [ready, user, navigate]);
 
-  // Usuário logado (vem do auth, fallback enquanto carrega)
-  const usuario = user ?? { posto: "Maj", nome: "Miguel", role: "MAJ - ADMIN UNIVERSAL" };
+  // Usuário logado (sem fallback fixo para evitar flicker visual no reload)
+  const usuario = user ?? { posto: "", nome: "", role: "", setor: "" };
   const ehAdmin = isAdmin(user);
 
   const isPendenteChefia = (p: Processo) => {
@@ -239,53 +239,6 @@ function Index() {
         timestamp: agoraISO,
       }]
     });
-  };
-
-  const gerarNumeroClone = (numeroOriginal: string) => {
-    const sufixo = Math.floor(1000 + Math.random() * 9000);
-    return `${numeroOriginal}-CL${sufixo}`;
-  };
-
-  const handleClonarProcesso = async (processoId: string) => {
-    try {
-      const processoOriginal = processos.find((p) => p.id === processoId);
-      if (!processoOriginal) {
-        console.error("❌ Processo não encontrado para clonar:", processoId);
-        return;
-      }
-
-      const novoNumero = gerarNumeroClone(processoOriginal.numero);
-
-      // Clona apenas dados de cadastro, limpando todo o trâmite para nascer como processo novo.
-      await criar({
-        numero: novoNumero,
-        cliente: processoOriginal.cliente,
-        vara: processoOriginal.vara,
-        parteContraria: processoOriginal.parteContraria,
-        tipoAcao: processoOriginal.tipoAcao,
-        prazo: processoOriginal.prazo,
-        prazoFatal: processoOriginal.prazoFatal,
-        tipo: processoOriginal.tipo,
-        setor: processoOriginal.setor,
-        prioridade: processoOriginal.prioridade,
-        secao: processoOriginal.secao,
-        origem: processoOriginal.origem,
-        origemDU: processoOriginal.origemDU,
-        secaoDU: processoOriginal.secaoDU,
-        isMS: processoOriginal.isMS,
-        dataEntrada: processoOriginal.dataEntrada,
-        observacoes: processoOriginal.observacoes,
-        tipoPA: processoOriginal.tipoPA,
-        status: "novo",
-        responsavel: "",
-        encarregado: "",
-        descricao: "Sem movimentação",
-      });
-
-      console.log("✅ Processo clonado com sucesso:", novoNumero);
-    } catch (error) {
-      console.error("❌ Erro ao clonar processo:", error);
-    }
   };
 
   const handleRedistribuir = async (processoId: string, novoResponsavel: string) => {
@@ -707,7 +660,6 @@ function Index() {
                 onEdit={handleEdit}
                 onDelete={remover}
                 onMove={handleMoverStatus}
-                onClone={handleClonarProcesso}
                 onRedistribuir={handleRedistribuir}
                 usuario={user || undefined}
                 ehAdmin={ehAdmin}

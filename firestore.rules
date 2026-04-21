@@ -1,39 +1,104 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Sistema interno — qualquer usuário autenticado é um militar credenciado.
-    // A autorização por papel (admin/assessor/chefe) é feita no frontend.
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function authEmail() {
+      return isSignedIn() && request.auth.token.email != null
+        ? request.auth.token.email
+        : '';
+    }
+
+    function isAdminUniversal() {
+      return authEmail() == 'miguelss3@yahoo.com.br';
+    }
+
+    function hasUserProfileByUid() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function userProfileByUid() {
+      return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    function userSetor() {
+      return hasUserProfileByUid() && userProfileByUid().setor != null
+        ? userProfileByUid().setor
+        : '';
+    }
+
+    function isChefePerfil() {
+      return hasUserProfileByUid() && (
+        userProfileByUid().isChefe == true ||
+        userProfileByUid().isChefe == 'sim' ||
+        userProfileByUid().isChefe == 'Sim' ||
+        userProfileByUid().cargo == 'Admin Universal' ||
+        userProfileByUid().setor == 'CHEFE ASSEAPASSJUR'
+      );
+    }
+
+    function canManageSetor(setor) {
+      return isAdminUniversal() ||
+        isChefePerfil() ||
+        (setor in ['DU', 'PA'] && userSetor() == setor);
+    }
+
+    function isOwnerPayload(data) {
+      return data.userId == request.auth.uid &&
+        data.userEmail == authEmail();
+    }
+
+    function canCreateProcess(data) {
+      return isSignedIn() &&
+        (data.setor in ['DU', 'PA']) &&
+        isOwnerPayload(data) &&
+        canManageSetor(data.setor);
+    }
+
+    function canUpdateProcess(oldData, newData) {
+      return isSignedIn() &&
+        canManageSetor(oldData.setor) &&
+        oldData.userId == newData.userId &&
+        oldData.userEmail == newData.userEmail &&
+        oldData.setor == newData.setor;
+    }
+
+    function canDeleteProcess(oldData) {
+      return isSignedIn() && canManageSetor(oldData.setor);
+    }
     
     // Regras para a coleção de processos
     match /processos/{processoId} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null;
+      allow read:   if isSignedIn();
+      allow create: if canCreateProcess(request.resource.data);
+      allow update: if canUpdateProcess(resource.data, request.resource.data);
+      allow delete: if canDeleteProcess(resource.data);
       
       // Subcoleção de histórico
       match /historico/{mensagemId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if isSignedIn();
       }
     }
     
     // Regras para a coleção de usuários
     match /usuarios/{userId} {
-      allow read:  if request.auth != null;
+      allow read:  if isSignedIn();
       // Escrita restrita: apenas o admin universal por email
-      allow write: if request.auth != null &&
-                      request.auth.token.email == 'miguelss3@yahoo.com.br';
+      allow write: if isSignedIn() && isAdminUniversal();
     }
     
     // Regras para a coleção de distribuições
     match /distribuicoes/{distribuicaoId} {
-      allow read:  if request.auth != null;
-      allow write: if request.auth != null;
+      allow read:  if isSignedIn();
+      allow write: if isSignedIn();
     }
     
     match /mensagens/{mensagemId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isSignedIn();
     }
     
     // Regra padrão: negar acesso a outras coleções não especificadas

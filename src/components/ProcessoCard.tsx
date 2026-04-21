@@ -19,7 +19,6 @@ import {
   Trash2, 
   Send, 
   CheckCircle,
-  Copy,
   Clock,
   FileText,
   User,
@@ -44,12 +43,11 @@ interface ProcessoCardProps {
   onEdit?: (p: Processo) => void;
   onDelete?: (id: string) => void;
   onMove?: (id: string, status: StatusProcesso) => void;
-  onClone?: (id: string) => void;
   showActions?: boolean;
   isDragging?: boolean; // Flag para quando está sendo arrastado no overlay
 }
 
-export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onClone, showActions = true, isDragging = false }: ProcessoCardProps) => {
+export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, showActions = true, isDragging = false }: ProcessoCardProps) => {
   const p = processo || pAntigo!;
   
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
@@ -122,7 +120,11 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
         style={style}
         {...listeners}
         {...attributes}
-        className={`p-4 bg-white shadow-sm border-l-4 border-l-sky-600 hover:shadow-md transition-all relative group cursor-grab active:cursor-grabbing ${
+        className={`p-4 shadow-sm border-l-4 transition-all relative group cursor-grab active:cursor-grabbing ${
+          p.isMS
+            ? "bg-red-50 border-red-200 border-l-red-600 hover:shadow-lg"
+            : "bg-white border-l-sky-600 hover:shadow-md"
+        } ${
           isBeingDragged ? "opacity-30 scale-95" : ""
         }`}
         onClick={(e) => {
@@ -132,6 +134,15 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
           }
         }}
       >
+        {p.isMS && (
+          <div className="-mx-4 -mt-4 mb-3 px-4 py-2 bg-red-700 text-red-50 border-b border-red-800 rounded-t-md">
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
+              <AlertCircle className="w-3.5 h-3.5" />
+              Mandado de Seguranca / Urgente
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-col gap-3">
           {/* Header com badges */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -313,23 +324,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                 </Button>
               </div>
 
-              {/* Linha 2: Clonar */}
-              {onClone && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full border-cyan-300 text-cyan-700 hover:bg-cyan-50 text-xs h-9"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClone(p.id);
-                  }}
-                >
-                  <Copy className="w-3 h-3 mr-1" />
-                  Clonar
-                </Button>
-              )}
-              
-              {/* Linha 3: Finalizar (se não concluído) + Excluir */}
+              {/* Linha 2: Finalizar (se não concluído) + Excluir */}
               <div className={`grid gap-2 ${p.status !== "concluido" ? "grid-cols-2" : "grid-cols-1"}`}>
                 {/* Botão Finalizar (apenas se não estiver concluído) */}
                 {p.status !== "concluido" && (

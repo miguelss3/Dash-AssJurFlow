@@ -12,10 +12,9 @@ interface Props {
   onEdit: (p: Processo) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, status: StatusProcesso) => void;
-  onClone?: (id: string) => void;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onClone }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove }: Props) {
   const [aba, setAba] = useState<"ativos" | "concluidos">("ativos");
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
@@ -42,18 +41,21 @@ export function AssessorGroup({ responsavel, tipo, processos, processosConcluido
       }`}
     >
       {/* Header do assessor */}
-      <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-wide border ${bgClass} ${textClass} ${borderClass}`}
-        >
-          {tipo} • {responsavel}
-        </span>
-        <div className="inline-flex items-center rounded-full bg-muted p-1 gap-1">
+      <div className="px-4 py-3 border-b border-border space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className={`inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-bold tracking-wide border ${bgClass} ${textClass} ${borderClass}`}
+          >
+            {tipo} · {responsavel}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 rounded-xl bg-muted p-1 gap-1">
           <button
             type="button"
             onClick={() => setAba("ativos")}
-            className={`h-6 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide transition-colors ${
-              aba === "ativos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            className={`h-9 px-2 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors ${
+              aba === "ativos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Ativos ({processos.length})
@@ -61,8 +63,8 @@ export function AssessorGroup({ responsavel, tipo, processos, processosConcluido
           <button
             type="button"
             onClick={() => setAba("concluidos")}
-            className={`h-6 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide transition-colors ${
-              aba === "concluidos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground"
+            className={`h-9 px-2 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors ${
+              aba === "concluidos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             Concluídos ({processosConcluidos.length})
@@ -85,7 +87,6 @@ export function AssessorGroup({ responsavel, tipo, processos, processosConcluido
               onEdit={onEdit}
               onDelete={onDelete}
               onMove={onMove}
-              onClone={onClone}
               showActions
             />
           ))

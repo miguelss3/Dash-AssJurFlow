@@ -31,7 +31,36 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
   const movimentacoes = ativos.length * 3;
   const indiceResolutividade =
     total > 0 ? Math.round((concluidos / total) * 100) : 0;
-  const taxaReatividade = "23,9 h";
+
+  const temposReatividadeHoras = processos
+    .filter((p) => Boolean((p.responsavel || "").trim()))
+    .map((p) => {
+      const inicioBruto = p.criadoEm || p.dataEntrada;
+      const fimBruto = p.atualizadoEm || p.criadoEm;
+      const inicio = inicioBruto ? new Date(inicioBruto) : null;
+      const fim = fimBruto ? new Date(fimBruto) : null;
+      if (!inicio || !fim) return null;
+      if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return null;
+      const horas = (fim.getTime() - inicio.getTime()) / (1000 * 60 * 60);
+      return horas >= 0 ? horas : null;
+    })
+    .filter((h): h is number => typeof h === "number");
+
+  const mediaReatividadeHoras =
+    temposReatividadeHoras.length > 0
+      ? temposReatividadeHoras.reduce((acc, h) => acc + h, 0) / temposReatividadeHoras.length
+      : null;
+
+  const taxaReatividade =
+    mediaReatividadeHoras !== null
+      ? `${mediaReatividadeHoras.toFixed(1).replace(".", ",")} h`
+      : "--";
+
+  const casosAte24h = temposReatividadeHoras.filter((h) => h <= 24).length;
+  const percentualAte24h =
+    temposReatividadeHoras.length > 0
+      ? Math.round((casosAte24h / temposReatividadeHoras.length) * 100)
+      : 0;
 
   return (
     <div className="space-y-4">
@@ -92,10 +121,10 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
           </p>
           <div className="flex gap-2 mt-3 flex-wrap">
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-[var(--deadline-safe-bg)] text-[var(--deadline-safe)]">
-              64% em até 24h
+              {percentualAte24h}% em até 24h
             </span>
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-muted text-muted-foreground">
-              {ativos.length} apuradas
+              {temposReatividadeHoras.length} apuradas
             </span>
           </div>
         </div>
