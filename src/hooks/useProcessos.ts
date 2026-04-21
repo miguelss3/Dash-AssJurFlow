@@ -27,6 +27,15 @@ export function useProcessos() {
     ) as Partial<T>;
   };
 
+  const toIsoString = (valor: any): string | undefined => {
+    if (!valor) return undefined;
+    if (typeof valor === "string") return valor;
+    if (valor instanceof Date) return valor.toISOString();
+    if (typeof valor?.toDate === "function") return valor.toDate().toISOString();
+    if (typeof valor?.seconds === "number") return new Date(valor.seconds * 1000).toISOString();
+    return undefined;
+  };
+
   useEffect(() => {
     let unsubProcessos: (() => void) | null = null;
     let unsubDistribuicoes: (() => void) | null = null;
@@ -120,7 +129,7 @@ export function useProcessos() {
           prazoFatal: procData.prazoFatalDU || procData.prazoFatal,
           descricao: descricaoUltimoMovimento,
           status: statusMapeado,
-          criadoEm: procData.criadoEm || procData.dataEntrada || new Date().toISOString(),
+          criadoEm: toIsoString(procData.criadoEm) || toIsoString(procData.dataEntrada) || new Date().toISOString(),
           // Campos específicos AssJur Flow
           tipo: (procData.setor || procData.tipo || "OUTRO") as any,
           setor: procData.setor,
@@ -138,11 +147,17 @@ export function useProcessos() {
           origemDU: procData.origemDU,
           secaoDU: procData.secaoDU,
           isMS: procData.isMS || false,
-          dataEntrada: procData.dataEntrada,
+          dataEntrada: toIsoString(procData.dataEntrada) || procData.dataEntrada,
           observacoes: procData.observacoes,
           tipoPA: procData.tipoPA,
           encarregado: procData.encarregado,
-          atualizadoEm: procData.atualizadoEm
+          atualizadoEm: toIsoString(procData.atualizadoEm),
+          pedidoSubsidios: procData.pedidoSubsidios
+            ? {
+                ...procData.pedidoSubsidios,
+                solicitadoEm: toIsoString(procData.pedidoSubsidios?.solicitadoEm) || procData.pedidoSubsidios?.solicitadoEm,
+              }
+            : undefined,
         };
         
         // console.log(`📦 Processo ${processoMapeado.numero}: status="${processoMapeado.status}", responsavel="${processoMapeado.responsavel}", setor=${processoMapeado.setor}, finalizado_firebase=${procData.finalizado}`);

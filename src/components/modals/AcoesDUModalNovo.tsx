@@ -67,6 +67,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     try {
       const agoraISO = new Date().toISOString();
       const processoRef = doc(db, "processos", processoId);
+      const situacaoFluxo = tipoPedidoSubsidio === "interno"
+        ? "aguardando_assinatura_secao"
+        : "aguardando_aprovacao_externa";
+      const statusFluxo = tipoPedidoSubsidio === "interno"
+        ? "Aguardando Assinatura da Seção"
+        : "Aguardando Aprovação Externa";
 
       const pedidoSubsidios = {
         tipoDestino: tipoPedidoSubsidio,
@@ -75,18 +81,21 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         numeroDiex: numeroDiex.trim() || "",
         prazoResposta: prazoResposta || "",
         observacoes: observacoesSubsidio.trim() || "",
-        situacaoFluxo: "enviado_admin",
+        situacaoFluxo,
         solicitadoEm: agoraISO,
-        solicitadoPorNome: user.email || "Assessor",
+        solicitadoPorNome: autorMilitar,
       };
 
-      const msgHistorico = `📨 Subsídios solicitados para ${tipoPedidoSubsidio === "interno" ? secaoInterna : omExterna} por ${user.email?.split("@")[0]}.`;
+      const msgHistorico = tipoPedidoSubsidio === "interno"
+        ? `📨 Subsídios internos solicitados para ${secaoInterna}. Aguardando assinatura da seção e devolução com DIEx.`
+        : `📨 Subsídios externos solicitados para ${omExterna}. Aguardando aprovação externa e posterior assinatura do CHEM.`;
 
       await updateDoc(processoRef, {
         pedidoSubsidios,
+        status: statusFluxo,
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: user.email || "Sistema",
+        atualizadoPorNome: autorMilitar,
       });
 
       // Adicionar ao histórico (subcoleção)
@@ -133,28 +142,59 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     try {
       const agoraISO = new Date().toISOString();
       const processoRef = doc(db, "processos", processoId);
+      const processoSnap = await getDoc(processoRef);
+      const pedidoSubsidiosAtual = processoSnap.exists() ? (processoSnap.data()?.pedidoSubsidios || {}) : {};
+      const tipoDestinoAtual = pedidoSubsidiosAtual?.tipoDestino as "interno" | "externo" | undefined;
+      const isChefiaProcessandoPedido = isAdmin(user) && ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(pedidoSubsidiosAtual?.situacaoFluxo || "");
 
       const respostaDU = {
         numeroOficio: numeroOficio.trim() || "",
         numeroDiex: numeroDiexResposta.trim() || "",
         dataEnvio,
         observacoes: observacoesResposta.trim() || "",
-        situacao: isAdmin(user) ? "em_aprovacao_chem" : "enviada_chefia",
+        situacao: isAdmin(user) ? "processada_chefia" : "enviada_chefia",
         registradoEm: agoraISO,
-        registradoPorNome: user.email || "Assessor",
+        registradoPorNome: autorMilitar,
       };
 
-      const msgHistorico = isAdmin(user)
-        ? `⏳ Resposta aguardando aprovação do CHEM. Registrada por ${user.email?.split("@")[0]}.`
-        : `📤 Resposta enviada à chefia (Ofício: ${numeroOficio || "—"}, DIEx: ${numeroDiexResposta || "—"}) por ${user.email?.split("@")[0]}.`;
+      let msgHistorico = `📤 Resposta enviada à chefia (Ofício: ${numeroOficio || "—"}, DIEx: ${numeroDiexResposta || "—"}) por ${autorMilitar}.`;
+      let statusDestino = isAdmin(user) ? "Aguardando CHEM" : "Aguardando Conferência";
+      let patchPedidoSubsidios: any = null;
 
-      await updateDoc(processoRef, {
+      if (isChefiaProcessandoPedido && tipoDestinoAtual === "interno") {
+        msgHistorico = `✅ Pedido interno assinado pela chefia e devolvido ao assessor com DIEx ${numeroDiexResposta || "—"}.`;
+        statusDestino = "Em Andamento";
+        patchPedidoSubsidios = {
+          ...pedidoSubsidiosAtual,
+          numeroDiex: numeroDiexResposta.trim() || pedidoSubsidiosAtual?.numeroDiex || "",
+          situacaoFluxo: "devolvido_assessor_com_diex",
+          assinadoChefiaEm: agoraISO,
+          assinadoChefiaPorNome: autorMilitar,
+        };
+      } else if (isChefiaProcessandoPedido && tipoDestinoAtual === "externo") {
+        msgHistorico = `✅ Pedido externo aprovado pela chefia. Processo aguardando assinatura do CHEM (DIEx ${numeroDiexResposta || "—"}).`;
+        statusDestino = "Aguardando CHEM";
+        patchPedidoSubsidios = {
+          ...pedidoSubsidiosAtual,
+          numeroDiex: numeroDiexResposta.trim() || pedidoSubsidiosAtual?.numeroDiex || "",
+          situacaoFluxo: "aprovado_externo_aguardando_chem",
+          aprovadoChefiaEm: agoraISO,
+          aprovadoChefiaPorNome: autorMilitar,
+        };
+      }
+
+      const updatePayload: any = {
         respostaDU,
-        status: isAdmin(user) ? "Aguardando CHEM" : "Aguardando Conferência",
+        status: statusDestino,
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: user.email || "Sistema",
-      });
+        atualizadoPorNome: autorMilitar,
+      };
+      if (patchPedidoSubsidios) {
+        updatePayload.pedidoSubsidios = patchPedidoSubsidios;
+      }
+
+      await updateDoc(processoRef, updatePayload);
 
       // Adicionar ao histórico (subcoleção)
       const historicoRef = collection(db, `processos/${processoId}/historico`);

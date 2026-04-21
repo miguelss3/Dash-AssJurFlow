@@ -6,13 +6,14 @@ interface Props {
   responsavel: string;
   tipo: TipoProcesso;
   processos: Processo[];
+  ehAdmin?: boolean;
   onEdit: (p: Processo) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, status: StatusProcesso) => void;
   onClone?: (id: string) => void;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, onEdit, onDelete, onMove, onClone }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, ehAdmin, onEdit, onDelete, onMove, onClone }: Props) {
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
   });
@@ -59,6 +60,7 @@ export function AssessorGroup({ responsavel, tipo, processos, onEdit, onDelete, 
             <ProcessoCard
               key={p.id}
               processo={p}
+              ehAdmin={ehAdmin}
               onEdit={onEdit}
               onDelete={onDelete}
               onMove={onMove}

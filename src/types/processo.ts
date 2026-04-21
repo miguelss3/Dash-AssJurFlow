@@ -8,6 +8,18 @@ export type StatusProcesso =
 export type TipoProcesso = "DU" | "PA" | "OUTRO";
 export type Prioridade = "liminar" | "urgente" | "normal";
 
+export interface PedidoSubsidios {
+  tipoDestino?: "interno" | "externo";
+  secaoInterna?: string;
+  omExterna?: string;
+  numeroDiex?: string;
+  prazoResposta?: string;
+  observacoes?: string;
+  situacaoFluxo?: string;
+  solicitadoEm?: string;
+  solicitadoPorNome?: string;
+}
+
 export interface Processo {
   id: string;
   numero: string;          // Nº processo OU Portaria Nr
@@ -47,6 +59,7 @@ export interface Processo {
   userEmail?: string;      // Email do usuário para referência
   criadoPorNome?: string;  // Nome/email de quem cadastrou
   atualizadoPorNome?: string; // Nome/email de quem atualizou por último
+  pedidoSubsidios?: PedidoSubsidios;
 }
 
 export interface Coluna {

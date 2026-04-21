@@ -40,6 +40,7 @@ import { CSS } from "@dnd-kit/utilities";
 interface ProcessoCardProps {
   processo?: Processo;
   p?: Processo; // Compatibilidade com código antigo
+  ehAdmin?: boolean;
   onEdit?: (p: Processo) => void;
   onDelete?: (id: string) => void;
   onMove?: (id: string, status: StatusProcesso) => void;
@@ -48,7 +49,7 @@ interface ProcessoCardProps {
   isDragging?: boolean; // Flag para quando está sendo arrastado no overlay
 }
 
-export const ProcessoCard = ({ processo, p: pAntigo, onEdit, onDelete, onMove, onClone, showActions = true, isDragging = false }: ProcessoCardProps) => {
+export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onClone, showActions = true, isDragging = false }: ProcessoCardProps) => {
   const p = processo || pAntigo!;
   
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
@@ -62,6 +63,11 @@ export const ProcessoCard = ({ processo, p: pAntigo, onEdit, onDelete, onMove, o
   const setor = p.setor || p.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
+  const situacaoSubsidio = p.pedidoSubsidios?.situacaoFluxo;
+  const statusNormalizado = (p.status || "").toString().trim().toLowerCase();
+  const bloqueioPorStatus = statusNormalizado.includes("aguardando assinatura");
+  const bloqueioPorFluxo = ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(situacaoSubsidio || "");
+  const acaoDUBloqueada = !ehAdmin && isDU && (bloqueioPorFluxo || bloqueioPorStatus);
   
   const [modalAcoesDU, setModalAcoesDU] = useState(false);
   const [modalAcoesPA, setModalAcoesPA] = useState(false);
@@ -233,14 +239,17 @@ export const ProcessoCard = ({ processo, p: pAntigo, onEdit, onDelete, onMove, o
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-sky-300 text-sky-700 hover:bg-sky-50 text-xs h-9"
+                    className="border-sky-300 text-sky-700 hover:bg-sky-50 text-[11px] h-9 disabled:opacity-60 whitespace-nowrap"
+                    disabled={acaoDUBloqueada}
                     onClick={(e) => {
                       e.stopPropagation();
+                      if (acaoDUBloqueada) return;
                       abrirAcoesDU();
                     }}
+                    title={acaoDUBloqueada ? "Aguardando trâmite do pedido de subsídios" : "Ações do processo"}
                   >
-                    <Send className="w-3 h-3 mr-1" />
-                    Ação
+                    <Send className="w-3 h-3 mr-1 shrink-0" />
+                    {acaoDUBloqueada ? "Aguard." : "Ação"}
                   </Button>
                 ) : (
                   <Button

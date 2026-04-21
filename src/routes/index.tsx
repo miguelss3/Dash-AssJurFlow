@@ -88,7 +88,6 @@ export const Route = createFileRoute("/")({
 
 type Aba = "mesa" | "prazos" | "arquivo" | "indicadores" | "equipe";
 type FiltroTipo = "todos" | "DU" | "PA";
-type Visao = "minha" | "setor";
 
 function Index() {
   const navigate = useNavigate();
@@ -101,7 +100,6 @@ function Index() {
   const [filtroTipo, setFiltroTipo] = useState<FiltroTipo>("todos");
   const [busca, setBusca] = useState("");
   const [aba, setAba] = useState<Aba>("mesa");
-  const [visao, setVisao] = useState<Visao>("setor");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -112,16 +110,20 @@ function Index() {
   const usuario = user ?? { posto: "Maj", nome: "Miguel", role: "MAJ - ADMIN UNIVERSAL" };
   const ehAdmin = isAdmin(user);
 
-  // Assessores SEMPRE veem "Visão do Setor" (não podem alternar)
+  const isPendenteChefia = (p: Processo) => {
+    const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
+    const statusNorm = (p.status || "").toString().toLowerCase();
+    return ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(situacaoFluxo)
+      || statusNorm.includes("aguardando assinatura");
+  };
+
+  // Todos operam na Visão do Setor
   useEffect(() => {
-    if (!ehAdmin && visao !== "setor") {
-      setVisao("setor");
-    }
     // Assessores veem apenas processos do seu setor (DU ou PA)
     if (!ehAdmin && usuario.setor && filtroTipo === "todos") {
       setFiltroTipo(usuario.setor as FiltroTipo);
     }
-  }, [ehAdmin, visao, usuario.setor, filtroTipo]);
+  }, [ehAdmin, usuario.setor, filtroTipo]);
 
   const filtrados = useMemo(() => {
     // console.log("🔍 FILTRO - Iniciando filtragem de processos...");
@@ -138,32 +140,8 @@ function Index() {
     return processos.filter((p) => {
       if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
       
-      // FILTRO "MINHA MESA": mostra apenas processos distribuídos para o assessor logado
-      if (visao === "minha") {
-        // Admin vê todos os processos
-        if (ehAdmin) return true;
-        
-        // Verifica se o responsável é o usuário atual
-        const nomeComPosto = `${usuario.posto} ${usuario.nome}`;
-        const nomeCompleto = usuario.nome;
-        const nomeGuerra = usuario.nomeGuerra || "";
-        
-        // Normaliza responsavel para comparação (remove espaços extras)
-        const responsavel = (p.responsavel || "").trim();
-        
-        const responsavelMatch = responsavel === nomeComPosto.trim() || 
-                                responsavel === nomeCompleto.trim() ||
-                                responsavel === nomeGuerra.trim() ||
-                                responsavel.includes(nomeCompleto.trim()) ||
-                                (nomeGuerra && responsavel.includes(nomeGuerra.trim()));
-        
-        // console.log(`  Processo ${p.numero}: responsavel="${responsavel}", nomeComPosto="${nomeComPosto}", nomeCompleto="${nomeCompleto}", nomeGuerra="${nomeGuerra}", match=${responsavelMatch}`);
-        
-        if (!responsavelMatch) return false;
-      }
-      
       // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
-      if (visao === "setor" && !ehAdmin && usuario.setor) {
+      if (!ehAdmin && usuario.setor) {
         const processoSetor = p.setor || p.tipo;
         // console.log(`  Verificando processo ${p.numero}: processoSetor=${processoSetor}, usuarioSetor=${usuario.setor}`);
         
@@ -193,23 +171,14 @@ function Index() {
       if (filtro === "semana") return s === "today" || s === "soon";
       return true;
     });
-  }, [processos, filtro, busca, filtroTipo, visao, usuario.posto, usuario.nome, usuario.setor, ehAdmin]);
+  }, [processos, filtro, busca, filtroTipo, usuario.posto, usuario.nome, usuario.setor, ehAdmin]);
 
   const ativosCount = processos.filter((p) => p.status !== "concluido").length;
   const vencidosCount = processos.filter(
     (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
   ).length;
+  const notificacoesChefiaCount = processos.filter((p) => p.status !== "concluido" && isPendenteChefia(p)).length;
   
-  // Contador "Minha Mesa" - processos distribuídos para o assessor logado
-  const minhaMesaCount = processos.filter((p) => {
-    if (p.status === "concluido") return false;
-    const nomeComPosto = `${usuario.posto} ${usuario.nome}`;
-    const nomeCompleto = usuario.nome;
-    return p.responsavel === nomeComPosto || 
-           p.responsavel === nomeCompleto ||
-           p.responsavel?.includes(nomeCompleto);
-  }).length;
-
   const handleEdit = (p: Processo) => {
     setEditing(p);
     setDialogOpen(true);
@@ -581,8 +550,10 @@ function Index() {
                 className="relative h-10 w-10 rounded-full bg-card border border-border hover:bg-muted"
               >
                 <Bell className="h-4 w-4 text-foreground" />
-                {vencidosCount > 0 && (
-                  <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-destructive ring-2 ring-card animate-pulse-soft" />
+                {(ehAdmin ? notificacoesChefiaCount : vencidosCount) > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center ring-2 ring-card">
+                    {ehAdmin ? notificacoesChefiaCount : vencidosCount}
+                  </span>
                 )}
               </Button>
 
@@ -628,62 +599,11 @@ function Index() {
             <>
               {/* Sub-controles: Minha Mesa | Visão do Setor | DU | PA + busca + filtros à direita */}
               <div className="flex items-center gap-2 flex-wrap">
-                {/* Assessores veem apenas um label estático "Visão do Setor" */}
-                {!ehAdmin ? (
-                  <div className="flex items-center gap-1.5 bg-card border border-border rounded-full p-1 shrink-0">
-                    <div className="px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider bg-foreground text-background">
-                      Visão do Setor
-                    </div>
+                <div className="flex items-center gap-1.5 bg-card border border-border rounded-full p-1 shrink-0">
+                  <div className="px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider bg-foreground text-background">
+                    Visão do Setor
                   </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 bg-card border border-border rounded-full p-1 shrink-0">
-                    <button
-                      onClick={() => setVisao("minha")}
-                      className={`relative px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all ${
-                        visao === "minha"
-                          ? "bg-foreground text-background"
-                          : "text-foreground/80 hover:bg-muted"
-                      }`}
-                    >
-                      Minha Mesa
-                      {minhaMesaCount > 0 && (
-                        <span className="ml-2 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold bg-destructive text-destructive-foreground">
-                          {minhaMesaCount}
-                        </span>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => setVisao("setor")}
-                      className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all ${
-                        visao === "setor"
-                          ? "bg-foreground text-background"
-                          : "text-foreground/80 hover:bg-muted"
-                      }`}
-                    >
-                      Visão do Setor
-                    </button>
-                    <button
-                      onClick={() => setFiltroTipo("DU")}
-                      className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase transition-all ${
-                        filtroTipo === "DU"
-                          ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border border-[var(--tipo-du)]/40"
-                          : "text-foreground/60 hover:bg-muted"
-                      }`}
-                    >
-                      DU
-                    </button>
-                    <button
-                      onClick={() => setFiltroTipo("PA")}
-                      className={`px-4 py-1.5 rounded-full text-[12px] font-bold uppercase transition-all ${
-                        filtroTipo === "PA"
-                          ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border border-[var(--tipo-pa)]/40"
-                          : "text-foreground/60 hover:bg-muted"
-                      }`}
-                    >
-                      PA
-                    </button>
-                  </div>
-                )}
+                </div>
 
                 <div className="relative flex-1 min-w-[240px]">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -756,30 +676,17 @@ function Index() {
                 </div>
               )}
 
-              {/* Visão do setor: agrupado por assessor (estilo AssJur) */}
-              {visao === "setor" ? (
-                <>
-                  <MesaTrabalho
-                    processos={filtrados}
-                    filtroTipo={filtroTipo}
-                    onEdit={handleEdit}
-                    onDelete={remover}
-                    onMove={handleMoverStatus}
-                    onClone={handleClonarProcesso}
-                    onRedistribuir={handleRedistribuir}
-                    usuario={user || undefined}
-                    ehAdmin={ehAdmin}
-                  />
-                </>
-              ) : (
-                <KanbanBoard
-                  processos={filtrados}
-                  onEdit={handleEdit}
-                  onDelete={remover}
-                  onMove={handleMoverStatus}
-                  onAdd={handleAdd}
-                />
-              )}
+              <MesaTrabalho
+                processos={filtrados}
+                filtroTipo={filtroTipo}
+                onEdit={handleEdit}
+                onDelete={remover}
+                onMove={handleMoverStatus}
+                onClone={handleClonarProcesso}
+                onRedistribuir={handleRedistribuir}
+                usuario={user || undefined}
+                ehAdmin={ehAdmin}
+              />
             </>
           )}
 

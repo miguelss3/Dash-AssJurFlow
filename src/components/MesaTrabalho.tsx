@@ -134,6 +134,11 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
 
     // O ID do 'over' é o responsável (nome do assessor ou "Aguardando Distribuição")
     const novoResponsavel = over.id as string;
+    if (novoResponsavel === "MESA DO CHEFE") {
+      setActiveId(null);
+      setActiveProcesso(null);
+      return;
+    }
     const processoId = active.id as string;
     const processoAtual = processosEfetivos.find((p) => p.id === processoId);
     const responsavelAnterior = processoAtual?.responsavel || "";
@@ -180,11 +185,25 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       // Usa 'setor' se existir (Firebase), senão 'tipo' (dados locais)
       const doTipo = ativos.filter((p) => (p.setor || p.tipo) === tipo);
       // console.log(`📊 Processos do tipo ${tipo}:`, doTipo.length);
+
+      const isPendenteChefia = (p: Processo) => {
+        const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
+        const statusNorm = (p.status || "").toString().toLowerCase();
+        return ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(situacaoFluxo)
+          || statusNorm.includes("aguardando assinatura");
+      };
+
+      const pendenciasChefia = ehAdmin ? doTipo.filter(isPendenteChefia) : [];
+      const doTipoSemPendenciasChefia = ehAdmin ? doTipo.filter((p) => !isPendenteChefia(p)) : doTipo;
       
       const map = new Map<string, Processo[]>();
+
+      if (ehAdmin && pendenciasChefia.length > 0) {
+        map.set("MESA DO CHEFE", pendenciasChefia);
+      }
       
       // Adiciona os processos aos seus responsáveis
-      doTipo.forEach((p) => {
+      doTipoSemPendenciasChefia.forEach((p) => {
         // Processos sem responsável ou com "Sem responsável" vão para "Aguardando Distribuição"
         let responsavelKey = p.responsavel || "";
         if (!responsavelKey || responsavelKey === "Sem responsável" || responsavelKey.trim() === "") {
@@ -215,6 +234,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           return true; // Outros assessores sempre aparecem
         })
         .sort((a, b) => {
+          if (a.nome.includes("MESA DO CHEFE")) return -1;
+          if (b.nome.includes("MESA DO CHEFE")) return 1;
           if (a.nome.includes("📥 Aguardando")) return -1;
           if (b.nome.includes("📥 Aguardando")) return 1;
           return a.nome.localeCompare(b.nome);
@@ -272,6 +293,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                     responsavel={a.nome}
                     tipo={grupo.tipo}
                     processos={a.itens}
+                    ehAdmin={ehAdmin}
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onMove={onMove}
@@ -290,6 +312,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           <div className="opacity-80 rotate-3 scale-105">
             <ProcessoCard
               p={activeProcesso}
+              ehAdmin={ehAdmin}
               onEdit={() => {}}
               onDelete={() => {}}
               isDragging={true}

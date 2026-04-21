@@ -24,9 +24,45 @@ interface DetalhesProcessoModalProps {
 export function DetalhesProcessoModal({ open, onOpenChange, processo }: DetalhesProcessoModalProps) {
   if (!processo) return null;
 
+  const formatarDataHoraSegura = (valor?: string | null) => {
+    if (!valor) return "—";
+    try {
+      const data = new Date(valor);
+      if (Number.isNaN(data.getTime())) return "—";
+      return data.toLocaleString("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "—";
+    }
+  };
+
   const setor = processo.setor || processo.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
+
+  const prazoItens = [
+    processo.prazo ? { tipo: "interno" as const, label: "Prazo Interno", valor: processo.prazo } : null,
+    processo.prazoFatal ? { tipo: "fatal" as const, label: "Prazo Fatal", valor: processo.prazoFatal } : null,
+    isDU && processo.pedidoSubsidios?.prazoResposta
+      ? { tipo: "subsidios" as const, label: "Prazo Subsídios", valor: processo.pedidoSubsidios.prazoResposta }
+      : null,
+  ]
+    .filter((item): item is { tipo: "interno" | "fatal" | "subsidios"; label: string; valor: string } => Boolean(item))
+    .sort((a, b) => {
+      const dataA = new Date(a.valor).getTime();
+      const dataB = new Date(b.valor).getTime();
+      const invalidaA = Number.isNaN(dataA);
+      const invalidaB = Number.isNaN(dataB);
+      if (invalidaA && invalidaB) return 0;
+      if (invalidaA) return 1;
+      if (invalidaB) return -1;
+      return dataA - dataB;
+    });
 
   const InfoRow = ({ icon: Icon, label, value }: { icon: any; label: string; value?: string | null }) => {
     if (!value) return null;
@@ -80,6 +116,24 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
             </div>
           </div>
 
+          {/* Fluxo de Subsídios (DU) */}
+          {isDU && processo.pedidoSubsidios && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">Pedido de Subsídios</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  <InfoRow icon={FileText} label="Destino" value={processo.pedidoSubsidios.tipoDestino === "interno" ? "Interno" : "Externo"} />
+                  <InfoRow icon={Building2} label="Seção/OM" value={processo.pedidoSubsidios.tipoDestino === "interno" ? processo.pedidoSubsidios.secaoInterna : processo.pedidoSubsidios.omExterna} />
+                  <InfoRow icon={Mail} label="DIEx" value={processo.pedidoSubsidios.numeroDiex || "Pendente"} />
+                  <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(processo.pedidoSubsidios.solicitadoEm)} />
+                  <InfoRow icon={Clock} label="Prazo de Resposta" value={processo.pedidoSubsidios.prazoResposta ? formatarData(processo.pedidoSubsidios.prazoResposta) : "—"} />
+                  <InfoRow icon={AlertCircle} label="Situação" value={processo.pedidoSubsidios.situacaoFluxo || "—"} />
+                </div>
+              </div>
+            </>
+          )}
+
           <Separator />
 
           {/* Informações Principais */}
@@ -114,47 +168,33 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
               {processo.dataEntrada && (
                 <InfoRow icon={Calendar} label="Data de Entrada" value={formatarData(processo.dataEntrada)} />
               )}
-              
-              {processo.prazo && (
-                <div className="flex items-start gap-3">
-                  <Clock className="w-4 h-4 text-blue-500 mt-0.5" />
-                  <div className="flex-1">
-                    <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Prazo Interno</div>
-                    <div className="text-sm text-slate-800 mt-0.5 flex items-center gap-2">
-                      {formatarData(processo.prazo)}
-                      {diasRestantes(processo.prazo) > 0 && (
-                        <Badge variant="outline" className="text-[10px]">
-                          {diasRestantes(processo.prazo)} dias restantes
-                        </Badge>
-                      )}
+
+              {prazoItens.map((item) => {
+                const dias = diasRestantes(item.valor);
+                const isFatal = item.tipo === "fatal";
+                const icone = isFatal ? (
+                  <AlertCircle className={`w-4 h-4 mt-0.5 ${dias <= 5 ? "text-red-500" : "text-orange-500"}`} />
+                ) : (
+                  <Clock className={`w-4 h-4 mt-0.5 ${item.tipo === "subsidios" ? "text-indigo-500" : "text-blue-500"}`} />
+                );
+
+                return (
+                  <div key={item.tipo} className="flex items-start gap-3">
+                    {icone}
+                    <div className="flex-1">
+                      <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">{item.label}</div>
+                      <div className={`text-sm mt-0.5 flex items-center gap-2 ${isFatal ? (dias <= 5 ? "text-red-600 font-bold" : "text-orange-600") : "text-slate-800"}`}>
+                        {formatarData(item.valor)}
+                        {dias > 0 && (
+                          <Badge variant={isFatal && dias <= 5 ? "destructive" : "outline"} className="text-[10px]">
+                            {dias} dias restantes
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-              
-              {processo.prazoFatal && (
-                <div className="flex items-start gap-3">
-                  <AlertCircle className={`w-4 h-4 mt-0.5 ${
-                    diasRestantes(processo.prazoFatal) <= 5 ? 'text-red-500' : 'text-orange-500'
-                  }`} />
-                  <div className="flex-1">
-                    <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Prazo Fatal</div>
-                    <div className={`text-sm mt-0.5 flex items-center gap-2 ${
-                      diasRestantes(processo.prazoFatal) <= 5 ? 'text-red-600 font-bold' : 'text-orange-600'
-                    }`}>
-                      {formatarData(processo.prazoFatal)}
-                      {diasRestantes(processo.prazoFatal) > 0 && (
-                        <Badge 
-                          variant={diasRestantes(processo.prazoFatal) <= 5 ? "destructive" : "outline"}
-                          className="text-[10px]"
-                        >
-                          {diasRestantes(processo.prazoFatal)} dias restantes
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
+                );
+              })}
             </div>
           </div>
 
@@ -185,13 +225,7 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                       {processo.atualizadoPorNome && processo.atualizadoEm && <span> • </span>}
                       {processo.atualizadoEm && (
                         <span>
-                          {new Date(processo.atualizadoEm).toLocaleString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
+                          {formatarDataHoraSegura(processo.atualizadoEm)}
                         </span>
                       )}
                     </div>
@@ -210,13 +244,7 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                 <div className="space-y-0.5">
                   <div className="text-[10px] text-slate-400 uppercase tracking-wide">Cadastrado</div>
                   <div className="text-slate-600 font-medium">
-                    {new Date(processo.criadoEm).toLocaleString('pt-BR', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    {formatarDataHoraSegura(processo.criadoEm)}
                   </div>
                   {processo.criadoPorNome && (
                     <div className="text-[10px] text-slate-400">por {processo.criadoPorNome.split('@')[0]}</div>
@@ -227,13 +255,7 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                 <div className="space-y-0.5">
                   <div className="text-[10px] text-slate-400 uppercase tracking-wide">Atualizado</div>
                   <div className="text-slate-600 font-medium">
-                    {new Date(processo.atualizadoEm).toLocaleString('pt-BR', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
+                    {formatarDataHoraSegura(processo.atualizadoEm)}
                   </div>
                   {processo.atualizadoPorNome && (
                     <div className="text-[10px] text-slate-400">por {processo.atualizadoPorNome.split('@')[0]}</div>
