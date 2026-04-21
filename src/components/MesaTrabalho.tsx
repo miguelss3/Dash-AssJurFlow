@@ -56,9 +56,12 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         
         const assessores = snapshot.docs.map(doc => {
           const data = doc.data();
-          const nomeCompleto = data.posto && data.nome 
-            ? `${data.posto} ${data.nome}`.trim()
-            : data.nome || data.email?.split("@")[0] || "Assessor";
+          // Usa nomeGuerra para garantir que o nome da coluna bate com
+          // o campo responsavel dos processos (gravado como "Posto NomeGuerra")
+          const nomeExibicao = data.nomeGuerra || data.nome || data.email?.split("@")[0] || "Assessor";
+          const nomeCompleto = data.posto
+            ? `${data.posto} ${nomeExibicao}`.trim()
+            : nomeExibicao;
           
           return {
             nome: nomeCompleto,
