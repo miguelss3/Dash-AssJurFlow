@@ -33,6 +33,14 @@ service cloud.firestore {
       // Permite exclusão se é admin OU se o processo pertence ao usuário
       allow delete: if request.auth != null && 
                        (isAdmin() || resource.data.userId == request.auth.uid);
+      
+      // Subcoleção de histórico - permite leitura/escrita para todos autenticados
+      match /historico/{mensagemId} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update: if request.auth != null;
+        allow delete: if request.auth != null && isAdmin();
+      }
     }
     
     // Regras para a coleção de usuários

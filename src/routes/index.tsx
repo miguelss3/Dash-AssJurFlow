@@ -84,7 +84,7 @@ export const Route = createFileRoute("/")({
   },
 });
 
-type Aba = "mesa" | "prazos" | "consulta" | "arquivo" | "indicadores" | "equipe";
+type Aba = "mesa" | "prazos" | "arquivo" | "indicadores" | "equipe";
 type FiltroTipo = "todos" | "DU" | "PA";
 type Visao = "minha" | "setor";
 
@@ -175,7 +175,6 @@ function Index() {
   const tabs: { id: Aba; label: string }[] = [
     { id: "mesa", label: "Mesa de Trabalho" },
     { id: "prazos", label: "Controle de Prazos" },
-    { id: "consulta", label: "Consulta Geral" },
     { id: "arquivo", label: "Arquivo / Encerrados" },
     { id: "indicadores", label: "Indicadores de Gestão" },
     { id: "equipe", label: "Gestão da Equipe" },
@@ -540,14 +539,6 @@ function Index() {
 
           {aba === "prazos" && (
             <CalendarioPrazos processos={processos} usuario={usuario} />
-          )}
-
-          {aba === "consulta" && (
-            <EmptyTab
-              icon={ListFilter}
-              title="Consulta Geral"
-              description="Pesquise no acervo completo de processos da 12ª RM, com filtros por seção, origem, encarregado e período."
-            />
           )}
 
           {aba === "arquivo" && (

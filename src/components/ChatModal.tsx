@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, X } from "lucide-react";
@@ -124,6 +124,9 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
       <DialogContent className="max-w-3xl h-[85vh] flex flex-col p-0">
         <DialogHeader className="p-6 border-b bg-slate-50 rounded-t-2xl">
           <DialogTitle className="font-extrabold text-lg text-slate-800">{titulo}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Histórico de mensagens e movimentações do processo. Digite uma mensagem abaixo para registrar uma nova movimentação.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Área de mensagens */}

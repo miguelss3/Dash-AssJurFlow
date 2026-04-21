@@ -85,6 +85,13 @@ export const ProcessoCard = ({ processo, onEdit, onDelete, onMove, showActions =
               </span>
               <span className="text-xs font-mono font-bold text-slate-500">{p.numero}</span>
               
+              {/* Badge Tipo PA (IPM, Sindicância, Conselho) */}
+              {isPA && p.tipoPA && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-300">
+                  {p.tipoPA}
+                </span>
+              )}
+              
               {/* Badge Prioridade/MS */}
               {p.isMS && (
                 <Badge variant="destructive" className="text-[10px] h-5">
