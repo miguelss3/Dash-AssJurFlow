@@ -302,11 +302,19 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
             {tipoPedidoSubsidio === "interno" && (
               <div className="space-y-2">
                 <Label>Seção Interna *</Label>
-                <Input 
-                  value={secaoInterna} 
-                  onChange={(e) => setSecaoInterna(e.target.value)}
-                  placeholder="Ex: SVP, SFPC, PMM..." 
-                />
+                <Select value={secaoInterna} onValueChange={setSecaoInterna}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a seção..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="SVP">SVP</SelectItem>
+                    <SelectItem value="SFPC">SFPC</SelectItem>
+                    <SelectItem value="DIVADM">DIVADM</SelectItem>
+                    <SelectItem value="APG">APG</SelectItem>
+                    <SelectItem value="PMM">PMM</SelectItem>
+                    <SelectItem value="OUTROS">OUTROS</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
@@ -322,11 +330,13 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
             )}
 
             <div className="space-y-2">
-              <Label>Número do DIEx (opcional)</Label>
+              <Label>Número do DIEx {isAdmin(user) ? "" : "(será preenchido depois pelo chefe)"}</Label>
               <Input 
                 value={numeroDiex} 
                 onChange={(e) => setNumeroDiex(e.target.value)}
-                placeholder="Ex: DIEx Nr 123-AsseApAssJur" 
+                placeholder={isAdmin(user) ? "Ex: DIEx Nr 123-AsseApAssJur" : "Na 1ª vez, o número será preenchido depois"}
+                disabled={!isAdmin(user)}
+                className={!isAdmin(user) ? "bg-slate-100 cursor-not-allowed" : ""}
               />
             </div>
 

@@ -1,5 +1,5 @@
-import { useProcessos } from "@/hooks/useProcessos";
 import { ProcessoCard } from "./ProcessoCard";
+import type { Processo, StatusProcesso } from "@/types/processo";
 
 // Definimos as colunas conforme o fluxo real da 12ª RM
 const COLUNAS = [
@@ -9,11 +9,15 @@ const COLUNAS = [
   { id: "REVISÃO", titulo: "Revisão Final" }
 ];
 
-export const KanbanBoard = () => {
-  const { processos, carregando } = useProcessos();
+interface KanbanBoardProps {
+  processos: Processo[];
+  onEdit?: (p: Processo) => void;
+  onDelete?: (id: string) => void;
+  onMove?: (id: string, novoStatus: StatusProcesso) => void;
+  onAdd?: (status: StatusProcesso) => void;
+}
 
-  if (carregando) return <div className="p-8 text-center text-slate-500">A carregar processos da 12ª RM...</div>;
-
+export const KanbanBoard = ({ processos, onEdit, onDelete, onMove, onAdd }: KanbanBoardProps) => {
   return (
     <div className="flex flex-col md:flex-row gap-6 h-full overflow-x-auto pb-4">
       {COLUNAS.map((coluna) => (

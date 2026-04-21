@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
 import { AssessorGroup } from "./AssessorGroup";
 import {
@@ -11,8 +11,10 @@ import {
   DragStartEvent,
   DragEndEvent,
 } from "@dnd-kit/core";
-import { useState } from "react";
 import { ProcessoCard } from "./ProcessoCard";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import type { AuthUser } from "@/hooks/useAuth";
 
 interface Props {
   processos: Processo[];
@@ -21,11 +23,14 @@ interface Props {
   onDelete: (id: string) => void;
   onMove: (id: string, status: StatusProcesso) => void;
   onRedistribuir?: (processoId: string, novoResponsavel: string) => void;
+  usuario?: AuthUser;
+  ehAdmin?: boolean;
 }
 
-export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onRedistribuir }: Props) {
+export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onRedistribuir, usuario, ehAdmin }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
+  const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -34,6 +39,42 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       },
     })
   );
+
+  // Busca todos os assessores do setor (DU ou PA)
+  useEffect(() => {
+    const buscarAssessores = async () => {
+      if (!usuario || ehAdmin) return; // Admin vê todos, não precisa buscar
+      
+      const setorParaBuscar = usuario.setor; // "DU" ou "PA"
+      if (!setorParaBuscar) return;
+      
+      try {
+        // console.log("🔍 Buscando assessores do setor:", setorParaBuscar);
+        const usuariosRef = collection(db, "usuarios");
+        const q = query(usuariosRef, where("setor", "==", setorParaBuscar));
+        const snapshot = await getDocs(q);
+        
+        const assessores = snapshot.docs.map(doc => {
+          const data = doc.data();
+          const nomeCompleto = data.posto && data.nome 
+            ? `${data.posto} ${data.nome}`.trim()
+            : data.nome || data.email?.split("@")[0] || "Assessor";
+          
+          return {
+            nome: nomeCompleto,
+            setor: data.setor || setorParaBuscar,
+          };
+        });
+        
+        // console.log("✅ Assessores encontrados:", assessores);
+        setAssessoresDoSetor(assessores);
+      } catch (error) {
+        console.error("❌ Erro ao buscar assessores:", error);
+      }
+    };
+    
+    buscarAssessores();
+  }, [usuario, ehAdmin]);
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -75,10 +116,11 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   };
 
   const grupos = useMemo(() => {
-    console.log("📊 MesaTrabalho - Total de processos recebidos:", processos.length);
+    // console.log("📊 MesaTrabalho - Total de processos recebidos:", processos.length);
+    // console.log("📊 Assessores do setor carregados:", assessoresDoSetor.length);
     
     const ativos = processos.filter((p) => p.status !== "concluido");
-    console.log("📊 Processos ativos (não concluídos):", ativos.length);
+    // console.log("📊 Processos ativos (não concluídos):", ativos.length);
     
     const tipos: TipoProcesso[] =
       filtroTipo === "todos" ? ["DU", "PA"] : [filtroTipo as TipoProcesso];
@@ -88,9 +130,11 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     for (const tipo of tipos) {
       // Usa 'setor' se existir (Firebase), senão 'tipo' (dados locais)
       const doTipo = ativos.filter((p) => (p.setor || p.tipo) === tipo);
-      console.log(`📊 Processos do tipo ${tipo}:`, doTipo.length);
+      // console.log(`📊 Processos do tipo ${tipo}:`, doTipo.length);
       
       const map = new Map<string, Processo[]>();
+      
+      // Adiciona os processos aos seus responsáveis
       doTipo.forEach((p) => {
         // Processos sem responsável ou com "Sem responsável" vão para "Aguardando Distribuição"
         let responsavelKey = p.responsavel || "";
@@ -101,11 +145,26 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         map.get(responsavelKey)!.push(p);
       });
       
-      console.log(`📊 Assessores encontrados para ${tipo}:`, Array.from(map.keys()));
+      // Adiciona todos os assessores do setor (mesmo sem processos)
+      const assessoresDesteTipo = assessoresDoSetor.filter(a => a.setor === tipo);
+      assessoresDesteTipo.forEach(assessor => {
+        if (!map.has(assessor.nome)) {
+          map.set(assessor.nome, []); // Coluna vazia
+        }
+      });
       
-      // Ordena: "Aguardando Distribuição" primeiro, depois ordem alfabética
+      // console.log(`📊 Assessores com colunas para ${tipo}:`, Array.from(map.keys()));
+      
+      // Ordena: "Aguardando Distribuição" primeiro (SE houver processos), depois ordem alfabética
       const assessores = Array.from(map.entries())
         .map(([nome, itens]) => ({ nome, itens }))
+        .filter(({ nome, itens }) => {
+          // Só mostra "Aguardando Distribuição" se tiver processos
+          if (nome.includes("📥 Aguardando")) {
+            return itens.length > 0;
+          }
+          return true; // Outros assessores sempre aparecem
+        })
         .sort((a, b) => {
           if (a.nome.includes("📥 Aguardando")) return -1;
           if (b.nome.includes("📥 Aguardando")) return 1;
@@ -118,7 +177,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     
     console.log("📊 Resultado final:", result);
     return result;
-  }, [processos, filtroTipo]);
+  }, [processos, filtroTipo, assessoresDoSetor]);
 
   if (grupos.length === 0) {
     return (

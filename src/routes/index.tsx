@@ -113,38 +113,56 @@ function Index() {
   const ehAdmin = isAdmin(user);
 
   const filtrados = useMemo(() => {
-    console.log("🔍 FILTRO - Iniciando filtragem de processos...");
-    console.log("  Total de processos:", processos.length);
-    console.log("  Usuário:", usuario.nome);
-    console.log("  Setor do usuário:", usuario.setor);
-    console.log("  É admin?:", ehAdmin);
-    console.log("  Visão:", visao);
-    console.log("  Filtro tipo:", filtroTipo);
+    // console.log("🔍 FILTRO - Iniciando filtragem de processos...");
+    // console.log("  Total de processos:", processos.length);
+    // console.log("  Usuário completo:", usuario);
+    // console.log("  Nome:", usuario.nome);
+    // console.log("  Posto:", usuario.posto);
+    // console.log("  Nome Guerra:", usuario.nomeGuerra);
+    // console.log("  Setor do usuário:", usuario.setor);
+    // console.log("  É admin?:", ehAdmin);
+    // console.log("  Visão:", visao);
+    // console.log("  Filtro tipo:", filtroTipo);
     
     return processos.filter((p) => {
       if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
       
       // FILTRO "MINHA MESA": mostra apenas processos distribuídos para o assessor logado
       if (visao === "minha") {
-        // Verifica se o responsável é o usuário atual (com ou sem posto)
+        // Admin vê todos os processos
+        if (ehAdmin) return true;
+        
+        // Verifica se o responsável é o usuário atual
         const nomeComPosto = `${usuario.posto} ${usuario.nome}`;
         const nomeCompleto = usuario.nome;
-        const responsavelMatch = p.responsavel === nomeComPosto || 
-                                p.responsavel === nomeCompleto ||
-                                p.responsavel?.includes(nomeCompleto);
+        const nomeGuerra = usuario.nomeGuerra || "";
+        
+        // Normaliza responsavel para comparação (remove espaços extras)
+        const responsavel = (p.responsavel || "").trim();
+        
+        const responsavelMatch = responsavel === nomeComPosto.trim() || 
+                                responsavel === nomeCompleto.trim() ||
+                                responsavel === nomeGuerra.trim() ||
+                                responsavel.includes(nomeCompleto.trim()) ||
+                                (nomeGuerra && responsavel.includes(nomeGuerra.trim()));
+        
+        // console.log(`  Processo ${p.numero}: responsavel="${responsavel}", nomeComPosto="${nomeComPosto}", nomeCompleto="${nomeCompleto}", nomeGuerra="${nomeGuerra}", match=${responsavelMatch}`);
+        
         if (!responsavelMatch) return false;
       }
       
       // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
       if (visao === "setor" && !ehAdmin && usuario.setor) {
-        console.log(`  Verificando processo ${p.numero}: setor=${p.setor}, tipo=${p.tipo}, usuarioSetor=${usuario.setor}`);
-        // Assessor de DU vê apenas processos de DU
-        // Assessor de PA vê apenas processos de PA
-        if (p.setor !== usuario.setor && p.tipo !== usuario.setor) {
-          console.log(`    ❌ Processo ${p.numero} filtrado (setor incompatível)`);
+        const processoSetor = p.setor || p.tipo;
+        // console.log(`  Verificando processo ${p.numero}: processoSetor=${processoSetor}, usuarioSetor=${usuario.setor}`);
+        
+        // Assessor de DU vê APENAS processos de DU
+        // Assessor de PA vê APENAS processos de PA
+        if (processoSetor !== usuario.setor) {
+          // console.log(`    ❌ Processo ${p.numero} filtrado (setor ${processoSetor} !== ${usuario.setor})`);
           return false;
         }
-        console.log(`    ✅ Processo ${p.numero} passa no filtro de setor`);
+        // console.log(`    ✅ Processo ${p.numero} passa no filtro de setor`);
       }
       if (busca.trim()) {
         const q = busca.toLowerCase();
@@ -262,13 +280,22 @@ function Index() {
   ];
 
   // Tabs principais (estilo AssJur)
-  const tabs: { id: Aba; label: string }[] = [
+  // Assessores NÃO veem "Arquivo" e "Gestão da Equipe"
+  const tabsCompletas: { id: Aba; label: string }[] = [
     { id: "mesa", label: "Mesa de Trabalho" },
     { id: "prazos", label: "Controle de Prazos" },
     { id: "arquivo", label: "Arquivo / Encerrados" },
     { id: "indicadores", label: "Indicadores de Gestão" },
     { id: "equipe", label: "Gestão da Equipe" },
   ];
+  
+  const tabsAssessor: { id: Aba; label: string }[] = [
+    { id: "mesa", label: "Mesa de Trabalho" },
+    { id: "prazos", label: "Controle de Prazos" },
+    { id: "indicadores", label: "Indicadores de Gestão" },
+  ];
+  
+  const tabs = ehAdmin ? tabsCompletas : tabsAssessor;
 
   return (
     <div className="min-h-screen bg-background">
@@ -604,9 +631,6 @@ function Index() {
               {/* Visão do setor: agrupado por assessor (estilo AssJur) */}
               {visao === "setor" ? (
                 <>
-                  {console.log("🔍 Enviando para MesaTrabalho:", filtrados.length, "processos")}
-                  {console.log("🔍 FiltroTipo:", filtroTipo)}
-                  {console.log("🔍 Visão:", visao)}
                   <MesaTrabalho
                     processos={filtrados}
                     filtroTipo={filtroTipo}
@@ -614,6 +638,8 @@ function Index() {
                     onDelete={remover}
                     onMove={moverStatus}
                     onRedistribuir={handleRedistribuir}
+                    usuario={user || undefined}
+                    ehAdmin={ehAdmin}
                   />
                 </>
               ) : (

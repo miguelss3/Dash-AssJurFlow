@@ -28,13 +28,13 @@ const ORIGENS_DU = ["SAPIENS", "Ofício", "E-mail", "Whatsapp", "Presencial", "O
 const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 
 // LOG DE VERIFICAÇÃO - ESTE LOG DEVE APARECER SEMPRE
-console.log("🚀🚀🚀 ARQUIVO CadastroProcessoModal.tsx CARREGADO - VERSÃO NOVA COM LOGS! 🚀🚀🚀");
+// console.log("🚀🚀🚀 ARQUIVO CadastroProcessoModal.tsx CARREGADO - VERSÃO NOVA COM LOGS! 🚀🚀🚀");
 
 export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess }: CadastroProcessoModalProps) {
   const { user } = useAuth();
   
-  console.log("🔐 CadastroProcessoModal - User logado:", user?.email || "Nenhum usuário");
-  console.log("🔐 Modal open?", open);
+  // console.log("🔐 CadastroProcessoModal - User logado:", user?.email || "Nenhum usuário");
+  // console.log("🔐 Modal open?", open);
   console.log("🔐 Processo para editar?", processo?.id || "Não, é cadastro novo");
 
   // Estado do formulário
@@ -912,4 +912,4 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 }
 
 // Log quando componente é renderizado
-console.log("🎨 CadastroProcessoModal renderizado");
+// console.log("🎨 CadastroProcessoModal renderizado");
