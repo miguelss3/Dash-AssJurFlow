@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Processo } from "@/types/processo";
-import { collection, addDoc, updateDoc, doc, Timestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { AlertCircle } from "lucide-react";
@@ -337,6 +337,20 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           timestamp: agoraISO,
         });
 
+        // Também salvar na coleção mensagens (compatibilidade sistema antigo)
+        const mensagensRef = doc(db, "mensagens", processo.id);
+        const mensagensSnap = await getDoc(mensagensRef);
+        const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
+        await setDoc(mensagensRef, {
+          historico: [...historicoExistente, {
+            id: crypto.randomUUID(),
+            autor: user?.email || "Sistema",
+            autorId: user?.uid || "sistema",
+            texto: msgAtualizacao,
+            timestamp: agoraISO,
+          }]
+        });
+
         toast.success("Processo atualizado com sucesso!");
       } else {
         const msgCadastro = (setor === "DU" && isMS)
@@ -364,10 +378,35 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           timestamp: agoraISO,
         });
 
+        // Também salvar na coleção mensagens (compatibilidade sistema antigo)
+        await setDoc(doc(db, "mensagens", processoRef.id), {
+          historico: [{
+            id: crypto.randomUUID(),
+            autor: "Sistema",
+            autorId: "sistema",
+            texto: msgCadastro,
+            timestamp: agoraISO,
+          }]
+        });
+
         if (setor === "PA") {
           let msgAdicional = "";
           if (isSindicanciaAntiga) {
             msgAdicional = `🗂️ Sindicância antiga cadastrada no acervo com a portaria ${numeroFinal}.`;
+
+          // Atualizar também na coleção mensagens
+          const mensagensRef = doc(db, "mensagens", processoRef.id);
+          const mensagensSnap = await getDoc(mensagensRef);
+          const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
+          await setDoc(mensagensRef, {
+            historico: [...historicoExistente, {
+              id: crypto.randomUUID(),
+              autor: "Sistema",
+              autorId: "sistema",
+              texto: msgAdicional,
+              timestamp: agoraISO,
+            }]
+          });
           } else if (isDiligenciaPA) {
             msgAdicional = `🔎 ${tipoPA} cadastrado em diligência${mudouEncarregado ? ` com nova portaria ${numeroFinal}` : " mantendo a mesma portaria"}. Aguardando assinatura do Cmt.`;
           } else {

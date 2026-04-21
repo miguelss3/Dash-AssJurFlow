@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Send, X } from "lucide-react";
-import { collection, addDoc, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, query, orderBy, onSnapshot, Timestamp, doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -104,8 +104,10 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
 
     try {
       const textoMensagem = novaMensagem.trim();
+      const agoraISO = new Date().toISOString();
       const historicoRef = collection(db, `processos/${processo.id}/historico`);
       
+      // Salvar na subcoleção historico
       await addDoc(historicoRef, {
         autor: user.nome || user.email?.split("@")[0] || "Usuário",
         autorId: user.uid,
@@ -118,6 +120,20 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
       await updateDoc(processoRef, {
         descricao: textoMensagem,
         atualizadoEm: Timestamp.now(),
+      });
+
+      // Também salvar na coleção mensagens (compatibilidade sistema antigo)
+      const mensagensRef = doc(db, "mensagens", processo.id);
+      const mensagensSnap = await getDoc(mensagensRef);
+      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
+      await setDoc(mensagensRef, {
+        historico: [...historicoExistente, {
+          id: crypto.randomUUID(),
+          autor: user.nome || user.email?.split("@")[0] || "Usuário",
+          autorId: user.uid,
+          texto: textoMensagem,
+          timestamp: agoraISO,
+        }]
       });
 
       setNovaMensagem("");
