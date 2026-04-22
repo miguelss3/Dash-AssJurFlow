@@ -3,6 +3,10 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +22,7 @@ import {
   MessageSquare, 
   Trash2, 
   Send, 
-  CheckCircle,
+  RotateCcw,
   Clock,
   FileText,
   User,
@@ -43,13 +47,14 @@ interface ProcessoCardProps {
   onEdit?: (p: Processo) => void;
   onDelete?: (id: string) => void;
   onMove?: (id: string, status: StatusProcesso) => void;
+  onReativarProcesso?: (processoId: string, payload?: { motivo: string; novoPrazoFatal: string }) => void | Promise<void>;
   showActions?: boolean;
   isDragging?: boolean; // Flag para quando está sendo arrastado no overlay
   naoLido?: boolean;
   onMarcarComoLido?: (processoId: string) => void;
 }
 
-export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido }: ProcessoCardProps) => {
+export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onReativarProcesso, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido }: ProcessoCardProps) => {
   const p = processo || pAntigo!;
   const marcarComoLido = () => onMarcarComoLido?.(p.id);
   
@@ -87,38 +92,49 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const [modalDetalhes, setModalDetalhes] = useState(false);
   const [modalChat, setModalChat] = useState(false);
   const [alertExcluir, setAlertExcluir] = useState(false);
+  const [modalReativar, setModalReativar] = useState(false);
+  const [motivoReabertura, setMotivoReabertura] = useState("");
+  const [novoPrazoFatal, setNovoPrazoFatal] = useState("");
+  const [reativando, setReativando] = useState(false);
   
   // Função para abrir o chat do processo
   const abrirChat = () => {
     setModalChat(true);
   };
   
-  // Função para finalizar processo
-  const finalizarProcesso = () => {
-    if (isDU) {
-      const assinaturaCHEM = p.respostaDU?.situacao === "assinada_chem";
-      if (!assinaturaCHEM) {
-        toast.error("Finalize DU apenas após registrar assinatura do CHEM.");
+  const abrirReativacao = () => {
+    setMotivoReabertura("");
+    setNovoPrazoFatal(p.prazoFatal || "");
+    setModalReativar(true);
+  };
+
+  const reativarProcesso = async () => {
+    if (!onReativarProcesso) return;
+
+    if (!ehAdmin) {
+      if (!motivoReabertura.trim()) {
+        toast.error("Informe o motivo da reabertura.");
         return;
       }
-
-      const possuiNumeroDocumento = !!(p.respostaDU?.numeroOficio?.trim() || p.respostaDU?.numeroDiex?.trim());
-      if (!possuiNumeroDocumento) {
-        toast.error("Para DU, informe número de Ofício ou DIEx antes de finalizar.");
-        return;
-      }
-
-      if (!p.respostaDU?.destinoDocumento?.trim()) {
-        toast.error("Para DU, informe o destino do documento antes de finalizar.");
+      if (!novoPrazoFatal) {
+        toast.error("Informe o novo prazo fatal.");
         return;
       }
     }
 
-    if (window.confirm(`Deseja finalizar o processo ${p.numero}?`)) {
-      if (onMove) {
-        onMove(p.id, "concluido");
-        toast.success("Processo finalizado!");
-      }
+    try {
+      setReativando(true);
+      await Promise.resolve(
+        onReativarProcesso(p.id, {
+          motivo: motivoReabertura.trim(),
+          novoPrazoFatal,
+        }),
+      );
+      setModalReativar(false);
+      setMotivoReabertura("");
+      setNovoPrazoFatal("");
+    } finally {
+      setReativando(false);
     }
   };
   
@@ -205,11 +221,15 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
               {p.prioridade === "normal" && (
                 <Badge variant="outline" className="text-[10px] h-5">Normal</Badge>
               )}
-              {badgeAcaoChefia && (
+              {(p.processoReaberto && p.status !== "concluido") ? (
+                <Badge variant="outline" className="text-[10px] h-5 border-blue-300 text-blue-700 bg-blue-50">
+                  Processo reaberto
+                </Badge>
+              ) : badgeAcaoChefia ? (
                 <Badge variant="outline" className="text-[10px] h-5 border-amber-300 text-amber-700 bg-amber-50">
                   {badgeAcaoChefia}
                 </Badge>
-              )}
+              ) : null}
               {(p.pedidoSubsidios?.reiteracoes || 0) > 0 && (
                 <Badge variant="outline" className="text-[10px] h-5 border-indigo-300 text-indigo-700 bg-indigo-50">
                   Reiterações: {p.pedidoSubsidios?.reiteracoes}
@@ -359,22 +379,22 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                 </Button>
               </div>
 
-              {/* Linha 2: Finalizar (se não concluído) + Excluir */}
-              <div className={`grid gap-2 ${p.status !== "concluido" ? "grid-cols-2" : "grid-cols-1"}`}>
-                {/* Botão Finalizar (apenas se não estiver concluído) */}
-                {p.status !== "concluido" && (
+              {/* Linha 2: Reativar (concluídos) + Excluir */}
+              <div className={`grid gap-2 ${p.status === "concluido" ? "grid-cols-2" : "grid-cols-1"}`}>
+                {/* Botão Reativar (apenas para concluído) */}
+                {p.status === "concluido" && (
                   <Button
                     size="sm"
                     variant="outline"
-                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs h-9"
+                    className="border-blue-300 text-blue-700 hover:bg-blue-50 text-xs h-9"
                     onClick={(e) => {
                       e.stopPropagation();
                       marcarComoLido();
-                      finalizarProcesso();
+                      abrirReativacao();
                     }}
                   >
-                    <CheckCircle className="w-3 h-3 mr-1" />
-                    Finalizar
+                    <RotateCcw className="w-3 h-3 mr-1" />
+                    Reabrir
                   </Button>
                 )}
                 
@@ -442,6 +462,51 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
         onOpenChange={setModalChat}
         processo={p}
       />
+
+      <Dialog open={modalReativar} onOpenChange={setModalReativar}>
+        <DialogContent onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Reabrir Processo {p.numero}</DialogTitle>
+            <DialogDescription>
+              {ehAdmin
+                ? "Ao reabrir, o processo volta ao fluxo ativo."
+                : "Informe o motivo da reabertura e defina o novo prazo fatal."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor={`motivo-${p.id}`}>Motivo da reabertura {!ehAdmin ? "*" : ""}</Label>
+              <Textarea
+                id={`motivo-${p.id}`}
+                value={motivoReabertura}
+                onChange={(e) => setMotivoReabertura(e.target.value)}
+                placeholder="Descreva o motivo da reabertura"
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor={`prazo-fatal-${p.id}`}>Novo prazo fatal {!ehAdmin ? "*" : ""}</Label>
+              <Input
+                id={`prazo-fatal-${p.id}`}
+                type="date"
+                value={novoPrazoFatal}
+                onChange={(e) => setNovoPrazoFatal(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setModalReativar(false)} disabled={reativando}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={reativarProcesso} disabled={reativando || !onReativarProcesso}>
+              {reativando ? "Reabrindo..." : "Confirmar Reabertura"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* AlertDialog de Confirmação de Exclusão */}
       <AlertDialog open={alertExcluir} onOpenChange={setAlertExcluir}>

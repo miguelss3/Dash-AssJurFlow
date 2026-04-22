@@ -12,11 +12,12 @@ interface Props {
   onEdit: (p: Processo) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, status: StatusProcesso) => void;
+  onReativarProcesso?: (processoId: string, payload?: { motivo: string; novoPrazoFatal: string }) => void | Promise<void>;
   unreadProcessIds?: Set<string>;
   onReadProcess?: (processoId: string) => void;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, unreadProcessIds, onReadProcess }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, unreadProcessIds, onReadProcess }: Props) {
   const [aba, setAba] = useState<"ativos" | "concluidos">("ativos");
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
@@ -89,6 +90,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosConcluido
               onEdit={onEdit}
               onDelete={onDelete}
               onMove={onMove}
+              onReativarProcesso={onReativarProcesso}
               showActions
               naoLido={!!unreadProcessIds?.has(p.id)}
               onMarcarComoLido={onReadProcess}

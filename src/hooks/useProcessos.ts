@@ -179,6 +179,10 @@ export function useProcessos() {
           entrada: procData.dataEntrada || procData.entrada,
           userId: procData.userId || procData.criadoPorId,
           userEmail: procData.userEmail,
+          processoReaberto: procData.processoReaberto === true,
+          motivoReabertura: procData.motivoReabertura,
+          reabertoEm: toIsoString(procData.reabertoEm) || procData.reabertoEm,
+          reabertoPorNome: procData.reabertoPorNome,
           // Campos DU e PA específicos
           origemDU: procData.origemDU,
           secaoDU: procData.secaoDU,

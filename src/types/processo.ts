@@ -80,6 +80,10 @@ export interface Processo {
   userEmail?: string;      // Email do usuário para referência
   criadoPorNome?: string;  // Nome/email de quem cadastrou
   atualizadoPorNome?: string; // Nome/email de quem atualizou por último
+  processoReaberto?: boolean;
+  motivoReabertura?: string;
+  reabertoEm?: string;
+  reabertoPorNome?: string;
   pedidoSubsidios?: PedidoSubsidios;
   respostaDU?: RespostaDU;
 }

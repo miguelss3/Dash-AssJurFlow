@@ -24,6 +24,14 @@ interface CadastroProcessoModalProps {
 
 const TIPOS_PA = ["IPM", "Sindicância", "Conselho de Disciplina", "Conselho de Justificação", "Investigação Preliminar", "Outros"];
 const ASSUNTOS_SINDICANCIA = ["Falta Injustificada", "Embriaguez", "Deserção", "Outros"];
+const ASSUNTOS_DU_PRINCIPAIS = [
+  "Saúde e FUSEx",
+  "Movimentação e Transferência",
+  "SFPC / CAC",
+  "Carreira e Remuneração",
+  "Disciplina e Justiça",
+  "Licitações e Contratos",
+];
 const ORIGENS_DU = ["SAPIENS", "Email", "MPF", "Justiça Federal", "Justiça Estadual", "Outros"];
 const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 
@@ -273,7 +281,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     }
     if (setor === "DU" && !assunto.trim()) {
       // console.log("❌ VALIDAÇÃO FALHOU: assunto DU vazio");
-      toast.error("Preencha o assunto do processo.");
+      toast.error("Selecione o assunto principal do processo DU.");
       return;
     }
 
@@ -745,12 +753,33 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           ) : (
             <div className="space-y-2">
               <Label htmlFor="assunto">Assunto *</Label>
-              <Input
-                id="assunto"
-                value={assunto}
-                onChange={(e) => setAssunto(e.target.value)}
-                placeholder="Descreva o assunto do processo"
-              />
+              {setor === "DU" ? (
+                <>
+                  <Select value={assunto} onValueChange={setAssunto}>
+                    <SelectTrigger id="assunto">
+                      <SelectValue placeholder="Selecione o assunto principal" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ASSUNTOS_DU_PRINCIPAIS.map((ass) => (
+                        <SelectItem key={ass} value={ass}>{ass}</SelectItem>
+                      ))}
+                      {!!assunto && !ASSUNTOS_DU_PRINCIPAIS.includes(assunto) && (
+                        <SelectItem value={assunto}>{assunto}</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Use Observações para registrar os detalhes específicos (ex.: PAD, pregão, evacuação, promoção).
+                  </p>
+                </>
+              ) : (
+                <Input
+                  id="assunto"
+                  value={assunto}
+                  onChange={(e) => setAssunto(e.target.value)}
+                  placeholder="Descreva o assunto do processo"
+                />
+              )}
             </div>
           )
           )}
@@ -917,7 +946,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
                   id="observacoes"
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
-                  placeholder="Informações relevantes sobre o processo..."
+                  placeholder={setor === "DU" ? "Detalhe aqui o caso específico do assunto DU selecionado..." : "Informações relevantes sobre o processo..."}
                   rows={3}
                 />
               </div>

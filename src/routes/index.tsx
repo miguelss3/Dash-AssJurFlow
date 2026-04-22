@@ -45,6 +45,12 @@ const CalendarioPrazos = lazy(() =>
 const GestaoEquipe = lazy(() =>
   import("@/components/GestaoEquipe").then((m) => ({ default: m.GestaoEquipe })),
 );
+const AcoesDUModalNovo = lazy(() =>
+  import("@/components/modals/AcoesDUModalNovo").then((m) => ({ default: m.AcoesDUModalNovo })),
+);
+const AcoesPAModalNovo = lazy(() =>
+  import("@/components/modals/AcoesPAModalNovo").then((m) => ({ default: m.AcoesPAModalNovo })),
+);
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -171,6 +177,8 @@ function Index() {
   const [ultimoAcessoNotificacoes, setUltimoAcessoNotificacoes] = useState<number>(0);
   const [notificacoesCalendario, setNotificacoesCalendario] = useState<NotificacaoItem[]>([]);
   const [processosLidos, setProcessosLidos] = useState<Record<string, number>>({});
+  const [processoAcaoSelecionado, setProcessoAcaoSelecionado] = useState<Processo | null>(null);
+  const [processoAcaoOpen, setProcessoAcaoOpen] = useState(false);
   const notificacoesRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -455,6 +463,27 @@ function Index() {
     setDialogOpen(true);
   };
 
+  const abrirModalAcaoProcesso = (processo: Processo) => {
+    setProcessoAcaoSelecionado(processo);
+    setProcessoAcaoOpen(true);
+  };
+
+  const handleClickNotificacao = (n: NotificacaoItem) => {
+    const processo = processos.find((p) => p.id === n.id);
+    setNotificacoesOpen(false);
+
+    if (!processo) {
+      if (n.id.startsWith("cal-")) {
+        setAba("prazos");
+      }
+      return;
+    }
+
+    marcarProcessoComoLido(processo.id);
+    setAba("mesa");
+    abrirModalAcaoProcesso(processo);
+  };
+
   useEffect(() => {
     if (!perfilOpen || !user) return;
     setPerfilNome(user.nome || "");
@@ -727,17 +756,89 @@ function Index() {
       };
 
       const msgHistorico = `Status alterado para ${rotulosStatus[novoStatus]}.`;
-      await atualizar(processoId, {
+      const patch: Record<string, unknown> = {
         status: novoStatus,
         descricao: msgHistorico,
         atualizadoEm: new Date().toISOString(),
         atualizadoPorNome: nomeMilitarAtual,
-      });
+      };
+
+      patch.finalizado = novoStatus === "concluido";
+      if (novoStatus === "concluido") {
+        patch.processoReaberto = false;
+      }
+
+      await atualizar(processoId, patch as Partial<Processo>);
       Promise.resolve(registrarMovimentacao(processoId, msgHistorico)).catch((error) => {
         console.error("❌ Erro ao registrar histórico de status:", error);
       });
     } catch (error) {
       console.error("❌ Erro ao mover status:", error);
+    }
+  };
+
+  const handleReativarProcesso = async (
+    processoId: string,
+    payload?: { motivo: string; novoPrazoFatal: string },
+  ) => {
+    try {
+      const processo = processos.find((p) => p.id === processoId);
+      if (!processo) return;
+
+      const motivo = payload?.motivo?.trim() || "";
+      const novoPrazoFatal = payload?.novoPrazoFatal?.trim() || "";
+      const setor = normalizarSetor(processo.setor || processo.tipo);
+
+      if (!ehAdmin) {
+        if (!motivo) {
+          toast.error("Informe o motivo da reabertura.");
+          return;
+        }
+        if (!novoPrazoFatal) {
+          toast.error("Informe o novo prazo fatal.");
+          return;
+        }
+      }
+
+      const mensagens: string[] = ["Processo reaberto."];
+      if (motivo) mensagens.push(`Motivo: ${motivo}.`);
+      if (novoPrazoFatal) mensagens.push(`Novo prazo fatal: ${novoPrazoFatal}.`);
+      const msgHistorico = mensagens.join(" ");
+
+      const patch: Record<string, unknown> = {
+        status: "andamento",
+        finalizado: false,
+        processoReaberto: true,
+        motivoReabertura: motivo || null,
+        reabertoEm: new Date().toISOString(),
+        reabertoPorNome: nomeMilitarAtual,
+        descricao: msgHistorico,
+        atualizadoEm: new Date().toISOString(),
+        atualizadoPorNome: nomeMilitarAtual,
+      };
+
+      if (novoPrazoFatal) {
+        patch.prazoFatal = novoPrazoFatal;
+        if (setor === "DU") {
+          patch.prazoFatalDU = novoPrazoFatal;
+        }
+      }
+
+      if (setor === "DU") {
+        patch.pedidoSubsidios = {
+          ...(processo.pedidoSubsidios || {}),
+          situacaoFluxo: "MESA_ASSESSOR",
+        };
+      }
+
+      await atualizar(processoId, patch as Partial<Processo>);
+      Promise.resolve(registrarMovimentacao(processoId, msgHistorico)).catch((error) => {
+        console.error("❌ Erro ao registrar histórico de reabertura:", error);
+      });
+      toast.success("Processo reaberto com sucesso.");
+    } catch (error) {
+      console.error("❌ Erro ao reabrir processo:", error);
+      toast.error("Não foi possível reabrir o processo.");
     }
   };
 
@@ -975,12 +1076,18 @@ function Index() {
                       ) : (
                         <ul className="divide-y divide-border">
                           {listaNotificacoes.map((n) => (
-                            <li key={n.id} className="px-4 py-3">
-                              <p className="text-xs font-semibold text-foreground">{n.titulo}</p>
-                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.texto}</p>
-                              <p className="text-[11px] text-muted-foreground/80 mt-1">
-                                {formatarDataHora(n.momentoISO)}
-                              </p>
+                            <li key={n.id}>
+                              <button
+                                type="button"
+                                onClick={() => handleClickNotificacao(n)}
+                                className="w-full text-left px-4 py-3 hover:bg-muted/60 transition-colors"
+                              >
+                                <p className="text-xs font-semibold text-foreground">{n.titulo}</p>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.texto}</p>
+                                <p className="text-[11px] text-muted-foreground/80 mt-1">
+                                  {formatarDataHora(n.momentoISO)}
+                                </p>
+                              </button>
                             </li>
                           ))}
                         </ul>
@@ -1115,6 +1222,7 @@ function Index() {
                 onEdit={handleEdit}
                 onDelete={remover}
                 onMove={handleMoverStatus}
+                onReativarProcesso={handleReativarProcesso}
                 onRedistribuir={handleRedistribuir}
                 usuario={user || undefined}
                 ehAdmin={ehAdmin}
@@ -1129,6 +1237,7 @@ function Index() {
               <CalendarioPrazos
                 processos={processosParaDashboard}
                 usuario={usuario}
+                ehAdmin={ehAdmin}
                 onNovoLancamento={handleNovoLancamentoCalendario}
               />
             </Suspense>
@@ -1175,6 +1284,32 @@ function Index() {
               setEditing(null);
             }}
           />
+        </Suspense>
+      )}
+
+      {processoAcaoSelecionado && (
+        <Suspense fallback={null}>
+          {normalizarSetor(processoAcaoSelecionado.setor || processoAcaoSelecionado.tipo) === "DU" ? (
+            <AcoesDUModalNovo
+              open={processoAcaoOpen}
+              onOpenChange={(open) => {
+                setProcessoAcaoOpen(open);
+                if (!open) setProcessoAcaoSelecionado(null);
+              }}
+              processoId={processoAcaoSelecionado.id}
+              numeroProcesso={processoAcaoSelecionado.numero}
+            />
+          ) : (
+            <AcoesPAModalNovo
+              open={processoAcaoOpen}
+              onOpenChange={(open) => {
+                setProcessoAcaoOpen(open);
+                if (!open) setProcessoAcaoSelecionado(null);
+              }}
+              processoId={processoAcaoSelecionado.id}
+              numeroProcesso={processoAcaoSelecionado.numero}
+            />
+          )}
         </Suspense>
       )}
 

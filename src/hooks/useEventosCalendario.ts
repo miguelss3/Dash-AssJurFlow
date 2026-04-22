@@ -1,4 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  where,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export type TipoEvento = "prazo" | "feriado" | "sem_expediente" | "audiencia" | "reuniao";
 
@@ -10,84 +21,73 @@ export interface EventoCalendario {
   tipo: TipoEvento;
   criadoPor: string;
   criadoEm: string;
+  setor: "DU" | "PA";
 }
 
-const STORAGE_KEY = "assjur-flow:eventos-calendario:v1";
-
-function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+function toIsoString(value: any): string {
+  if (!value) return new Date().toISOString();
+  if (typeof value === "string") return value;
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value?.toDate === "function") return value.toDate().toISOString();
+  return new Date().toISOString();
 }
 
-function addDaysISO(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return isoDate(d);
-}
-
-const SEED: EventoCalendario[] = [
-  {
-    id: crypto.randomUUID(),
-    data: addDaysISO(3),
-    titulo: "Feriado Nacional - Tiradentes",
-    tipo: "feriado",
-    criadoPor: "Maj Miguel",
-    criadoEm: new Date().toISOString(),
-  },
-  {
-    id: crypto.randomUUID(),
-    data: addDaysISO(7),
-    titulo: "Sem expediente - Manutenção elétrica",
-    descricao: "Quartel sem expediente das 08h às 18h.",
-    tipo: "sem_expediente",
-    criadoPor: "Maj Miguel",
-    criadoEm: new Date().toISOString(),
-  },
-  {
-    id: crypto.randomUUID(),
-    data: addDaysISO(10),
-    titulo: "Reunião de coordenação AssJur",
-    descricao: "Pauta: redistribuição de processos vencidos.",
-    tipo: "reuniao",
-    criadoPor: "Maj Miguel",
-    criadoEm: new Date().toISOString(),
-  },
-];
-
-export function useEventosCalendario() {
+export function useEventosCalendario(setor: "DU" | "PA" | "", ehAdmin?: boolean) {
   const [eventos, setEventos] = useState<EventoCalendario[]>([]);
-  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setEventos(JSON.parse(raw));
-      } else {
-        setEventos(SEED);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED));
-      }
-    } catch {
-      setEventos(SEED);
+    if (!setor && !ehAdmin) {
+      setEventos([]);
+      return;
     }
-    setLoaded(true);
-  }, []);
 
-  useEffect(() => {
-    if (loaded) localStorage.setItem(STORAGE_KEY, JSON.stringify(eventos));
-  }, [eventos, loaded]);
+    const eventosRef = collection(db, "eventosCalendario");
+    const q = ehAdmin
+      ? query(eventosRef)
+      : query(eventosRef, where("setor", "==", setor));
 
-  const criar = useCallback((e: Omit<EventoCalendario, "id" | "criadoEm">) => {
-    const novoEvento: EventoCalendario = {
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const lista = snapshot.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            data: String(data.data || ""),
+            titulo: String(data.titulo || ""),
+            descricao: data.descricao ? String(data.descricao) : undefined,
+            tipo: (data.tipo || "prazo") as TipoEvento,
+            criadoPor: String(data.criadoPor || "Sistema"),
+            criadoEm: toIsoString(data.criadoEm),
+            setor: ((data.setor || setor || "DU") as "DU" | "PA"),
+          } satisfies EventoCalendario;
+        });
+        lista.sort((a, b) => a.data.localeCompare(b.data));
+        setEventos(lista);
+      },
+      () => {
+        setEventos([]);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [setor, ehAdmin]);
+
+  const criar = useCallback(async (e: Omit<EventoCalendario, "id" | "criadoEm">) => {
+    const payload = {
       ...e,
-      id: crypto.randomUUID(),
-      criadoEm: new Date().toISOString(),
+      criadoEm: serverTimestamp(),
     };
-    setEventos((prev) => [...prev, novoEvento]);
-    return novoEvento;
+    const ref = await addDoc(collection(db, "eventosCalendario"), payload);
+    return {
+      ...e,
+      id: ref.id,
+      criadoEm: new Date().toISOString(),
+    } satisfies EventoCalendario;
   }, []);
 
-  const remover = useCallback((id: string) => {
-    setEventos((prev) => prev.filter((e) => e.id !== id));
+  const remover = useCallback(async (id: string) => {
+    await deleteDoc(doc(db, "eventosCalendario", id));
   }, []);
 
   return { eventos, criar, remover };

@@ -105,10 +105,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
   const [numeroRecebido, setNumeroRecebido] = useState("");
   const [numeroDocFinal, setNumeroDocFinal] = useState("");
   const [reiteracoes, setReiteracoes] = useState(0);
+  const [carregandoFluxo, setCarregandoFluxo] = useState(false);
 
   const carregarFluxo = async () => {
     if (!processoId) return;
 
+    setCarregandoFluxo(true);
     try {
       const processoRef = doc(db, "processos", processoId);
       const snap = await getDoc(processoRef);
@@ -137,6 +139,8 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     } catch (error) {
       console.error("Erro ao carregar fluxo DU:", error);
       toast.error("Não foi possível carregar o fluxo do processo.");
+    } finally {
+      setCarregandoFluxo(false);
     }
   };
 
@@ -573,7 +577,13 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
           <strong>Situação atual:</strong> {cabecalhoSituacao}
         </div>
 
-        {ehChefia ? renderVisaoChefe() : renderVisaoAssessor()}
+        {carregandoFluxo ? (
+          <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-center text-sm text-slate-600">
+            Carregando ações do processo...
+          </div>
+        ) : (
+          ehChefia ? renderVisaoChefe() : renderVisaoAssessor()
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -51,10 +51,12 @@ import {
 } from "@/hooks/useEventosCalendario";
 import { statusPrazo } from "@/lib/prazo";
 import { DetalhesProcessoModal } from "@/components/DetalhesProcessoModal";
+import { toast } from "sonner";
 
 interface Props {
   processos: Processo[];
-  usuario: { posto: string; nome: string; role?: string };
+  usuario: { posto: string; nome: string; role?: string; setor?: string };
+  ehAdmin?: boolean;
   onNovoLancamento?: (payload: { id: string; titulo: string; descricao?: string; criadoEm: string }) => void;
 }
 
@@ -95,8 +97,9 @@ function labelTipo(t: TipoEvento | "prazo-interno" | "prazo-fatal"): string {
   return TIPOS_EVENTO.find((x) => x.id === t)?.label ?? t;
 }
 
-export function CalendarioPrazos({ processos, usuario, onNovoLancamento }: Props) {
-  const { eventos, criar, remover } = useEventosCalendario();
+export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLancamento }: Props) {
+  const setorUsuario = ((usuario?.setor || "").toString().toUpperCase() === "PA" ? "PA" : "DU") as "DU" | "PA";
+  const { eventos, criar, remover } = useEventosCalendario(setorUsuario, ehAdmin);
   const [mesRef, setMesRef] = useState(new Date());
   const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -180,22 +183,27 @@ export function CalendarioPrazos({ processos, usuario, onNovoLancamento }: Props
     setDialogOpen(true);
   };
 
-  const handleSalvar = () => {
+  const handleSalvar = async () => {
     if (!novoTitulo.trim()) return;
-    const novoEvento = criar({
-      data: novaData,
-      titulo: novoTitulo.trim(),
-      descricao: novaDescricao.trim() || undefined,
-      tipo: novoTipo,
-      criadoPor: `${usuario.posto} ${usuario.nome}`,
-    });
-    onNovoLancamento?.({
-      id: novoEvento.id,
-      titulo: novoEvento.titulo,
-      descricao: novoEvento.descricao,
-      criadoEm: novoEvento.criadoEm,
-    });
-    setDialogOpen(false);
+    try {
+      const novoEvento = await criar({
+        data: novaData,
+        titulo: novoTitulo.trim(),
+        descricao: novaDescricao.trim() || undefined,
+        tipo: novoTipo,
+        criadoPor: `${usuario.posto} ${usuario.nome}`,
+        setor: setorUsuario,
+      });
+      onNovoLancamento?.({
+        id: novoEvento.id,
+        titulo: novoEvento.titulo,
+        descricao: novoEvento.descricao,
+        criadoEm: novoEvento.criadoEm,
+      });
+      setDialogOpen(false);
+    } catch {
+      toast.error("Não foi possível salvar o lançamento no banco de dados.");
+    }
   };
 
   const itensDoDiaSelecionado: DiaItem[] = diaSelecionado
@@ -526,7 +534,13 @@ export function CalendarioPrazos({ processos, usuario, onNovoLancamento }: Props
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => remover(item.evento!.id)}
+                        onClick={async () => {
+                          try {
+                            await remover(item.evento!.id);
+                          } catch {
+                            toast.error("Não foi possível remover o evento.");
+                          }
+                        }}
                         title="Remover evento"
                       >
                         <Trash2 className="h-3.5 w-3.5" />

@@ -23,6 +23,7 @@ interface Props {
   onEdit: (p: Processo) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, status: StatusProcesso) => void;
+  onReativarProcesso?: (processoId: string, payload?: { motivo: string; novoPrazoFatal: string }) => void | Promise<void>;
   onRedistribuir?: (processoId: string, novoResponsavel: string) => void | Promise<void>;
   usuario?: AuthUser;
   ehAdmin?: boolean;
@@ -30,7 +31,7 @@ interface Props {
   onReadProcess?: (processoId: string) => void;
 }
 
-export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess }: Props) {
+export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
@@ -332,6 +333,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onMove={onMove}
+                    onReativarProcesso={onReativarProcesso}
                     unreadProcessIds={unreadProcessIds}
                     onReadProcess={onReadProcess}
                   />

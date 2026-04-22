@@ -139,6 +139,22 @@ service cloud.firestore {
         request.resource.data.keys().hasOnly(['historico']);
       allow delete: if false;
     }
+
+    match /eventosCalendario/{eventoId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.setor in ['DU', 'PA'] &&
+        canManageSetor(request.resource.data.setor) &&
+        request.resource.data.data is string &&
+        request.resource.data.titulo is string &&
+        request.resource.data.tipo is string;
+      allow update: if isSignedIn() &&
+        resource.data.setor in ['DU', 'PA'] &&
+        canManageSetor(resource.data.setor);
+      allow delete: if isSignedIn() &&
+        resource.data.setor in ['DU', 'PA'] &&
+        canManageSetor(resource.data.setor);
+    }
     
     // Regra padrão: negar acesso a outras coleções não especificadas
     match /{document=**} {
