@@ -234,11 +234,6 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
   const handleRegistrarResposta = async () => {
     if (!processoId || !user) return;
 
-    if (!numeroOficio.trim() && !numeroDiexResposta.trim()) {
-      toast.error("Informe ao menos um número (Ofício ou DIEx).");
-      return;
-    }
-
     if (!destinoDocumentoResposta.trim()) {
       toast.error("Informe o destino do documento.");
       return;
@@ -251,6 +246,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       const pedidoSubsidiosAtual = processoSnap.exists() ? (processoSnap.data()?.pedidoSubsidios || {}) : {};
       const tipoDestinoAtual = pedidoSubsidiosAtual?.tipoDestino as "interno" | "externo" | undefined;
       const isChefiaProcessandoPedido = isAdmin(user) && ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(pedidoSubsidiosAtual?.situacaoFluxo || "");
+      const aguardandoAssinaturaCHEM = !isAdmin(user) && tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(pedidoSubsidiosAtual?.situacaoFluxo || "");
+
+      if (aguardandoAssinaturaCHEM && !numeroOficio.trim() && !numeroDiexResposta.trim()) {
+        toast.error("Informe Ofício, DIEx ou ambos após a assinatura do CHEM.");
+        return;
+      }
 
       const respostaDU = {
         numeroOficio: numeroOficio.trim() || "",
@@ -258,13 +259,13 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         destinoDocumento: destinoDocumentoResposta.trim(),
         dataEnvio,
         observacoes: observacoesResposta.trim() || "",
-        situacao: isAdmin(user) ? "processada_chefia" : "enviada_chefia",
+        situacao: aguardandoAssinaturaCHEM ? "assinada_chem" : (isAdmin(user) ? "processada_chefia" : "enviada_chefia"),
         registradoEm: agoraISO,
         registradoPorNome: autorMilitar,
       };
 
       let msgHistorico = `📤 Resposta enviada à chefia (Ofício: ${numeroOficio || "—"}, DIEx: ${numeroDiexResposta || "—"}, Destino: ${destinoDocumentoResposta.trim()}) por ${autorMilitar}.`;
-      let statusDestino = isAdmin(user) ? "Aguardando CHEM" : "Aguardando Conferência";
+      let statusDestino = isAdmin(user) ? "Aguardando Assinatura do CHEM" : "Aguardando Conferência da Chefia";
       let patchPedidoSubsidios: any = null;
 
       if (isChefiaProcessandoPedido && tipoDestinoAtual === "interno") {
@@ -274,20 +275,30 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
           ...pedidoSubsidiosAtual,
           numeroDiex: numeroDiexResposta.trim() || pedidoSubsidiosAtual?.numeroDiex || "",
           numeroDiexHistorico: mergeDiexHistorico(pedidoSubsidiosAtual, numeroDiexResposta.trim()),
-          situacaoFluxo: "devolvido_assessor_com_diex",
+          situacaoFluxo: "devolvido_assessor_interno",
           assinadoChefiaEm: agoraISO,
           assinadoChefiaPorNome: autorMilitar,
         };
       } else if (isChefiaProcessandoPedido && tipoDestinoAtual === "externo") {
-        msgHistorico = `✅ Pedido externo aprovado pela chefia. Processo aguardando assinatura do CHEM (DIEx ${numeroDiexResposta || "—"}).`;
-        statusDestino = "Aguardando CHEM";
+        msgHistorico = "✅ Chefe da AssJur conferiu, aprovou e enviou ao CHEM. Card devolvido ao assessor aguardando assinatura do CHEM no SPED.";
+        statusDestino = "Aguardando Assinatura do CHEM";
+        patchPedidoSubsidios = {
+          ...pedidoSubsidiosAtual,
+          numeroDiex: "",
+          numeroDiexHistorico: mergeDiexHistorico(pedidoSubsidiosAtual),
+          situacaoFluxo: "aprovado_externo_enviado_chem",
+          aprovadoChefiaEm: agoraISO,
+          aprovadoChefiaPorNome: autorMilitar,
+        };
+      } else if (aguardandoAssinaturaCHEM) {
+        msgHistorico = `✅ Assessor registrou os números após a assinatura do CHEM (Ofício: ${numeroOficio || "—"}, DIEx: ${numeroDiexResposta || "—"}). Processo liberado para finalização.`;
+        statusDestino = "Aguardando Finalização DU";
         patchPedidoSubsidios = {
           ...pedidoSubsidiosAtual,
           numeroDiex: numeroDiexResposta.trim() || pedidoSubsidiosAtual?.numeroDiex || "",
           numeroDiexHistorico: mergeDiexHistorico(pedidoSubsidiosAtual, numeroDiexResposta.trim()),
-          situacaoFluxo: "aprovado_externo_aguardando_chem",
-          aprovadoChefiaEm: agoraISO,
-          aprovadoChefiaPorNome: autorMilitar,
+          situacaoFluxo: "resposta_assinada_chem",
+          dataAssinatura: dataEnvio || pedidoSubsidiosAtual?.dataAssinatura || "",
         };
       }
 
@@ -343,13 +354,38 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     try {
       const agoraISO = new Date().toISOString();
       const processoRef = doc(db, "processos", processoId);
+      const processoSnap = await getDoc(processoRef);
+      const pedidoAtual = processoSnap.exists() ? (processoSnap.data()?.pedidoSubsidios || {}) : {};
+      const respostaAtual = processoSnap.exists() ? (processoSnap.data()?.respostaDU || {}) : {};
 
-      const msgHistorico = `✅ Resposta assinada pelo CHEM. Registrado por ${user.email?.split("@")[0]}.`;
+      const numeroOficioAtual = (respostaAtual?.numeroOficio || "").toString().trim();
+      const numeroDiexAtual = (respostaAtual?.numeroDiex || "").toString().trim();
+      const destinoAtual = (respostaAtual?.destinoDocumento || "").toString().trim();
+
+      if (!numeroOficioAtual && !numeroDiexAtual) {
+        toast.error("Registre Ofício ou DIEx na resposta antes de confirmar assinatura CHEM.");
+        return;
+      }
+      if (!destinoAtual) {
+        toast.error("Informe o destino do documento antes de confirmar assinatura CHEM.");
+        return;
+      }
+
+      const msgHistorico = `✅ Resposta assinada pelo CHEM. Processo liberado para finalização definitiva por ${user.email?.split("@")[0]}.`;
 
       await updateDoc(processoRef, {
-        "respostaDU.situacao": "assinada_chem",
-        status: "concluido",
-        finalizado: true,
+        respostaDU: {
+          ...respostaAtual,
+          situacao: "assinada_chem",
+          registradoEm: respostaAtual?.registradoEm || agoraISO,
+          registradoPorNome: respostaAtual?.registradoPorNome || autorMilitar,
+        },
+        pedidoSubsidios: {
+          ...pedidoAtual,
+          situacaoFluxo: "resposta_assinada_chem",
+        },
+        status: "Aguardando Finalização DU",
+        finalizado: false,
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: user.email || "Sistema",
@@ -464,7 +500,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       const processoSnap = await getDoc(processoRef);
       const pedidoAtual = processoSnap.exists() ? (processoSnap.data()?.pedidoSubsidios || {}) : {};
 
-      const msgHistorico = "✅ Aprovado e enviado para o CHEM. Processo devolvido ao assessor sem número de documento (disponível somente após assinatura do CHEM).";
+      const msgHistorico = "✅ Chefe/Admin aprovou e devolveu para o assessor. O processo segue aguardando a assinatura do CHEM no SPED para posterior registro dos números.";
 
       await updateDoc(processoRef, {
         pedidoSubsidios: {
@@ -483,7 +519,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
 
       await registrarHistorico(msgHistorico);
 
-      toast.success("Aprovado e enviado ao CHEM.");
+      toast.success("Aprovado e devolvido ao assessor.");
       resetFormularios();
       onOpenChange(false);
       if (onSuccess) onSuccess();
@@ -526,7 +562,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                 className="w-full justify-start border-blue-300 text-blue-700 hover:bg-blue-50"
                 variant="outline"
               >
-                ✅ Aprovado e Enviado para o CHEM
+                ✅ Aprovar e Devolver para o Assessor
               </Button>
             )}
             
@@ -543,18 +579,10 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               className="w-full justify-start border-emerald-300 text-emerald-700 hover:bg-emerald-50"
               variant="outline"
             >
-              📤 Registrar Resposta
+              {tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(situacaoFluxoAtual)
+                ? "🖊️ Registrar Números Após Assinatura do CHEM"
+                : "📤 Registrar Resposta"}
             </Button>
-
-            {isAdmin(user) && (
-              <Button
-                onClick={() => setAcaoSelecionada("despachar_chem")}
-                className="w-full justify-start border-amber-300 text-amber-700 hover:bg-amber-50"
-                variant="outline"
-              >
-                ✅ Registrar Assinatura CHEM
-              </Button>
-            )}
           </div>
         )}
 
@@ -584,9 +612,9 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
 
         {acaoSelecionada === "aprovar_enviar_chem" && (
           <div className="space-y-4">
-            <h3 className="font-semibold text-blue-700">✅ Aprovado e Enviado para o CHEM</h3>
+            <h3 className="font-semibold text-blue-700">✅ Aprovar e Devolver para o Assessor</h3>
             <p className="text-sm text-slate-600">
-              Este fluxo devolve o processo ao assessor sem número de documento. O número só ficará disponível após assinatura do CHEM.
+              O chefe/admin confere a resposta, aprova e devolve o card ao assessor. A partir daí o status fica em aguardando assinatura do CHEM; só depois o assessor informa Ofício e/ou DIEx.
             </p>
 
             <div className="flex gap-2 justify-end">
@@ -594,7 +622,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                 Voltar
               </Button>
               <Button onClick={handleAprovarEnviarCHEM} className="bg-blue-600">
-                Confirmar e Enviar
+                Aprovar e Devolver
               </Button>
             </div>
           </div>
@@ -734,7 +762,21 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
 
         {acaoSelecionada === "registrar_resposta" && (
           <div className="space-y-4">
-            <h3 className="font-semibold text-emerald-700">📤 Registrar Resposta</h3>
+            <h3 className="font-semibold text-emerald-700">
+              {tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(situacaoFluxoAtual)
+                ? "🖊️ Registrar Números Após Assinatura do CHEM"
+                : "📤 Registrar Resposta"}
+            </h3>
+
+            {tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(situacaoFluxoAtual) ? (
+              <p className="text-sm text-slate-600">
+                Após a assinatura no SPED, o assessor registra aqui o número do DIEx, do Ofício ou ambos. Só depois disso o processo poderá ser finalizado.
+              </p>
+            ) : (
+              <p className="text-sm text-slate-600">
+                O assessor envia a resposta para conferência do Chefe da AssJur. Nesta etapa, os números do documento ainda podem ficar em branco.
+              </p>
+            )}
             
             <div className="space-y-2">
               <Label>Número do Ofício</Label>
@@ -786,25 +828,9 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                 Voltar
               </Button>
               <Button onClick={handleRegistrarResposta} className="bg-emerald-600">
-                Registrar Resposta
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {acaoSelecionada === "despachar_chem" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-amber-700">✅ Registrar Assinatura CHEM</h3>
-            <p className="text-sm text-slate-600">
-              Confirme que o CHEM assinou a resposta. Este processo será marcado como concluído.
-            </p>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAcaoSelecionada(null)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleDespacharCHEM} className="bg-amber-600">
-                Confirmar Assinatura
+                {tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(situacaoFluxoAtual)
+                  ? "Salvar Números"
+                  : "Enviar para Chefia"}
               </Button>
             </div>
           </div>

@@ -174,6 +174,12 @@ export function useProcessos() {
                 solicitadoEm: toIsoString(procData.pedidoSubsidios?.solicitadoEm) || procData.pedidoSubsidios?.solicitadoEm,
               }
             : undefined,
+          respostaDU: procData.respostaDU
+            ? {
+                ...procData.respostaDU,
+                registradoEm: toIsoString(procData.respostaDU?.registradoEm) || procData.respostaDU?.registradoEm,
+              }
+            : undefined,
         };
         
         // console.log(`📦 Processo ${processoMapeado.numero}: status="${processoMapeado.status}", responsavel="${processoMapeado.responsavel}", setor=${processoMapeado.setor}, finalizado_firebase=${procData.finalizado}`);

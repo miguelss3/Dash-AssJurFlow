@@ -122,9 +122,9 @@ function Index() {
   const isPendenteChefia = (p: Processo) => {
     const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
     const statusNorm = (p.status || "").toString().toLowerCase();
-    return ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(situacaoFluxo)
+    return ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin", "assinado_externo"].includes(situacaoFluxo)
       || statusNorm.includes("aguardando assinatura")
-      || statusNorm.includes("aguardando chem");
+      || statusNorm.includes("aguardando conferencia da chefia");
   };
 
   // Todos operam na Visão do Setor

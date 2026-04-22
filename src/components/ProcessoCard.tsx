@@ -63,13 +63,16 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const isPA = setor === "PA";
   const situacaoSubsidio = p.pedidoSubsidios?.situacaoFluxo;
   const statusNormalizado = (p.status || "").toString().trim().toLowerCase();
-  const bloqueioPorStatus = statusNormalizado.includes("aguardando assinatura") || statusNormalizado.includes("aguardando chem");
-  const bloqueioPorFluxo = ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(situacaoSubsidio || "");
+  const aguardandoAssinaturaCHEM = situacaoSubsidio === "aprovado_externo_enviado_chem" || statusNormalizado.includes("aguardando assinatura do chem");
+  const bloqueioPorStatus = (statusNormalizado.includes("aguardando assinatura") && !aguardandoAssinaturaCHEM) || statusNormalizado.includes("aguardando conferencia");
+  const bloqueioPorFluxo = ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin", "assinado_externo"].includes(situacaoSubsidio || "");
   const acaoDUBloqueada = !ehAdmin && isDU && (bloqueioPorFluxo || bloqueioPorStatus);
   const badgeAcaoChefia = (() => {
     if (situacaoSubsidio === "aguardando_assinatura_secao") return "Assinatura do Chefe de Seção";
     if (situacaoSubsidio === "aguardando_aprovacao_externa") return "Envio para aprovação do CHEM";
-    if (situacaoSubsidio === "aprovado_externo_enviado_chem" || statusNormalizado.includes("aguardando chem")) return "Saída pelo CHEM";
+    if (statusNormalizado.includes("aguardando conferencia da chefia")) return "Conferência do Chefe/Admin";
+    if (situacaoSubsidio === "aprovado_externo_enviado_chem" || statusNormalizado.includes("aguardando assinatura do chem")) return "Aguardando Assinatura do CHEM";
+    if (situacaoSubsidio === "resposta_assinada_chem") return "Liberado para Finalização";
     return null;
   })();
   
@@ -86,6 +89,25 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   
   // Função para finalizar processo
   const finalizarProcesso = () => {
+    if (isDU) {
+      const assinaturaCHEM = p.respostaDU?.situacao === "assinada_chem";
+      if (!assinaturaCHEM) {
+        toast.error("Finalize DU apenas após registrar assinatura do CHEM.");
+        return;
+      }
+
+      const possuiNumeroDocumento = !!(p.respostaDU?.numeroOficio?.trim() || p.respostaDU?.numeroDiex?.trim());
+      if (!possuiNumeroDocumento) {
+        toast.error("Para DU, informe número de Ofício ou DIEx antes de finalizar.");
+        return;
+      }
+
+      if (!p.respostaDU?.destinoDocumento?.trim()) {
+        toast.error("Para DU, informe o destino do documento antes de finalizar.");
+        return;
+      }
+    }
+
     if (window.confirm(`Deseja finalizar o processo ${p.numero}?`)) {
       if (onMove) {
         onMove(p.id, "concluido");
@@ -273,7 +295,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                       if (acaoDUBloqueada) return;
                       abrirAcoesDU();
                     }}
-                    title={acaoDUBloqueada ? "Aguardando trâmite do pedido de subsídios" : "Ações do processo"}
+                    title={acaoDUBloqueada ? "Aguardando devolução do chefe/admin para liberar o preenchimento" : "Ações do processo"}
                   >
                     <Send className="w-3 h-3 mr-1 shrink-0" />
                     {acaoDUBloqueada ? "Aguard." : "Ação"}

@@ -10,7 +10,8 @@ import {
   Building2,
   Clock,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Circle
 } from "lucide-react";
 import { formatarData, diasRestantes } from "@/lib/prazo";
 import { Separator } from "@/components/ui/separator";
@@ -44,6 +45,78 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
   const setor = processo.setor || processo.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
+  const pedido = processo.pedidoSubsidios;
+  const respostaDU = processo.respostaDU;
+  const tipoDestino = pedido?.tipoDestino || "interno";
+  const situacaoFluxo = pedido?.situacaoFluxo || "";
+
+  const rotuloSituacaoFluxo = (situacao?: string) => {
+    const mapa: Record<string, string> = {
+      aguardando_assinatura_secao: "Aguardando assinatura do chefe da seção",
+      aguardando_aprovacao_externa: "Aguardando aprovação externa",
+      enviado_admin: "Enviado para chefia",
+      devolvido_assessor_interno: "Devolvido ao assessor (interno)",
+      devolvido_assessor_externo: "Devolvido ao assessor (externo)",
+      aprovado_externo_enviado_chem: "Aguardando assinatura do CHEM",
+      assinado_externo: "Assinatura externa registrada pelo assessor",
+      resposta_assinada_chem: "Resposta assinada pelo CHEM",
+    };
+    if (!situacao) return "—";
+    return mapa[situacao] || situacao;
+  };
+
+  const timelineDU = (() => {
+    if (!isDU || !pedido) return [] as Array<{ id: string; titulo: string; detalhe: string; concluido: boolean; data?: string }>;
+
+    const ordemInterno = ["aguardando_assinatura_secao", "enviado_admin", "devolvido_assessor_interno", "resposta_assinada_chem"];
+    const ordemExterno = ["aguardando_aprovacao_externa", "enviado_admin", "aprovado_externo_enviado_chem", "resposta_assinada_chem"];
+    const ordemAtual = tipoDestino === "interno" ? ordemInterno : ordemExterno;
+    const indiceAtual = ordemAtual.indexOf(situacaoFluxo);
+
+    const eventoConcluido = (codigo: string) => {
+      const idx = ordemAtual.indexOf(codigo);
+      if (idx < 0) return false;
+      if (situacaoFluxo === "resposta_assinada_chem") return true;
+      return indiceAtual >= idx;
+    };
+
+    const itens: Array<{ id: string; titulo: string; detalhe: string; concluido: boolean; data?: string }> = [
+      {
+        id: "solicitacao",
+        titulo: "Solicitação enviada para chefia",
+        detalhe: pedido.tipoSolicitacao === "reiteracao" ? "Reiteração de pedido de subsídios" : "Primeira solicitação de subsídios",
+        concluido: !!pedido.solicitadoEm,
+        data: pedido.solicitadoEm,
+      },
+      {
+        id: "devolucao",
+        titulo: tipoDestino === "interno" ? "Chefia devolveu ao assessor com DIEx" : "Chefia conferiu e enviou ao CHEM",
+        detalhe: tipoDestino === "interno" ? "Fluxo interno com DIEx da seção" : "Após conferência, o card volta ao assessor aguardando assinatura do CHEM",
+        concluido: eventoConcluido(tipoDestino === "interno" ? "devolvido_assessor_interno" : "aprovado_externo_enviado_chem"),
+        data: (pedido as any).devolvidoAoAssessorEm || (pedido as any).assinadoChefiaEm || (pedido as any).aprovadoChefiaEm,
+      },
+    ];
+
+    if (tipoDestino === "externo") {
+      itens.push({
+        id: "registro_numeros",
+        titulo: "Assinatura do CHEM registrada pelo assessor",
+        detalhe: "Assessor preenche Ofício, DIEx ou ambos após assinatura no SPED",
+        concluido: eventoConcluido("resposta_assinada_chem") || respostaDU?.situacao === "assinada_chem",
+        data: respostaDU?.registradoEm,
+      });
+    }
+
+    itens.push({
+      id: "chem",
+      titulo: "Assinatura do CHEM",
+      detalhe: "Etapa final do fluxo documental DU",
+      concluido: respostaDU?.situacao === "assinada_chem" || eventoConcluido("resposta_assinada_chem"),
+      data: respostaDU?.registradoEm,
+    });
+
+    return itens;
+  })();
 
   const prazoItens = [
     processo.prazo ? { tipo: "interno" as const, label: "Prazo Interno", valor: processo.prazo } : null,
@@ -128,7 +201,32 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                   <InfoRow icon={Mail} label="DIEx" value={processo.pedidoSubsidios.numeroDiex || "Pendente"} />
                   <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(processo.pedidoSubsidios.solicitadoEm)} />
                   <InfoRow icon={Clock} label="Prazo de Resposta" value={processo.pedidoSubsidios.prazoResposta ? formatarData(processo.pedidoSubsidios.prazoResposta) : "—"} />
-                  <InfoRow icon={AlertCircle} label="Situação" value={processo.pedidoSubsidios.situacaoFluxo || "—"} />
+                  <InfoRow icon={AlertCircle} label="Situação" value={rotuloSituacaoFluxo(processo.pedidoSubsidios.situacaoFluxo)} />
+                </div>
+              </div>
+            </>
+          )}
+
+          {isDU && timelineDU.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">Linha do Tempo Documental DU</h4>
+                <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+                  {timelineDU.map((evento) => (
+                    <div key={evento.id} className="flex items-start gap-3 rounded-md border border-slate-100 bg-slate-50 p-3">
+                      {evento.concluido ? (
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <Circle className="mt-0.5 h-4 w-4 text-slate-400" />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-sm font-semibold ${evento.concluido ? "text-emerald-700" : "text-slate-700"}`}>{evento.titulo}</div>
+                        <div className="text-xs text-slate-500 mt-0.5">{evento.detalhe}</div>
+                        {evento.data && <div className="text-[11px] text-slate-400 mt-1">{formatarDataHoraSegura(evento.data)}</div>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </>

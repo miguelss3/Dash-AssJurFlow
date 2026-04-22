@@ -23,6 +23,17 @@ export interface PedidoSubsidios {
   reiteracoes?: number;
 }
 
+export interface RespostaDU {
+  numeroOficio?: string;
+  numeroDiex?: string;
+  destinoDocumento?: string;
+  dataEnvio?: string;
+  observacoes?: string;
+  situacao?: string;
+  registradoEm?: string;
+  registradoPorNome?: string;
+}
+
 export interface Processo {
   id: string;
   numero: string;          // Nº processo OU Portaria Nr
@@ -63,6 +74,7 @@ export interface Processo {
   criadoPorNome?: string;  // Nome/email de quem cadastrou
   atualizadoPorNome?: string; // Nome/email de quem atualizou por último
   pedidoSubsidios?: PedidoSubsidios;
+  respostaDU?: RespostaDU;
 }
 
 export interface Coluna {
