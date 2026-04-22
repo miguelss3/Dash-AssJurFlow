@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
+import { useEffect, useState, type FormEvent } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Shield, Lock, Mail, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,21 +16,22 @@ export const Route = createFileRoute("/login")({
       },
     ],
   }),
-  beforeLoad: () => {
-    if (typeof window !== "undefined" && window.localStorage.getItem("assjur:auth")) {
-      throw redirect({ to: "/" });
-    }
-  },
   component: LoginPage,
 });
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, ready, isAuthenticated } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (ready && isAuthenticated) {
+      navigate({ to: "/" });
+    }
+  }, [ready, isAuthenticated, navigate]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();

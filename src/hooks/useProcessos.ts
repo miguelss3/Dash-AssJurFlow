@@ -44,12 +44,18 @@ export function useProcessos() {
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
       // Cancela listeners anteriores se existirem
       if (unsubProcessos) { unsubProcessos(); unsubProcessos = null; }
-      if (unsubDistribuicoes) { unsubDistribuicoes = null; }
+      if (unsubDistribuicoes) { unsubDistribuicoes(); unsubDistribuicoes = null; }
 
       if (!firebaseUser) {
+        setProcessos([]);
+        setErro(null);
         setCarregando(false);
         return;
       }
+
+      setProcessos([]);
+      setErro(null);
+      setCarregando(true);
 
       // Busca dados do usuário do localStorage para verificar se é admin
     let userData: AuthUser | null = null;
