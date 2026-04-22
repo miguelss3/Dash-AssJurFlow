@@ -70,6 +70,26 @@ export interface Processo {
   // Específicos PA (Procedimento Apuratório)
   tipoPA?: string;         // IPM, Sindicância, Conselho de Disciplina
   encarregado?: string;    // Encarregado do PA
+  presidenteConselhoPosto?: string;
+  presidenteConselhoNome?: string;
+  omPresidenteConselho?: string;
+  situacaoFluxo?: string;
+  primeiraPortaria?: string;
+  interessado?: string;
+  dataAssinatura?: string;
+  dataInicioPrazo?: string;
+  despachoFinal?: string;
+  prorrogacoes?: Array<{
+    dias: number;
+    doc: string;
+    em?: string;
+    por?: string;
+  }>;
+  decisaoAutNomeante?: string;
+  numeroDIExRemessa?: string;
+  resultadoFinalConselho?: string;
+  teveRecurso?: boolean;
+  membrosConselho?: string;
   subtipo?: string;        // IPM, Sindicância, Diligência
   faseAtual?: string;      // Em diligência, Portaria assinada, Para assinatura, Atrasado, Prazo não iniciado
   inicioPrazo?: string;    // ISO

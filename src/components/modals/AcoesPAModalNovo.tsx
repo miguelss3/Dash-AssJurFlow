@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
@@ -8,6 +8,78 @@ import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Calendar as CalendarIcon,
+  CheckCircle2,
+  Clock,
+  FileBadge,
+  FileText,
+  History,
+  Landmark,
+  PenTool,
+  PlusCircle,
+  Scale,
+  Send,
+  ShieldCheck,
+  Timer,
+  User,
+  Users,
+} from "lucide-react";
+
+type RolePA = "assessor_pa" | "chefe_assjur";
+
+type SituacaoFluxoPA =
+  | "MESA_ASSESSOR_NOVO"
+  | "AGUARDANDO_CHEFIA"
+  | "AGUARDANDO_PRAZO"
+  | "EM_CURSO"
+  | "AGUARDANDO_CHEFIA_SOLUCAO"
+  | "APTO_FINALIZAR"
+  | "C_MEMORIA"
+  | "C_PORTARIA"
+  | "C_EM_CURSO"
+  | "C_DECISAO_AUT_NOMEANTE"
+  | "C_INTIMACAO_ACUSADO"
+  | "C_ENCAMINHAMENTO_CMTEX"
+  | "C_DECISAO_CMTEX"
+  | "CONCLUIDO";
+
+type ProrrogacaoItem = {
+  dias: number;
+  doc: string;
+  em: string;
+  por?: string;
+};
+
+type ProcessoPA = {
+  tipoPA?: string;
+  situacaoFluxo?: SituacaoFluxoPA;
+  encarregado?: string;
+  primeiraPortaria?: string;
+  numeroProcesso?: string;
+  parte?: string;
+  cliente?: string;
+  interessado?: string;
+  presidenteConselhoPosto?: string;
+  presidenteConselhoNome?: string;
+  omPresidenteConselho?: string;
+  dataAssinatura?: string;
+  dataInicioPrazo?: string;
+  despachoFinal?: string;
+  prorrogacoes?: ProrrogacaoItem[];
+  substituicaoEncarregado?: {
+    novoEncarregado?: string;
+    novaPortaria?: string;
+    motivo?: string;
+    registradoEm?: string;
+    registradoPorNome?: string;
+  };
+  decisaoAutNomeante?: string;
+  numeroDIExRemessa?: string;
+  resultadoFinalConselho?: string;
+  teveRecurso?: boolean;
+  membrosConselho?: string;
+};
 
 interface AcoesPAModalNovoProps {
   open: boolean;
@@ -22,409 +94,631 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
   const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
   const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
   const autorId = user?.uid || "sistema";
-  const [acaoSelecionada, setAcaoSelecionada] = useState<string | null>(null);
+  const role: RolePA = isAdmin(user) ? "chefe_assjur" : "assessor_pa";
 
-  // Estados para Iniciar Prazo
-  const [dataInicioPrazo, setDataInicioPrazo] = useState(new Date().toISOString().split("T")[0]);
+  const [carregando, setCarregando] = useState(false);
+  const [processo, setProcesso] = useState<ProcessoPA | null>(null);
 
-  // Estados para Substituir Encarregado
+  // Estado do fluxo persistido
+  const [situacaoFluxo, setSituacaoFluxo] = useState<SituacaoFluxoPA>("MESA_ASSESSOR_NOVO");
+
+  // Campos persistidos
+  const [dataAssinatura, setDataAssinatura] = useState("");
+  const [dataInicioPrazo, setDataInicioPrazo] = useState("");
+  const [despachoFinal, setDespachoFinal] = useState("");
+  const [historicoProrrogacoes, setHistoricoProrrogacoes] = useState<ProrrogacaoItem[]>([]);
   const [novoEncarregado, setNovoEncarregado] = useState("");
   const [novaPortaria, setNovaPortaria] = useState("");
   const [motivoSubstituicao, setMotivoSubstituicao] = useState("");
+  const [membrosConselho, setMembrosConselho] = useState("");
+  const [decisaoAutNomeante, setDecisaoAutNomeante] = useState("");
+  const [numeroDIExRemessa, setNumeroDIExRemessa] = useState("");
+  const [resultadoFinalConselho, setResultadoFinalConselho] = useState("");
+  const [teveRecurso, setTeveRecurso] = useState(false);
+
+  // Campos de interface transitórios
+  const [isSubstituindo, setIsSubstituindo] = useState(false);
+  const [isProrrogando, setIsProrrogando] = useState(false);
+  const [docProrrogacao, setDocProrrogacao] = useState("");
 
   const resetFormularios = () => {
-    setAcaoSelecionada(null);
-    setDataInicioPrazo(new Date().toISOString().split("T")[0]);
+    setDataAssinatura("");
+    setDataInicioPrazo("");
+    setDespachoFinal("");
+    setHistoricoProrrogacoes([]);
     setNovoEncarregado("");
     setNovaPortaria("");
     setMotivoSubstituicao("");
+    setMembrosConselho("");
+    setDecisaoAutNomeante("");
+    setNumeroDIExRemessa("");
+    setResultadoFinalConselho("");
+    setTeveRecurso(false);
+    setIsSubstituindo(false);
+    setIsProrrogando(false);
+    setDocProrrogacao("");
   };
 
-  const handleEnviarAssinatura = async () => {
-    if (!processoId || !user) return;
+  const tipoProcesso = processo?.tipoPA || "";
+  const isConselho = tipoProcesso === "Conselho de Disciplina" || tipoProcesso === "Conselho de Justificação";
+  const diasIniciais = tipoProcesso === "IPM" ? 40 : 30;
+  const diasProrrogacao = tipoProcesso === "Sindicância" ? 30 : 20;
 
+  const encarregadoAtual = useMemo(() => {
+    if (!processo) return "Não definido";
+    if (isConselho) {
+      const posto = processo.presidenteConselhoPosto || "";
+      const nome = processo.presidenteConselhoNome || "";
+      const composto = `${posto} ${nome}`.trim();
+      return composto || processo.encarregado || "Não definido";
+    }
+    return processo.encarregado || "Não definido";
+  }, [processo, isConselho]);
+
+  const numeroPortaria = processo?.primeiraPortaria || processo?.numeroProcesso || numeroProcesso || "Não definida";
+  const interessadoAcusado = processo?.interessado || processo?.parte || processo?.cliente || "Não definido";
+
+  const estadoInicial = (proc: ProcessoPA): SituacaoFluxoPA => {
+    if (proc.situacaoFluxo) return proc.situacaoFluxo;
+    if (proc.tipoPA === "Conselho de Disciplina" || proc.tipoPA === "Conselho de Justificação") {
+      return "C_MEMORIA";
+    }
+    return "MESA_ASSESSOR_NOVO";
+  };
+
+  const carregarProcesso = async () => {
+    if (!processoId || !open) return;
+    setCarregando(true);
     try {
-      const agoraISO = new Date().toISOString();
       const processoRef = doc(db, "processos", processoId);
+      const snap = await getDoc(processoRef);
+      if (!snap.exists()) {
+        toast.error("Processo não encontrado.");
+        return;
+      }
 
-      const msgHistorico = `📋 ${user.email?.split("@")[0]} encaminhou para assinatura do Cmt.`;
+      const data = snap.data() as ProcessoPA;
+      setProcesso(data);
+      setSituacaoFluxo(estadoInicial(data));
+      setDataAssinatura((data.dataAssinatura || "").toString());
+      setDataInicioPrazo((data.dataInicioPrazo || "").toString());
+      setDespachoFinal((data.despachoFinal || "").toString());
+      setHistoricoProrrogacoes(Array.isArray(data.prorrogacoes) ? data.prorrogacoes : []);
+      setMembrosConselho((data.membrosConselho || "").toString());
+      setDecisaoAutNomeante((data.decisaoAutNomeante || "").toString());
+      setNumeroDIExRemessa((data.numeroDIExRemessa || "").toString());
+      setResultadoFinalConselho((data.resultadoFinalConselho || "").toString());
+      setTeveRecurso(data.teveRecurso === true);
+    } catch (error) {
+      console.error("Erro ao carregar processo PA:", error);
+      toast.error("Não foi possível carregar o fluxo do PA.");
+    } finally {
+      setCarregando(false);
+    }
+  };
 
-      await updateDoc(processoRef, {
-        aguardandoAssinaturaCmt: true,
-        notificadoAssinaturaCmtEm: agoraISO,
-        notificadoAssinaturaCmtPorNome: user.email || "Assessor",
-        status: "andamento",
-        descricao: msgHistorico,
-        atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: user.email || "Sistema",
-      });
+  useEffect(() => {
+    if (!open) {
+      resetFormularios();
+      return;
+    }
+    carregarProcesso();
+  }, [open, processoId]);
 
-      // Adicionar ao histórico
-      const historicoRef = collection(db, `processos/${processoId}/historico`);
-      await addDoc(historicoRef, {
-        autor: autorMilitar,
-        autorId,
-        texto: msgHistorico,
-        timestamp: agoraISO,
-      });
+  const registrarHistorico = async (texto: string) => {
+    const agoraISO = new Date().toISOString();
 
-      // Também salvar na coleção mensagens
-      const mensagensRef = doc(db, "mensagens", processoId);
-      const mensagensSnap = await getDoc(mensagensRef);
-      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
-      await setDoc(mensagensRef, {
-        historico: [...historicoExistente, {
+    const historicoRef = collection(db, `processos/${processoId}/historico`);
+    await addDoc(historicoRef, {
+      autor: autorMilitar,
+      autorId,
+      texto,
+      timestamp: agoraISO,
+    });
+
+    const mensagensRef = doc(db, "mensagens", processoId);
+    const mensagensSnap = await getDoc(mensagensRef);
+    const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
+    await setDoc(mensagensRef, {
+      historico: [
+        ...historicoExistente,
+        {
           id: crypto.randomUUID(),
           autor: autorMilitar,
           autorId,
-          texto: msgHistorico,
+          texto,
           timestamp: agoraISO,
-        }]
-      });
-
-      toast.success("Processo enviado para assinatura do Cmt!");
-      resetFormularios();
-      onOpenChange(false);
-      if (onSuccess) onSuccess();
-    } catch (error) {
-      console.error("Erro ao enviar para assinatura:", error);
-      toast.error("Erro ao enviar para assinatura");
-    }
-  };
-
-  const handleIniciarPrazo = async () => {
-    if (!processoId || !user) return;
-
-    if (!dataInicioPrazo) {
-      toast.error("Selecione a data de início do prazo.");
-      return;
-    }
-
-    try {
-      const agoraISO = new Date().toISOString();
-      const processoRef = doc(db, "processos", processoId);
-
-      const msgHistorico = `⏱️ Prazo iniciado em ${new Date(dataInicioPrazo).toLocaleDateString("pt-BR")} por ${user.email?.split("@")[0]}.`;
-
-      await updateDoc(processoRef, {
-        dataInicialPrazo: dataInicioPrazo,
-        dataInicialPrazoPorNome: user.email || "Assessor",
-        status: "andamento",
-        descricao: msgHistorico,
-        atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: user.email || "Sistema",
-      });
-
-      // Adicionar ao histórico
-      const historicoRef = collection(db, `processos/${processoId}/historico`);
-      await addDoc(historicoRef, {
-        autor: autorMilitar,
-        autorId,
-        texto: msgHistorico,
-        timestamp: agoraISO,
-      });
-
-      // Também salvar na coleção mensagens
-      const mensagensRef = doc(db, "mensagens", processoId);
-      const mensagensSnap = await getDoc(mensagensRef);
-      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
-      await setDoc(mensagensRef, {
-        historico: [...historicoExistente, {
-          id: crypto.randomUUID(),
-          autor: autorMilitar,
-          autorId,
-          texto: msgHistorico,
-          timestamp: agoraISO,
-        }]
-      });
-
-      toast.success("Prazo iniciado com sucesso!");
-      resetFormularios();
-      onOpenChange(false);
-      if (onSuccess) onSuccess();
-    } catch (error) {
-      console.error("Erro ao iniciar prazo:", error);
-      toast.error("Erro ao iniciar prazo");
-    }
-  };
-
-  const handleSubstituirEncarregado = async () => {
-    if (!processoId || !user) return;
-
-    if (!novoEncarregado.trim()) {
-      toast.error("Informe o novo encarregado.");
-      return;
-    }
-    if (!novaPortaria.trim()) {
-      toast.error("Informe a nova portaria.");
-      return;
-    }
-
-    try {
-      const agoraISO = new Date().toISOString();
-      const processoRef = doc(db, "processos", processoId);
-
-      const msgHistorico = `🔄 Encarregado substituído para ${novoEncarregado} pela portaria ${novaPortaria}. Registrado por ${user.email?.split("@")[0]}.`;
-
-      await updateDoc(processoRef, {
-        encarregado: novoEncarregado,
-        substituicaoEncarregado: {
-          novoEncarregado,
-          novaPortaria,
-          motivo: motivoSubstituicao.trim() || "",
-          registradoEm: agoraISO,
-          registradoPorNome: user.email || "Sistema",
         },
-        descricao: msgHistorico,
+      ],
+    });
+  };
+
+  const avancarFluxo = async (
+    novaSituacao: SituacaoFluxoPA,
+    descricao: string,
+    extra: Record<string, unknown> = {},
+  ) => {
+    if (!processoId || !user) return;
+    try {
+      const patch: Record<string, unknown> = {
+        situacaoFluxo: novaSituacao,
+        descricao,
         atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: user.email || "Sistema",
-      });
+        atualizadoPorNome: autorMilitar,
+        ...extra,
+      };
 
-      // Adicionar ao histórico
-      const historicoRef = collection(db, `processos/${processoId}/historico`);
-      await addDoc(historicoRef, {
-        autor: autorMilitar,
-        autorId,
-        texto: msgHistorico,
-        timestamp: agoraISO,
-      });
+      if (novaSituacao === "CONCLUIDO") {
+        patch.status = "concluido";
+        patch.finalizado = true;
+      } else {
+        patch.status = "andamento";
+        patch.finalizado = false;
+      }
 
-      // Também salvar na coleção mensagens
-      const mensagensRef = doc(db, "mensagens", processoId);
-      const mensagensSnap = await getDoc(mensagensRef);
-      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
-      await setDoc(mensagensRef, {
-        historico: [...historicoExistente, {
-          id: crypto.randomUUID(),
-          autor: autorMilitar,
-          autorId,
-          texto: msgHistorico,
-          timestamp: agoraISO,
-        }]
-      });
+      // Compatibilidade com flags antigas, agora guiadas pela máquina de estado
+      if (novaSituacao === "AGUARDANDO_CHEFIA") {
+        patch.aguardandoAssinaturaCmt = true;
+      }
+      if (novaSituacao === "AGUARDANDO_PRAZO") {
+        patch.aguardandoAssinaturaCmt = false;
+      }
 
-      toast.success("Encarregado substituído com sucesso!");
-      resetFormularios();
-      onOpenChange(false);
+      await updateDoc(doc(db, "processos", processoId), patch);
+      await registrarHistorico(descricao);
+      setSituacaoFluxo(novaSituacao);
       if (onSuccess) onSuccess();
+      toast.success("Fluxo PA atualizado.");
     } catch (error) {
-      console.error("Erro ao substituir encarregado:", error);
-      toast.error("Erro ao substituir encarregado");
+      console.error("Erro ao avançar fluxo PA:", error);
+      toast.error("Falha ao atualizar o fluxo PA.");
     }
   };
 
-  const handleConfirmarAssinatura = async () => {
-    if (!processoId || !user || !isAdmin(user)) return;
-
+  const salvarSubstituicao = async () => {
+    if (!novoEncarregado.trim() || !novaPortaria.trim()) {
+      toast.error("Informe novo encarregado e nova portaria.");
+      return;
+    }
     try {
       const agoraISO = new Date().toISOString();
-      const processoRef = doc(db, "processos", processoId);
-
-      const msgHistorico = `✅ Portaria assinada pelo Cmt. Registrado por ${user.email?.split("@")[0]}. Prazo liberado para início.`;
-
-      await updateDoc(processoRef, {
-        aguardandoAssinaturaCmt: false,
-        portariaAssinadaEm: agoraISO,
-        portariaAssinadaPorNome: user.email || "Admin",
-        notificacaoAdminPendente: false,
-        status: "andamento",
-        descricao: msgHistorico,
+      await updateDoc(doc(db, "processos", processoId), {
+        encarregado: novoEncarregado.trim(),
+        substituicaoEncarregado: {
+          novoEncarregado: novoEncarregado.trim(),
+          novaPortaria: novaPortaria.trim(),
+          motivo: motivoSubstituicao.trim(),
+          registradoEm: agoraISO,
+          registradoPorNome: autorMilitar,
+        },
         atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: user.email || "Sistema",
+        atualizadoPorNome: autorMilitar,
+        descricao: `Substituição de encarregado registrada: ${novoEncarregado.trim()} (${novaPortaria.trim()}).`,
       });
-
-      // Adicionar ao histórico
-      const historicoRef = collection(db, `processos/${processoId}/historico`);
-      await addDoc(historicoRef, {
-        autor: autorMilitar,
-        autorId,
-        texto: msgHistorico,
-        timestamp: agoraISO,
-      });
-
-      // Também salvar na coleção mensagens
-      const mensagensRef = doc(db, "mensagens", processoId);
-      const mensagensSnap = await getDoc(mensagensRef);
-      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
-      await setDoc(mensagensRef, {
-        historico: [...historicoExistente, {
-          id: crypto.randomUUID(),
-          autor: autorMilitar,
-          autorId,
-          texto: msgHistorico,
-          timestamp: agoraISO,
-        }]
-      });
-
-      toast.success("Assinatura confirmada!");
-      resetFormularios();
-      onOpenChange(false);
+      await registrarHistorico(`Substituição de encarregado: ${novoEncarregado.trim()} - ${novaPortaria.trim()}.`);
+      setIsSubstituindo(false);
+      setNovoEncarregado("");
+      setNovaPortaria("");
+      setMotivoSubstituicao("");
       if (onSuccess) onSuccess();
+      toast.success("Substituição registrada.");
     } catch (error) {
-      console.error("Erro ao confirmar assinatura:", error);
-      toast.error("Erro ao confirmar assinatura");
+      console.error("Erro ao registrar substituição:", error);
+      toast.error("Não foi possível registrar a substituição.");
+    }
+  };
+
+  const salvarProrrogacao = async () => {
+    if (!docProrrogacao.trim()) {
+      toast.error("Informe o documento de prorrogação.");
+      return;
+    }
+    try {
+      const item: ProrrogacaoItem = {
+        dias: diasProrrogacao,
+        doc: docProrrogacao.trim(),
+        em: new Date().toISOString(),
+        por: autorMilitar,
+      };
+      const novasProrrogacoes = [...historicoProrrogacoes, item];
+      await updateDoc(doc(db, "processos", processoId), {
+        prorrogacoes: novasProrrogacoes,
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+        descricao: `Prazo prorrogado em +${diasProrrogacao} dias (${item.doc}).`,
+      });
+      await registrarHistorico(`Prorrogação registrada: +${diasProrrogacao} dias (${item.doc}).`);
+      setHistoricoProrrogacoes(novasProrrogacoes);
+      setDocProrrogacao("");
+      setIsProrrogando(false);
+      if (onSuccess) onSuccess();
+      toast.success(`Prorrogação de +${diasProrrogacao} dias registrada.`);
+    } catch (error) {
+      console.error("Erro ao registrar prorrogação:", error);
+      toast.error("Não foi possível registrar a prorrogação.");
+    }
+  };
+
+  const cabecalhoReadOnly = (
+    <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 text-sm">
+      <h4 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+        <ShieldCheck className="w-4 h-4 text-sky-700" /> Dados do Processo (Somente Leitura)
+      </h4>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="bg-white border border-slate-200 rounded-lg px-3 py-2">
+          <p className="text-[10px] uppercase font-bold text-slate-500">Portaria</p>
+          <p className="font-semibold text-slate-800">{numeroPortaria}</p>
+        </div>
+        <div className="bg-white border border-slate-200 rounded-lg px-3 py-2">
+          <p className="text-[10px] uppercase font-bold text-slate-500">Encarregado/Presidente</p>
+          <p className="font-semibold text-slate-800">{encarregadoAtual}</p>
+        </div>
+        {isConselho && (
+          <div className="bg-white border border-slate-200 rounded-lg px-3 py-2 sm:col-span-2">
+            <p className="text-[10px] uppercase font-bold text-slate-500">Acusado/Interessado</p>
+            <p className="font-semibold text-slate-800">{interessadoAcusado}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderVisaoAssessorConselho = () => {
+    switch (situacaoFluxo) {
+      case "C_MEMORIA":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {cabecalhoReadOnly}
+            <Button
+              onClick={() => avancarFluxo("C_PORTARIA", "Memória elaborada e enviada à chefia para assinatura da portaria.")}
+              className="w-full bg-rose-600 hover:bg-rose-700"
+            >
+              Elaborar Memória e Enviar à Chefia
+            </Button>
+          </div>
+        );
+
+      case "C_EM_CURSO":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {historicoProrrogacoes.length > 0 && (
+              <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-start gap-3">
+                <History className="w-5 h-5 text-rose-600 mt-0.5" />
+                <div className="w-full">
+                  <h4 className="text-sm font-bold text-rose-900">Prorrogações ({historicoProrrogacoes.length})</h4>
+                  <ul className="mt-1 space-y-1">
+                    {historicoProrrogacoes.map((p, i) => (
+                      <li key={`${p.doc}-${i}`} className="text-[11px] bg-white text-rose-800 px-2 py-1 rounded border border-rose-100 flex justify-between">
+                        <span>{p.doc}</span>
+                        <span className="font-bold">+{p.dias}d</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {isProrrogando ? (
+              <div className="space-y-3 bg-rose-50 p-4 rounded-xl border border-rose-200">
+                <h4 className="font-bold text-rose-900 flex items-center gap-2"><Timer className="w-4 h-4" /> Registrar Prorrogação</h4>
+                <div className="text-sm bg-rose-100 border border-rose-300 text-rose-900 rounded-lg px-3 py-2 font-semibold">+{diasProrrogacao} dias (padrão legal)</div>
+                <Input value={docProrrogacao} onChange={(e) => setDocProrrogacao(e.target.value)} placeholder="Documento concessório" />
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setIsProrrogando(false)}>Cancelar</Button>
+                  <Button className="flex-1 bg-rose-600 hover:bg-rose-700" onClick={salvarProrrogacao}>Registar +{diasProrrogacao} dias</Button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-sky-50 p-5 rounded-xl border border-sky-200">
+                <h4 className="font-bold text-sky-900 flex items-center gap-2 mb-2"><Users className="w-5 h-5" /> Conselho em Curso</h4>
+                <p className="text-sm text-sky-800 mb-3">Prazo legal inicial: {diasIniciais} dias.</p>
+                <Button variant="outline" className="w-full border-rose-300 text-rose-700" onClick={() => setIsProrrogando(true)}>
+                  <PlusCircle className="w-4 h-4 mr-1" /> Prorrogar Prazo (+{diasProrrogacao}d)
+                </Button>
+              </div>
+            )}
+
+            <Button onClick={() => avancarFluxo("C_DECISAO_AUT_NOMEANTE", "Conselho concluído e remetido para decisão da autoridade nomeante.")} className="w-full bg-slate-800 hover:bg-black">
+              <PenTool className="w-4 h-4 mr-1" /> Enviar p/ Decisão da Autoridade
+            </Button>
+          </div>
+        );
+
+      case "C_INTIMACAO_ACUSADO":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-amber-50 p-5 rounded-xl border border-amber-200">
+              <h4 className="font-bold text-amber-900 flex items-center gap-2 mb-3"><Scale className="w-5 h-5" /> Intimação e Recurso</h4>
+              <p className="text-sm text-amber-800 mb-4">O acusado apresentou recurso no prazo legal?</p>
+              <div className="bg-white p-3 rounded-lg border border-amber-100 text-xs text-slate-600">
+                <strong className="text-amber-900 block mb-1">Decisão Exarada:</strong>
+                {decisaoAutNomeante || "Sem decisão registrada."}
+              </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button className="w-full bg-amber-600 hover:bg-amber-700" onClick={() => {
+                setTeveRecurso(true);
+                void avancarFluxo("C_ENCAMINHAMENTO_CMTEX", "Recurso do acusado recebido. Encaminhar ao Cmt Ex.", { teveRecurso: true });
+              }}>
+                <FileText className="w-4 h-4 mr-1" /> Sim, apresentou recurso
+              </Button>
+              <Button className="w-full bg-slate-900 hover:bg-black" onClick={() => {
+                setTeveRecurso(false);
+                setResultadoFinalConselho("Transitou em Julgado - Sem Recurso");
+                void avancarFluxo("CONCLUIDO", "Conselho encerrado sem recurso do acusado.", {
+                  teveRecurso: false,
+                  resultadoFinalConselho: "Transitou em Julgado - Sem Recurso",
+                });
+              }}>
+                <CheckCircle2 className="w-4 h-4 mr-1" /> Não apresentou recurso (finalizar)
+              </Button>
+            </div>
+          </div>
+        );
+
+      case "C_ENCAMINHAMENTO_CMTEX":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-amber-50 p-5 rounded-xl border border-amber-200">
+              <h4 className="font-bold text-amber-900 flex items-center gap-2 mb-2"><Send className="w-5 h-5" /> Encaminhamento ao Cmt Ex</h4>
+              <Label htmlFor="dieg-remessa" className="text-[11px] uppercase text-amber-900">Nº DIEx/Ofício de Remessa</Label>
+              <Input id="dieg-remessa" value={numeroDIExRemessa} onChange={(e) => setNumeroDIExRemessa(e.target.value)} className="mt-1" />
+            </div>
+            <Button disabled={!numeroDIExRemessa.trim()} onClick={() => avancarFluxo("C_DECISAO_CMTEX", "Remessa ao Cmt Ex confirmada.", { numeroDIExRemessa: numeroDIExRemessa.trim(), teveRecurso: true })} className="w-full bg-amber-600 hover:bg-amber-700">
+              Confirmar Remessa ao Cmt Ex
+            </Button>
+          </div>
+        );
+
+      default:
+        return <div className="text-center text-sm text-slate-500 py-4">Aguardando ação da Chefia.</div>;
+    }
+  };
+
+  const renderVisaoChefeConselho = () => {
+    switch (situacaoFluxo) {
+      case "C_PORTARIA":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {cabecalhoReadOnly}
+            <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl">
+              <h4 className="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2"><FileBadge className="w-4 h-4" /> Portaria de Instauração</h4>
+              <Label htmlFor="assinatura-chefia-conselho">Data da Assinatura</Label>
+              <Input id="assinatura-chefia-conselho" type="date" value={dataAssinatura} onChange={(e) => setDataAssinatura(e.target.value)} className="mt-1" />
+            </div>
+            <Button disabled={!dataAssinatura} onClick={() => avancarFluxo("C_EM_CURSO", "Portaria assinada e Conselho instalado.", { dataAssinatura })} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              Confirmar Assinatura e Instalar
+            </Button>
+          </div>
+        );
+
+      case "C_DECISAO_AUT_NOMEANTE":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl">
+              <h4 className="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2"><Scale className="w-4 h-4" /> Decisão da Autoridade Nomeante</h4>
+              <Textarea value={decisaoAutNomeante} onChange={(e) => setDecisaoAutNomeante(e.target.value)} rows={4} />
+            </div>
+            <Button disabled={!decisaoAutNomeante.trim()} onClick={() => avancarFluxo("C_INTIMACAO_ACUSADO", "Decisão da autoridade nomeante registrada e devolvida ao assessor.", { decisaoAutNomeante: decisaoAutNomeante.trim() })} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              Exarar Decisão e Devolver ao Assessor
+            </Button>
+          </div>
+        );
+
+      case "C_DECISAO_CMTEX":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl">
+              <h4 className="font-bold text-rose-900 text-sm mb-2 flex items-center gap-2"><Landmark className="w-4 h-4" /> Decisão Final (Cmt Ex)</h4>
+              <select
+                value={resultadoFinalConselho}
+                onChange={(e) => setResultadoFinalConselho(e.target.value)}
+                className="w-full p-3 border border-rose-300 rounded-lg text-sm bg-white"
+              >
+                <option value="">Selecione a decisão...</option>
+                <option value="Exclusão a Bem da Disciplina da Força">Exclusão a Bem da Disciplina da Força</option>
+                <option value="Reforma Administrativa Disciplinar">Reforma Administrativa Disciplinar</option>
+                <option value="Arquivamento (Absolvição/Justificação)">Arquivamento (Absolvição/Justificação)</option>
+              </select>
+            </div>
+            <Button disabled={!resultadoFinalConselho} onClick={() => avancarFluxo("CONCLUIDO", "Decisão final do Cmt Ex registrada e Conselho encerrado.", { resultadoFinalConselho, teveRecurso })} className="w-full bg-rose-700 hover:bg-rose-800">
+              Registar Decisão Final e Encerrar
+            </Button>
+          </div>
+        );
+
+      default:
+        return <div className="text-center text-sm text-slate-500 py-4">Aguardando ação do Assessor.</div>;
+    }
+  };
+
+  const renderVisaoAssessorPadrao = () => {
+    switch (situacaoFluxo) {
+      case "MESA_ASSESSOR_NOVO":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {cabecalhoReadOnly}
+            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+              <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2"><Send className="w-5 h-5 text-sky-600" /> Passo 1: Enviar Portaria</h4>
+              <p className="text-sm text-slate-600">Encaminha para validação e assinatura da chefia da AssJur.</p>
+            </div>
+            <Button onClick={() => avancarFluxo("AGUARDANDO_CHEFIA", "Processo PA enviado à chefia para assinatura da portaria.")} className="w-full bg-sky-600 hover:bg-sky-700">
+              Enviar para a Chefia da AssJur
+            </Button>
+          </div>
+        );
+
+      case "AGUARDANDO_PRAZO":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200">
+              <h4 className="font-bold text-emerald-900 mb-3 flex items-center gap-2"><FileBadge className="w-5 h-5" /> Portaria assinada</h4>
+              <Label htmlFor="inicio-prazo-pa">Data de início do prazo</Label>
+              <Input id="inicio-prazo-pa" type="date" value={dataInicioPrazo} onChange={(e) => setDataInicioPrazo(e.target.value)} className="mt-1" />
+              <p className="text-xs text-emerald-700 mt-2">Prazo legal inicial: {diasIniciais} dias.</p>
+            </div>
+            <Button disabled={!dataInicioPrazo} onClick={() => avancarFluxo("EM_CURSO", `Prazo do PA iniciado em ${new Date(dataInicioPrazo).toLocaleDateString("pt-BR")}.`, { dataInicioPrazo })} className="w-full bg-emerald-600 hover:bg-emerald-700">
+              Confirmar Data e Iniciar Prazo
+            </Button>
+          </div>
+        );
+
+      case "EM_CURSO":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {historicoProrrogacoes.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-start gap-3">
+                <History className="w-5 h-5 text-amber-600 mt-0.5" />
+                <div className="w-full">
+                  <h4 className="text-sm font-bold text-amber-900">Prorrogações ({historicoProrrogacoes.length})</h4>
+                  <ul className="mt-1 space-y-1">
+                    {historicoProrrogacoes.map((p, i) => (
+                      <li key={`${p.doc}-${i}`} className="text-[11px] bg-white text-amber-800 px-2 py-1 rounded border border-amber-100 flex justify-between">
+                        <span>{p.doc}</span>
+                        <span className="font-bold">+{p.dias}d</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {isProrrogando && (
+              <div className="space-y-3 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                <h4 className="font-bold text-amber-900 flex items-center gap-2"><Timer className="w-4 h-4" /> Registrar Prorrogação</h4>
+                <div className="text-sm bg-amber-100 border border-amber-300 text-amber-900 rounded-lg px-3 py-2 font-semibold">+{diasProrrogacao} dias (padrão legal)</div>
+                <Input value={docProrrogacao} onChange={(e) => setDocProrrogacao(e.target.value)} placeholder="Documento concessório" />
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setIsProrrogando(false)}>Cancelar</Button>
+                  <Button className="flex-1 bg-amber-600 hover:bg-amber-700" onClick={salvarProrrogacao}>Registar +{diasProrrogacao} dias</Button>
+                </div>
+              </div>
+            )}
+
+            {isSubstituindo && (
+              <div className="space-y-3 bg-orange-50 p-4 rounded-xl border border-orange-200">
+                <h4 className="font-bold text-orange-900 flex items-center gap-2"><User className="w-4 h-4" /> Substituição de Encarregado</h4>
+                <Input value={novoEncarregado} onChange={(e) => setNovoEncarregado(e.target.value)} placeholder="Novo encarregado" />
+                <Input value={novaPortaria} onChange={(e) => setNovaPortaria(e.target.value)} placeholder="Nova portaria" />
+                <Textarea value={motivoSubstituicao} onChange={(e) => setMotivoSubstituicao(e.target.value)} rows={3} placeholder="Motivo (opcional)" />
+                <div className="flex gap-2">
+                  <Button variant="outline" className="flex-1" onClick={() => setIsSubstituindo(false)}>Cancelar</Button>
+                  <Button className="flex-1 bg-orange-600 hover:bg-orange-700" onClick={salvarSubstituicao}>Registar Substituição</Button>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-sky-50 p-5 rounded-xl border border-sky-200">
+              <h4 className="font-bold text-sky-900 flex items-center gap-2 mb-2"><Clock className="w-5 h-5" /> Processo em curso</h4>
+              <p className="text-sm text-sky-800 mb-3">Controle de prazos e instrução da solução do PA.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <Button variant="outline" className="border-amber-300 text-amber-800" onClick={() => setIsProrrogando(true)}>
+                  <PlusCircle className="w-4 h-4 mr-1" /> Prorrogar (+{diasProrrogacao}d)
+                </Button>
+                <Button variant="outline" className="border-orange-300 text-orange-800" onClick={() => setIsSubstituindo(true)}>
+                  <User className="w-4 h-4 mr-1" /> Substituir Encarregado
+                </Button>
+              </div>
+            </div>
+
+            <Button onClick={() => avancarFluxo("AGUARDANDO_CHEFIA_SOLUCAO", "Solução do PA elaborada e encaminhada à chefia para despacho.")} className="w-full bg-slate-900 hover:bg-black">
+              <PenTool className="w-4 h-4 mr-1" /> Elaborar Solução e Enviar à Chefia
+            </Button>
+          </div>
+        );
+
+      case "APTO_FINALIZAR":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
+              <h4 className="font-bold text-slate-800 mb-3">Transcrever Despachos</h4>
+              <Textarea value={despachoFinal} onChange={(e) => setDespachoFinal(e.target.value)} rows={4} />
+            </div>
+            <Button disabled={!despachoFinal.trim()} onClick={() => avancarFluxo("CONCLUIDO", "Despacho final registrado e PA encerrado.", { despachoFinal: despachoFinal.trim() })} className="w-full bg-slate-900 hover:bg-black">
+              Registar Despachos e Finalizar
+            </Button>
+          </div>
+        );
+
+      default:
+        return <div className="text-center text-sm text-slate-500 py-4">Aguardando ação da Chefia.</div>;
+    }
+  };
+
+  const renderVisaoChefePadrao = () => {
+    switch (situacaoFluxo) {
+      case "AGUARDANDO_CHEFIA":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {cabecalhoReadOnly}
+            <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl">
+              <h4 className="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2"><PenTool className="w-4 h-4" /> Confirmação de Assinatura</h4>
+              <Label htmlFor="assinatura-chefia-pa">Data da assinatura</Label>
+              <Input id="assinatura-chefia-pa" type="date" value={dataAssinatura} onChange={(e) => setDataAssinatura(e.target.value)} className="mt-1" />
+            </div>
+            <Button disabled={!dataAssinatura} onClick={() => avancarFluxo("AGUARDANDO_PRAZO", "Assinatura da portaria confirmada pela chefia.", { dataAssinatura, portariaAssinadaEm: new Date().toISOString() })} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              Confirmar Assinatura e Devolver
+            </Button>
+          </div>
+        );
+
+      case "AGUARDANDO_CHEFIA_SOLUCAO":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-indigo-50 p-5 rounded-xl border border-indigo-200">
+              <h4 className="font-bold text-indigo-900 flex items-center gap-2 mb-2"><FileText className="w-5 h-5" /> Despacho Final do Comandante</h4>
+              <p className="text-sm text-indigo-800">Despacho da chefia confirmado e liberado para transcrição final pelo assessor.</p>
+            </div>
+            <Button onClick={() => avancarFluxo("APTO_FINALIZAR", "Despacho final confirmado pela chefia e devolvido ao assessor.")} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              Confirmar Despacho e Devolver
+            </Button>
+          </div>
+        );
+
+      default:
+        return <div className="text-center text-sm text-slate-500 py-4">Aguardando ação do Assessor.</div>;
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={(opening) => {
-      if (!opening) resetFormularios();
+      if (!opening) {
+        resetFormularios();
+        setProcesso(null);
+      }
       onOpenChange(opening);
     }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ações PA - {numeroProcesso}</DialogTitle>
-          <DialogDescription className="sr-only">
-            Gerenciar ações de Processos Administrativos
+          <DialogDescription>
+            Fluxo orientado por máquina de estados para Sindicância, IPM e Conselhos.
           </DialogDescription>
         </DialogHeader>
 
-        {!acaoSelecionada && (
-          <div className="space-y-3">
-            <h3 className="font-semibold text-slate-700">Selecione uma ação:</h3>
-            
-            {!isAdmin(user) && (
-              <>
-                <Button
-                  onClick={() => setAcaoSelecionada("enviar_assinatura")}
-                  className="w-full justify-start border-purple-300 text-purple-700 hover:bg-purple-50"
-                  variant="outline"
-                >
-                  📋 Enviar p/ Assinatura Cmt
-                </Button>
+        {carregando ? (
+          <div className="py-8 text-center text-sm text-slate-500">Carregando fluxo do PA...</div>
+        ) : !processo ? (
+          <div className="py-8 text-center text-sm text-slate-500">Não foi possível carregar este processo.</div>
+        ) : (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 flex items-center justify-between text-xs">
+              <span className="text-slate-600">Perfil atual</span>
+              <span className="font-bold text-slate-800 flex items-center gap-1">
+                {role === "assessor_pa" ? <User className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                {role === "assessor_pa" ? "Assessor PA" : "Chefe AssJur"}
+              </span>
+            </div>
 
-                <Button
-                  onClick={() => setAcaoSelecionada("iniciar_prazo")}
-                  className="w-full justify-start border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                  variant="outline"
-                >
-                  ▶ Iniciar Prazo
-                </Button>
+            {isConselho
+              ? (role === "assessor_pa" ? renderVisaoAssessorConselho() : renderVisaoChefeConselho())
+              : (role === "assessor_pa" ? renderVisaoAssessorPadrao() : renderVisaoChefePadrao())}
 
-                <Button
-                  onClick={() => setAcaoSelecionada("substituir_encarregado")}
-                  className="w-full justify-start border-orange-300 text-orange-700 hover:bg-orange-50"
-                  variant="outline"
-                >
-                  🔄 Substituir Encarregado
-                </Button>
-              </>
+            {situacaoFluxo === "CONCLUIDO" && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-4 text-sm font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4" /> Fluxo concluído.
+              </div>
             )}
-
-            {isAdmin(user) && (
-              <Button
-                onClick={() => setAcaoSelecionada("confirmar_assinatura")}
-                className="w-full justify-start border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                variant="outline"
-              >
-                ✅ Confirmar Assinatura
-              </Button>
-            )}
-          </div>
-        )}
-
-        {acaoSelecionada === "enviar_assinatura" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-purple-700">📋 Enviar p/ Assinatura Cmt</h3>
-            <p className="text-sm text-slate-600">
-              O processo será encaminhado para a mesa do administrador aguardando assinatura do Comandante.
-            </p>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAcaoSelecionada(null)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleEnviarAssinatura} className="bg-purple-600">
-                Enviar para Assinatura
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {acaoSelecionada === "iniciar_prazo" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-emerald-700">▶ Iniciar Prazo</h3>
-            
-            <div className="space-y-2">
-              <Label>Data de Início do Prazo</Label>
-              <Input 
-                type="date"
-                value={dataInicioPrazo} 
-                onChange={(e) => setDataInicioPrazo(e.target.value)}
-              />
-              <p className="text-xs text-slate-500">
-                Normalmente é a data de hoje, mas pode ser ajustada se necessário.
-              </p>
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAcaoSelecionada(null)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleIniciarPrazo} className="bg-emerald-600">
-                Iniciar Prazo
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {acaoSelecionada === "substituir_encarregado" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-orange-700">🔄 Substituir Encarregado</h3>
-            
-            <div className="space-y-2">
-              <Label>Novo Encarregado *</Label>
-              <Input 
-                value={novoEncarregado} 
-                onChange={(e) => setNovoEncarregado(e.target.value)}
-                placeholder="Ex: Maj Silva" 
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Nova Portaria *</Label>
-              <Input 
-                value={novaPortaria} 
-                onChange={(e) => setNovaPortaria(e.target.value)}
-                placeholder="Ex: Portaria Nr 15/2026" 
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Motivo da Substituição (opcional)</Label>
-              <Textarea 
-                value={motivoSubstituicao} 
-                onChange={(e) => setMotivoSubstituicao(e.target.value)}
-                placeholder="Ex: Substituição por diligência, férias, etc..." 
-              />
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAcaoSelecionada(null)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSubstituirEncarregado} className="bg-orange-600">
-                Registrar Substituição
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {acaoSelecionada === "confirmar_assinatura" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-emerald-700">✅ Confirmar Assinatura</h3>
-            <p className="text-sm text-slate-600">
-              Confirme que a Portaria foi assinada pelo Comandante. O processo será devolvido ao assessor para início do prazo.
-            </p>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAcaoSelecionada(null)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleConfirmarAssinatura} className="bg-emerald-600">
-                Confirmar Assinatura
-              </Button>
-            </div>
           </div>
         )}
       </DialogContent>

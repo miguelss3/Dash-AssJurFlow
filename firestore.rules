@@ -128,13 +128,15 @@ service cloud.firestore {
         resource.data.processoId is string &&
         request.resource.data.processoId == resource.data.processoId &&
         canAccessProcessById(resource.data.processoId);
-      allow delete: if isSignedIn() &&
+      allow delete: if isAdminUniversal() || (
+        isSignedIn() &&
         resource.data.processoId is string &&
-        canAccessProcessById(resource.data.processoId);
+        canAccessProcessById(resource.data.processoId)
+      );
     }
     
     match /mensagens/{mensagemId} {
-      allow read: if canAccessProcessById(mensagemId);
+      allow read: if isAdminUniversal() || canAccessProcessById(mensagemId);
       allow create, update: if canAccessProcessById(mensagemId) &&
         request.resource.data.keys().hasOnly(['historico']);
       allow delete: if false;

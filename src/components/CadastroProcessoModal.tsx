@@ -23,7 +23,14 @@ interface CadastroProcessoModalProps {
 }
 
 const TIPOS_PA = ["IPM", "Sindicância", "Conselho de Disciplina", "Conselho de Justificação", "Investigação Preliminar", "Outros"];
-const ASSUNTOS_SINDICANCIA = ["Falta Injustificada", "Embriaguez", "Deserção", "Outros"];
+const ASSUNTOS_SINDICANCIA = [
+  "Apuração de Fato",
+  "Dano ao Erário",
+  "Despesa de Exercícios Anteriores",
+  "FUSEx",
+  "Transgressão Disciplinar",
+  "OUTROS",
+];
 const ASSUNTOS_DU_PRINCIPAIS = [
   "Saúde e FUSEx",
   "Movimentação e Transferência",
@@ -34,6 +41,8 @@ const ASSUNTOS_DU_PRINCIPAIS = [
 ];
 const ORIGENS_DU = ["SAPIENS", "Email", "MPF", "Justiça Federal", "Justiça Estadual", "Outros"];
 const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
+const POSTOS_CONSELHO = ["Cap", "Maj", "TC", "Cel"];
+const POSTOS_ENCARREGADO = ["Sgt", "Ten", "Cap", "Maj", "TC", "Cel"];
 
 // LOG DE VERIFICAÇÃO - ESTE LOG DEVE APARECER SEMPRE
 // console.log("🚀🚀🚀 ARQUIVO CadastroProcessoModal.tsx CARREGADO - VERSÃO NOVA COM LOGS! 🚀🚀🚀");
@@ -92,6 +101,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
   const [novaPortaria, setNovaPortaria] = useState("");
   const [assuntoSindicancia, setAssuntoSindicancia] = useState("");
   const [especificidadesSindicancia, setEspecificidadesSindicancia] = useState("");
+  const [omPresidenteConselho, setOmPresidenteConselho] = useState("");
 
   const [loading, setLoading] = useState(false);
 
@@ -136,6 +146,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     setNovaPortaria("");
     setAssuntoSindicancia("");
     setEspecificidadesSindicancia("");
+    setOmPresidenteConselho("");
   };
 
   const preencherParaEdicao = (p: Processo) => {
@@ -156,6 +167,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
     if (p.setor === "PA") {
       setTipoPA(p.tipoPA || "");
+      const conselhoPA = p.tipoPA === "Conselho de Disciplina" || p.tipoPA === "Conselho de Justificação";
       
       // Determinar fluxo
       const temDiligencia = p.faseAtual?.includes?.("diligencia") || p.faseAtual?.includes?.("Diligência");
@@ -180,6 +192,16 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
         }
       }
 
+      if (conselhoPA) {
+        if (p.presidenteConselhoPosto) {
+          setPostoEncarregado(p.presidenteConselhoPosto);
+        }
+        if (p.presidenteConselhoNome) {
+          setNomeEncarregado(p.presidenteConselhoNome);
+        }
+        setOmPresidenteConselho(p.omPresidenteConselho || "");
+      }
+
       // Assunto sindicância
       if (p.tipoPA === "Sindicância" && p.tipoAcao) {
         const partes = p.tipoAcao.split(" - ");
@@ -193,9 +215,18 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     }
   };
 
-  const aceitaDiligencia = (tipo: string) => {
+  const isConselhoPA = (tipo: string) => {
+    return tipo === "Conselho de Disciplina" || tipo === "Conselho de Justificação";
+  };
+
+  const usaPortariaPA = (tipo: string) => {
     const norm = tipo.toLowerCase();
     return norm.includes("ipm") || norm.includes("sindic") || norm.includes("conselho");
+  };
+
+  const aceitaDiligencia = (tipo: string) => {
+    const norm = tipo.toLowerCase();
+    return norm.includes("ipm") || norm.includes("sindic");
   };
 
   const formatarPortaria = (valor: string) => {
@@ -213,7 +244,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       const isDiligencia = aceitaDiligencia(tipoPA) && fluxoIPM === "Diligência";
       if (isSindicanciaAntiga) return "Número da Portaria Antiga";
       if (isDiligencia) return "1ª Portaria / Ano";
-      if (aceitaDiligencia(tipoPA)) return "Número da Portaria / Ano";
+      if (usaPortariaPA(tipoPA)) return "Número da Portaria / Ano";
     }
     return "Número do Processo";
   };
@@ -223,7 +254,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     if (setor === "PA") {
       const isSindicanciaAntiga = tipoPA === "Sindicância" && fluxoIPM === "Sindicância Antigo";
       if (isSindicanciaAntiga) return "Ex: 12";
-      if (aceitaDiligencia(tipoPA)) return "Ex: Portaria Nr 12/2026";
+      if (usaPortariaPA(tipoPA)) return "Ex: Portaria Nr 12/2026";
     }
     return "Ex: 0001234-56...";
   };
@@ -288,6 +319,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     // console.log("✅ Todas validações passaram! Prosseguindo...");
     
     const isSindicanciaPA = setor === "PA" && tipoPA === "Sindicância";
+    const isConselhoPASelecionado = setor === "PA" && isConselhoPA(tipoPA);
     const isDiligenciaPA = setor === "PA" && aceitaDiligencia(tipoPA) && fluxoIPM === "Diligência";
     const isSindicanciaAntiga = isSindicanciaPA && fluxoIPM === "Sindicância Antigo";
 
@@ -317,6 +349,18 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       toast.error("Selecione o ano da Sindicância Antiga.");
       return;
     }
+    if (isConselhoPASelecionado && !postoEncarregado) {
+      toast.error("Selecione o posto do Presidente do Conselho.");
+      return;
+    }
+    if (isConselhoPASelecionado && !nomeEncarregado.trim()) {
+      toast.error("Informe o nome do Presidente do Conselho.");
+      return;
+    }
+    if (isConselhoPASelecionado && !omPresidenteConselho.trim()) {
+      toast.error("Informe a OM do Presidente do Conselho.");
+      return;
+    }
 
     // console.log("🚀 Iniciando cadastro no Firebase...");
     setLoading(true);
@@ -336,7 +380,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
       // Número da portaria
       const valorBasePortaria = isSindicanciaAntiga && anoLegado ? `${numeroProcesso}/${anoLegado}` : numeroProcesso;
-      const primeiraPortariaFormatada = (setor === "PA" && (aceitaDiligencia(tipoPA) || isSindicanciaAntiga))
+      const primeiraPortariaFormatada = (setor === "PA" && (usaPortariaPA(tipoPA) || isSindicanciaAntiga))
         ? formatarPortaria(valorBasePortaria)
         : numeroProcesso;
       const numeroFinal = (mudouEncarregado && novaPortaria) ? formatarPortaria(novaPortaria) : primeiraPortariaFormatada;
@@ -344,7 +388,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
       // Encarregado
       const encarregadoPrimeiro = `${postoEncarregado} ${nomeEncarregado}`.trim() || null;
       const encarregadoAtualInformado = `${postoEncarregadoAtual} ${nomeEncarregadoAtual}`.trim() || null;
-      const encarregadoFinal = (isDiligenciaPA && mudouEncarregado) ? encarregadoAtualInformado : encarregadoPrimeiro;
+      const encarregadoPresidente = `${postoEncarregado} ${nomeEncarregado}`.trim() || null;
+      const encarregadoFinal = isConselhoPASelecionado
+        ? encarregadoPresidente
+        : ((isDiligenciaPA && mudouEncarregado) ? encarregadoAtualInformado : encarregadoPrimeiro);
 
       // Status inicial
       let statusInicial = "Aguardando Distribuição";
@@ -404,6 +451,12 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           dados.primeiroEncarregado = encarregadoPrimeiro;
           dados.mudouEncarregadoDiligencia = mudouEncarregado ? "Sim" : "Não";
           if (mudouEncarregado) dados.novaPortariaDiligencia = numeroFinal;
+        }
+
+        if (isConselhoPASelecionado) {
+          dados.presidenteConselhoPosto = postoEncarregado;
+          dados.presidenteConselhoNome = nomeEncarregado.trim();
+          dados.omPresidenteConselho = omPresidenteConselho.trim();
         }
       }
 
@@ -564,6 +617,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
   const mostrarFluxoIPM = setor === "PA" && aceitaDiligencia(tipoPA);
   const mostrarEncarregado = setor === "PA" && aceitaDiligencia(tipoPA);
+  const mostrarPresidenteConselho = setor === "PA" && isConselhoPA(tipoPA);
   const mostrarAnoLegado = setor === "PA" && tipoPA === "Sindicância" && fluxoIPM === "Sindicância Antigo";
   const mostrarMudancaEncarregado = setor === "PA" && aceitaDiligencia(tipoPA) && fluxoIPM === "Diligência";
   const mostrarAssuntoSindicancia = setor === "PA" && tipoPA === "Sindicância";
@@ -858,12 +912,16 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="postoEncarregado">Posto *</Label>
-                  <Input
-                    id="postoEncarregado"
-                    value={postoEncarregado}
-                    onChange={(e) => setPostoEncarregado(e.target.value)}
-                    placeholder="Ex: Ten"
-                  />
+                  <Select value={postoEncarregado} onValueChange={setPostoEncarregado}>
+                    <SelectTrigger id="postoEncarregado">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {POSTOS_ENCARREGADO.map((posto) => (
+                        <SelectItem key={posto} value={posto}>{posto}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nomeEncarregado">Nome *</Label>
@@ -874,6 +932,46 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
                     placeholder="Ex: Portela"
                   />
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Presidente do Conselho (CD/CJ) */}
+          {mostrarPresidenteConselho && (
+            <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
+              <h4 className="font-semibold text-sm">Presidente do Conselho</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="postoPresidenteConselho">Posto *</Label>
+                  <Select value={postoEncarregado} onValueChange={setPostoEncarregado}>
+                    <SelectTrigger id="postoPresidenteConselho">
+                      <SelectValue placeholder="Selecione..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {POSTOS_CONSELHO.map((posto) => (
+                        <SelectItem key={posto} value={posto}>{posto}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="nomePresidenteConselho">Nome *</Label>
+                  <Input
+                    id="nomePresidenteConselho"
+                    value={nomeEncarregado}
+                    onChange={(e) => setNomeEncarregado(e.target.value)}
+                    placeholder="Ex: Portela"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="omPresidenteConselho">OM do Presidente *</Label>
+                <Input
+                  id="omPresidenteConselho"
+                  value={omPresidenteConselho}
+                  onChange={(e) => setOmPresidenteConselho(e.target.value)}
+                  placeholder="Ex: 12ª RM, 1º BIS, 4ª Cia Com"
+                />
               </div>
             </div>
           )}
@@ -895,12 +993,16 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="postoEncarregadoAtual">Posto Atual *</Label>
-                      <Input
-                        id="postoEncarregadoAtual"
-                        value={postoEncarregadoAtual}
-                        onChange={(e) => setPostoEncarregadoAtual(e.target.value)}
-                        placeholder="Ex: Ten"
-                      />
+                      <Select value={postoEncarregadoAtual} onValueChange={setPostoEncarregadoAtual}>
+                        <SelectTrigger id="postoEncarregadoAtual">
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {POSTOS_ENCARREGADO.map((posto) => (
+                            <SelectItem key={posto} value={posto}>{posto}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="nomeEncarregadoAtual">Nome Atual *</Label>
