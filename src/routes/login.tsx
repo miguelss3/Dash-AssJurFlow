@@ -156,12 +156,16 @@ function LoginPage() {
 
             <form onSubmit={submit} className="space-y-4">
               <div>
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">
+                <label
+                  htmlFor="login-email"
+                  className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block"
+                >
                   E-mail
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="login-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -174,12 +178,16 @@ function LoginPage() {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block">
+                <label
+                  htmlFor="login-senha"
+                  className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5 block"
+                >
                   Senha
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="login-senha"
                     type="password"
                     value={senha}
                     onChange={(e) => setSenha(e.target.value)}

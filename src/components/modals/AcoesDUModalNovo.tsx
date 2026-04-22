@@ -337,22 +337,22 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               </h4>
               <div className="space-y-2">
                 <label className={`flex items-start gap-2 p-3 border rounded-xl cursor-pointer transition-all ${acaoPrincipal === "DILIGENCIA" ? "bg-white border-sky-400 ring-1 ring-sky-200" : "bg-transparent border-slate-200 hover:bg-white"}`}>
-                  <input type="radio" checked={acaoPrincipal === "DILIGENCIA"} onChange={() => setAcaoPrincipal("DILIGENCIA")} className="mt-1" />
+                  <input type="radio" name="acao-principal-du" aria-label="Pedir diligência" checked={acaoPrincipal === "DILIGENCIA"} onChange={() => setAcaoPrincipal("DILIGENCIA")} className="mt-1" />
                   <div className="w-full">
                     <p className="font-bold text-slate-800 text-sm">1. Pedir Diligência</p>
                     {acaoPrincipal === "DILIGENCIA" && (
                       <div className="mt-2 space-y-3">
                         <div className="flex gap-2">
                           <label className={`flex-1 flex items-center justify-center p-2 border rounded-md text-[11px] font-bold cursor-pointer ${tipoDiligencia === "INTERNO" ? "bg-sky-100 border-sky-300 text-sky-800" : "bg-white"}`}>
-                            <input type="radio" checked={tipoDiligencia === "INTERNO"} onChange={() => setTipoDiligencia("INTERNO")} className="hidden" /> Interno
+                            <input type="radio" name="tipo-diligencia-du" aria-label="Diligência interna" checked={tipoDiligencia === "INTERNO"} onChange={() => setTipoDiligencia("INTERNO")} className="hidden" /> Interno
                           </label>
                           <label className={`flex-1 flex items-center justify-center p-2 border rounded-md text-[11px] font-bold cursor-pointer ${tipoDiligencia === "EXTERNO" ? "bg-sky-100 border-sky-300 text-sky-800" : "bg-white"}`}>
-                            <input type="radio" checked={tipoDiligencia === "EXTERNO"} onChange={() => setTipoDiligencia("EXTERNO")} className="hidden" /> Externo
+                            <input type="radio" name="tipo-diligencia-du" aria-label="Diligência externa" checked={tipoDiligencia === "EXTERNO"} onChange={() => setTipoDiligencia("EXTERNO")} className="hidden" /> Externo
                           </label>
                         </div>
                         <div className="relative">
                           <CalendarIcon className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
-                          <input type="date" value={dataPrazo} onChange={(e) => setDataPrazo(e.target.value)} className="w-full pl-9 p-2 text-sm border rounded-md outline-none focus:ring-2 ring-sky-500" />
+                          <input type="date" aria-label="Prazo da diligência" value={dataPrazo} onChange={(e) => setDataPrazo(e.target.value)} className="w-full pl-9 p-2 text-sm border rounded-md outline-none focus:ring-2 ring-sky-500" />
                         </div>
                       </div>
                     )}
@@ -360,7 +360,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                 </label>
 
                 <label className={`flex items-start gap-2 p-3 border rounded-xl cursor-pointer transition-all ${acaoPrincipal === "DEFESA" ? "bg-white border-sky-400 ring-1 ring-sky-200" : "bg-transparent border-slate-200 hover:bg-white"}`}>
-                  <input type="radio" checked={acaoPrincipal === "DEFESA"} onChange={() => setAcaoPrincipal("DEFESA")} className="mt-1" />
+                  <input type="radio" name="acao-principal-du" aria-label="Elaborar defesa final" checked={acaoPrincipal === "DEFESA"} onChange={() => setAcaoPrincipal("DEFESA")} className="mt-1" />
                   <div>
                     <p className="font-bold text-slate-800 text-sm">2. Elaborar Defesa Final</p>
                     <p className="text-[11px] text-slate-500 mt-0.5">Enviar minuta final para aprovação.</p>
@@ -393,7 +393,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               <FileSignature className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
               <h4 className="font-bold text-emerald-900 text-sm">Pedido Aprovado pelo CHEM</h4>
               <p className="text-xs text-emerald-700 mb-3">Insira o numero gerado no SPED:</p>
-              <input type="text" value={numeroSaida} onChange={(e) => setNumeroSaida(e.target.value)} placeholder="Ex: Oficio n° 45/2026" className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none" />
+              <input type="text" aria-label="Número de saída do pedido aprovado" value={numeroSaida} onChange={(e) => setNumeroSaida(e.target.value)} placeholder="Ex: Oficio n° 45/2026" className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none" />
             </div>
             <button disabled={!numeroSaida} onClick={() => avancarFluxo("AGUARDANDO_RESPOSTA", { numeroSaida })} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl disabled:bg-emerald-300">
               Registar Saida e Iniciar Prazo
@@ -421,7 +421,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
             <div className="bg-orange-50 p-5 rounded-xl border border-orange-200">
               <h4 className="font-bold text-orange-900 text-sm mb-2">Cobranca de Diligência</h4>
               <p className="text-xs text-orange-800 mb-3">Novo prazo fatal para esta {reiteracoes + 1}ª cobranca:</p>
-              <input type="date" value={dataPrazo} onChange={(e) => setDataPrazo(e.target.value)} className="w-full p-2 border rounded-md outline-none" />
+              <input type="date" aria-label="Novo prazo fatal da cobrança" value={dataPrazo} onChange={(e) => setDataPrazo(e.target.value)} className="w-full p-2 border rounded-md outline-none" />
             </div>
             <div className="flex gap-2">
               <button onClick={() => avancarFluxo("AGUARDANDO_RESPOSTA")} className="flex-1 bg-slate-200 font-bold text-sm rounded-xl py-3">
@@ -451,7 +451,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               <FileSignature className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
               <h4 className="font-bold text-emerald-900 text-sm">Defesa Aprovada!</h4>
               <p className="text-xs text-emerald-700 mb-3">Insira o n° final assinado pelo CHEM:</p>
-              <input type="text" value={numeroDocFinal} onChange={(e) => setNumeroDocFinal(e.target.value)} placeholder="Ex: Oficio n° 789/2026" className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none" />
+              <input type="text" aria-label="Número final assinado pelo CHEM" value={numeroDocFinal} onChange={(e) => setNumeroDocFinal(e.target.value)} placeholder="Ex: Oficio n° 789/2026" className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none" />
             </div>
             <button disabled={!numeroDocFinal} onClick={() => avancarFluxo("APTO_FINALIZAR", { numeroDocFinal })} className="w-full bg-emerald-600 disabled:bg-emerald-300 text-white font-bold py-3 rounded-xl">
               Registar Numero
@@ -501,7 +501,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               {tipoDiligencia === "INTERNO" ? (
                 <div className="space-y-2 mt-4">
                   <label className="text-[11px] font-bold text-indigo-900 uppercase">N° do DIEx Assinado:</label>
-                  <input type="text" value={numeroSaida} onChange={(e) => setNumeroSaida(e.target.value)} placeholder="Ex: DIEx 123/2026" className="w-full p-2.5 border rounded-lg outline-none text-sm" />
+                  <input type="text" aria-label="Número do DIEx assinado" value={numeroSaida} onChange={(e) => setNumeroSaida(e.target.value)} placeholder="Ex: DIEx 123/2026" className="w-full p-2.5 border rounded-lg outline-none text-sm" />
                 </div>
               ) : (
                 <p className="text-[11px] text-indigo-800 bg-white/50 p-2 rounded mt-2">Encaminhe este pedido para o CHEM assinar.</p>
@@ -529,7 +529,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                 <Inbox className="w-4 h-4" /> Entrada de Resposta
               </h4>
               <label className="text-[11px] font-bold text-amber-900 uppercase">N° do Doc. Recebido:</label>
-              <input type="text" value={numeroRecebido} onChange={(e) => setNumeroRecebido(e.target.value)} placeholder="Ex: Oficio/DIEx recebido" className="w-full mt-1 p-2.5 border rounded-lg outline-none text-sm" />
+              <input type="text" aria-label="Número do documento recebido" value={numeroRecebido} onChange={(e) => setNumeroRecebido(e.target.value)} placeholder="Ex: Oficio/DIEx recebido" className="w-full mt-1 p-2.5 border rounded-lg outline-none text-sm" />
             </div>
             <button
               disabled={!numeroRecebido}

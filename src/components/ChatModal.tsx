@@ -224,6 +224,7 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
         {/* Área de envio */}
         <div className="p-6 border-t bg-white rounded-b-2xl">
           <Textarea
+            aria-label="Nova movimentação do processo"
             value={novaMensagem}
             onChange={(e) => setNovaMensagem(e.target.value)}
             onKeyDown={handleKeyDown}
