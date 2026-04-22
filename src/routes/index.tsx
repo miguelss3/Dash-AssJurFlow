@@ -21,11 +21,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useProcessos } from "@/hooks/useProcessos";
 import { Dashboard } from "@/components/Dashboard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
+import { toast } from "sonner";
 
 const KanbanBoard = lazy(() =>
   import("@/components/KanbanBoard").then((m) => ({ default: m.KanbanBoard })),
@@ -150,6 +153,14 @@ function Index() {
   const [busca, setBusca] = useState("");
   const [aba, setAba] = useState<Aba>("mesa");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [perfilOpen, setPerfilOpen] = useState(false);
+  const [perfilSaving, setPerfilSaving] = useState(false);
+  const [perfilNome, setPerfilNome] = useState("");
+  const [perfilNomeGuerra, setPerfilNomeGuerra] = useState("");
+  const [perfilEmail, setPerfilEmail] = useState("");
+  const [perfilTelefone, setPerfilTelefone] = useState("");
+  const [perfilSenha, setPerfilSenha] = useState("");
+  const [perfilSenhaConfirmacao, setPerfilSenhaConfirmacao] = useState("");
   const [notificacoesOpen, setNotificacoesOpen] = useState(false);
   const [ultimoAcessoNotificacoes, setUltimoAcessoNotificacoes] = useState<number>(0);
   const notificacoesRef = useRef<HTMLDivElement | null>(null);
@@ -252,6 +263,12 @@ function Index() {
     (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
   ).length;
   const notificacoesChefiaCount = processos.filter((p) => p.status !== "concluido" && isPendenteChefia(p)).length;
+
+  const nomeMilitarAtual = useMemo(() => {
+    if (!user) return "Sistema";
+    const nomeBase = user.nomeGuerra || user.nome || user.email?.split("@")[0] || "Usuário";
+    return user.posto ? `${user.posto} ${nomeBase}`.trim() : nomeBase;
+  }, [user]);
 
   const chaveNotificacoes = useMemo(
     () => (user?.uid ? `assjur:notificacoes:lastSeen:${user.uid}` : ""),
@@ -372,6 +389,137 @@ function Index() {
     setDialogOpen(true);
   };
 
+  useEffect(() => {
+    if (!perfilOpen || !user) return;
+    setPerfilNome(user.nome || "");
+    setPerfilNomeGuerra(user.nomeGuerra || "");
+    setPerfilEmail(user.email || "");
+    setPerfilTelefone(user.telefone || "");
+    setPerfilSenha("");
+    setPerfilSenhaConfirmacao("");
+  }, [perfilOpen, user]);
+
+  const handleSalvarPerfil = async () => {
+    if (!user) {
+      toast.error("Sessao invalida. Faca login novamente.");
+      return;
+    }
+
+    const nome = perfilNome.trim();
+    const nomeGuerra = perfilNomeGuerra.trim();
+    const email = perfilEmail.trim().toLowerCase();
+    const telefone = perfilTelefone.trim();
+    const senha = perfilSenha;
+    const senhaConfirmacao = perfilSenhaConfirmacao;
+
+    if (!nome || !email) {
+      toast.error("Informe nome e e-mail.");
+      return;
+    }
+
+    if (senha && senha.length < 6) {
+      toast.error("A nova senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    if (senha !== senhaConfirmacao) {
+      toast.error("A confirmacao da senha nao confere.");
+      return;
+    }
+
+    setPerfilSaving(true);
+    try {
+      const [{ auth, db }, authSdk, fsSdk] = await Promise.all([
+        import("@/lib/firebase"),
+        import("firebase/auth"),
+        import("firebase/firestore"),
+      ]);
+
+      const atual = auth.currentUser;
+      if (!atual) throw new Error("Sessao nao encontrada");
+
+      const emailAtual = (atual.email || user.email || "").trim().toLowerCase();
+
+      if (email !== emailAtual) {
+        await authSdk.updateEmail(atual, email);
+      }
+
+      if (senha) {
+        await authSdk.updatePassword(atual, senha);
+      }
+
+      const nomeExibicao = (nomeGuerra || nome).trim();
+      await authSdk.updateProfile(atual, { displayName: nomeExibicao });
+
+      // Tenta sincronizar na coleção usuarios (quando permitido pelas regras)
+      try {
+        const usuariosRef = fsSdk.collection(db, "usuarios");
+        const qUid = fsSdk.query(usuariosRef, fsSdk.where("uid", "==", atual.uid));
+        const snapUid = await fsSdk.getDocs(qUid);
+
+        if (!snapUid.empty) {
+          await fsSdk.updateDoc(snapUid.docs[0].ref, {
+            nome,
+            nomeGuerra,
+            email,
+            telefone,
+            atualizadoEm: new Date().toISOString(),
+          });
+        } else {
+          const qEmail = fsSdk.query(usuariosRef, fsSdk.where("email", "==", emailAtual));
+          const snapEmail = await fsSdk.getDocs(qEmail);
+          if (!snapEmail.empty) {
+            await fsSdk.updateDoc(snapEmail.docs[0].ref, {
+              nome,
+              nomeGuerra,
+              email,
+              telefone,
+              atualizadoEm: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (error: any) {
+        if (error?.code === "permission-denied") {
+          toast.info("Senha/e-mail atualizados. Perfil no Firestore sera sincronizado pela administracao.");
+        } else {
+          console.warn("Falha ao sincronizar perfil no Firestore:", error);
+        }
+      }
+
+      // Mantém cache local alinhado para a UI após reload/sessão
+      try {
+        const cachedRaw = window.localStorage.getItem("assjur:auth");
+        const cached = cachedRaw ? JSON.parse(cachedRaw) : {};
+        const atualizado = {
+          ...cached,
+          ...user,
+          nome,
+          nomeGuerra: nomeGuerra || undefined,
+          email,
+          telefone: telefone || undefined,
+        };
+        window.localStorage.setItem("assjur:auth", JSON.stringify(atualizado));
+      } catch {
+        // sem cache local
+      }
+
+      setPerfilOpen(false);
+      toast.success("Perfil atualizado com sucesso!");
+      window.location.reload();
+    } catch (error: any) {
+      console.error("Erro ao atualizar perfil:", error);
+      if (error?.code === "auth/requires-recent-login") {
+        toast.error("Para alterar e-mail ou senha, entre novamente no sistema e tente outra vez.");
+      } else if (error?.code === "auth/email-already-in-use") {
+        toast.error("Este e-mail ja esta em uso.");
+      } else {
+        toast.error("Nao foi possivel atualizar seu perfil.");
+      }
+    } finally {
+      setPerfilSaving(false);
+    }
+  };
+
   const handleAdd = (status: StatusProcesso) => {
     setEditing(null);
     setDefaultStatus(status);
@@ -382,12 +530,6 @@ function Index() {
     if (editing) atualizar(editing.id, dados);
     else criar(dados);
   };
-
-  const nomeMilitarAtual = useMemo(() => {
-    if (!user) return "Sistema";
-    const nomeBase = user.nomeGuerra || user.nome || user.email?.split("@")[0] || "Usuário";
-    return user.posto ? `${user.posto} ${nomeBase}`.trim() : nomeBase;
-  }, [user]);
 
   const registrarMovimentacao = async (processoId: string, texto: string) => {
     const { db } = await import("@/lib/firebase");
@@ -656,6 +798,7 @@ function Index() {
                 <button
                   type="button"
                   title="Configurações"
+                  onClick={() => setPerfilOpen(true)}
                   className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-white transition-colors"
                 >
                   <Settings className="h-3.5 w-3.5" />
@@ -940,6 +1083,93 @@ function Index() {
           />
         </Suspense>
       )}
+
+      <Dialog open={perfilOpen} onOpenChange={setPerfilOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Meu Perfil</DialogTitle>
+            <DialogDescription>
+              Atualize seus dados e, se desejar, altere sua senha.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="perfil-nome">Nome</Label>
+              <Input
+                id="perfil-nome"
+                value={perfilNome}
+                onChange={(e) => setPerfilNome(e.target.value)}
+                placeholder="Seu nome completo"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="perfil-nome-guerra">Nome de Guerra</Label>
+              <Input
+                id="perfil-nome-guerra"
+                value={perfilNomeGuerra}
+                onChange={(e) => setPerfilNomeGuerra(e.target.value)}
+                placeholder="Ex: Becker"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="perfil-email">E-mail</Label>
+                <Input
+                  id="perfil-email"
+                  type="email"
+                  value={perfilEmail}
+                  onChange={(e) => setPerfilEmail(e.target.value)}
+                  placeholder="usuario@dominio.mil.br"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="perfil-telefone">Telefone</Label>
+                <Input
+                  id="perfil-telefone"
+                  value={perfilTelefone}
+                  onChange={(e) => setPerfilTelefone(e.target.value)}
+                  placeholder="(92) 99999-9999"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="perfil-senha">Nova Senha</Label>
+                <Input
+                  id="perfil-senha"
+                  type="password"
+                  value={perfilSenha}
+                  onChange={(e) => setPerfilSenha(e.target.value)}
+                  placeholder="Deixe em branco para manter"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="perfil-senha-2">Confirmar Nova Senha</Label>
+                <Input
+                  id="perfil-senha-2"
+                  type="password"
+                  value={perfilSenhaConfirmacao}
+                  onChange={(e) => setPerfilSenhaConfirmacao(e.target.value)}
+                  placeholder="Repita a nova senha"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPerfilOpen(false)} disabled={perfilSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSalvarPerfil} disabled={perfilSaving}>
+              {perfilSaving ? "Salvando..." : "Salvar Alteracoes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
