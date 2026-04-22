@@ -50,10 +50,12 @@ import {
   type TipoEvento,
 } from "@/hooks/useEventosCalendario";
 import { statusPrazo } from "@/lib/prazo";
+import { DetalhesProcessoModal } from "@/components/DetalhesProcessoModal";
 
 interface Props {
   processos: Processo[];
   usuario: { posto: string; nome: string; role?: string };
+  onNovoLancamento?: (payload: { id: string; titulo: string; descricao?: string; criadoEm: string }) => void;
 }
 
 interface DiaItem {
@@ -93,11 +95,12 @@ function labelTipo(t: TipoEvento | "prazo-interno" | "prazo-fatal"): string {
   return TIPOS_EVENTO.find((x) => x.id === t)?.label ?? t;
 }
 
-export function CalendarioPrazos({ processos, usuario }: Props) {
+export function CalendarioPrazos({ processos, usuario, onNovoLancamento }: Props) {
   const { eventos, criar, remover } = useEventosCalendario();
   const [mesRef, setMesRef] = useState(new Date());
   const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [processoSelecionado, setProcessoSelecionado] = useState<Processo | null>(null);
 
   // Form state
   const [novoTipo, setNovoTipo] = useState<TipoEvento>("prazo");
@@ -179,12 +182,18 @@ export function CalendarioPrazos({ processos, usuario }: Props) {
 
   const handleSalvar = () => {
     if (!novoTitulo.trim()) return;
-    criar({
+    const novoEvento = criar({
       data: novaData,
       titulo: novoTitulo.trim(),
       descricao: novaDescricao.trim() || undefined,
       tipo: novoTipo,
       criadoPor: `${usuario.posto} ${usuario.nome}`,
+    });
+    onNovoLancamento?.({
+      id: novoEvento.id,
+      titulo: novoEvento.titulo,
+      descricao: novoEvento.descricao,
+      criadoEm: novoEvento.criadoEm,
     });
     setDialogOpen(false);
   };
@@ -351,17 +360,10 @@ export function CalendarioPrazos({ processos, usuario }: Props) {
               Lançar prazo, feriado ou dia sem expediente
             </h4>
             <p className="text-xs text-muted-foreground mt-1">
-              Os prazos dos processos ativos aparecem automaticamente. Use o botão abaixo
-              para registrar eventos manuais.
+              Os prazos dos processos ativos aparecem automaticamente. Use o botão
+              "Lançar evento" no topo para registrar eventos manuais.
             </p>
           </div>
-          <Button
-            onClick={() => handleAdd(diaSelecionado ?? undefined)}
-            className="h-10 rounded-xl bg-accent text-accent-foreground hover:bg-accent-glow font-bold"
-          >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Novo lançamento
-          </Button>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -494,6 +496,15 @@ export function CalendarioPrazos({ processos, usuario }: Props) {
                       <p className="text-sm font-semibold text-foreground leading-tight">
                         {item.titulo}
                       </p>
+                      {item.ref && item.processo && (
+                        <button
+                          type="button"
+                          onClick={() => setProcessoSelecionado(item.processo!)}
+                          className="mt-1 text-xs font-bold text-primary hover:underline"
+                        >
+                          Processo: {item.ref}
+                        </button>
+                      )}
                       {item.responsavel && (
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Responsável: <span className="font-semibold">{item.responsavel}</span>
@@ -616,6 +627,14 @@ export function CalendarioPrazos({ processos, usuario }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DetalhesProcessoModal
+        open={!!processoSelecionado}
+        onOpenChange={(open) => {
+          if (!open) setProcessoSelecionado(null);
+        }}
+        processo={processoSelecionado}
+      />
     </div>
   );
 }

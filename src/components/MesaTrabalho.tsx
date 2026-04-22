@@ -26,9 +26,11 @@ interface Props {
   onRedistribuir?: (processoId: string, novoResponsavel: string) => void | Promise<void>;
   usuario?: AuthUser;
   ehAdmin?: boolean;
+  unreadProcessIds?: Set<string>;
+  onReadProcess?: (processoId: string) => void;
 }
 
-export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onRedistribuir, usuario, ehAdmin }: Props) {
+export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
@@ -330,6 +332,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                     onEdit={onEdit}
                     onDelete={onDelete}
                     onMove={onMove}
+                    unreadProcessIds={unreadProcessIds}
+                    onReadProcess={onReadProcess}
                   />
                 ))}
               </div>
@@ -348,6 +352,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
               onEdit={() => {}}
               onDelete={() => {}}
               isDragging={true}
+              naoLido={!!(activeProcesso && unreadProcessIds?.has(activeProcesso.id))}
             />
           </div>
         ) : null}

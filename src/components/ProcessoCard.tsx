@@ -45,10 +45,13 @@ interface ProcessoCardProps {
   onMove?: (id: string, status: StatusProcesso) => void;
   showActions?: boolean;
   isDragging?: boolean; // Flag para quando está sendo arrastado no overlay
+  naoLido?: boolean;
+  onMarcarComoLido?: (processoId: string) => void;
 }
 
-export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, showActions = true, isDragging = false }: ProcessoCardProps) => {
+export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido }: ProcessoCardProps) => {
   const p = processo || pAntigo!;
+  const marcarComoLido = () => onMarcarComoLido?.(p.id);
   
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
     id: p.id,
@@ -151,10 +154,13 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
             : "bg-white border-l-sky-600 hover:shadow-md"
         } ${
           isBeingDragged ? "opacity-30 scale-95" : ""
+        } ${
+          naoLido ? "font-bold" : ""
         }`}
         onClick={(e) => {
           // Só abre detalhes se não estiver arrastando
           if (!isBeingDragged && !isDragging) {
+            marcarComoLido();
             setModalDetalhes(true);
           }
         }}
@@ -295,6 +301,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                     disabled={acaoDUBloqueada}
                     onClick={(e) => {
                       e.stopPropagation();
+                      marcarComoLido();
                       if (acaoDUBloqueada) return;
                       abrirAcoesDU();
                     }}
@@ -310,6 +317,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                     className="border-purple-300 text-purple-700 hover:bg-purple-50 text-xs h-9"
                     onClick={(e) => {
                       e.stopPropagation();
+                      marcarComoLido();
                       abrirAcoesPA();
                     }}
                   >
@@ -326,6 +334,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                     className="border-amber-300 text-amber-700 hover:bg-amber-50 text-xs h-9"
                     onClick={(e) => {
                       e.stopPropagation();
+                      marcarComoLido();
                       onEdit(p);
                     }}
                   >
@@ -341,6 +350,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                   className="border-slate-300 text-slate-600 hover:bg-slate-50 text-xs h-9"
                   onClick={(e) => {
                     e.stopPropagation();
+                      marcarComoLido();
                     abrirChat();
                   }}
                 >
@@ -359,6 +369,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                     className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 text-xs h-9"
                     onClick={(e) => {
                       e.stopPropagation();
+                      marcarComoLido();
                       finalizarProcesso();
                     }}
                   >
@@ -375,6 +386,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                     className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-9 font-semibold"
                     onClick={(e) => {
                       e.stopPropagation();
+                      marcarComoLido();
                       setAlertExcluir(true);
                     }}
                   >

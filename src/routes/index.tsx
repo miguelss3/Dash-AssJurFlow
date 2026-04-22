@@ -102,8 +102,8 @@ type Aba = "mesa" | "prazos" | "arquivo" | "indicadores" | "equipe";
 type FiltroTipo = "todos" | "DU" | "PA";
 
 type NotificacaoItem = {
-  processoId: string;
-  numero: string;
+  id: string;
+  titulo: string;
   texto: string;
   momentoISO: string;
 };
@@ -141,10 +141,16 @@ function formatarDataHora(valorISO: string): string {
   });
 }
 
+function processoTimestampMs(p: Processo | undefined): number {
+  if (!p) return 0;
+  const dt = new Date(p.atualizadoEm || p.criadoEm).getTime();
+  return Number.isNaN(dt) ? 0 : dt;
+}
+
 function Index() {
   const navigate = useNavigate();
   const { user, ready, logout } = useAuth();
-  const { processos, criar, atualizar, remover, moverStatus } = useProcessos();
+  const { processos, criar, atualizar, remover } = useProcessos();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Processo | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<StatusProcesso>("novo");
@@ -163,6 +169,8 @@ function Index() {
   const [perfilSenhaConfirmacao, setPerfilSenhaConfirmacao] = useState("");
   const [notificacoesOpen, setNotificacoesOpen] = useState(false);
   const [ultimoAcessoNotificacoes, setUltimoAcessoNotificacoes] = useState<number>(0);
+  const [notificacoesCalendario, setNotificacoesCalendario] = useState<NotificacaoItem[]>([]);
+  const [processosLidos, setProcessosLidos] = useState<Record<string, number>>({});
   const notificacoesRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -200,30 +208,14 @@ function Index() {
 
   // Filtra dados para dashboard/indicadores: assessor vê só seu setor, admin vê todos
   const processosParaDashboard = useMemo(() => {
-    console.log("🔍 Debug Dashboard:", {
-      ehAdmin,
-      usuarioSetor: setorUsuario,
-      totalProcessos: processos.length,
-      processosComSetor: processos.filter(p => p.setor).length,
-      processosComTipo: processos.filter(p => p.tipo).length,
-    });
-    
     if (ehAdmin) {
-      console.log(`  ✅ Admin: mostrando todos ${processos.length} processos`);
       return processos;
     }
     
-    const filtered = processos.filter((p) => {
+    return processos.filter((p) => {
       const setorProcesso = normalizarSetor(p.setor || p.tipo);
-      const setorMatch = setorProcesso === setorUsuario;
-      if (!setorMatch) {
-        console.log(`  ❌ Processo filtrado: ${p.numero} (setor="${p.setor}", tipo="${p.tipo}") !== usuarioSetor="${setorUsuario}"`);
-      }
-      return setorMatch;
+      return setorProcesso === setorUsuario;
     });
-    
-    console.log(`  📊 Assessor: ${filtered.length}/${processos.length} processos passaram no filtro`);
-    return filtered;
   }, [processos, ehAdmin, setorUsuario]);
 
   const filtrados = useMemo(() => {
@@ -258,12 +250,6 @@ function Index() {
     });
   }, [processos, filtro, busca, filtroTipo, usuario.posto, usuario.nome, setorUsuario, ehAdmin]);
 
-  const ativosCount = processos.filter((p) => p.status !== "concluido").length;
-  const vencidosCount = processos.filter(
-    (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
-  ).length;
-  const notificacoesChefiaCount = processos.filter((p) => p.status !== "concluido" && isPendenteChefia(p)).length;
-
   const nomeMilitarAtual = useMemo(() => {
     if (!user) return "Sistema";
     const nomeBase = user.nomeGuerra || user.nome || user.email?.split("@")[0] || "Usuário";
@@ -272,6 +258,16 @@ function Index() {
 
   const chaveNotificacoes = useMemo(
     () => (user?.uid ? `assjur:notificacoes:lastSeen:${user.uid}` : ""),
+    [user?.uid],
+  );
+
+  const chaveNotificacoesCalendario = useMemo(
+    () => (user?.uid ? `assjur:notificacoes:calendario:${user.uid}` : ""),
+    [user?.uid],
+  );
+
+  const chaveProcessosLidos = useMemo(
+    () => (user?.uid ? `assjur:processos:lidos:${user.uid}` : ""),
     [user?.uid],
   );
 
@@ -296,6 +292,73 @@ function Index() {
     }
   }, [chaveNotificacoes]);
 
+  useEffect(() => {
+    if (!chaveNotificacoesCalendario) {
+      setNotificacoesCalendario([]);
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(chaveNotificacoesCalendario);
+      if (!raw) {
+        setNotificacoesCalendario([]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as NotificacaoItem[];
+      setNotificacoesCalendario(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setNotificacoesCalendario([]);
+    }
+  }, [chaveNotificacoesCalendario]);
+
+  useEffect(() => {
+    if (!chaveProcessosLidos) {
+      setProcessosLidos({});
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(chaveProcessosLidos);
+      if (!raw) {
+        setProcessosLidos({});
+        return;
+      }
+      const parsed = JSON.parse(raw) as Record<string, number>;
+      setProcessosLidos(parsed && typeof parsed === "object" ? parsed : {});
+    } catch {
+      setProcessosLidos({});
+    }
+  }, [chaveProcessosLidos]);
+
+  const processosNaoLidosIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const p of processos) {
+      const ts = processoTimestampMs(p);
+      const lidoEm = processosLidos[p.id] || 0;
+      if (ts > lidoEm) ids.add(p.id);
+    }
+    return ids;
+  }, [processos, processosLidos]);
+
+  const marcarProcessoComoLido = (processoId: string) => {
+    const processo = processos.find((p) => p.id === processoId);
+    if (!processo) return;
+
+    const ts = processoTimestampMs(processo);
+    setProcessosLidos((prev) => {
+      if ((prev[processoId] || 0) >= ts) return prev;
+      const next = { ...prev, [processoId]: ts };
+      if (chaveProcessosLidos) {
+        try {
+          window.localStorage.setItem(chaveProcessosLidos, JSON.stringify(next));
+        } catch {
+          // sem persistencia local
+        }
+      }
+      return next;
+    });
+  };
+
   const notificacoesAssessor = useMemo(() => {
     if (ehAdmin || !user) return [] as NotificacaoItem[];
 
@@ -318,8 +381,8 @@ function Index() {
     return processos
       .filter(pertenceAoAssessor)
       .map((p) => ({
-        processoId: p.id,
-        numero: p.numero,
+        id: p.id,
+        titulo: `Processo ${p.numero}`,
         texto: p.descricao || "Movimentacao atualizada.",
         momentoISO: p.atualizadoEm || p.criadoEm,
       }))
@@ -334,8 +397,8 @@ function Index() {
     return processos
       .filter((p) => p.status !== "concluido" && isPendenteChefia(p))
       .map((p) => ({
-        processoId: p.id,
-        numero: p.numero,
+        id: p.id,
+        titulo: `Processo ${p.numero}`,
         texto: p.descricao || "Processo pendente de validacao da chefia.",
         momentoISO: p.atualizadoEm || p.criadoEm,
       }))
@@ -343,22 +406,25 @@ function Index() {
       .slice(0, 20);
   }, [processos, ehAdmin]);
 
-  const listaNotificacoes = ehAdmin ? notificacoesChefia : notificacoesAssessor;
+  const notificacoesBase = ehAdmin ? notificacoesChefia : notificacoesAssessor;
 
-  const notificacoesNaoLidasAssessor = useMemo(() => {
-    if (ehAdmin) return 0;
-    return notificacoesAssessor.filter(
+  const listaNotificacoes = useMemo(() => {
+    return [...notificacoesBase, ...notificacoesCalendario]
+      .sort((a, b) => new Date(b.momentoISO).getTime() - new Date(a.momentoISO).getTime())
+      .slice(0, 30);
+  }, [notificacoesBase, notificacoesCalendario]);
+
+  const contadorSino = useMemo(() => {
+    return listaNotificacoes.filter(
       (n) => new Date(n.momentoISO).getTime() > ultimoAcessoNotificacoes,
     ).length;
-  }, [ehAdmin, notificacoesAssessor, ultimoAcessoNotificacoes]);
-
-  const contadorSino = ehAdmin ? notificacoesChefiaCount : notificacoesNaoLidasAssessor;
+  }, [listaNotificacoes, ultimoAcessoNotificacoes]);
 
   const abrirFecharNotificacoes = () => {
     const abrindo = !notificacoesOpen;
     setNotificacoesOpen(abrindo);
 
-    if (!ehAdmin && abrindo && chaveNotificacoes) {
+    if (abrindo && chaveNotificacoes) {
       const agora = Date.now();
       setUltimoAcessoNotificacoes(agora);
       try {
@@ -526,6 +592,27 @@ function Index() {
     setDialogOpen(true);
   };
 
+  const handleNovoLancamentoCalendario = (payload: { id: string; titulo: string; descricao?: string; criadoEm: string }) => {
+    if (!chaveNotificacoesCalendario) return;
+
+    const item: NotificacaoItem = {
+      id: `cal-${payload.id}`,
+      titulo: "Novo lançamento no calendário",
+      texto: payload.descricao?.trim() ? `${payload.titulo} - ${payload.descricao}` : payload.titulo,
+      momentoISO: payload.criadoEm,
+    };
+
+    setNotificacoesCalendario((prev) => {
+      const next = [item, ...prev].slice(0, 40);
+      try {
+        window.localStorage.setItem(chaveNotificacoesCalendario, JSON.stringify(next));
+      } catch {
+        // sem persistencia local
+      }
+      return next;
+    });
+  };
+
   const handleSave = (dados: Omit<Processo, "id" | "criadoEm">) => {
     if (editing) atualizar(editing.id, dados);
     else criar(dados);
@@ -565,12 +652,9 @@ function Index() {
     try {
       const { db } = await import("@/lib/firebase");
       const { collection, addDoc, getDocs, query, updateDoc, where } = await import("firebase/firestore");
-
-      console.log("📦 Redistribuindo processo:", processoId, "→", novoResponsavel || "Aguardando Distribuição");
       
       const processo = processos.find((p) => p.id === processoId);
       if (!processo) {
-        console.error("❌ Processo não encontrado:", processoId);
         return;
       }
       
@@ -587,7 +671,7 @@ function Index() {
       const autorNome = nomeMilitarAtual;
       
       // Atualiza o processo com responsável, data e autor
-      await atualizar(processoId, {
+      const atualizarProcessoPromise = atualizar(processoId, {
         responsavel: novoResponsavel,
         descricao: msgHistorico,
         atualizadoEm: agoraISO,
@@ -598,32 +682,35 @@ function Index() {
       // O board usa assessorNome dessa coleção para decidir a coluna de cada card.
       const distribuicoesRef = collection(db, "distribuicoes");
       const qDistrib = query(distribuicoesRef, where("processoId", "==", processoId));
-      const distribSnapshot = await getDocs(qDistrib);
+      const sincronizarDistribuicaoPromise = (async () => {
+        const distribSnapshot = await getDocs(qDistrib);
 
-      if (distribSnapshot.empty) {
-        await addDoc(distribuicoesRef, {
-          processoId,
-          assessorId: "manual",
-          assessorNome: novoResponsavel,
-          prazo: "",
-          prioridade: "Normal",
-          dataDistribuicao: agoraISO,
-          atualizadoEm: agoraISO,
-        });
-      } else {
-        const updates = distribSnapshot.docs.map((docSnap) =>
-          updateDoc(docSnap.ref, {
+        if (distribSnapshot.empty) {
+          await addDoc(distribuicoesRef, {
+            processoId,
+            assessorId: "manual",
             assessorNome: novoResponsavel,
+            prazo: "",
+            prioridade: "Normal",
             dataDistribuicao: agoraISO,
             atualizadoEm: agoraISO,
-          })
-        );
-        await Promise.all(updates);
-      }
+          });
+        } else {
+          const updates = distribSnapshot.docs.map((docSnap) =>
+            updateDoc(docSnap.ref, {
+              assessorNome: novoResponsavel,
+              dataDistribuicao: agoraISO,
+              atualizadoEm: agoraISO,
+            })
+          );
+          await Promise.all(updates);
+        }
+      })();
       
-      await registrarMovimentacao(processoId, msgHistorico);
-      
-      console.log("✅ Processo redistribuído com sucesso!");
+      await atualizarProcessoPromise;
+      Promise.all([sincronizarDistribuicaoPromise, registrarMovimentacao(processoId, msgHistorico)]).catch((error) => {
+        console.error("❌ Erro em pós-processamento da redistribuição:", error);
+      });
     } catch (error) {
       console.error("❌ Erro ao redistribuir processo:", error);
     }
@@ -631,8 +718,6 @@ function Index() {
 
   const handleMoverStatus = async (processoId: string, novoStatus: StatusProcesso) => {
     try {
-      await moverStatus(processoId, novoStatus);
-
       const rotulosStatus: Record<StatusProcesso, string> = {
         novo: "Triagem",
         andamento: "Em Andamento",
@@ -643,11 +728,14 @@ function Index() {
 
       const msgHistorico = `Status alterado para ${rotulosStatus[novoStatus]}.`;
       await atualizar(processoId, {
+        status: novoStatus,
         descricao: msgHistorico,
         atualizadoEm: new Date().toISOString(),
         atualizadoPorNome: nomeMilitarAtual,
       });
-      await registrarMovimentacao(processoId, msgHistorico);
+      Promise.resolve(registrarMovimentacao(processoId, msgHistorico)).catch((error) => {
+        console.error("❌ Erro ao registrar histórico de status:", error);
+      });
     } catch (error) {
       console.error("❌ Erro ao mover status:", error);
     }
@@ -887,8 +975,8 @@ function Index() {
                       ) : (
                         <ul className="divide-y divide-border">
                           {listaNotificacoes.map((n) => (
-                            <li key={n.processoId} className="px-4 py-3">
-                              <p className="text-xs font-semibold text-foreground">Processo {n.numero}</p>
+                            <li key={n.id} className="px-4 py-3">
+                              <p className="text-xs font-semibold text-foreground">{n.titulo}</p>
                               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.texto}</p>
                               <p className="text-[11px] text-muted-foreground/80 mt-1">
                                 {formatarDataHora(n.momentoISO)}
@@ -1030,13 +1118,19 @@ function Index() {
                 onRedistribuir={handleRedistribuir}
                 usuario={user || undefined}
                 ehAdmin={ehAdmin}
+                unreadProcessIds={processosNaoLidosIds}
+                onReadProcess={marcarProcessoComoLido}
               />
             </>
           )}
 
           {aba === "prazos" && (
             <Suspense fallback={<TabLoading label="Carregando controle de prazos..." />}>
-              <CalendarioPrazos processos={processos} usuario={usuario} />
+              <CalendarioPrazos
+                processos={processosParaDashboard}
+                usuario={usuario}
+                onNovoLancamento={handleNovoLancamentoCalendario}
+              />
             </Suspense>
           )}
 

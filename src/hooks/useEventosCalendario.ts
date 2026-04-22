@@ -77,10 +77,13 @@ export function useEventosCalendario() {
   }, [eventos, loaded]);
 
   const criar = useCallback((e: Omit<EventoCalendario, "id" | "criadoEm">) => {
-    setEventos((prev) => [
-      ...prev,
-      { ...e, id: crypto.randomUUID(), criadoEm: new Date().toISOString() },
-    ]);
+    const novoEvento: EventoCalendario = {
+      ...e,
+      id: crypto.randomUUID(),
+      criadoEm: new Date().toISOString(),
+    };
+    setEventos((prev) => [...prev, novoEvento]);
+    return novoEvento;
   }, []);
 
   const remover = useCallback((id: string) => {
