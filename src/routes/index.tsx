@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SoldierAvatar } from "@/components/SoldierAvatar";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
@@ -98,6 +98,46 @@ export const Route = createFileRoute("/")({
 type Aba = "mesa" | "prazos" | "arquivo" | "indicadores" | "equipe";
 type FiltroTipo = "todos" | "DU" | "PA";
 
+type NotificacaoItem = {
+  processoId: string;
+  numero: string;
+  texto: string;
+  momentoISO: string;
+};
+
+function normalizarSetor(valor: unknown): "DU" | "PA" | "" {
+  const txt = String(valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase();
+
+  if (!txt) return "";
+  if (txt === "DU" || txt.includes("DEFESA") || txt.includes("USUARIO")) return "DU";
+  if (txt === "PA" || txt.includes("PROCESSO") || txt.includes("ADMIN")) return "PA";
+  return "";
+}
+
+function normalizarTexto(valor: unknown): string {
+  return String(valor ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function formatarDataHora(valorISO: string): string {
+  const dt = new Date(valorISO);
+  if (Number.isNaN(dt.getTime())) return "data indisponivel";
+  return dt.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function Index() {
   const navigate = useNavigate();
   const { user, ready, logout } = useAuth();
@@ -110,25 +150,18 @@ function Index() {
   const [busca, setBusca] = useState("");
   const [aba, setAba] = useState<Aba>("mesa");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [notificacoesOpen, setNotificacoesOpen] = useState(false);
+  const [ultimoAcessoNotificacoes, setUltimoAcessoNotificacoes] = useState<number>(0);
+  const notificacoesRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (ready && !user) navigate({ to: "/login" });
   }, [ready, user, navigate]);
 
-  if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-          <p className="text-sm font-medium text-slate-600">Sincronizando sessao...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Usuário logado (sem fallback fixo para evitar flicker visual no reload)
   const usuario = user ?? { posto: "", nome: "", role: "", setor: "" };
   const ehAdmin = isAdmin(user);
+  const setorUsuario = normalizarSetor(usuario.setor || usuario.role || usuario.secao || usuario.cargo);
 
   const isPendenteChefia = (p: Processo) => {
     const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
@@ -149,38 +182,50 @@ function Index() {
   // Todos operam na Visão do Setor
   useEffect(() => {
     // Assessores veem apenas processos do seu setor (DU ou PA)
-    if (!ehAdmin && usuario.setor && filtroTipo === "todos") {
-      setFiltroTipo(usuario.setor as FiltroTipo);
+    if (!ehAdmin && setorUsuario && filtroTipo === "todos") {
+      setFiltroTipo(setorUsuario);
     }
-  }, [ehAdmin, usuario.setor, filtroTipo]);
+  }, [ehAdmin, setorUsuario, filtroTipo]);
+
+  // Filtra dados para dashboard/indicadores: assessor vê só seu setor, admin vê todos
+  const processosParaDashboard = useMemo(() => {
+    console.log("🔍 Debug Dashboard:", {
+      ehAdmin,
+      usuarioSetor: setorUsuario,
+      totalProcessos: processos.length,
+      processosComSetor: processos.filter(p => p.setor).length,
+      processosComTipo: processos.filter(p => p.tipo).length,
+    });
+    
+    if (ehAdmin) {
+      console.log(`  ✅ Admin: mostrando todos ${processos.length} processos`);
+      return processos;
+    }
+    
+    const filtered = processos.filter((p) => {
+      const setorProcesso = normalizarSetor(p.setor || p.tipo);
+      const setorMatch = setorProcesso === setorUsuario;
+      if (!setorMatch) {
+        console.log(`  ❌ Processo filtrado: ${p.numero} (setor="${p.setor}", tipo="${p.tipo}") !== usuarioSetor="${setorUsuario}"`);
+      }
+      return setorMatch;
+    });
+    
+    console.log(`  📊 Assessor: ${filtered.length}/${processos.length} processos passaram no filtro`);
+    return filtered;
+  }, [processos, ehAdmin, setorUsuario]);
 
   const filtrados = useMemo(() => {
-    // console.log("🔍 FILTRO - Iniciando filtragem de processos...");
-    // console.log("  Total de processos:", processos.length);
-    // console.log("  Usuário completo:", usuario);
-    // console.log("  Nome:", usuario.nome);
-    // console.log("  Posto:", usuario.posto);
-    // console.log("  Nome Guerra:", usuario.nomeGuerra);
-    // console.log("  Setor do usuário:", usuario.setor);
-    // console.log("  É admin?:", ehAdmin);
-    // console.log("  Visão:", visao);
-    // console.log("  Filtro tipo:", filtroTipo);
-    
     return processos.filter((p) => {
-      if (filtroTipo !== "todos" && p.tipo !== filtroTipo) return false;
+      const setorProcesso = normalizarSetor(p.setor || p.tipo);
+
+      if (filtroTipo !== "todos" && setorProcesso !== filtroTipo) return false;
       
       // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
-      if (!ehAdmin && usuario.setor) {
-        const processoSetor = p.setor || p.tipo;
-        // console.log(`  Verificando processo ${p.numero}: processoSetor=${processoSetor}, usuarioSetor=${usuario.setor}`);
-        
-        // Assessor de DU vê APENAS processos de DU
-        // Assessor de PA vê APENAS processos de PA
-        if (processoSetor !== usuario.setor) {
-          // console.log(`    ❌ Processo ${p.numero} filtrado (setor ${processoSetor} !== ${usuario.setor})`);
+      if (!ehAdmin && setorUsuario) {
+        if (setorProcesso !== setorUsuario) {
           return false;
         }
-        // console.log(`    ✅ Processo ${p.numero} passa no filtro de setor`);
       }
       if (busca.trim()) {
         const q = busca.toLowerCase();
@@ -200,13 +245,127 @@ function Index() {
       if (filtro === "semana") return s === "today" || s === "soon";
       return true;
     });
-  }, [processos, filtro, busca, filtroTipo, usuario.posto, usuario.nome, usuario.setor, ehAdmin]);
+  }, [processos, filtro, busca, filtroTipo, usuario.posto, usuario.nome, setorUsuario, ehAdmin]);
 
   const ativosCount = processos.filter((p) => p.status !== "concluido").length;
   const vencidosCount = processos.filter(
     (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
   ).length;
   const notificacoesChefiaCount = processos.filter((p) => p.status !== "concluido" && isPendenteChefia(p)).length;
+
+  const chaveNotificacoes = useMemo(
+    () => (user?.uid ? `assjur:notificacoes:lastSeen:${user.uid}` : ""),
+    [user?.uid],
+  );
+
+  useEffect(() => {
+    if (!chaveNotificacoes) {
+      setUltimoAcessoNotificacoes(0);
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(chaveNotificacoes);
+      if (raw) {
+        const valor = Number(raw);
+        setUltimoAcessoNotificacoes(Number.isFinite(valor) ? valor : Date.now());
+      } else {
+        const agora = Date.now();
+        window.localStorage.setItem(chaveNotificacoes, String(agora));
+        setUltimoAcessoNotificacoes(agora);
+      }
+    } catch {
+      setUltimoAcessoNotificacoes(Date.now());
+    }
+  }, [chaveNotificacoes]);
+
+  const notificacoesAssessor = useMemo(() => {
+    if (ehAdmin || !user) return [] as NotificacaoItem[];
+
+    const candidatos = [
+      nomeMilitarAtual,
+      `${user.posto || ""} ${user.nome || ""}`.trim(),
+      user.nome,
+      user.nomeGuerra,
+      user.email?.split("@")[0],
+    ]
+      .map((v) => normalizarTexto(v))
+      .filter((v) => v.length >= 3);
+
+    const pertenceAoAssessor = (p: Processo) => {
+      const respNorm = normalizarTexto(p.responsavel);
+      if (!respNorm) return false;
+      return candidatos.some((c) => respNorm.includes(c) || c.includes(respNorm));
+    };
+
+    return processos
+      .filter(pertenceAoAssessor)
+      .map((p) => ({
+        processoId: p.id,
+        numero: p.numero,
+        texto: p.descricao || "Movimentacao atualizada.",
+        momentoISO: p.atualizadoEm || p.criadoEm,
+      }))
+      .filter((n) => !Number.isNaN(new Date(n.momentoISO).getTime()))
+      .sort((a, b) => new Date(b.momentoISO).getTime() - new Date(a.momentoISO).getTime())
+      .slice(0, 20);
+  }, [processos, ehAdmin, user, nomeMilitarAtual]);
+
+  const notificacoesChefia = useMemo(() => {
+    if (!ehAdmin) return [] as NotificacaoItem[];
+
+    return processos
+      .filter((p) => p.status !== "concluido" && isPendenteChefia(p))
+      .map((p) => ({
+        processoId: p.id,
+        numero: p.numero,
+        texto: p.descricao || "Processo pendente de validacao da chefia.",
+        momentoISO: p.atualizadoEm || p.criadoEm,
+      }))
+      .sort((a, b) => new Date(b.momentoISO).getTime() - new Date(a.momentoISO).getTime())
+      .slice(0, 20);
+  }, [processos, ehAdmin]);
+
+  const listaNotificacoes = ehAdmin ? notificacoesChefia : notificacoesAssessor;
+
+  const notificacoesNaoLidasAssessor = useMemo(() => {
+    if (ehAdmin) return 0;
+    return notificacoesAssessor.filter(
+      (n) => new Date(n.momentoISO).getTime() > ultimoAcessoNotificacoes,
+    ).length;
+  }, [ehAdmin, notificacoesAssessor, ultimoAcessoNotificacoes]);
+
+  const contadorSino = ehAdmin ? notificacoesChefiaCount : notificacoesNaoLidasAssessor;
+
+  const abrirFecharNotificacoes = () => {
+    const abrindo = !notificacoesOpen;
+    setNotificacoesOpen(abrindo);
+
+    if (!ehAdmin && abrindo && chaveNotificacoes) {
+      const agora = Date.now();
+      setUltimoAcessoNotificacoes(agora);
+      try {
+        window.localStorage.setItem(chaveNotificacoes, String(agora));
+      } catch {
+        // sem persistencia, segue apenas em memoria
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!notificacoesOpen) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      const alvo = event.target as Node | null;
+      if (!notificacoesRef.current || !alvo) return;
+      if (!notificacoesRef.current.contains(alvo)) {
+        setNotificacoesOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [notificacoesOpen]);
   
   const handleEdit = (p: Processo) => {
     setEditing(p);
@@ -353,17 +512,19 @@ function Index() {
   };
 
   // Sidebar nav
-  const navMain: { id: Aba; label: string; icon: typeof LayoutGrid; badge?: number }[] = [
-    { id: "mesa", label: "Painel de Controle", icon: LayoutGrid, badge: ativosCount },
+  const navMain: { id: Aba; label: string; icon: typeof LayoutGrid }[] = [
+    { id: "mesa", label: "Painel de Controle", icon: LayoutGrid },
   ];
 
   const navSec: { id: Aba; label: string; icon: typeof LayoutGrid }[] = [
     { id: "prazos", label: "Controle de Prazos", icon: Calendar },
-    { id: "arquivo", label: "Processos Antigos", icon: History },
+    ...(ehAdmin ? [{ id: "arquivo" as Aba, label: "Processos Antigos", icon: History }] : []),
   ];
 
   // Tabs principais (estilo AssJur)
-  // Assessores NÃO veem "Arquivo" e "Gestão da Equipe"
+  // Apenas ADMIN vê "Arquivo" e "Gestão da Equipe"
+  // Assessores (DU ou PA) veem apenas: Mesa, Prazos e Indicadores
+  // Aba "Arquivo / Encerrados" é específica de processos finalizados (gestão PA)
   const tabsCompletas: { id: Aba; label: string }[] = [
     { id: "mesa", label: "Mesa de Trabalho" },
     { id: "prazos", label: "Controle de Prazos" },
@@ -379,6 +540,24 @@ function Index() {
   ];
   
   const tabs = ehAdmin ? tabsCompletas : tabsAssessor;
+
+  useEffect(() => {
+    if (!tabs.some((t) => t.id === aba)) {
+      setAba("mesa");
+    }
+  }, [tabs, aba]);
+
+  // Renderiza tela de carregamento enquanto a sessão não foi sincronizada
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="mx-auto mb-3 h-10 w-10 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+          <p className="text-sm font-medium text-slate-600">Sincronizando sessao...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -434,17 +613,6 @@ function Index() {
                 >
                   <Icon className="h-4.5 w-4.5 shrink-0" />
                   <span className="flex-1 text-left">{item.label}</span>
-                  {item.badge !== undefined && item.badge > 0 && (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold ${
-                        active
-                          ? "bg-white/20 text-white"
-                          : "bg-sidebar-accent text-sidebar-foreground"
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -541,18 +709,55 @@ function Index() {
             </div>
 
             <div className="flex items-center gap-2 ml-auto shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative h-10 w-10 rounded-full bg-card border border-border hover:bg-muted"
-              >
-                <Bell className="h-4 w-4 text-foreground" />
-                {(ehAdmin ? notificacoesChefiaCount : vencidosCount) > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center ring-2 ring-card">
-                    {ehAdmin ? notificacoesChefiaCount : vencidosCount}
-                  </span>
+              <div className="relative" ref={notificacoesRef}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={abrirFecharNotificacoes}
+                  className="relative h-10 w-10 rounded-full bg-card border border-border hover:bg-muted"
+                  aria-label="Abrir notificacoes"
+                >
+                  <Bell className="h-4 w-4 text-foreground" />
+                  {contadorSino > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center ring-2 ring-card">
+                      {contadorSino}
+                    </span>
+                  )}
+                </Button>
+
+                {notificacoesOpen && (
+                  <div className="absolute right-0 mt-2 w-[340px] max-w-[90vw] rounded-2xl border border-border bg-card shadow-2xl z-50 overflow-hidden">
+                    <div className="px-4 py-3 border-b border-border bg-muted/40">
+                      <p className="text-sm font-bold text-foreground">Notificacoes</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {ehAdmin
+                          ? "Pendencias da chefia"
+                          : "Ultimas movimentacoes novas dos seus processos"}
+                      </p>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto">
+                      {listaNotificacoes.length === 0 ? (
+                        <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                          Nenhuma notificacao no momento.
+                        </div>
+                      ) : (
+                        <ul className="divide-y divide-border">
+                          {listaNotificacoes.map((n) => (
+                            <li key={n.processoId} className="px-4 py-3">
+                              <p className="text-xs font-semibold text-foreground">Processo {n.numero}</p>
+                              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.texto}</p>
+                              <p className="text-[11px] text-muted-foreground/80 mt-1">
+                                {formatarDataHora(n.momentoISO)}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
                 )}
-              </Button>
+              </div>
 
               <Button
                 onClick={() => handleAdd("novo")}
@@ -650,7 +855,7 @@ function Index() {
               </div>
 
               <Dashboard
-                processos={processos}
+                processos={processosParaDashboard}
                 filtro={filtro}
                 onFiltroChange={setFiltro}
               />
@@ -710,7 +915,7 @@ function Index() {
 
           {aba === "indicadores" && (
             <Suspense fallback={<TabLoading label="Carregando indicadores..." />}>
-              <Estatisticas processos={processos} />
+              <Estatisticas processos={processosParaDashboard} />
             </Suspense>
           )}
 

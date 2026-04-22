@@ -75,7 +75,7 @@ export function useAuth() {
 
   useEffect(() => {
     // Monitora mudanças no estado de autenticação do Firebase
-    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseUser(fbUser);
       
       if (fbUser) {
@@ -89,24 +89,90 @@ export function useAuth() {
             userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
           }
           
-          // console.log("🔄 Dados carregados do localStorage:", userData.nome, "|", userData.role, "| Admin:", isAdmin(userData));
+          console.log("🔄 Dados do localStorage:", {
+            nome: userData.nome,
+            setor: userData.setor,
+            role: userData.role,
+            email: userData.email,
+          });
           setUser(userData);
         } else {
-          // Fallback: cria um usuário básico
+          // Sem cache local: tenta reconstruir perfil pelo Firestore (email/uid)
+          let userData: AuthUser | null = null;
+
+          try {
+            const usuariosRef = collection(db, "usuarios");
+            const qEmail = query(usuariosRef, where("email", "==", fbUser.email));
+            const snapshotEmail = await getDocs(qEmail);
+
+            if (!snapshotEmail.empty) {
+              const d = snapshotEmail.docs[0].data();
+              const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
+              userData = {
+                posto: d.posto || "",
+                nome: d.nome || fbUser.displayName || nomeExtraido,
+                role: d.role || "ASSESSOR",
+                secao: d.secao || d.setor || "AssJur",
+                email: fbUser.email || undefined,
+                uid: fbUser.uid,
+                nomeGuerra: d.nomeGuerra,
+                setor: d.setor,
+                cargo: d.cargo,
+                isChefe: d.isChefe === true || d.isChefe === "sim",
+                telefone: d.telefone,
+              };
+            } else {
+              const qUid = query(usuariosRef, where("uid", "==", fbUser.uid));
+              const snapshotUid = await getDocs(qUid);
+              if (!snapshotUid.empty) {
+                const d = snapshotUid.docs[0].data();
+                const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
+                userData = {
+                  posto: d.posto || "",
+                  nome: d.nome || fbUser.displayName || nomeExtraido,
+                  role: d.role || "ASSESSOR",
+                  secao: d.secao || d.setor || "AssJur",
+                  email: fbUser.email || undefined,
+                  uid: fbUser.uid,
+                  nomeGuerra: d.nomeGuerra,
+                  setor: d.setor,
+                  cargo: d.cargo,
+                  isChefe: d.isChefe === true || d.isChefe === "sim",
+                  telefone: d.telefone,
+                };
+              }
+            }
+          } catch (error) {
+            console.warn("⚠️ Falha ao buscar perfil no Firestore durante restore de sessão:", error);
+          }
+
+          // Fallback final: cria um usuário básico
+          if (!userData) {
           const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
-          const userData = {
-            posto: "",
-            nome: fbUser.displayName || nomeExtraido,
-            role: "ASSESSOR",
-            secao: "AssJur",
-            email: fbUser.email || undefined,
-            uid: fbUser.uid,
-          };
+            userData = {
+              posto: "",
+              nome: fbUser.displayName || nomeExtraido,
+              role: "ASSESSOR",
+              secao: "AssJur",
+              email: fbUser.email || undefined,
+              uid: fbUser.uid,
+            };
+            console.warn("⚠️ Usuário sem dados no localStorage/Firestore, usando fallback:", userData);
+          } else {
+            console.log("🔄 Sessão restaurada com perfil do Firestore:", {
+              nome: userData.nome,
+              setor: userData.setor,
+              role: userData.role,
+              email: userData.email,
+            });
+          }
           
           // Se é admin por email, ajusta o role
           if (isAdmin(userData)) {
             userData.role = "ADMIN UNIVERSAL";
           }
+
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
           
           setUser(userData);
         }
@@ -159,6 +225,13 @@ export function useAuth() {
               isChefe: d.isChefe === true || d.isChefe === "sim",
               telefone: d.telefone,
             };
+            
+            console.log("✅ Login bem-sucedido. Dados do usuário:", {
+              nome: userData.nome,
+              setor: userData.setor,
+              cargo: userData.cargo,
+              role: userData.role,
+            });
             
             if (isAdmin(userData)) {
               userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";

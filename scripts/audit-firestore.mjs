@@ -13,7 +13,7 @@ const firebaseConfig = {
 };
 
 const email = process.env.FIREBASE_AUDIT_EMAIL || "miguel@12rm.eb.mil.br";
-const password = process.env.FIREBASE_AUDIT_PASSWORD || "12rm2024";
+const password = process.env.FIREBASE_AUDIT_PASSWORD || "";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -42,6 +42,10 @@ function canonicalizarStatus(raw) {
 }
 
 async function auditar() {
+  if (!password) {
+    throw new Error("FIREBASE_AUDIT_PASSWORD não informado.");
+  }
+
   console.log(`Audit login email: ${email}`);
   await signInWithEmailAndPassword(auth, email, password);
 

@@ -36,6 +36,19 @@ export function useProcessos() {
     return undefined;
   };
 
+  const normalizarSetor = (valor: any): "DU" | "PA" | "" => {
+    const txt = String(valor ?? "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .trim()
+      .toUpperCase();
+
+    if (!txt) return "";
+    if (txt === "DU" || txt.includes("DEFESA") || txt.includes("USUARIO")) return "DU";
+    if (txt === "PA" || txt.includes("PROCESSO") || txt.includes("ADMIN")) return "PA";
+    return "";
+  };
+
   useEffect(() => {
     let unsubProcessos: (() => void) | null = null;
     let unsubDistribuicoes: (() => void) | null = null;
@@ -85,6 +98,7 @@ export function useProcessos() {
       const listaProcessos: Processo[] = [];
       
       processosCache.forEach((procData) => {
+        const setorCanonico = normalizarSetor(procData.setor || procData.tipo);
         // Busca a distribuição correspondente ao processo
         const distribuicao = distribuicoesCache.find((d: any) => d.processoId === procData.id);
         
@@ -153,8 +167,8 @@ export function useProcessos() {
           status: statusMapeado,
           criadoEm: toIsoString(procData.criadoEm) || toIsoString(procData.dataEntrada) || new Date().toISOString(),
           // Campos específicos AssJur Flow
-          tipo: (procData.setor || procData.tipo || "OUTRO") as any,
-          setor: procData.setor,
+          tipo: (setorCanonico || procData.tipo || "OUTRO") as any,
+          setor: setorCanonico || procData.setor,
           prioridade: (procData.prioridade || "normal") as any,
           secao: procData.secaoDU || procData.secao || "N/A",
           origem: procData.origemDU || procData.origem || "N/A",
