@@ -122,7 +122,15 @@ function Index() {
   const isPendenteChefia = (p: Processo) => {
     const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
     const statusNorm = (p.status || "").toString().toLowerCase();
-    return ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin", "assinado_externo"].includes(situacaoFluxo)
+    return [
+      "aguardando_assinatura_secao",
+      "aguardando_aprovacao_externa",
+      "enviado_admin",
+      "assinado_externo",
+      "CHEFIA_DILIGENCIA",
+      "CHEFIA_DEFESA",
+      "AGUARDANDO_RESPOSTA",
+    ].includes(situacaoFluxo)
       || statusNorm.includes("aguardando assinatura")
       || statusNorm.includes("aguardando conferencia da chefia");
   };

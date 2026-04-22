@@ -11,9 +11,15 @@ export type Prioridade = "liminar" | "urgente" | "normal";
 export interface PedidoSubsidios {
   tipoSolicitacao?: "primeira_vez" | "reiteracao";
   tipoDestino?: "interno" | "externo";
+  tipoDiligencia?: "INTERNO" | "EXTERNO";
+  acaoPrincipal?: "DILIGENCIA" | "DEFESA";
   secaoInterna?: string;
   omExterna?: string;
   numeroDiex?: string;
+  numeroSaida?: string;
+  numeroRecebido?: string;
+  numeroDocFinal?: string;
+  dataPrazo?: string;
   numeroDiexHistorico?: string[];
   prazoResposta?: string;
   observacoes?: string;
@@ -26,6 +32,7 @@ export interface PedidoSubsidios {
 export interface RespostaDU {
   numeroOficio?: string;
   numeroDiex?: string;
+  numeroRecebido?: string;
   destinoDocumento?: string;
   dataEnvio?: string;
   observacoes?: string;

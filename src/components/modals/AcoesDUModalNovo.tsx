@@ -1,27 +1,35 @@
-import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import { useEffect, useMemo, useState } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  ArrowRightCircle,
+  CalendarIcon,
+  CheckCircle2,
+  Clock,
+  FileSignature,
+  Flag,
+  Inbox,
+  Lock,
+  Repeat,
+  Send,
+  ShieldCheck,
+} from "lucide-react";
 
-type UltimoPedidoSubsidios = {
-  tipoSolicitacao?: "primeira_vez" | "reiteracao";
-  tipoDestino?: "interno" | "externo";
-  secaoInterna?: string;
-  omExterna?: string;
-  numeroDiex?: string;
-  numeroDiexHistorico?: string[];
-  prazoResposta?: string;
-  observacoes?: string;
-  situacaoFluxo?: string;
-  reiteracoes?: number;
-};
+type SituacaoFluxoDU =
+  | "MESA_ASSESSOR"
+  | "CHEFIA_DILIGENCIA"
+  | "AGUARDANDO_CHEM_DILIGENCIA"
+  | "AGUARDANDO_RESPOSTA"
+  | "CRIANDO_REITERACAO"
+  | "CHEFIA_DEFESA"
+  | "AGUARDANDO_CHEM_DEFESA"
+  | "APTO_FINALIZAR";
+
+type AcaoPrincipal = "DILIGENCIA" | "DEFESA";
+type TipoDiligencia = "INTERNO" | "EXTERNO";
 
 interface AcoesDUModalNovoProps {
   open: boolean;
@@ -31,398 +39,111 @@ interface AcoesDUModalNovoProps {
   onSuccess?: () => void;
 }
 
+const SITUACAO_ALIAS: Record<string, SituacaoFluxoDU> = {
+  aguardando_assinatura_secao: "CHEFIA_DILIGENCIA",
+  aguardando_aprovacao_externa: "CHEFIA_DILIGENCIA",
+  enviado_admin: "CHEFIA_DILIGENCIA",
+  devolvido_assessor_interno: "MESA_ASSESSOR",
+  devolvido_assessor_externo: "MESA_ASSESSOR",
+  devolvido_assessor_com_diex: "MESA_ASSESSOR",
+  aprovado_externo_enviado_chem: "AGUARDANDO_CHEM_DILIGENCIA",
+  aprovado_externo_aguardando_chem: "AGUARDANDO_CHEM_DILIGENCIA",
+  assinado_externo: "AGUARDANDO_CHEM_DILIGENCIA",
+  resposta_assinada_chem: "APTO_FINALIZAR",
+};
+
+const statusPorSituacao: Record<SituacaoFluxoDU, string> = {
+  MESA_ASSESSOR: "Em Andamento",
+  CHEFIA_DILIGENCIA: "Aguardando Ação da Chefia",
+  AGUARDANDO_CHEM_DILIGENCIA: "Aguardando Assinatura do CHEM",
+  AGUARDANDO_RESPOSTA: "Aguardando Resposta",
+  CRIANDO_REITERACAO: "Preparando Reiteração",
+  CHEFIA_DEFESA: "Aguardando Ação da Chefia",
+  AGUARDANDO_CHEM_DEFESA: "Aguardando Assinatura do CHEM",
+  APTO_FINALIZAR: "Aguardando Finalização DU",
+};
+
+const descricaoPorSituacao: Record<SituacaoFluxoDU, string> = {
+  MESA_ASSESSOR: "Processo devolvido à mesa do assessor.",
+  CHEFIA_DILIGENCIA: "Assessor enviou diligência para decisão da chefia.",
+  AGUARDANDO_CHEM_DILIGENCIA: "Chefia aprovou e encaminhou para assinatura do CHEM.",
+  AGUARDANDO_RESPOSTA: "Diligência emitida. Aguardando resposta da seção/OM.",
+  CRIANDO_REITERACAO: "Reiteração em elaboração pelo assessor.",
+  CHEFIA_DEFESA: "Minuta de defesa encaminhada para decisão da chefia.",
+  AGUARDANDO_CHEM_DEFESA: "Defesa aprovada pela chefia e aguardando assinatura do CHEM.",
+  APTO_FINALIZAR: "Documento final registrado. Processo apto para finalização.",
+};
+
+const normalizeSituacao = (situacao?: string): SituacaoFluxoDU => {
+  if (!situacao) return "MESA_ASSESSOR";
+  if (([
+    "MESA_ASSESSOR",
+    "CHEFIA_DILIGENCIA",
+    "AGUARDANDO_CHEM_DILIGENCIA",
+    "AGUARDANDO_RESPOSTA",
+    "CRIANDO_REITERACAO",
+    "CHEFIA_DEFESA",
+    "AGUARDANDO_CHEM_DEFESA",
+    "APTO_FINALIZAR",
+  ] as string[]).includes(situacao)) {
+    return situacao as SituacaoFluxoDU;
+  }
+  return SITUACAO_ALIAS[situacao] || "MESA_ASSESSOR";
+};
+
 export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcesso, onSuccess }: AcoesDUModalNovoProps) {
   const { user } = useAuth();
+  const ehChefia = isAdmin(user);
   const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
   const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
-  const [acaoSelecionada, setAcaoSelecionada] = useState<string | null>(null);
-  
-  // Estados para Solicitar Subsídios
-  const [tipoSolicitacaoSubsidio, setTipoSolicitacaoSubsidio] = useState<"primeira_vez" | "reiteracao">("primeira_vez");
-  const [tipoPedidoSubsidio, setTipoPedidoSubsidio] = useState<"interno" | "externo">("interno");
-  const [secaoInterna, setSecaoInterna] = useState("");
-  const [omExterna, setOMExterna] = useState("");
-  const [numeroDiex, setNumeroDiex] = useState("");
-  const [dieuxAnteriores, setDieuxAnteriores] = useState<string[]>([]);
-  const [prazoResposta, setPrazoResposta] = useState("");
-  const [observacoesSubsidio, setObservacoesSubsidio] = useState("");
-  
-  // Estados para Registrar Resposta
-  const [numeroOficio, setNumeroOficio] = useState("");
-  const [numeroDiexResposta, setNumeroDiexResposta] = useState("");
-  const [destinoDocumentoResposta, setDestinoDocumentoResposta] = useState("");
-  const [dataEnvio, setDataEnvio] = useState(new Date().toISOString().split("T")[0]);
-  const [observacoesResposta, setObservacoesResposta] = useState("");
-  const [tipoDestinoAtual, setTipoDestinoAtual] = useState<"interno" | "externo" | "">("");
-  const [situacaoFluxoAtual, setSituacaoFluxoAtual] = useState("");
-  const [ultimoPedidoSubsidios, setUltimoPedidoSubsidios] = useState<UltimoPedidoSubsidios | null>(null);
+
+  const [situacaoFluxo, setSituacaoFluxo] = useState<SituacaoFluxoDU>("MESA_ASSESSOR");
+  const [acaoPrincipal, setAcaoPrincipal] = useState<AcaoPrincipal>("DILIGENCIA");
+  const [tipoDiligencia, setTipoDiligencia] = useState<TipoDiligencia>("INTERNO");
+  const [dataPrazo, setDataPrazo] = useState("");
+  const [numeroSaida, setNumeroSaida] = useState("");
+  const [numeroRecebido, setNumeroRecebido] = useState("");
+  const [numeroDocFinal, setNumeroDocFinal] = useState("");
+  const [reiteracoes, setReiteracoes] = useState(0);
+
+  const carregarFluxo = async () => {
+    if (!processoId) return;
+
+    try {
+      const processoRef = doc(db, "processos", processoId);
+      const snap = await getDoc(processoRef);
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+      const pedido = data?.pedidoSubsidios || {};
+      const resposta = data?.respostaDU || {};
+
+      setSituacaoFluxo(normalizeSituacao(pedido?.situacaoFluxo));
+      setAcaoPrincipal((pedido?.acaoPrincipal as AcaoPrincipal) || "DILIGENCIA");
+
+      const tipoDestino = (pedido?.tipoDestino || "").toString().toLowerCase();
+      const tipoSalvo = (pedido?.tipoDiligencia as TipoDiligencia) || "";
+      if (tipoSalvo === "INTERNO" || tipoSalvo === "EXTERNO") {
+        setTipoDiligencia(tipoSalvo);
+      } else {
+        setTipoDiligencia(tipoDestino === "externo" ? "EXTERNO" : "INTERNO");
+      }
+
+      setDataPrazo((pedido?.dataPrazo || pedido?.prazoResposta || "").toString());
+      setNumeroSaida((pedido?.numeroSaida || pedido?.numeroDiex || resposta?.numeroDiex || "").toString());
+      setNumeroRecebido((pedido?.numeroRecebido || resposta?.numeroRecebido || "").toString());
+      setNumeroDocFinal((pedido?.numeroDocFinal || resposta?.numeroOficio || "").toString());
+      setReiteracoes(Number(pedido?.reiteracoes || 0));
+    } catch (error) {
+      console.error("Erro ao carregar fluxo DU:", error);
+      toast.error("Não foi possível carregar o fluxo do processo.");
+    }
+  };
 
   useEffect(() => {
-    if (!open || !processoId) return;
-
-    const carregarContexto = async () => {
-      try {
-        const processoRef = doc(db, "processos", processoId);
-        const snap = await getDoc(processoRef);
-        if (!snap.exists()) return;
-        const pedido = snap.data()?.pedidoSubsidios || {};
-        setTipoDestinoAtual((pedido.tipoDestino as "interno" | "externo") || "");
-        setSituacaoFluxoAtual((pedido.situacaoFluxo as string) || "");
-        setUltimoPedidoSubsidios(pedido as UltimoPedidoSubsidios);
-      } catch (error) {
-        console.error("Erro ao carregar contexto de subsídios:", error);
-      }
-    };
-
-    carregarContexto();
+    if (!open) return;
+    carregarFluxo();
   }, [open, processoId]);
-
-  const resetFormularios = () => {
-    setAcaoSelecionada(null);
-    setTipoSolicitacaoSubsidio("primeira_vez");
-    setTipoPedidoSubsidio("interno");
-    setSecaoInterna("");
-    setOMExterna("");
-    setNumeroDiex("");
-    setDieuxAnteriores([]);
-    setPrazoResposta("");
-    setObservacoesSubsidio("");
-    setNumeroOficio("");
-    setNumeroDiexResposta("");
-    setDestinoDocumentoResposta("");
-    setDataEnvio(new Date().toISOString().split("T")[0]);
-    setObservacoesResposta("");
-  };
-
-  const extrairDiexAnteriores = (pedidoAnterior: any, respostaDUAnterior: any): string[] => {
-    const candidatos = [
-      ...(Array.isArray(pedidoAnterior?.numeroDiexHistorico) ? pedidoAnterior.numeroDiexHistorico : []),
-      pedidoAnterior?.numeroDiex,
-      respostaDUAnterior?.numeroDiex,
-    ]
-      .map((v) => (typeof v === "string" ? v.trim() : ""))
-      .filter(Boolean);
-
-    return Array.from(new Set(candidatos));
-  };
-
-  const mergeDiexHistorico = (pedidoAtual: any, novoDiex?: string): string[] => {
-    const base = Array.isArray(pedidoAtual?.numeroDiexHistorico) ? pedidoAtual.numeroDiexHistorico : [];
-    const candidatos = [
-      ...base,
-      pedidoAtual?.numeroDiex,
-      novoDiex,
-    ]
-      .map((v) => (typeof v === "string" ? v.trim() : ""))
-      .filter(Boolean);
-
-    return Array.from(new Set(candidatos));
-  };
-
-  const handleSolicitarSubsidios = async () => {
-    if (!processoId || !user) return;
-
-    const processoRef = doc(db, "processos", processoId);
-    const processoSnap = await getDoc(processoRef);
-    const pedidoAnterior = processoSnap.exists() ? (processoSnap.data()?.pedidoSubsidios || {}) : {};
-    const respostaDUAnterior = processoSnap.exists() ? (processoSnap.data()?.respostaDU || {}) : {};
-
-    if (tipoSolicitacaoSubsidio === "reiteracao" && !pedidoAnterior?.tipoDestino) {
-      toast.error("Não existe solicitação anterior para reiterar.");
-      return;
-    }
-
-    const tipoDestinoEfetivo: "interno" | "externo" =
-      tipoSolicitacaoSubsidio === "reiteracao"
-        ? (pedidoAnterior.tipoDestino as "interno" | "externo")
-        : tipoPedidoSubsidio;
-
-    const secaoInternaEfetiva =
-      tipoSolicitacaoSubsidio === "reiteracao"
-        ? (pedidoAnterior.secaoInterna || "")
-        : secaoInterna;
-
-    const omExternaEfetiva =
-      tipoSolicitacaoSubsidio === "reiteracao"
-        ? (pedidoAnterior.omExterna || "")
-        : omExterna;
-
-    const diexHistorico = extrairDiexAnteriores(pedidoAnterior, respostaDUAnterior);
-    setDieuxAnteriores(diexHistorico);
-
-    if (tipoDestinoEfetivo === "interno" && !secaoInternaEfetiva.trim()) {
-      toast.error("Informe a seção interna.");
-      return;
-    }
-    if (tipoDestinoEfetivo === "externo" && !omExternaEfetiva.trim()) {
-      toast.error("Informe a OM externa.");
-      return;
-    }
-
-    try {
-      const agoraISO = new Date().toISOString();
-      const situacaoFluxo = tipoDestinoEfetivo === "interno"
-        ? "aguardando_assinatura_secao"
-        : "aguardando_aprovacao_externa";
-      const statusFluxo = tipoDestinoEfetivo === "interno"
-        ? "Aguardando Assinatura da Seção"
-        : "Aguardando Aprovação Externa";
-
-      const pedidoSubsidios = {
-        tipoSolicitacao: tipoSolicitacaoSubsidio,
-        tipoDestino: tipoDestinoEfetivo,
-        secaoInterna: tipoDestinoEfetivo === "interno" ? secaoInternaEfetiva : "",
-        omExterna: tipoDestinoEfetivo === "externo" ? omExternaEfetiva : "",
-        numeroDiex: numeroDiex.trim() || "",
-        numeroDiexHistorico: diexHistorico,
-        prazoResposta: prazoResposta || "",
-        observacoes: observacoesSubsidio.trim() || "",
-        situacaoFluxo,
-        solicitadoEm: agoraISO,
-        solicitadoPorNome: autorMilitar,
-        reiteracoes: tipoSolicitacaoSubsidio === "reiteracao"
-          ? (pedidoAnterior?.reiteracoes || 0) + 1
-          : 0,
-      };
-
-      const prefixo = tipoSolicitacaoSubsidio === "reiteracao" ? "🔁 Reiteração" : "📨 Solicitação";
-      const msgHistorico = tipoDestinoEfetivo === "interno"
-        ? `${prefixo} de subsídios internos para ${secaoInternaEfetiva}. Aguardando assinatura da seção e devolução com DIEx.`
-        : `${prefixo} de subsídios externos para ${omExternaEfetiva}. Aguardando aprovação externa e posterior assinatura do CHEM.`;
-
-      await updateDoc(processoRef, {
-        pedidoSubsidios,
-        status: statusFluxo,
-        descricao: msgHistorico,
-        atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: autorMilitar,
-      });
-
-      // Adicionar ao histórico (subcoleção)
-      const historicoRef = collection(db, `processos/${processoId}/historico`);
-      await addDoc(historicoRef, {
-        autor: autorMilitar,
-        autorId: user.uid,
-        texto: msgHistorico,
-        timestamp: agoraISO,
-      });
-
-      // Também salvar na coleção mensagens (compatibilidade)
-      const mensagensRef = doc(db, "mensagens", processoId);
-      const mensagensSnap = await getDoc(mensagensRef);
-      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
-      await setDoc(mensagensRef, {
-        historico: [...historicoExistente, {
-          id: crypto.randomUUID(),
-          autor: autorMilitar,
-          autorId: user.uid,
-          texto: msgHistorico,
-          timestamp: agoraISO,
-        }]
-      });
-
-      toast.success(tipoSolicitacaoSubsidio === "reiteracao" ? "Reiteração enviada!" : "Pedido de subsídios enviado!");
-      resetFormularios();
-      onOpenChange(false);
-      if (onSuccess) onSuccess();
-    } catch (error) {
-      console.error("Erro ao solicitar subsídios:", error);
-      toast.error("Erro ao enviar pedido de subsídios");
-    }
-  };
-
-  const handleRegistrarResposta = async () => {
-    if (!processoId || !user) return;
-
-    if (!destinoDocumentoResposta.trim()) {
-      toast.error("Informe o destino do documento.");
-      return;
-    }
-
-    try {
-      const agoraISO = new Date().toISOString();
-      const processoRef = doc(db, "processos", processoId);
-      const processoSnap = await getDoc(processoRef);
-      const pedidoSubsidiosAtual = processoSnap.exists() ? (processoSnap.data()?.pedidoSubsidios || {}) : {};
-      const tipoDestinoAtual = pedidoSubsidiosAtual?.tipoDestino as "interno" | "externo" | undefined;
-      const isChefiaProcessandoPedido = isAdmin(user) && ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin"].includes(pedidoSubsidiosAtual?.situacaoFluxo || "");
-      const aguardandoAssinaturaCHEM = !isAdmin(user) && tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(pedidoSubsidiosAtual?.situacaoFluxo || "");
-
-      if (aguardandoAssinaturaCHEM && !numeroOficio.trim() && !numeroDiexResposta.trim()) {
-        toast.error("Informe Ofício, DIEx ou ambos após a assinatura do CHEM.");
-        return;
-      }
-
-      const respostaDU = {
-        numeroOficio: numeroOficio.trim() || "",
-        numeroDiex: numeroDiexResposta.trim() || "",
-        destinoDocumento: destinoDocumentoResposta.trim(),
-        dataEnvio,
-        observacoes: observacoesResposta.trim() || "",
-        situacao: aguardandoAssinaturaCHEM ? "assinada_chem" : (isAdmin(user) ? "processada_chefia" : "enviada_chefia"),
-        registradoEm: agoraISO,
-        registradoPorNome: autorMilitar,
-      };
-
-      let msgHistorico = `📤 Resposta enviada à chefia (Ofício: ${numeroOficio || "—"}, DIEx: ${numeroDiexResposta || "—"}, Destino: ${destinoDocumentoResposta.trim()}) por ${autorMilitar}.`;
-      let statusDestino = isAdmin(user) ? "Aguardando Assinatura do CHEM" : "Aguardando Conferência da Chefia";
-      let patchPedidoSubsidios: any = null;
-
-      if (isChefiaProcessandoPedido && tipoDestinoAtual === "interno") {
-        msgHistorico = `✅ Pedido interno assinado pela chefia e devolvido ao assessor com DIEx ${numeroDiexResposta || "—"}.`;
-        statusDestino = "Em Andamento";
-        patchPedidoSubsidios = {
-          ...pedidoSubsidiosAtual,
-          numeroDiex: numeroDiexResposta.trim() || pedidoSubsidiosAtual?.numeroDiex || "",
-          numeroDiexHistorico: mergeDiexHistorico(pedidoSubsidiosAtual, numeroDiexResposta.trim()),
-          situacaoFluxo: "devolvido_assessor_interno",
-          assinadoChefiaEm: agoraISO,
-          assinadoChefiaPorNome: autorMilitar,
-        };
-      } else if (isChefiaProcessandoPedido && tipoDestinoAtual === "externo") {
-        msgHistorico = "✅ Chefe da AssJur conferiu, aprovou e enviou ao CHEM. Card devolvido ao assessor aguardando assinatura do CHEM no SPED.";
-        statusDestino = "Aguardando Assinatura do CHEM";
-        patchPedidoSubsidios = {
-          ...pedidoSubsidiosAtual,
-          numeroDiex: "",
-          numeroDiexHistorico: mergeDiexHistorico(pedidoSubsidiosAtual),
-          situacaoFluxo: "aprovado_externo_enviado_chem",
-          aprovadoChefiaEm: agoraISO,
-          aprovadoChefiaPorNome: autorMilitar,
-        };
-      } else if (aguardandoAssinaturaCHEM) {
-        msgHistorico = `✅ Assessor registrou os números após a assinatura do CHEM (Ofício: ${numeroOficio || "—"}, DIEx: ${numeroDiexResposta || "—"}). Processo liberado para finalização.`;
-        statusDestino = "Aguardando Finalização DU";
-        patchPedidoSubsidios = {
-          ...pedidoSubsidiosAtual,
-          numeroDiex: numeroDiexResposta.trim() || pedidoSubsidiosAtual?.numeroDiex || "",
-          numeroDiexHistorico: mergeDiexHistorico(pedidoSubsidiosAtual, numeroDiexResposta.trim()),
-          situacaoFluxo: "resposta_assinada_chem",
-          dataAssinatura: dataEnvio || pedidoSubsidiosAtual?.dataAssinatura || "",
-        };
-      }
-
-      const updatePayload: any = {
-        respostaDU,
-        status: statusDestino,
-        descricao: msgHistorico,
-        atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: autorMilitar,
-      };
-      if (patchPedidoSubsidios) {
-        updatePayload.pedidoSubsidios = patchPedidoSubsidios;
-      }
-
-      await updateDoc(processoRef, updatePayload);
-
-      // Adicionar ao histórico (subcoleção)
-      const historicoRef = collection(db, `processos/${processoId}/historico`);
-      await addDoc(historicoRef, {
-        autor: autorMilitar,
-        autorId: user.uid,
-        texto: msgHistorico,
-        timestamp: agoraISO,
-      });
-
-      // Também salvar na coleção mensagens (compatibilidade)
-      const mensagensRef = doc(db, "mensagens", processoId);
-      const mensagensSnap = await getDoc(mensagensRef);
-      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
-      await setDoc(mensagensRef, {
-        historico: [...historicoExistente, {
-          id: crypto.randomUUID(),
-          autor: autorMilitar,
-          autorId: user.uid,
-          texto: msgHistorico,
-          timestamp: agoraISO,
-        }]
-      });
-
-      toast.success("Resposta registrada com sucesso!");
-      resetFormularios();
-      onOpenChange(false);
-      if (onSuccess) onSuccess();
-    } catch (error) {
-      console.error("Erro ao registrar resposta:", error);
-      toast.error("Erro ao registrar resposta");
-    }
-  };
-
-  const handleDespacharCHEM = async () => {
-    if (!processoId || !user || !isAdmin(user)) return;
-
-    try {
-      const agoraISO = new Date().toISOString();
-      const processoRef = doc(db, "processos", processoId);
-      const processoSnap = await getDoc(processoRef);
-      const pedidoAtual = processoSnap.exists() ? (processoSnap.data()?.pedidoSubsidios || {}) : {};
-      const respostaAtual = processoSnap.exists() ? (processoSnap.data()?.respostaDU || {}) : {};
-
-      const numeroOficioAtual = (respostaAtual?.numeroOficio || "").toString().trim();
-      const numeroDiexAtual = (respostaAtual?.numeroDiex || "").toString().trim();
-      const destinoAtual = (respostaAtual?.destinoDocumento || "").toString().trim();
-
-      if (!numeroOficioAtual && !numeroDiexAtual) {
-        toast.error("Registre Ofício ou DIEx na resposta antes de confirmar assinatura CHEM.");
-        return;
-      }
-      if (!destinoAtual) {
-        toast.error("Informe o destino do documento antes de confirmar assinatura CHEM.");
-        return;
-      }
-
-      const msgHistorico = `✅ Resposta assinada pelo CHEM. Processo liberado para finalização definitiva por ${user.email?.split("@")[0]}.`;
-
-      await updateDoc(processoRef, {
-        respostaDU: {
-          ...respostaAtual,
-          situacao: "assinada_chem",
-          registradoEm: respostaAtual?.registradoEm || agoraISO,
-          registradoPorNome: respostaAtual?.registradoPorNome || autorMilitar,
-        },
-        pedidoSubsidios: {
-          ...pedidoAtual,
-          situacaoFluxo: "resposta_assinada_chem",
-        },
-        status: "Aguardando Finalização DU",
-        finalizado: false,
-        descricao: msgHistorico,
-        atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: user.email || "Sistema",
-      });
-
-      // Adicionar ao histórico
-      const historicoRef = collection(db, `processos/${processoId}/historico`);
-      await addDoc(historicoRef, {
-        autor: autorMilitar,
-        autorId: user.uid,
-        texto: msgHistorico,
-        timestamp: agoraISO,
-      });
-
-      // Também salvar na coleção mensagens
-      const mensagensRef = doc(db, "mensagens", processoId);
-      const mensagensSnap = await getDoc(mensagensRef);
-      const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
-      await setDoc(mensagensRef, {
-        historico: [...historicoExistente, {
-          id: crypto.randomUUID(),
-          autor: autorMilitar,
-          autorId: user.uid,
-          texto: msgHistorico,
-          timestamp: agoraISO,
-        }]
-      });
-
-      toast.success("Despacho CHEM registrado!");
-      resetFormularios();
-      onOpenChange(false);
-      if (onSuccess) onSuccess();
-    } catch (error) {
-      console.error("Erro ao despachar CHEM:", error);
-      toast.error("Erro ao registrar despacho");
-    }
-  };
 
   const registrarHistorico = async (texto: string) => {
     const agoraISO = new Date().toISOString();
@@ -439,402 +160,420 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     const mensagensSnap = await getDoc(mensagensRef);
     const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
     await setDoc(mensagensRef, {
-      historico: [...historicoExistente, {
-        id: crypto.randomUUID(),
-        autor: autorMilitar,
-        autorId: user?.uid || "sistema",
-        texto,
-        timestamp: agoraISO,
-      }]
+      historico: [
+        ...historicoExistente,
+        {
+          id: crypto.randomUUID(),
+          autor: autorMilitar,
+          autorId: user?.uid || "sistema",
+          texto,
+          timestamp: agoraISO,
+        },
+      ],
     });
   };
 
-  const handleAssinarDiexChefia = async () => {
-    if (!processoId || !user || !isAdmin(user)) return;
-    if (!numeroDiexResposta.trim()) {
-      toast.error("Informe o número do DIEx para assinar.");
-      return;
-    }
+  const avancarFluxo = async (
+    proximaSituacao: SituacaoFluxoDU,
+    extras?: {
+      numeroSaida?: string;
+      numeroRecebido?: string;
+      numeroDocFinal?: string;
+      dataPrazo?: string;
+      reiteracoes?: number;
+      acaoPrincipal?: AcaoPrincipal;
+      tipoDiligencia?: TipoDiligencia;
+    },
+  ) => {
+    if (!processoId || !user) return;
 
     try {
-      const agoraISO = new Date().toISOString();
       const processoRef = doc(db, "processos", processoId);
-      const processoSnap = await getDoc(processoRef);
-      const pedidoAtual = processoSnap.exists() ? (processoSnap.data()?.pedidoSubsidios || {}) : {};
+      const snap = await getDoc(processoRef);
+      const dataAtual = snap.exists() ? snap.data() : {};
+      const pedidoAtual = dataAtual?.pedidoSubsidios || {};
+      const respostaAtual = dataAtual?.respostaDU || {};
 
-      const msgHistorico = `✅ Assinatura do Chefe de Seção concluída. Processo devolvido ao assessor com DIEx ${numeroDiexResposta.trim()}.`;
+      const numeroSaidaEfetivo = (extras?.numeroSaida ?? numeroSaida).trim();
+      const numeroRecebidoEfetivo = (extras?.numeroRecebido ?? numeroRecebido).trim();
+      const numeroDocFinalEfetivo = (extras?.numeroDocFinal ?? numeroDocFinal).trim();
+      const dataPrazoEfetiva = (extras?.dataPrazo ?? dataPrazo).trim();
+      const acaoPrincipalEfetiva = extras?.acaoPrincipal ?? acaoPrincipal;
+      const tipoDiligenciaEfetiva = extras?.tipoDiligencia ?? tipoDiligencia;
+      const reiteracoesEfetivas = extras?.reiteracoes ?? reiteracoes;
+
+      const numeroDiexHistorico = Array.from(
+        new Set(
+          [
+            ...(Array.isArray(pedidoAtual?.numeroDiexHistorico) ? pedidoAtual.numeroDiexHistorico : []),
+            pedidoAtual?.numeroDiex,
+            respostaAtual?.numeroDiex,
+            numeroSaidaEfetivo,
+          ]
+            .map((v) => (typeof v === "string" ? v.trim() : ""))
+            .filter(Boolean),
+        ),
+      );
+
+      const pedidoSubsidiosPatch = {
+        ...pedidoAtual,
+        tipoSolicitacao: reiteracoesEfetivas > 0 ? "reiteracao" : "primeira_vez",
+        tipoDestino: tipoDiligenciaEfetiva === "INTERNO" ? "interno" : "externo",
+        tipoDiligencia: tipoDiligenciaEfetiva,
+        acaoPrincipal: acaoPrincipalEfetiva,
+        dataPrazo: dataPrazoEfetiva,
+        prazoResposta: dataPrazoEfetiva,
+        numeroSaida: numeroSaidaEfetivo,
+        numeroRecebido: numeroRecebidoEfetivo,
+        numeroDocFinal: numeroDocFinalEfetivo,
+        numeroDiex: numeroSaidaEfetivo || pedidoAtual?.numeroDiex || "",
+        numeroDiexHistorico,
+        reiteracoes: reiteracoesEfetivas,
+        situacaoFluxo: proximaSituacao,
+      };
+
+      const respostaPatch = {
+        ...respostaAtual,
+        numeroDiex: numeroSaidaEfetivo || respostaAtual?.numeroDiex || "",
+        numeroOficio: numeroDocFinalEfetivo || respostaAtual?.numeroOficio || "",
+        numeroRecebido: numeroRecebidoEfetivo || respostaAtual?.numeroRecebido || "",
+        situacao: proximaSituacao === "APTO_FINALIZAR" ? "assinada_chem" : (respostaAtual?.situacao || "fluxo_du"),
+        registradoEm: new Date().toISOString(),
+        registradoPorNome: autorMilitar,
+      };
+
+      const descricao = descricaoPorSituacao[proximaSituacao];
 
       await updateDoc(processoRef, {
-        pedidoSubsidios: {
-          ...pedidoAtual,
-          numeroDiex: numeroDiexResposta.trim(),
-          numeroDiexHistorico: mergeDiexHistorico(pedidoAtual, numeroDiexResposta.trim()),
-          situacaoFluxo: "devolvido_assessor_com_diex",
-          assinadoChefiaEm: agoraISO,
-          assinadoChefiaPorNome: autorMilitar,
-        },
-        status: "Em Andamento",
-        descricao: msgHistorico,
+        pedidoSubsidios: pedidoSubsidiosPatch,
+        respostaDU: respostaPatch,
+        status: statusPorSituacao[proximaSituacao],
+        descricao,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
       });
 
-      await registrarHistorico(msgHistorico);
+      await registrarHistorico(descricao);
 
-      toast.success("DIEx assinado e devolvido ao assessor.");
-      resetFormularios();
-      onOpenChange(false);
+      setSituacaoFluxo(proximaSituacao);
+      if (extras?.reiteracoes !== undefined) setReiteracoes(extras.reiteracoes);
+      if (extras?.numeroSaida !== undefined) setNumeroSaida(extras.numeroSaida);
+      if (extras?.numeroRecebido !== undefined) setNumeroRecebido(extras.numeroRecebido);
+      if (extras?.numeroDocFinal !== undefined) setNumeroDocFinal(extras.numeroDocFinal);
+      if (extras?.dataPrazo !== undefined) setDataPrazo(extras.dataPrazo);
+      if (extras?.acaoPrincipal !== undefined) setAcaoPrincipal(extras.acaoPrincipal);
+      if (extras?.tipoDiligencia !== undefined) setTipoDiligencia(extras.tipoDiligencia);
+
       if (onSuccess) onSuccess();
     } catch (error) {
-      console.error("Erro ao assinar DIEx:", error);
-      toast.error("Erro ao assinar DIEx");
+      console.error("Erro ao avançar fluxo DU:", error);
+      toast.error("Falha ao atualizar o fluxo DU.");
     }
   };
 
-  const handleAprovarEnviarCHEM = async () => {
-    if (!processoId || !user || !isAdmin(user)) return;
+  const finalizarProcesso = async () => {
+    if (!processoId || !user) return;
 
     try {
-      const agoraISO = new Date().toISOString();
       const processoRef = doc(db, "processos", processoId);
-      const processoSnap = await getDoc(processoRef);
-      const pedidoAtual = processoSnap.exists() ? (processoSnap.data()?.pedidoSubsidios || {}) : {};
-
-      const msgHistorico = "✅ Chefe/Admin aprovou e devolveu para o assessor. O processo segue aguardando a assinatura do CHEM no SPED para posterior registro dos números.";
+      const descricao = "Processo finalizado no fluxo DU.";
 
       await updateDoc(processoRef, {
-        pedidoSubsidios: {
-          ...pedidoAtual,
-          numeroDiex: "",
-          numeroDiexHistorico: mergeDiexHistorico(pedidoAtual),
-          situacaoFluxo: "aprovado_externo_enviado_chem",
-          aprovadoChefiaEm: agoraISO,
-          aprovadoChefiaPorNome: autorMilitar,
-        },
-        status: "Aguardando CHEM",
-        descricao: msgHistorico,
+        status: "concluido",
+        descricao,
+        finalizado: true,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
       });
 
-      await registrarHistorico(msgHistorico);
-
-      toast.success("Aprovado e devolvido ao assessor.");
-      resetFormularios();
+      await registrarHistorico(descricao);
+      toast.success("Processo finalizado com sucesso.");
       onOpenChange(false);
       if (onSuccess) onSuccess();
     } catch (error) {
-      console.error("Erro ao aprovar/enviar CHEM:", error);
-      toast.error("Erro ao aprovar e enviar ao CHEM");
+      console.error("Erro ao finalizar processo:", error);
+      toast.error("Não foi possível finalizar o processo.");
+    }
+  };
+
+  const cabecalhoSituacao = useMemo(() => {
+    const mapa: Record<SituacaoFluxoDU, string> = {
+      MESA_ASSESSOR: "Mesa do Assessor",
+      CHEFIA_DILIGENCIA: "Na Chefia - Diligência",
+      AGUARDANDO_CHEM_DILIGENCIA: "Aguardando CHEM - Diligência",
+      AGUARDANDO_RESPOSTA: "Aguardando Resposta",
+      CRIANDO_REITERACAO: "Criando Reiteração",
+      CHEFIA_DEFESA: "Na Chefia - Defesa",
+      AGUARDANDO_CHEM_DEFESA: "Aguardando CHEM - Defesa",
+      APTO_FINALIZAR: "Apto para Finalização",
+    };
+    return mapa[situacaoFluxo];
+  }, [situacaoFluxo]);
+
+  const renderVisaoAssessor = () => {
+    switch (situacaoFluxo) {
+      case "MESA_ASSESSOR":
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {numeroRecebido && (
+              <div className="bg-sky-50 border border-sky-200 p-3 rounded-xl flex items-start gap-2">
+                <CheckCircle2 className="w-4 h-4 text-sky-600 mt-0.5" />
+                <div>
+                  <h4 className="text-sm font-bold text-sky-900">Resposta Recebida</h4>
+                  <p className="text-[11px] text-sky-700">
+                    A Chefia registou o Doc: <strong>{numeroRecebido}</strong>.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <h4 className="font-semibold text-slate-800 mb-3 text-sm flex items-center gap-2">
+                <Send className="w-4 h-4 text-sky-600" /> Escolha a ação:
+              </h4>
+              <div className="space-y-2">
+                <label className={`flex items-start gap-2 p-3 border rounded-xl cursor-pointer transition-all ${acaoPrincipal === "DILIGENCIA" ? "bg-white border-sky-400 ring-1 ring-sky-200" : "bg-transparent border-slate-200 hover:bg-white"}`}>
+                  <input type="radio" checked={acaoPrincipal === "DILIGENCIA"} onChange={() => setAcaoPrincipal("DILIGENCIA")} className="mt-1" />
+                  <div className="w-full">
+                    <p className="font-bold text-slate-800 text-sm">1. Pedir Diligência</p>
+                    {acaoPrincipal === "DILIGENCIA" && (
+                      <div className="mt-2 space-y-3">
+                        <div className="flex gap-2">
+                          <label className={`flex-1 flex items-center justify-center p-2 border rounded-md text-[11px] font-bold cursor-pointer ${tipoDiligencia === "INTERNO" ? "bg-sky-100 border-sky-300 text-sky-800" : "bg-white"}`}>
+                            <input type="radio" checked={tipoDiligencia === "INTERNO"} onChange={() => setTipoDiligencia("INTERNO")} className="hidden" /> Interno
+                          </label>
+                          <label className={`flex-1 flex items-center justify-center p-2 border rounded-md text-[11px] font-bold cursor-pointer ${tipoDiligencia === "EXTERNO" ? "bg-sky-100 border-sky-300 text-sky-800" : "bg-white"}`}>
+                            <input type="radio" checked={tipoDiligencia === "EXTERNO"} onChange={() => setTipoDiligencia("EXTERNO")} className="hidden" /> Externo
+                          </label>
+                        </div>
+                        <div className="relative">
+                          <CalendarIcon className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                          <input type="date" value={dataPrazo} onChange={(e) => setDataPrazo(e.target.value)} className="w-full pl-9 p-2 text-sm border rounded-md outline-none focus:ring-2 ring-sky-500" />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </label>
+
+                <label className={`flex items-start gap-2 p-3 border rounded-xl cursor-pointer transition-all ${acaoPrincipal === "DEFESA" ? "bg-white border-sky-400 ring-1 ring-sky-200" : "bg-transparent border-slate-200 hover:bg-white"}`}>
+                  <input type="radio" checked={acaoPrincipal === "DEFESA"} onChange={() => setAcaoPrincipal("DEFESA")} className="mt-1" />
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">2. Elaborar Defesa Final</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">Enviar minuta final para aprovação.</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <button
+              disabled={acaoPrincipal === "DILIGENCIA" && !dataPrazo}
+              onClick={() =>
+                avancarFluxo(acaoPrincipal === "DILIGENCIA" ? "CHEFIA_DILIGENCIA" : "CHEFIA_DEFESA", {
+                  acaoPrincipal,
+                  tipoDiligencia,
+                  dataPrazo,
+                  numeroRecebido: "",
+                })
+              }
+              className="w-full bg-sky-600 hover:bg-sky-700 disabled:bg-sky-300 text-white font-bold py-3 rounded-xl transition-colors"
+            >
+              Enviar para a Chefia
+            </button>
+          </div>
+        );
+
+      case "AGUARDANDO_CHEM_DILIGENCIA":
+        return (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 text-center">
+              <FileSignature className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+              <h4 className="font-bold text-emerald-900 text-sm">Pedido Aprovado pelo CHEM</h4>
+              <p className="text-xs text-emerald-700 mb-3">Insira o numero gerado no SPED:</p>
+              <input type="text" value={numeroSaida} onChange={(e) => setNumeroSaida(e.target.value)} placeholder="Ex: Oficio n° 45/2026" className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none" />
+            </div>
+            <button disabled={!numeroSaida} onClick={() => avancarFluxo("AGUARDANDO_RESPOSTA", { numeroSaida })} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl disabled:bg-emerald-300">
+              Registar Saida e Iniciar Prazo
+            </button>
+          </div>
+        );
+
+      case "AGUARDANDO_RESPOSTA":
+        return (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="bg-amber-50 p-5 rounded-xl border border-amber-200 text-center">
+              <Clock className="w-8 h-8 text-amber-500 mx-auto mb-2" />
+              <h4 className="font-bold text-amber-900 text-sm">Diligência em Andamento</h4>
+              <p className="text-xs text-amber-700 mb-4">A aguardar resposta da secao/OM.</p>
+              <button onClick={() => avancarFluxo("CRIANDO_REITERACAO")} className="w-full bg-white border border-orange-300 text-orange-700 hover:bg-orange-50 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-1">
+                <Repeat className="w-3 h-3" /> Gerar Cobranca Oficial
+              </button>
+            </div>
+          </div>
+        );
+
+      case "CRIANDO_REITERACAO":
+        return (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="bg-orange-50 p-5 rounded-xl border border-orange-200">
+              <h4 className="font-bold text-orange-900 text-sm mb-2">Cobranca de Diligência</h4>
+              <p className="text-xs text-orange-800 mb-3">Novo prazo fatal para esta {reiteracoes + 1}ª cobranca:</p>
+              <input type="date" value={dataPrazo} onChange={(e) => setDataPrazo(e.target.value)} className="w-full p-2 border rounded-md outline-none" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => avancarFluxo("AGUARDANDO_RESPOSTA")} className="flex-1 bg-slate-200 font-bold text-sm rounded-xl py-3">
+                Cancelar
+              </button>
+              <button
+                disabled={!dataPrazo}
+                onClick={() =>
+                  avancarFluxo("CHEFIA_DILIGENCIA", {
+                    reiteracoes: reiteracoes + 1,
+                    numeroSaida: "",
+                    dataPrazo,
+                  })
+                }
+                className="flex-1 bg-orange-600 disabled:bg-orange-300 text-white font-bold py-3 rounded-xl text-sm"
+              >
+                Enviar a Chefia
+              </button>
+            </div>
+          </div>
+        );
+
+      case "AGUARDANDO_CHEM_DEFESA":
+        return (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 text-center">
+              <FileSignature className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+              <h4 className="font-bold text-emerald-900 text-sm">Defesa Aprovada!</h4>
+              <p className="text-xs text-emerald-700 mb-3">Insira o n° final assinado pelo CHEM:</p>
+              <input type="text" value={numeroDocFinal} onChange={(e) => setNumeroDocFinal(e.target.value)} placeholder="Ex: Oficio n° 789/2026" className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none" />
+            </div>
+            <button disabled={!numeroDocFinal} onClick={() => avancarFluxo("APTO_FINALIZAR", { numeroDocFinal })} className="w-full bg-emerald-600 disabled:bg-emerald-300 text-white font-bold py-3 rounded-xl">
+              Registar Numero
+            </button>
+          </div>
+        );
+
+      case "APTO_FINALIZAR":
+        return (
+          <div className="space-y-4 animate-in fade-in text-center">
+            <div className="bg-slate-100 p-6 rounded-xl border border-slate-300">
+              <Flag className="w-8 h-8 text-slate-800 mx-auto mb-2" />
+              <h4 className="font-bold text-slate-800 text-sm">Pronto para Finalização</h4>
+            </div>
+            <button onClick={finalizarProcesso} className="w-full bg-slate-900 text-white hover:bg-black font-bold py-4 rounded-xl">
+              Finalizar Processo
+            </button>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="bg-slate-50 p-6 rounded-xl border text-center border-dashed border-slate-300">
+            <Lock className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <h4 className="font-bold text-slate-600 text-sm">Acesso Bloqueado</h4>
+            <p className="text-[11px] text-slate-500 mt-1">A aguardar ação da Chefia ou CHEM.</p>
+          </div>
+        );
+    }
+  };
+
+  const renderVisaoChefe = () => {
+    const isReit = reiteracoes > 0;
+
+    switch (situacaoFluxo) {
+      case "CHEFIA_DILIGENCIA":
+        return (
+          <div className="space-y-4 animate-in fade-in">
+            <div className={`p-4 rounded-xl border ${isReit ? "bg-red-50 border-red-200" : "bg-indigo-50 border-indigo-200"}`}>
+              <div className="flex justify-between items-center mb-3">
+                <h4 className={`font-bold text-sm ${isReit ? "text-red-900" : "text-indigo-900"}`}>
+                  {isReit ? "Cobranca de Diligência" : `Diligência ${tipoDiligencia}`}
+                </h4>
+                {isReit && <span className="bg-red-200 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full">{reiteracoes}ª Reit.</span>}
+              </div>
+
+              {tipoDiligencia === "INTERNO" ? (
+                <div className="space-y-2 mt-4">
+                  <label className="text-[11px] font-bold text-indigo-900 uppercase">N° do DIEx Assinado:</label>
+                  <input type="text" value={numeroSaida} onChange={(e) => setNumeroSaida(e.target.value)} placeholder="Ex: DIEx 123/2026" className="w-full p-2.5 border rounded-lg outline-none text-sm" />
+                </div>
+              ) : (
+                <p className="text-[11px] text-indigo-800 bg-white/50 p-2 rounded mt-2">Encaminhe este pedido para o CHEM assinar.</p>
+              )}
+            </div>
+            <button
+              disabled={tipoDiligencia === "INTERNO" && !numeroSaida}
+              onClick={() =>
+                avancarFluxo(tipoDiligencia === "INTERNO" ? "AGUARDANDO_RESPOSTA" : "AGUARDANDO_CHEM_DILIGENCIA", {
+                  numeroSaida,
+                })
+              }
+              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-3 rounded-xl text-sm"
+            >
+              {tipoDiligencia === "INTERNO" ? "Assinar e Iniciar Prazo" : "Aprovar e Encaminhar"}
+            </button>
+          </div>
+        );
+
+      case "AGUARDANDO_RESPOSTA":
+        return (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="bg-amber-50 p-4 rounded-xl border border-amber-200">
+              <h4 className="font-bold text-amber-900 text-sm mb-3 flex items-center gap-2">
+                <Inbox className="w-4 h-4" /> Entrada de Resposta
+              </h4>
+              <label className="text-[11px] font-bold text-amber-900 uppercase">N° do Doc. Recebido:</label>
+              <input type="text" value={numeroRecebido} onChange={(e) => setNumeroRecebido(e.target.value)} placeholder="Ex: Oficio/DIEx recebido" className="w-full mt-1 p-2.5 border rounded-lg outline-none text-sm" />
+            </div>
+            <button
+              disabled={!numeroRecebido}
+              onClick={() => avancarFluxo("MESA_ASSESSOR", { numeroRecebido })}
+              className="w-full bg-amber-600 disabled:bg-amber-300 text-white font-bold py-3 rounded-xl flex justify-center gap-2 text-sm"
+            >
+              <ArrowRightCircle className="w-4 h-4" /> Devolver ao Assessor
+            </button>
+          </div>
+        );
+
+      case "CHEFIA_DEFESA":
+        return (
+          <div className="space-y-4 animate-in fade-in">
+            <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl">
+              <h4 className="font-bold text-indigo-900 text-sm mb-2">Revisao de Defesa Final</h4>
+              <p className="text-xs text-indigo-800">Aprove o envio da minuta para o CHEM.</p>
+            </div>
+            <button onClick={() => avancarFluxo("AGUARDANDO_CHEM_DEFESA")} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">
+              Aprovar e Encaminhar
+            </button>
+          </div>
+        );
+
+      default:
+        return (
+          <div className="bg-slate-50 p-6 rounded-xl border text-center border-dashed border-slate-300">
+            <ShieldCheck className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <h4 className="font-bold text-slate-600 text-sm">Sem Pendências</h4>
+            <p className="text-[11px] text-slate-500 mt-1">Nada a fazer neste processo por agora.</p>
+          </div>
+        );
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(opening) => {
-      if (!opening) resetFormularios();
-      onOpenChange(opening);
-    }}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ações DU - {numeroProcesso}</DialogTitle>
-          <DialogDescription className="sr-only">
-            Gerenciar ações de processos da Defesa de Usuários
-          </DialogDescription>
+          <DialogDescription className="sr-only">Fluxo inteligente de tramitação da Defesa da União.</DialogDescription>
         </DialogHeader>
 
-        {!acaoSelecionada && (
-          <div className="space-y-3">
-            <h3 className="font-semibold text-slate-700">Selecione uma ação:</h3>
+        <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+          <strong>Situação atual:</strong> {cabecalhoSituacao}
+        </div>
 
-            {isAdmin(user) && tipoDestinoAtual === "interno" && ["aguardando_assinatura_secao", "enviado_admin"].includes(situacaoFluxoAtual) && (
-              <Button
-                onClick={() => setAcaoSelecionada("assinar_diex")}
-                className="w-full justify-start border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                variant="outline"
-              >
-                ✍️ Assinar DIEx
-              </Button>
-            )}
-
-            {isAdmin(user) && tipoDestinoAtual === "externo" && ["aguardando_aprovacao_externa", "enviado_admin"].includes(situacaoFluxoAtual) && (
-              <Button
-                onClick={() => setAcaoSelecionada("aprovar_enviar_chem")}
-                className="w-full justify-start border-blue-300 text-blue-700 hover:bg-blue-50"
-                variant="outline"
-              >
-                ✅ Aprovar e Devolver para o Assessor
-              </Button>
-            )}
-            
-            <Button
-              onClick={() => setAcaoSelecionada("solicitar_subsidios")}
-              className="w-full justify-start border-sky-300 text-sky-700 hover:bg-sky-50"
-              variant="outline"
-            >
-              📨 Solicitar Subsídios
-            </Button>
-
-            <Button
-              onClick={() => setAcaoSelecionada("registrar_resposta")}
-              className="w-full justify-start border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-              variant="outline"
-            >
-              {tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(situacaoFluxoAtual)
-                ? "🖊️ Registrar Números Após Assinatura do CHEM"
-                : "📤 Registrar Resposta"}
-            </Button>
-          </div>
-        )}
-
-        {acaoSelecionada === "assinar_diex" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-indigo-700">✍️ Assinar DIEx (Chefe de Seção)</h3>
-
-            <div className="space-y-2">
-              <Label>Número do DIEx *</Label>
-              <Input
-                value={numeroDiexResposta}
-                onChange={(e) => setNumeroDiexResposta(e.target.value)}
-                placeholder="Ex: DIEx Nr 123-AsseApAssJur"
-              />
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAcaoSelecionada(null)}>
-                Voltar
-              </Button>
-              <Button onClick={handleAssinarDiexChefia} className="bg-indigo-600">
-                Confirmar Assinatura
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {acaoSelecionada === "aprovar_enviar_chem" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-blue-700">✅ Aprovar e Devolver para o Assessor</h3>
-            <p className="text-sm text-slate-600">
-              O chefe/admin confere a resposta, aprova e devolve o card ao assessor. A partir daí o status fica em aguardando assinatura do CHEM; só depois o assessor informa Ofício e/ou DIEx.
-            </p>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAcaoSelecionada(null)}>
-                Voltar
-              </Button>
-              <Button onClick={handleAprovarEnviarCHEM} className="bg-blue-600">
-                Aprovar e Devolver
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {acaoSelecionada === "solicitar_subsidios" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-sky-700">📨 Solicitar Subsídios</h3>
-
-            {!isAdmin(user) && (
-              <div className="space-y-2">
-                <Label>Tipo de Solicitação</Label>
-                <div className="flex items-center gap-4 rounded-md border border-slate-200 p-3">
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input
-                      type="radio"
-                      name="tipo-solicitacao-subsidio"
-                      checked={tipoSolicitacaoSubsidio === "primeira_vez"}
-                      onChange={() => setTipoSolicitacaoSubsidio("primeira_vez")}
-                    />
-                    1ª vez
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-slate-700">
-                    <input
-                      type="radio"
-                      name="tipo-solicitacao-subsidio"
-                      checked={tipoSolicitacaoSubsidio === "reiteracao"}
-                      onChange={() => setTipoSolicitacaoSubsidio("reiteracao")}
-                      disabled={!ultimoPedidoSubsidios?.tipoDestino}
-                    />
-                    Reiteração
-                  </label>
-                </div>
-              </div>
-            )}
-            
-            <div className="space-y-2">
-              <Label>Tipo de Destino</Label>
-              <Select
-                value={tipoSolicitacaoSubsidio === "reiteracao" ? (ultimoPedidoSubsidios?.tipoDestino || tipoPedidoSubsidio) : tipoPedidoSubsidio}
-                onValueChange={(v) => setTipoPedidoSubsidio(v as "interno" | "externo")}
-                disabled={tipoSolicitacaoSubsidio === "reiteracao" && !isAdmin(user)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="interno">Interno (Seção)</SelectItem>
-                  <SelectItem value="externo">Externo (OM)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {(tipoSolicitacaoSubsidio === "reiteracao" ? (ultimoPedidoSubsidios?.tipoDestino || tipoPedidoSubsidio) : tipoPedidoSubsidio) === "interno" && (
-              <div className="space-y-2">
-                <Label>Seção Interna *</Label>
-                <Select
-                  value={tipoSolicitacaoSubsidio === "reiteracao" ? (ultimoPedidoSubsidios?.secaoInterna || secaoInterna) : secaoInterna}
-                  onValueChange={setSecaoInterna}
-                  disabled={tipoSolicitacaoSubsidio === "reiteracao" && !isAdmin(user)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione a seção..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SVP">SVP</SelectItem>
-                    <SelectItem value="SFPC">SFPC</SelectItem>
-                    <SelectItem value="DIVADM">DIVADM</SelectItem>
-                    <SelectItem value="APG">APG</SelectItem>
-                    <SelectItem value="PMM">PMM</SelectItem>
-                    <SelectItem value="OUTROS">OUTROS</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            {(tipoSolicitacaoSubsidio === "reiteracao" ? (ultimoPedidoSubsidios?.tipoDestino || tipoPedidoSubsidio) : tipoPedidoSubsidio) === "externo" && (
-              <div className="space-y-2">
-                <Label>OM Externa *</Label>
-                <Input 
-                  value={tipoSolicitacaoSubsidio === "reiteracao" ? (ultimoPedidoSubsidios?.omExterna || omExterna) : omExterna}
-                  onChange={(e) => setOMExterna(e.target.value)}
-                  placeholder="Ex: 1º BIS, 2ª Cia..." 
-                  disabled={tipoSolicitacaoSubsidio === "reiteracao" && !isAdmin(user)}
-                />
-              </div>
-            )}
-
-            {tipoSolicitacaoSubsidio === "reiteracao" && dieuxAnteriores.length > 0 && (
-              <div className="space-y-2">
-                <Label>DIEx de pedidos anteriores</Label>
-                <div className="rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
-                  {dieuxAnteriores.join(" | ")}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>Número do DIEx {isAdmin(user) ? "" : "(será preenchido depois pelo chefe)"}</Label>
-              <Input 
-                value={numeroDiex} 
-                onChange={(e) => setNumeroDiex(e.target.value)}
-                placeholder={isAdmin(user) ? "Ex: DIEx Nr 123-AsseApAssJur" : "Na 1ª vez, o número será preenchido depois"}
-                disabled={!isAdmin(user)}
-                className={!isAdmin(user) ? "bg-slate-100 cursor-not-allowed" : ""}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Prazo para Resposta</Label>
-              <Input 
-                type="date"
-                value={prazoResposta} 
-                onChange={(e) => setPrazoResposta(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea 
-                value={observacoesSubsidio} 
-                onChange={(e) => setObservacoesSubsidio(e.target.value)}
-                placeholder="Informações adicionais sobre a solicitação..." 
-              />
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAcaoSelecionada(null)}>
-                Voltar
-              </Button>
-              <Button onClick={handleSolicitarSubsidios} className="bg-sky-600">
-                Enviar Solicitação
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {acaoSelecionada === "registrar_resposta" && (
-          <div className="space-y-4">
-            <h3 className="font-semibold text-emerald-700">
-              {tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(situacaoFluxoAtual)
-                ? "🖊️ Registrar Números Após Assinatura do CHEM"
-                : "📤 Registrar Resposta"}
-            </h3>
-
-            {tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(situacaoFluxoAtual) ? (
-              <p className="text-sm text-slate-600">
-                Após a assinatura no SPED, o assessor registra aqui o número do DIEx, do Ofício ou ambos. Só depois disso o processo poderá ser finalizado.
-              </p>
-            ) : (
-              <p className="text-sm text-slate-600">
-                O assessor envia a resposta para conferência do Chefe da AssJur. Nesta etapa, os números do documento ainda podem ficar em branco.
-              </p>
-            )}
-            
-            <div className="space-y-2">
-              <Label>Número do Ofício</Label>
-              <Input 
-                value={numeroOficio} 
-                onChange={(e) => setNumeroOficio(e.target.value)}
-                placeholder="Ex: Ofício Nr 45/2026" 
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Número do DIEx</Label>
-              <Input 
-                value={numeroDiexResposta} 
-                onChange={(e) => setNumeroDiexResposta(e.target.value)}
-                placeholder="Ex: DIEx Nr 123-AsseApAssJur" 
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Destino do Documento *</Label>
-              <Input
-                value={destinoDocumentoResposta}
-                onChange={(e) => setDestinoDocumentoResposta(e.target.value)}
-                placeholder="Ex: CHEM, Assessoria Jurídica, OM solicitante..."
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Data de Envio</Label>
-              <Input 
-                type="date"
-                value={dataEnvio} 
-                onChange={(e) => setDataEnvio(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Observações</Label>
-              <Textarea 
-                value={observacoesResposta} 
-                onChange={(e) => setObservacoesResposta(e.target.value)}
-                placeholder="Informações complementares sobre a resposta..." 
-              />
-            </div>
-
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setAcaoSelecionada(null)}>
-                Voltar
-              </Button>
-              <Button onClick={handleRegistrarResposta} className="bg-emerald-600">
-                {tipoDestinoAtual === "externo" && ["aprovado_externo_enviado_chem", "aprovado_externo_aguardando_chem"].includes(situacaoFluxoAtual)
-                  ? "Salvar Números"
-                  : "Enviar para Chefia"}
-              </Button>
-            </div>
-          </div>
-        )}
+        {ehChefia ? renderVisaoChefe() : renderVisaoAssessor()}
       </DialogContent>
     </Dialog>
   );

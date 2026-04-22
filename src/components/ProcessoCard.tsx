@@ -63,13 +63,16 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const isPA = setor === "PA";
   const situacaoSubsidio = p.pedidoSubsidios?.situacaoFluxo;
   const statusNormalizado = (p.status || "").toString().trim().toLowerCase();
-  const aguardandoAssinaturaCHEM = situacaoSubsidio === "aprovado_externo_enviado_chem" || statusNormalizado.includes("aguardando assinatura do chem");
-  const bloqueioPorStatus = (statusNormalizado.includes("aguardando assinatura") && !aguardandoAssinaturaCHEM) || statusNormalizado.includes("aguardando conferencia");
-  const bloqueioPorFluxo = ["aguardando_assinatura_secao", "aguardando_aprovacao_externa", "enviado_admin", "assinado_externo"].includes(situacaoSubsidio || "");
-  const acaoDUBloqueada = !ehAdmin && isDU && (bloqueioPorFluxo || bloqueioPorStatus);
+  const acaoDUBloqueada = false;
   const badgeAcaoChefia = (() => {
     if (situacaoSubsidio === "aguardando_assinatura_secao") return "Assinatura do Chefe de Seção";
     if (situacaoSubsidio === "aguardando_aprovacao_externa") return "Envio para aprovação do CHEM";
+    if (situacaoSubsidio === "CHEFIA_DILIGENCIA") return "Na Chefia - Diligência";
+    if (situacaoSubsidio === "CHEFIA_DEFESA") return "Na Chefia - Defesa";
+    if (situacaoSubsidio === "AGUARDANDO_CHEM_DILIGENCIA") return "Aguardando Assinatura do CHEM";
+    if (situacaoSubsidio === "AGUARDANDO_CHEM_DEFESA") return "Aguardando Assinatura do CHEM";
+    if (situacaoSubsidio === "AGUARDANDO_RESPOSTA") return "Aguardando Resposta";
+    if (situacaoSubsidio === "APTO_FINALIZAR") return "Liberado para Finalização";
     if (statusNormalizado.includes("aguardando conferencia da chefia")) return "Conferência do Chefe/Admin";
     if (situacaoSubsidio === "aprovado_externo_enviado_chem" || statusNormalizado.includes("aguardando assinatura do chem")) return "Aguardando Assinatura do CHEM";
     if (situacaoSubsidio === "resposta_assinada_chem") return "Liberado para Finalização";
