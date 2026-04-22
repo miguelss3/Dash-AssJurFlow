@@ -52,6 +52,7 @@ export function useProcessos() {
   useEffect(() => {
     let unsubProcessos: (() => void) | null = null;
     let unsubDistribuicoes: (() => void) | null = null;
+    let mergeTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Aguarda o Firebase Auth resolver o estado de autenticação antes de inscrever os listeners
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -93,10 +94,6 @@ export function useProcessos() {
     let processosCache: any[] = [];
     let distribuicoesCache: any[] = [];
     // Debounce para evitar renderização dupla no carregamento inicial
-    // (ambos os snapshots disparam quase ao mesmo tempo na primeira carga)
-    let mergeTimer: ReturnType<typeof setTimeout> | null = null;
-
-    // Função para mesclar processos com distribuições
     const mesclarProcessosComDistribuicoes = () => {
       if (mergeTimer) clearTimeout(mergeTimer);
       mergeTimer = setTimeout(() => {

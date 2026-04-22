@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SoldierAvatar } from "@/components/SoldierAvatar";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
@@ -165,6 +165,7 @@ function Index() {
   const [busca, setBusca] = useState("");
   const [aba, setAba] = useState<Aba>("mesa");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [, startTransition] = useTransition();
   const [perfilOpen, setPerfilOpen] = useState(false);
   const [perfilSaving, setPerfilSaving] = useState(false);
   const [perfilNome, setPerfilNome] = useState("");
@@ -643,8 +644,19 @@ function Index() {
   };
 
   const handleSave = (dados: Omit<Processo, "id" | "criadoEm">) => {
-    if (editing) atualizar(editing.id, dados);
-    else criar(dados);
+    if (editing) {
+      toast.promise(atualizar(editing.id, dados), {
+        loading: "Salvando alterações...",
+        success: "Processo atualizado.",
+        error: "Não foi possível salvar as alterações.",
+      });
+    } else {
+      toast.promise(criar(dados), {
+        loading: "Cadastrando processo...",
+        success: "Processo cadastrado.",
+        error: "Não foi possível cadastrar o processo.",
+      });
+    }
   };
 
   const registrarMovimentacao = async (processoId: string, texto: string) => {
@@ -946,7 +958,7 @@ function Index() {
                 <button
                   key={item.id}
                   onClick={() => {
-                    setAba(item.id);
+                    startTransition(() => setAba(item.id));
                     setSidebarOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-[var(--transition-smooth)] ${
@@ -968,7 +980,7 @@ function Index() {
                 <button
                   key={item.label}
                   onClick={() => {
-                    setAba(item.id);
+                    startTransition(() => setAba(item.id));
                     setSidebarOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-colors ${
@@ -1129,7 +1141,7 @@ function Index() {
               return (
                 <button
                   key={t.id}
-                  onClick={() => setAba(t.id)}
+                  onClick={() => startTransition(() => setAba(t.id))}
                   className={`shrink-0 px-4 py-3 text-sm font-semibold relative transition-colors ${
                     active
                       ? "text-foreground"
@@ -1172,7 +1184,7 @@ function Index() {
                 {ehAdmin && (
                   <div className="hidden sm:flex gap-1 shrink-0">
                     <button
-                      onClick={() => setFiltroTipo("todos")}
+                      onClick={() => startTransition(() => setFiltroTipo("todos"))}
                       className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
                         filtroTipo === "todos"
                           ? "bg-primary text-primary-foreground border-primary"
@@ -1182,7 +1194,7 @@ function Index() {
                       Todos
                     </button>
                     <button
-                      onClick={() => setFiltroTipo("DU")}
+                      onClick={() => startTransition(() => setFiltroTipo("DU"))}
                       className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
                         filtroTipo === "DU"
                           ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border-[var(--tipo-du)]/40"
@@ -1192,7 +1204,7 @@ function Index() {
                       DU
                     </button>
                     <button
-                      onClick={() => setFiltroTipo("PA")}
+                      onClick={() => startTransition(() => setFiltroTipo("PA"))}
                       className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
                         filtroTipo === "PA"
                           ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border-[var(--tipo-pa)]/40"
@@ -1208,7 +1220,7 @@ function Index() {
               <Dashboard
                 processos={processosParaDashboard}
                 filtro={filtro}
-                onFiltroChange={setFiltro}
+                onFiltroChange={(f) => startTransition(() => setFiltro(f))}
               />
 
               {filtro !== "todos" && (
@@ -1219,7 +1231,7 @@ function Index() {
                     {filtro === "hoje" && "Vencem hoje"}
                     {filtro === "semana" && "Próximos 7 dias"}
                     <button
-                      onClick={() => setFiltro("todos")}
+                      onClick={() => startTransition(() => setFiltro("todos"))}
                       className="hover:bg-foreground/10 rounded-full p-0.5 -mr-1"
                       aria-label="Limpar filtro"
                     >
@@ -1338,7 +1350,7 @@ function Index() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="perfil-nome">Nome</Label>
               <Input
@@ -1403,7 +1415,7 @@ function Index() {
                 />
               </div>
             </div>
-          </div>
+          </form>
 
           <DialogFooter>
             <Button variant="ghost" onClick={() => setPerfilOpen(false)} disabled={perfilSaving}>

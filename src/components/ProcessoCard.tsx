@@ -152,7 +152,6 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const confirmarExclusao = () => {
     if (onDelete) {
       onDelete(p.id);
-      toast.success(`Processo ${p.numero} excluído com sucesso!`);
       setAlertExcluir(false);
     }
   };

@@ -213,13 +213,6 @@ export function useAuth() {
               telefone: d.telefone,
             };
             
-            console.log("✅ Login bem-sucedido. Dados do usuário:", {
-              nome: userData.nome,
-              setor: userData.setor,
-              cargo: userData.cargo,
-              role: userData.role,
-            });
-            
             if (isAdmin(userData)) {
               userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
             }

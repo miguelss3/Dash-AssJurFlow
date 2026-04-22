@@ -21,6 +21,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
   const { user } = useAuth();
   const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
   const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
+  const autorId = user?.uid || "sistema";
   const [acaoSelecionada, setAcaoSelecionada] = useState<string | null>(null);
 
   // Estados para Iniciar Prazo
@@ -52,7 +53,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         aguardandoAssinaturaCmt: true,
         notificadoAssinaturaCmtEm: agoraISO,
         notificadoAssinaturaCmtPorNome: user.email || "Assessor",
-        status: "Aguardando Assinatura",
+        status: "andamento",
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: user.email || "Sistema",
@@ -62,7 +63,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       const historicoRef = collection(db, `processos/${processoId}/historico`);
       await addDoc(historicoRef, {
         autor: autorMilitar,
-        autorId: user.uid,
+        autorId,
         texto: msgHistorico,
         timestamp: agoraISO,
       });
@@ -75,7 +76,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         historico: [...historicoExistente, {
           id: crypto.randomUUID(),
           autor: autorMilitar,
-          autorId: user.uid,
+          autorId,
           texto: msgHistorico,
           timestamp: agoraISO,
         }]
@@ -108,7 +109,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       await updateDoc(processoRef, {
         dataInicialPrazo: dataInicioPrazo,
         dataInicialPrazoPorNome: user.email || "Assessor",
-        status: "Em Instrução",
+        status: "andamento",
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: user.email || "Sistema",
@@ -118,7 +119,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       const historicoRef = collection(db, `processos/${processoId}/historico`);
       await addDoc(historicoRef, {
         autor: autorMilitar,
-        autorId: user.uid,
+        autorId,
         texto: msgHistorico,
         timestamp: agoraISO,
       });
@@ -131,7 +132,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         historico: [...historicoExistente, {
           id: crypto.randomUUID(),
           autor: autorMilitar,
-          autorId: user.uid,
+          autorId,
           texto: msgHistorico,
           timestamp: agoraISO,
         }]
@@ -183,7 +184,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       const historicoRef = collection(db, `processos/${processoId}/historico`);
       await addDoc(historicoRef, {
         autor: autorMilitar,
-        autorId: user.uid,
+        autorId,
         texto: msgHistorico,
         timestamp: agoraISO,
       });
@@ -196,7 +197,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         historico: [...historicoExistente, {
           id: crypto.randomUUID(),
           autor: autorMilitar,
-          autorId: user.uid,
+          autorId,
           texto: msgHistorico,
           timestamp: agoraISO,
         }]
@@ -226,7 +227,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         portariaAssinadaEm: agoraISO,
         portariaAssinadaPorNome: user.email || "Admin",
         notificacaoAdminPendente: false,
-        status: "Aguardando Início de Prazo",
+        status: "andamento",
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: user.email || "Sistema",
@@ -236,7 +237,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       const historicoRef = collection(db, `processos/${processoId}/historico`);
       await addDoc(historicoRef, {
         autor: autorMilitar,
-        autorId: user.uid,
+        autorId,
         texto: msgHistorico,
         timestamp: agoraISO,
       });
@@ -249,7 +250,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         historico: [...historicoExistente, {
           id: crypto.randomUUID(),
           autor: autorMilitar,
-          autorId: user.uid,
+          autorId,
           texto: msgHistorico,
           timestamp: agoraISO,
         }]
