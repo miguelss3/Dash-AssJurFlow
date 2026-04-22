@@ -47,6 +47,20 @@ service cloud.firestore {
         (setor in ['DU', 'PA'] && userSetor() == setor);
     }
 
+    function processDocById(processoId) {
+      return get(/databases/$(database)/documents/processos/$(processoId)).data;
+    }
+
+    function processExists(processoId) {
+      return exists(/databases/$(database)/documents/processos/$(processoId));
+    }
+
+    function canAccessProcessById(processoId) {
+      return isSignedIn() &&
+        processExists(processoId) &&
+        canManageSetor(processDocById(processoId).setor);
+    }
+
     function isOwnerPayload(data) {
       return data.userId == request.auth.uid &&
         data.userEmail == authEmail();
@@ -64,7 +78,16 @@ service cloud.firestore {
         canManageSetor(oldData.setor) &&
         oldData.userId == newData.userId &&
         oldData.userEmail == newData.userEmail &&
-        oldData.setor == newData.setor;
+        oldData.setor == newData.setor &&
+        // Endurece update: bloqueia alteração de campos de identidade/origem.
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'userId',
+          'userEmail',
+          'setor',
+          'criadoEm',
+          'criadoPorUid',
+          'criadoPorEmail'
+        ]);
     }
 
     function canDeleteProcess(oldData) {
@@ -80,7 +103,11 @@ service cloud.firestore {
       
       // Subcoleção de histórico
       match /historico/{mensagemId} {
-        allow read, write: if isSignedIn();
+        allow read: if canAccessProcessById(processoId);
+        allow create: if canAccessProcessById(processoId) &&
+          request.resource.data.keys().hasOnly(['autor', 'autorId', 'texto', 'timestamp']) &&
+          request.resource.data.autorId == request.auth.uid;
+        allow update, delete: if false;
       }
     }
     
@@ -93,12 +120,24 @@ service cloud.firestore {
     
     // Regras para a coleção de distribuições
     match /distribuicoes/{distribuicaoId} {
-      allow read:  if isSignedIn();
-      allow write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.processoId is string &&
+        canAccessProcessById(request.resource.data.processoId);
+      allow update: if isSignedIn() &&
+        resource.data.processoId is string &&
+        request.resource.data.processoId == resource.data.processoId &&
+        canAccessProcessById(resource.data.processoId);
+      allow delete: if isSignedIn() &&
+        resource.data.processoId is string &&
+        canAccessProcessById(resource.data.processoId);
     }
     
     match /mensagens/{mensagemId} {
-      allow read, write: if isSignedIn();
+      allow read: if canAccessProcessById(mensagemId);
+      allow create, update: if canAccessProcessById(mensagemId) &&
+        request.resource.data.keys().hasOnly(['historico']);
+      allow delete: if false;
     }
     
     // Regra padrão: negar acesso a outras coleções não especificadas
