@@ -130,7 +130,7 @@ function LoginPage() {
         </div>
 
         <p className="text-xs text-white/40">
-          © 2026 Comando da 12ª Região Militar — Todos os direitos reservados.
+          &copy; {new Date().getFullYear()} Maj Cav Miguel &mdash; AssJur Flow &middot; 12ª Região Militar. Todos os direitos reservados.
         </p>
       </div>
 
@@ -215,7 +215,10 @@ function LoginPage() {
           </div>
 
           <p className="text-center text-xs text-white/50 mt-6">
-            Sistema homologado · Uso institucional · v3.2
+            Sistema homologado &middot; Uso institucional &middot; v3.2
+          </p>
+          <p className="text-center text-[11px] text-white/30 mt-1">
+            &copy; {new Date().getFullYear()} Maj Cav Miguel &mdash; AssJur Flow &middot; 12ª Região Militar
           </p>
         </div>
       </div>

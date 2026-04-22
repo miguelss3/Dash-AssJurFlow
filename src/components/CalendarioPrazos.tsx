@@ -61,7 +61,7 @@ interface Props {
 }
 
 interface DiaItem {
-  tipo: "prazo-interno" | "prazo-fatal" | TipoEvento;
+  tipo: "prazo-fatal" | TipoEvento;
   titulo: string;
   ref?: string; // numero processo
   responsavel?: string;
@@ -77,22 +77,19 @@ const TIPOS_EVENTO: { id: TipoEvento; label: string; icon: typeof CalendarIcon; 
   { id: "sem_expediente", label: "Sem Expediente", icon: Coffee, cor: "oklch(0.55 0.05 50)" },
 ];
 
-function corDoTipo(t: TipoEvento | "prazo-interno" | "prazo-fatal"): string {
-  if (t === "prazo-interno") return "oklch(0.7 0.18 60)";
+function corDoTipo(t: TipoEvento | "prazo-fatal"): string {
   if (t === "prazo-fatal") return "oklch(0.55 0.22 25)";
   const m = TIPOS_EVENTO.find((x) => x.id === t);
   return m?.cor ?? "oklch(0.6 0.05 240)";
 }
 
-function iconeDoTipo(t: TipoEvento | "prazo-interno" | "prazo-fatal") {
-  if (t === "prazo-interno") return AlertTriangle;
+function iconeDoTipo(t: TipoEvento | "prazo-fatal") {
   if (t === "prazo-fatal") return AlertTriangle;
   const m = TIPOS_EVENTO.find((x) => x.id === t);
   return m?.icon ?? CalendarIcon;
 }
 
-function labelTipo(t: TipoEvento | "prazo-interno" | "prazo-fatal"): string {
-  if (t === "prazo-interno") return "Prazo Interno";
+function labelTipo(t: TipoEvento | "prazo-fatal"): string {
   if (t === "prazo-fatal") return "Prazo Fatal";
   return TIPOS_EVENTO.find((x) => x.id === t)?.label ?? t;
 }
@@ -133,23 +130,10 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
       map.set(key, arr);
     };
 
-    // Prazos automáticos vindos dos processos (ativos)
+    // Prazo fatal automático vindo dos processos ativos
     processos
       .filter((p) => p.status !== "concluido")
       .forEach((p) => {
-        // Prazo interno (opcional)
-        if (p.prazo) {
-          const k1 = p.prazo.slice(0, 10);
-          push(k1, {
-            tipo: "prazo-interno",
-            titulo: `${p.numero} • ${p.tipoAcao}`,
-            ref: p.numero,
-            responsavel: p.responsavel,
-            processo: p,
-          });
-        }
-        
-        // Prazo fatal (opcional)
         if (p.prazoFatal) {
           const k2 = p.prazoFatal.slice(0, 10);
           push(k2, {
@@ -217,7 +201,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
     .filter((d) => isSameMonth(d, mesRef))
     .reduce((acc, d) => {
       const items = itensPorDia.get(format(d, "yyyy-MM-dd")) ?? [];
-      return acc + items.filter((i) => i.tipo === "prazo-interno" || i.tipo === "prazo-fatal").length;
+      return acc + items.filter((i) => i.tipo === "prazo-fatal").length;
     }, 0);
 
   const totalEventosMes = eventos.filter((e) => {
@@ -303,10 +287,17 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
             const semExp = items.some((i) => i.tipo === "sem_expediente" || i.tipo === "feriado");
 
             return (
-              <button
-                type="button"
+              <div
+                role="button"
+                tabIndex={0}
                 key={idx}
                 onClick={() => setDiaSelecionado(d)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setDiaSelecionado(d);
+                  }
+                }}
                 className={`relative text-left min-h-[90px] sm:min-h-[110px] border-r border-b border-border p-1.5 sm:p-2 transition-colors ${
                   fora ? "bg-muted/30" : "bg-card hover:bg-muted/40"
                 } ${selecionado ? "ring-2 ring-inset ring-primary z-10" : ""} ${
@@ -335,25 +326,51 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
                 <div className="space-y-0.5">
                   {items.slice(0, 3).map((item, i) => {
                     const cor = corDoTipo(item.tipo);
-                    const ehPrazo = item.tipo === "prazo-interno" || item.tipo === "prazo-fatal";
+                    const ehPrazo = item.tipo === "prazo-fatal";
+                    const conteudo = (
+                      <>
+                        {ehPrazo && "⚖ "}
+                        {item.titulo}
+                      </>
+                    );
+
+                    const estiloBase = {
+                      backgroundColor: `color-mix(in oklab, ${cor} 18%, transparent)`,
+                      color: cor,
+                      borderLeft: `2px solid ${cor}`,
+                    };
+
+                    if (ehPrazo && item.processo) {
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setProcessoSelecionado(item.processo!);
+                          }}
+                          className="w-full text-left text-[10px] leading-tight px-1.5 py-0.5 rounded truncate font-medium hover:brightness-95"
+                          style={estiloBase}
+                          title={`${item.titulo} (clique para abrir detalhes)`}
+                        >
+                          {conteudo}
+                        </button>
+                      );
+                    }
+
                     return (
                       <div
                         key={i}
                         className="text-[10px] leading-tight px-1.5 py-0.5 rounded truncate font-medium"
-                        style={{
-                          backgroundColor: `color-mix(in oklab, ${cor} 18%, transparent)`,
-                          color: cor,
-                          borderLeft: `2px solid ${cor}`,
-                        }}
+                        style={estiloBase}
                         title={item.titulo}
                       >
-                        {ehPrazo && "⚖ "}
-                        {item.titulo}
+                        {conteudo}
                       </div>
                     );
                   })}
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -368,7 +385,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
               Lançar prazo, feriado ou dia sem expediente
             </h4>
             <p className="text-xs text-muted-foreground mt-1">
-              Os prazos dos processos ativos aparecem automaticamente. Use o botão
+              O prazo fatal dos processos ativos aparece automaticamente. Use o botão
               "Lançar evento" no topo para registrar eventos manuais.
             </p>
           </div>
@@ -397,17 +414,6 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
               </button>
             );
           })}
-          <span
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border"
-            style={{
-              color: "oklch(0.7 0.18 60)",
-              borderColor: "oklch(0.7 0.18 60 / 0.35)",
-              backgroundColor: "oklch(0.7 0.18 60 / 0.1)",
-            }}
-          >
-            <AlertTriangle className="h-3 w-3" />
-            Prazo Interno (auto)
-          </span>
           <span
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border"
             style={{
@@ -463,8 +469,10 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
               {itensDoDiaSelecionado.map((item, i) => {
                 const Icon = iconeDoTipo(item.tipo);
                 const cor = corDoTipo(item.tipo);
-                const ehAuto = item.tipo === "prazo-interno" || item.tipo === "prazo-fatal";
-                const status = item.processo ? statusPrazo(item.processo.prazo) : null;
+                const ehAuto = item.tipo === "prazo-fatal";
+                const status = item.processo
+                  ? statusPrazo(item.processo.prazoFatal)
+                  : null;
                 return (
                   <li
                     key={i}

@@ -92,10 +92,16 @@ export function useProcessos() {
     // Estados internos para armazenar processos e distribuições separadamente
     let processosCache: any[] = [];
     let distribuicoesCache: any[] = [];
+    // Debounce para evitar renderização dupla no carregamento inicial
+    // (ambos os snapshots disparam quase ao mesmo tempo na primeira carga)
+    let mergeTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Função para mesclar processos com distribuições
     const mesclarProcessosComDistribuicoes = () => {
-      const listaProcessos: Processo[] = [];
+      if (mergeTimer) clearTimeout(mergeTimer);
+      mergeTimer = setTimeout(() => {
+        mergeTimer = null;
+        const listaProcessos: Processo[] = [];
       
       processosCache.forEach((procData) => {
         const setorCanonico = normalizarSetor(procData.setor || procData.tipo);
@@ -161,8 +167,8 @@ export function useProcessos() {
           // IMPORTANTE: usa assessorNome da distribuição se existir, senão usa encarregado do processo
           // Se nenhum dos dois existir, deixa vazio (não coloca "Sem responsável")
           responsavel: distribuicao?.assessorNome || procData.encarregado || procData.responsavel || "",
-          prazo: procData.prazoInternoDU || procData.prazo,
-          prazoFatal: procData.prazoFatalDU || procData.prazoFatal,
+          prazo: procData.prazoInternoDU || procData.prazo || procData.pedidoSubsidios?.dataPrazo || procData.pedidoSubsidios?.prazoResposta,
+          prazoFatal: procData.prazoFatalDU || procData.prazoFatal || procData.finalPrazo,
           descricao: descricaoUltimoMovimento,
           status: statusMapeado,
           criadoEm: toIsoString(procData.criadoEm) || toIsoString(procData.dataEntrada) || new Date().toISOString(),
@@ -240,6 +246,7 @@ export function useProcessos() {
       setProcessos(listaProcessos);
       setCarregando(false);
       setErro(null);
+      }, 40); // debounce: aguarda ambos os snapshots resolverem antes de re-renderizar
     };
 
     // Aponta para as coleções do Firestore
@@ -284,6 +291,7 @@ export function useProcessos() {
 
     // Cleanup: desinscreve de todos os listeners ao desmontar
     return () => {
+      if (mergeTimer) clearTimeout(mergeTimer);
       unsubAuth();
       if (unsubProcessos) unsubProcessos();
       if (unsubDistribuicoes) unsubDistribuicoes();
@@ -336,18 +344,11 @@ export function useProcessos() {
   const remover = async (id: string) => {
     try {
       // console.log(`🗑️ Iniciando exclusão do processo ${id}...`);
-      
-      // 1. Remove mensagens da subcoleção historico
-      try {
-        const historicoRef = collection(db, "processos", id, "historico");
-        const historicoSnapshot = await getDocs(historicoRef);
-        const deleteHistoricoPromises = historicoSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
-        await Promise.all(deleteHistoricoPromises);
-        // console.log(`✅ ${historicoSnapshot.size} mensagens do histórico removidas`);
-      } catch (err) {
-        console.warn("⚠️ Erro ao remover histórico:", err);
-      }
-      
+
+      // 1. Remove o documento principal do processo (resposta rápida na UI)
+      const processoRef = doc(db, "processos", id);
+      await deleteDoc(processoRef);
+
       // 2. Remove distribuições relacionadas ao processo
       try {
         const distribuicoesRef = collection(db, "distribuicoes");
@@ -356,24 +357,9 @@ export function useProcessos() {
         const deleteDistribPromises = distribSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
         await Promise.all(deleteDistribPromises);
         // console.log(`✅ ${distribSnapshot.size} distribuições removidas`);
-      } catch (err) {
-        console.warn("⚠️ Erro ao remover distribuições:", err);
+      } catch {
+        // sem permissao para limpar distribuicoes em alguns perfis; processo ja foi excluido
       }
-      
-      // 3. Remove mensagens antigas (compatibilidade com sistema antigo)
-      try {
-        const mensagemRef = doc(db, "mensagens", id);
-        await deleteDoc(mensagemRef);
-        // console.log(`✅ Mensagens antigas removidas`);
-      } catch (err) {
-        // Ignora se não existir
-        console.warn("⚠️ Mensagens antigas não encontradas");
-      }
-      
-      // 4. Remove o documento principal do processo
-      const processoRef = doc(db, "processos", id);
-      await deleteDoc(processoRef);
-      // console.log("✅ Processo principal removido com sucesso");
       
       // console.log(`✅ Processo ${id} e todos os dados relacionados foram excluídos permanentemente`);
     } catch (err: any) {

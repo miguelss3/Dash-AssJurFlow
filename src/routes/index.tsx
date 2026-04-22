@@ -678,12 +678,14 @@ function Index() {
   };
 
   const handleRedistribuir = async (processoId: string, novoResponsavel: string) => {
+    const toastId = toast.loading(novoResponsavel?.trim() ? "Redistribuindo processo..." : "Removendo distribuição...");
     try {
       const { db } = await import("@/lib/firebase");
       const { collection, addDoc, getDocs, query, updateDoc, where } = await import("firebase/firestore");
       
       const processo = processos.find((p) => p.id === processoId);
       if (!processo) {
+        toast.dismiss(toastId);
         return;
       }
       
@@ -737,24 +739,26 @@ function Index() {
       })();
       
       await atualizarProcessoPromise;
+      toast.success(msgHistorico, { id: toastId });
       Promise.all([sincronizarDistribuicaoPromise, registrarMovimentacao(processoId, msgHistorico)]).catch((error) => {
         console.error("❌ Erro em pós-processamento da redistribuição:", error);
       });
     } catch (error) {
       console.error("❌ Erro ao redistribuir processo:", error);
+      toast.error("Não foi possível redistribuir o processo.", { id: toastId });
     }
   };
 
   const handleMoverStatus = async (processoId: string, novoStatus: StatusProcesso) => {
+    const rotulosStatus: Record<StatusProcesso, string> = {
+      novo: "Triagem",
+      andamento: "Em Andamento",
+      audiencia: "Audiência",
+      recurso: "Recurso",
+      concluido: "Concluído",
+    };
+    const toastId = toast.loading(`Movendo para ${rotulosStatus[novoStatus]}...`);
     try {
-      const rotulosStatus: Record<StatusProcesso, string> = {
-        novo: "Triagem",
-        andamento: "Em Andamento",
-        audiencia: "Audiência",
-        recurso: "Recurso",
-        concluido: "Concluído",
-      };
-
       const msgHistorico = `Status alterado para ${rotulosStatus[novoStatus]}.`;
       const patch: Record<string, unknown> = {
         status: novoStatus,
@@ -769,12 +773,22 @@ function Index() {
       }
 
       await atualizar(processoId, patch as Partial<Processo>);
+      toast.success(`Status: ${rotulosStatus[novoStatus]}`, { id: toastId });
       Promise.resolve(registrarMovimentacao(processoId, msgHistorico)).catch((error) => {
         console.error("❌ Erro ao registrar histórico de status:", error);
       });
     } catch (error) {
       console.error("❌ Erro ao mover status:", error);
+      toast.error("Não foi possível atualizar o status.", { id: toastId });
     }
+  };
+
+  const handleRemover = async (id: string) => {
+    await toast.promise(remover(id), {
+      loading: "Excluindo processo...",
+      success: "Processo excluído.",
+      error: "Não foi possível excluir o processo.",
+    });
   };
 
   const handleReativarProcesso = async (
@@ -859,7 +873,6 @@ function Index() {
   const tabsCompletas: { id: Aba; label: string }[] = [
     { id: "mesa", label: "Mesa de Trabalho" },
     { id: "prazos", label: "Controle de Prazos" },
-    { id: "arquivo", label: "Arquivo / Encerrados" },
     { id: "indicadores", label: "Indicadores de Gestão" },
     { id: "equipe", label: "Gestão da Equipe" },
   ];
@@ -977,7 +990,7 @@ function Index() {
               <SoldierAvatar size={40} className="shadow-md rounded-full" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold text-white leading-tight truncate">
-                  {usuario.posto} {usuario.nome}
+                  {nomeMilitarAtual}
                 </p>
                 <p className="text-[9px] text-[oklch(0.78_0.18_145)] tracking-wider uppercase font-bold truncate">
                   {usuario.role}
@@ -1220,7 +1233,7 @@ function Index() {
                 processos={filtrados}
                 filtroTipo={filtroTipo}
                 onEdit={handleEdit}
-                onDelete={remover}
+                onDelete={handleRemover}
                 onMove={handleMoverStatus}
                 onReativarProcesso={handleReativarProcesso}
                 onRedistribuir={handleRedistribuir}
@@ -1248,13 +1261,9 @@ function Index() {
               icon={FolderArchive}
               title="Arquivo / Encerrados"
               description="Histórico de processos finalizados e arquivados."
-              processos={(() => {
-                const finalizados = processos.filter((p) => p.status === "concluido");
-                console.log(`📁 Aba Arquivo: ${finalizados.length} processos finalizados de ${processos.length} totais`);
-                return finalizados;
-              })()}
+              processos={processos.filter((p) => p.status === "concluido")}
               onEdit={handleEdit}
-              onDelete={remover}
+              onDelete={handleRemover}
               onMove={handleMoverStatus}
             />
           )}
@@ -1271,6 +1280,13 @@ function Index() {
             </Suspense>
           )}
         </main>
+
+        {/* Footer copyright */}
+        <footer className="py-3 px-4 sm:px-6 lg:px-8 text-center">
+          <p className="text-[11px] text-muted-foreground/50">
+            &copy; {new Date().getFullYear()} Maj Cav Miguel &mdash; AssJur Flow &middot; 12ª Região Militar &middot; Todos os direitos reservados.
+          </p>
+        </footer>
       </div>
 
       {dialogOpen && (

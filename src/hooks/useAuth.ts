@@ -89,12 +89,6 @@ export function useAuth() {
             userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
           }
           
-          console.log("🔄 Dados do localStorage:", {
-            nome: userData.nome,
-            setor: userData.setor,
-            role: userData.role,
-            email: userData.email,
-          });
           setUser(userData);
         } else {
           // Sem cache local: tenta reconstruir perfil pelo Firestore (email/uid)
@@ -158,13 +152,6 @@ export function useAuth() {
               uid: fbUser.uid,
             };
             console.warn("⚠️ Usuário sem dados no localStorage/Firestore, usando fallback:", userData);
-          } else {
-            console.log("🔄 Sessão restaurada com perfil do Firestore:", {
-              nome: userData.nome,
-              setor: userData.setor,
-              role: userData.role,
-              email: userData.email,
-            });
           }
           
           // Se é admin por email, ajusta o role
