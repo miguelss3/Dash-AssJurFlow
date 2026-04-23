@@ -344,7 +344,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                       <div className="mt-2 space-y-3">
                         <div className="flex gap-2">
                           <label className={`flex-1 flex items-center justify-center p-2 border rounded-md text-[11px] font-bold cursor-pointer ${tipoDiligencia === "INTERNO" ? "bg-sky-100 border-sky-300 text-sky-800" : "bg-white"}`}>
-                            <input type="radio" name="tipo-diligencia-du" aria-label="Diligência interna" checked={tipoDiligencia === "INTERNO"} onChange={() => setTipoDiligencia("INTERNO")} className="hidden" /> Interno
+                            <input type="radio" name="tipo-diligencia-du" aria-label="Diex Simplificado" checked={tipoDiligencia === "INTERNO"} onChange={() => setTipoDiligencia("INTERNO")} className="hidden" /> Diex Simplificado
                           </label>
                           <label className={`flex-1 flex items-center justify-center p-2 border rounded-md text-[11px] font-bold cursor-pointer ${tipoDiligencia === "EXTERNO" ? "bg-sky-100 border-sky-300 text-sky-800" : "bg-white"}`}>
                             <input type="radio" name="tipo-diligencia-du" aria-label="Diligência externa" checked={tipoDiligencia === "EXTERNO"} onChange={() => setTipoDiligencia("EXTERNO")} className="hidden" /> Externo
@@ -493,13 +493,14 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
             <div className={`p-4 rounded-xl border ${isReit ? "bg-red-50 border-red-200" : "bg-indigo-50 border-indigo-200"}`}>
               <div className="flex justify-between items-center mb-3">
                 <h4 className={`font-bold text-sm ${isReit ? "text-red-900" : "text-indigo-900"}`}>
-                  {isReit ? "Cobranca de Diligência" : `Diligência ${tipoDiligencia}`}
+                  {isReit ? "Cobranca de Diligência" : tipoDiligencia === "INTERNO" ? "DIEx Simplificado" : "Diligência Externa"}
                 </h4>
                 {isReit && <span className="bg-red-200 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full">{reiteracoes}ª Reit.</span>}
               </div>
 
               {tipoDiligencia === "INTERNO" ? (
                 <div className="space-y-2 mt-4">
+                  <p className="text-[11px] text-indigo-800 mb-1">Você assina o DIEx Simplificado. Informe o número gerado:</p>
                   <label className="text-[11px] font-bold text-indigo-900 uppercase">N° do DIEx Assinado:</label>
                   <input type="text" aria-label="Número do DIEx assinado" value={numeroSaida} onChange={(e) => setNumeroSaida(e.target.value)} placeholder="Ex: DIEx 123/2026" className="w-full p-2.5 border rounded-lg outline-none text-sm" />
                 </div>
@@ -516,7 +517,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               }
               className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-3 rounded-xl text-sm"
             >
-              {tipoDiligencia === "INTERNO" ? "Assinar e Iniciar Prazo" : "Aprovar e Encaminhar"}
+              {tipoDiligencia === "INTERNO" ? "Assinar DIEx e Iniciar Prazo" : "Aprovar e Encaminhar"}
             </button>
           </div>
         );

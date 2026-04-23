@@ -207,20 +207,30 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           "enviado_admin",
           "CHEFIA_DILIGENCIA",
           "CHEFIA_DEFESA",
-          "AGUARDANDO_RESPOSTA",
         ].includes(situacaoFluxo)
           || statusNorm.includes("aguardando assinatura")
           || statusNorm.includes("aguardando chem");
       };
 
-      const pendenciasChefia = ehAdmin ? doTipo.filter(isPendenteChefia) : [];
-      const doTipoSemPendenciasChefia = ehAdmin ? doTipo.filter((p) => !isPendenteChefia(p)) : doTipo;
+      const isAguardandoResposta = (p: Processo) => {
+        const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
+        const statusNorm = (p.status || "").toString().toLowerCase();
+        return situacaoFluxo === "AGUARDANDO_RESPOSTA" || statusNorm === "aguardando resposta";
+      };
+
+      const aguardandoRespostaDU = tipo === "DU" ? doTipo.filter(isAguardandoResposta) : [];
+      const pendenciasChefia = ehAdmin ? doTipo.filter((p) => !isAguardandoResposta(p) && isPendenteChefia(p)) : [];
+      const doTipoSemPendenciasChefia = ehAdmin ? doTipo.filter((p) => !isPendenteChefia(p) && !isAguardandoResposta(p)) : doTipo.filter((p) => !isAguardandoResposta(p));
       
       const mapAtivos = new Map<string, Processo[]>();
       const mapConcluidos = new Map<string, Processo[]>();
 
       if (ehAdmin && pendenciasChefia.length > 0) {
         mapAtivos.set("MESA DO CHEFE", pendenciasChefia);
+      }
+
+      if (aguardandoRespostaDU.length > 0) {
+        mapAtivos.set("📩 Aguardando Resposta", aguardandoRespostaDU);
       }
       
       // Adiciona os processos aos seus responsáveis
@@ -266,8 +276,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           itensConcluidos: mapConcluidos.get(nome) || [],
         }))
         .filter(({ nome, itensAtivos, itensConcluidos }) => {
-          // Só mostra "Aguardando Distribuição" se tiver processos
-          if (nome.includes("📥 Aguardando")) {
+          // Só mostra "Aguardando Distribuição" e colunas especiais se tiver processos
+          if (nome.includes("📥 Aguardando") || nome.includes("📩 Aguardando")) {
             return itensAtivos.length > 0 || itensConcluidos.length > 0;
           }
           return true; // Outros assessores sempre aparecem
@@ -275,6 +285,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         .sort((a, b) => {
           if (a.nome.includes("MESA DO CHEFE")) return -1;
           if (b.nome.includes("MESA DO CHEFE")) return 1;
+          if (a.nome.includes("📩 Aguardando Resposta")) return -1;
+          if (b.nome.includes("📩 Aguardando Resposta")) return 1;
           if (a.nome.includes("📥 Aguardando")) return -1;
           if (b.nome.includes("📥 Aguardando")) return 1;
           return a.nome.localeCompare(b.nome);
