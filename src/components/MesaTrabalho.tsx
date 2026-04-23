@@ -17,6 +17,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { AuthUser } from "@/hooks/useAuth";
 import type { SiteSettings } from "@/types/siteSettings";
+import { normalizarSetorUsuario } from "@/lib/userProfiles";
 
 interface Props {
   processos: Processo[];
@@ -85,26 +86,27 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   useEffect(() => {
     const buscarAssessores = async () => {
       if (!usuario) return;
-      
-      // Admin busca de ambos os setores; assessor busca apenas do seu setor
-      const setoresParaBuscar: string[] = ehAdmin ? ["DU", "PA"] : [usuario.setor || ""].filter(Boolean);
+
+      const setorUsuarioNormalizado = normalizarSetorUsuario(usuario.setor || usuario.role || usuario.secao || usuario.cargo);
+      const setoresParaBuscar: string[] = ehAdmin ? ["DU", "PA"] : [setorUsuarioNormalizado].filter(Boolean);
       if (setoresParaBuscar.length === 0) return;
-      
+
       try {
         const usuariosRef = collection(db, "usuarios");
         const todosDocs: { nome: string; setor: string }[] = [];
-        
+
         for (const setorParaBuscar of setoresParaBuscar) {
           const q = query(usuariosRef, where("setor", "==", setorParaBuscar));
           const snapshot = await getDocs(q);
           snapshot.docs.forEach(doc => {
-            const data = doc.data();
+            const data = doc.data() as Record<string, any>;
+            if (data.ativo === false) return;
             const nomeExibicao = data.nomeGuerra || data.nome || data.email?.split("@")[0] || "Assessor";
             const nomeCompleto = data.posto ? `${data.posto} ${nomeExibicao}`.trim() : nomeExibicao;
             todosDocs.push({ nome: nomeCompleto, setor: data.setor || setorParaBuscar });
           });
         }
-        
+
         setAssessoresDoSetor(todosDocs);
       } catch (error) {
         console.error("❌ Erro ao buscar assessores:", error);

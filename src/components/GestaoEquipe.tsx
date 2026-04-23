@@ -7,6 +7,7 @@ import { Input } from "./ui/input";
 import { Card } from "./ui/card";
 import { Pencil, Trash2, UserPlus } from "lucide-react";
 import type { AuthUser } from "@/hooks/useAuth";
+import { nomeMilitarUsuario } from "@/lib/userProfiles";
 
 interface Usuario extends AuthUser {
   id?: string;
@@ -364,7 +365,7 @@ export function GestaoEquipe() {
                       )}
                     </div>
                     <p className="font-extrabold text-lg text-foreground">
-                      {usuario.posto} {usuario.nome}
+                      {nomeMilitarUsuario(usuario)}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">{usuario.email}</p>
                     {usuario.telefone && (

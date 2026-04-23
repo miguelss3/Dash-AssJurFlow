@@ -6,7 +6,7 @@ import {
   type User as FirebaseUser 
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 
 export interface AuthUser {
   posto: string;
@@ -26,6 +26,51 @@ const STORAGE_KEY = "assjur:auth";
 
 // Emails de admin universal (exatamente como no sistema antigo)
 const EMAILS_ADMIN_UNIVERSAL = new Set(["miguelss3@yahoo.com.br"]);
+
+function mapAuthUserFromFirestore(data: Record<string, any>, fbUser: FirebaseUser): AuthUser {
+  const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
+  return {
+    posto: data.posto || "",
+    nome: data.nome || fbUser.displayName || nomeExtraido,
+    role: data.role || "ASSESSOR",
+    secao: data.secao || data.setor || "AssJur",
+    email: fbUser.email || undefined,
+    uid: fbUser.uid,
+    nomeGuerra: data.nomeGuerra,
+    setor: data.setor,
+    cargo: data.cargo,
+    isChefe: data.isChefe === true || data.isChefe === "sim",
+    telefone: data.telefone,
+  };
+}
+
+async function carregarPerfilPrivado(fbUser: FirebaseUser): Promise<AuthUser | null> {
+  try {
+    const docDireto = await getDoc(doc(db, "usuarios", fbUser.uid));
+    if (docDireto.exists()) {
+      return mapAuthUserFromFirestore(docDireto.data() as Record<string, any>, fbUser);
+    }
+
+    const usuariosRef = collection(db, "usuarios");
+    const qUid = query(usuariosRef, where("uid", "==", fbUser.uid));
+    const snapshotUid = await getDocs(qUid);
+    if (!snapshotUid.empty) {
+      return mapAuthUserFromFirestore(snapshotUid.docs[0].data() as Record<string, any>, fbUser);
+    }
+
+    if (fbUser.email) {
+      const qEmail = query(usuariosRef, where("email", "==", fbUser.email));
+      const snapshotEmail = await getDocs(qEmail);
+      if (!snapshotEmail.empty) {
+        return mapAuthUserFromFirestore(snapshotEmail.docs[0].data() as Record<string, any>, fbUser);
+      }
+    }
+  } catch (error) {
+    console.warn("⚠️ Falha ao buscar perfil privado do usuário:", error);
+  }
+
+  return null;
+}
 
 /**
  * Verifica se o usuário é administrador (pode ver TODOS os processos)
@@ -91,54 +136,8 @@ export function useAuth() {
           
           setUser(userData);
         } else {
-          // Sem cache local: tenta reconstruir perfil pelo Firestore (email/uid)
-          let userData: AuthUser | null = null;
-
-          try {
-            const usuariosRef = collection(db, "usuarios");
-            const qEmail = query(usuariosRef, where("email", "==", fbUser.email));
-            const snapshotEmail = await getDocs(qEmail);
-
-            if (!snapshotEmail.empty) {
-              const d = snapshotEmail.docs[0].data();
-              const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
-              userData = {
-                posto: d.posto || "",
-                nome: d.nome || fbUser.displayName || nomeExtraido,
-                role: d.role || "ASSESSOR",
-                secao: d.secao || d.setor || "AssJur",
-                email: fbUser.email || undefined,
-                uid: fbUser.uid,
-                nomeGuerra: d.nomeGuerra,
-                setor: d.setor,
-                cargo: d.cargo,
-                isChefe: d.isChefe === true || d.isChefe === "sim",
-                telefone: d.telefone,
-              };
-            } else {
-              const qUid = query(usuariosRef, where("uid", "==", fbUser.uid));
-              const snapshotUid = await getDocs(qUid);
-              if (!snapshotUid.empty) {
-                const d = snapshotUid.docs[0].data();
-                const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
-                userData = {
-                  posto: d.posto || "",
-                  nome: d.nome || fbUser.displayName || nomeExtraido,
-                  role: d.role || "ASSESSOR",
-                  secao: d.secao || d.setor || "AssJur",
-                  email: fbUser.email || undefined,
-                  uid: fbUser.uid,
-                  nomeGuerra: d.nomeGuerra,
-                  setor: d.setor,
-                  cargo: d.cargo,
-                  isChefe: d.isChefe === true || d.isChefe === "sim",
-                  telefone: d.telefone,
-                };
-              }
-            }
-          } catch (error) {
-            console.warn("⚠️ Falha ao buscar perfil no Firestore durante restore de sessão:", error);
-          }
+          // Sem cache local: tenta reconstruir perfil pelo Firestore (preferindo o documento privado por UID)
+          let userData: AuthUser | null = await carregarPerfilPrivado(fbUser);
 
           // Fallback final: cria um usuário básico
           if (!userData) {
@@ -185,69 +184,7 @@ export function useAuth() {
         // console.log("✅ Firebase Auth bem-sucedido para:", fbUser.email);
         
         // Busca dados do usuário na coleção "usuarios" por email
-        let userData: AuthUser | null = null;
-        
-        try {
-          const usuariosRef = collection(db, "usuarios");
-          
-          // Busca por email
-          const qEmail = query(usuariosRef, where("email", "==", fbUser.email));
-          const snapshotEmail = await getDocs(qEmail);
-          
-          if (!snapshotEmail.empty) {
-            const userDoc = snapshotEmail.docs[0];
-            const d = userDoc.data();
-            const nomeExtraido = email ? email.split("@")[0] : "Usuário";
-            
-            userData = {
-              posto: d.posto || "",
-              nome: d.nome || fbUser.displayName || nomeExtraido,
-              role: d.role || "ASSESSOR",
-              secao: d.secao || d.setor || "AssJur",
-              email: fbUser.email || email,
-              uid: fbUser.uid,
-              nomeGuerra: d.nomeGuerra,
-              setor: d.setor,
-              cargo: d.cargo,
-              isChefe: d.isChefe === true || d.isChefe === "sim",
-              telefone: d.telefone,
-            };
-            
-            if (isAdmin(userData)) {
-              userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
-            }
-          } else {
-            // Fallback: busca por campo uid
-            const qUid = query(usuariosRef, where("uid", "==", fbUser.uid));
-            const snapshotUid = await getDocs(qUid);
-            
-            if (!snapshotUid.empty) {
-              const userDoc = snapshotUid.docs[0];
-              const d = userDoc.data();
-              const nomeExtraido = email ? email.split("@")[0] : "Usuário";
-              
-              userData = {
-                posto: d.posto || "",
-                nome: d.nome || fbUser.displayName || nomeExtraido,
-                role: d.role || "ASSESSOR",
-                secao: d.secao || d.setor || "AssJur",
-                email: fbUser.email || email,
-                uid: fbUser.uid,
-                nomeGuerra: d.nomeGuerra,
-                setor: d.setor,
-                cargo: d.cargo,
-                isChefe: d.isChefe === true || d.isChefe === "sim",
-                telefone: d.telefone,
-              };
-              
-              if (isAdmin(userData)) {
-                userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
-              }
-            }
-          }
-        } catch (firestoreError) {
-          console.warn("⚠️ Erro ao buscar dados do usuário no Firestore:", firestoreError);
-        }
+        let userData: AuthUser | null = await carregarPerfilPrivado(fbUser);
         
         // Se não encontrou dados no Firestore, usa dados básicos
         if (!userData) {
