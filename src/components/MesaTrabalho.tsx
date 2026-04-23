@@ -219,8 +219,10 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       };
 
       const aguardandoRespostaDU = tipo === "DU" ? doTipo.filter(isAguardandoResposta) : [];
-      const pendenciasChefia = ehAdmin ? doTipo.filter((p) => !isAguardandoResposta(p) && isPendenteChefia(p)) : [];
-      const doTipoSemPendenciasChefia = ehAdmin ? doTipo.filter((p) => !isPendenteChefia(p) && !isAguardandoResposta(p)) : doTipo.filter((p) => !isAguardandoResposta(p));
+      const pendenciasChefia = ehAdmin ? doTipo.filter((p) => isPendenteChefia(p) && (tipo !== "DU" || !isAguardandoResposta(p))) : [];
+      const doTipoSemPendenciasChefia = ehAdmin
+        ? doTipo.filter((p) => !isPendenteChefia(p) && (tipo !== "DU" || !isAguardandoResposta(p)))
+        : (tipo === "DU" ? doTipo.filter((p) => !isAguardandoResposta(p)) : doTipo);
       
       const mapAtivos = new Map<string, Processo[]>();
       const mapConcluidos = new Map<string, Processo[]>();

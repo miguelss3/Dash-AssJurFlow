@@ -309,7 +309,14 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
             {p.responsavel && (
               <p className="flex items-center gap-1 text-sky-700 font-semibold">
                 <User className="w-3 h-3" />
-                {isDU ? 'Assessor:' : 'Encarregado:'} {p.responsavel}
+                Assessor: {p.responsavel}
+              </p>
+            )}
+            {/* Encarregado real do PA (oficial designado) */}
+            {isPA && p.encarregado && (
+              <p className="flex items-center gap-1 text-purple-700 font-medium">
+                <User className="w-3 h-3" />
+                <strong>Encarregado:</strong> {p.encarregado}
               </p>
             )}
           </div>

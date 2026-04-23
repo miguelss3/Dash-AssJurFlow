@@ -227,7 +227,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                 vara: procData.vara || "N/A",
                 parteContraria: procData.parteContraria || "N/A",
                 tipoAcao: procData.assunto || procData.tipoAcao || "Sem assunto",
-                responsavel: procData.responsavel || responsavelLegado || procData.encarregado || "",
+                responsavel: procData.responsavel || responsavelLegado || "",
                 prazo: procData.prazoInternoDU || procData.prazo || procData.pedidoSubsidios?.dataPrazo || procData.pedidoSubsidios?.prazoResposta,
                 prazoFatal: prazoFatalProcesso,
                 descricao: descricaoUltimoMovimento,
