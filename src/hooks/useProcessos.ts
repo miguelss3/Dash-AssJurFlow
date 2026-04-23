@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   collection, 
   query, 
@@ -20,6 +20,7 @@ export function useProcessos() {
   const [processos, setProcessos] = useState<Processo[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const mergeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const limparCamposUndefined = <T extends Record<string, any>>(obj: T): Partial<T> => {
     return Object.fromEntries(
@@ -52,13 +53,16 @@ export function useProcessos() {
   useEffect(() => {
     let unsubProcessos: (() => void) | null = null;
     let unsubDistribuicoes: (() => void) | null = null;
-    let mergeTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Aguarda o Firebase Auth resolver o estado de autenticação antes de inscrever os listeners
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
       // Cancela listeners anteriores se existirem
       if (unsubProcessos) { unsubProcessos(); unsubProcessos = null; }
       if (unsubDistribuicoes) { unsubDistribuicoes(); unsubDistribuicoes = null; }
+      if (mergeTimerRef.current) {
+        clearTimeout(mergeTimerRef.current);
+        mergeTimerRef.current = null;
+      }
 
       if (!firebaseUser) {
         setProcessos([]);
@@ -95,9 +99,9 @@ export function useProcessos() {
     let distribuicoesCache: any[] = [];
     // Debounce para evitar renderização dupla no carregamento inicial
     const mesclarProcessosComDistribuicoes = () => {
-      if (mergeTimer) clearTimeout(mergeTimer);
-      mergeTimer = setTimeout(() => {
-        mergeTimer = null;
+      if (mergeTimerRef.current) clearTimeout(mergeTimerRef.current);
+      mergeTimerRef.current = setTimeout(() => {
+        mergeTimerRef.current = null;
         const listaProcessos: Processo[] = [];
       
       processosCache.forEach((procData) => {
@@ -303,7 +307,10 @@ export function useProcessos() {
 
     // Cleanup: desinscreve de todos os listeners ao desmontar
     return () => {
-      if (mergeTimer) clearTimeout(mergeTimer);
+      if (mergeTimerRef.current) {
+        clearTimeout(mergeTimerRef.current);
+        mergeTimerRef.current = null;
+      }
       unsubAuth();
       if (unsubProcessos) unsubProcessos();
       if (unsubDistribuicoes) unsubDistribuicoes();

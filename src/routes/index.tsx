@@ -1020,9 +1020,12 @@ function Index() {
                 <button
                   type="button"
                   title="Sair"
-                  onClick={() => {
-                    logout();
-                    navigate({ to: "/login" });
+                  onClick={async () => {
+                    try {
+                      await logout();
+                    } finally {
+                      window.location.assign(`/login?v=${Date.now()}`);
+                    }
                   }}
                   className="p-1.5 rounded-md hover:bg-sidebar-accent text-sidebar-foreground/70 hover:text-white transition-colors"
                 >
