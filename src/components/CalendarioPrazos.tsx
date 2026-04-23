@@ -339,11 +339,19 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
                   {items.slice(0, 3).map((item, i) => {
                     const cor = corDoItem(item);
                     const ehPrazo = item.tipo === "prazo-fatal";
-                    const conteudo = (
-                      <>
-                        {ehPrazo && "⚖ "}
-                        {item.titulo}
-                      </>
+                    const conteudo = ehPrazo ? (
+                      <div className="min-w-0">
+                        {item.responsavel && (
+                          <div className="truncate text-[9px] font-semibold opacity-80">
+                            {item.responsavel}
+                          </div>
+                        )}
+                        <div className="truncate">
+                          ⚖ {item.titulo}
+                        </div>
+                      </div>
+                    ) : (
+                      item.titulo
                     );
 
                     const estiloBase = {
@@ -361,7 +369,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
                             e.stopPropagation();
                             setProcessoSelecionado(item.processo!);
                           }}
-                          className="w-full text-left text-[10px] leading-tight px-1.5 py-0.5 rounded truncate font-medium hover:brightness-95"
+                          className="w-full text-left text-[10px] leading-tight px-1.5 py-1 rounded font-medium hover:brightness-95"
                           style={estiloBase}
                           title={`${item.titulo} (clique para abrir detalhes)`}
                         >
@@ -373,7 +381,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
                     return (
                       <div
                         key={i}
-                        className="text-[10px] leading-tight px-1.5 py-0.5 rounded truncate font-medium"
+                        className="text-[10px] leading-tight px-1.5 py-1 rounded font-medium"
                         style={estiloBase}
                         title={item.titulo}
                       >
