@@ -8,8 +8,21 @@ export function normalizarSetorUsuario(valor: unknown): "DU" | "PA" | "" {
     .toUpperCase();
 
   if (!texto) return "";
-  if (texto === "DU" || texto.includes("DEFESA") || texto.includes("USUARIO")) return "DU";
-  if (texto === "PA" || texto.includes("PROCESSO") || texto.includes("ADMIN")) return "PA";
+  if (
+    texto === "DU"
+    || /(^|\s)DU($|\s)/.test(texto)
+    || texto.includes("DEFESA")
+    || texto.includes("USUARIO")
+  ) return "DU";
+  if (
+    texto === "PA"
+    || /(^|\s)PA($|\s)/.test(texto)
+    || texto.includes("PROCESSO")
+    || texto.includes("ASSESSOR PA")
+    || texto.includes("CHEFE PA")
+    || texto.includes("ASSJUR")
+    || texto.includes("ADMIN")
+  ) return "PA";
   return "";
 }
 

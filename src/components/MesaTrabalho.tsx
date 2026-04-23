@@ -40,6 +40,12 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
   const [responsaveisOtimizados, setResponsaveisOtimizados] = useState<Record<string, string>>({});
 
+  const COLUNAS_PA_EM_ANDAMENTO = [
+    "📗 Sindicâncias em Andamento",
+    "📘 IPM em Andamento",
+    "⚖ Conselhos em Andamento",
+  ] as const;
+
   const processosEfetivos = useMemo(() => {
     return processos.map((p) => {
       if (!(p.id in responsaveisOtimizados)) return p;
@@ -140,7 +146,11 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
 
     // O ID do 'over' é o responsável (nome do assessor ou "Aguardando Distribuição")
     const novoResponsavel = over.id as string;
-    if (novoResponsavel === "MESA DO CHEFE") {
+    if (
+      novoResponsavel === "MESA DO CHEFE"
+      || novoResponsavel === "📩 Aguardando Resposta"
+      || COLUNAS_PA_EM_ANDAMENTO.includes(novoResponsavel as typeof COLUNAS_PA_EM_ANDAMENTO[number])
+    ) {
       setActiveId(null);
       setActiveProcesso(null);
       return;
@@ -218,6 +228,26 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         return situacaoFluxo === "AGUARDANDO_RESPOSTA" || statusNorm === "aguardando resposta";
       };
 
+      const colunaPAEmAndamento = (p: Processo) => {
+        if (tipo !== "PA") return null;
+
+        const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
+        if (situacaoFluxo !== "EM_CURSO" && situacaoFluxo !== "C_EM_CURSO") {
+          return null;
+        }
+
+        const tipoPANormalizado = (p.tipoPA || p.subtipo || "")
+          .toString()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+
+        if (tipoPANormalizado.includes("conselho")) return "⚖ Conselhos em Andamento";
+        if (tipoPANormalizado.includes("ipm")) return "📘 IPM em Andamento";
+        if (tipoPANormalizado.includes("sindic")) return "📗 Sindicâncias em Andamento";
+        return null;
+      };
+
       const aguardandoRespostaDU = tipo === "DU" ? doTipo.filter(isAguardandoResposta) : [];
       const pendenciasChefia = ehAdmin ? doTipo.filter((p) => isPendenteChefia(p) && (tipo !== "DU" || !isAguardandoResposta(p))) : [];
       const doTipoSemPendenciasChefia = ehAdmin
@@ -226,6 +256,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       
       const mapAtivos = new Map<string, Processo[]>();
       const mapConcluidos = new Map<string, Processo[]>();
+
+      if (tipo === "PA") {
+        COLUNAS_PA_EM_ANDAMENTO.forEach((coluna) => {
+          mapAtivos.set(coluna, []);
+          mapConcluidos.set(coluna, []);
+        });
+      }
 
       if (ehAdmin && pendenciasChefia.length > 0) {
         mapAtivos.set("MESA DO CHEFE", pendenciasChefia);
@@ -237,11 +274,18 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       
       // Adiciona os processos aos seus responsáveis
       doTipoSemPendenciasChefia.forEach((p) => {
+        const colunaEspecialPA = colunaPAEmAndamento(p);
+        if (colunaEspecialPA) {
+          mapAtivos.get(colunaEspecialPA)!.push(p);
+          return;
+        }
+
         // Processos sem responsável ou com "Sem responsável" vão para "Aguardando Distribuição"
         let responsavelKey = p.responsavel || "";
         if (!responsavelKey || responsavelKey === "Sem responsável" || responsavelKey.trim() === "") {
-          responsavelKey = "📥 Aguardando Distribuição";
+          responsavelKey = tipo === "PA" ? "" : "📥 Aguardando Distribuição";
         }
+        if (!responsavelKey) return;
         if (!mapAtivos.has(responsavelKey)) mapAtivos.set(responsavelKey, []);
         mapAtivos.get(responsavelKey)!.push(p);
       });
@@ -249,8 +293,9 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       concluidosDoTipo.forEach((p) => {
         let responsavelKey = p.responsavel || "";
         if (!responsavelKey || responsavelKey === "Sem responsável" || responsavelKey.trim() === "") {
-          responsavelKey = "📥 Aguardando Distribuição";
+          responsavelKey = tipo === "PA" ? "" : "📥 Aguardando Distribuição";
         }
+        if (!responsavelKey) return;
         if (!mapConcluidos.has(responsavelKey)) mapConcluidos.set(responsavelKey, []);
         mapConcluidos.get(responsavelKey)!.push(p);
       });
@@ -287,6 +332,11 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         .sort((a, b) => {
           if (a.nome.includes("MESA DO CHEFE")) return -1;
           if (b.nome.includes("MESA DO CHEFE")) return 1;
+          if (COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]) && !COLUNAS_PA_EM_ANDAMENTO.includes(b.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number])) return -1;
+          if (!COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]) && COLUNAS_PA_EM_ANDAMENTO.includes(b.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number])) return 1;
+          if (COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]) && COLUNAS_PA_EM_ANDAMENTO.includes(b.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number])) {
+            return COLUNAS_PA_EM_ANDAMENTO.indexOf(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]) - COLUNAS_PA_EM_ANDAMENTO.indexOf(b.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]);
+          }
           if (a.nome.includes("📩 Aguardando Resposta")) return -1;
           if (b.nome.includes("📩 Aguardando Resposta")) return 1;
           if (a.nome.includes("📥 Aguardando")) return -1;
@@ -326,6 +376,12 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       <div className="space-y-6">
         {grupos.map((grupo) => {
           const isDU = grupo.tipo === "DU";
+          const colunasPAEmAndamento = grupo.tipo === "PA"
+            ? grupo.assessores.filter((a) => COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]))
+            : [];
+          const colunasPAAssessores = grupo.tipo === "PA"
+            ? grupo.assessores.filter((a) => !COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]))
+            : grupo.assessores;
           return (
             <section key={grupo.tipo}>
               <div className="mb-3">
@@ -339,25 +395,68 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                   Assessores {grupo.tipo}
                 </span>
               </div>
-              <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
-                {grupo.assessores.map((a) => (
-                  <AssessorGroup
-                    key={`${grupo.tipo}-${a.nome}`}
-                    responsavel={a.nome}
-                    tipo={grupo.tipo}
-                    processos={a.itensAtivos}
-                    processosConcluidos={a.itensConcluidos}
-                    ehAdmin={ehAdmin}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                    onMove={onMove}
-                    onReativarProcesso={onReativarProcesso}
-                    siteSettings={siteSettings}
-                    unreadProcessIds={unreadProcessIds}
-                    onReadProcess={onReadProcess}
-                  />
-                ))}
-              </div>
+              {grupo.tipo === "PA" ? (
+                <div className="space-y-4">
+                  <div className="flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
+                    {colunasPAEmAndamento.map((a) => (
+                      <AssessorGroup
+                        key={`${grupo.tipo}-${a.nome}`}
+                        responsavel={a.nome}
+                        tipo={grupo.tipo}
+                        processos={a.itensAtivos}
+                        processosConcluidos={a.itensConcluidos}
+                        ehAdmin={ehAdmin}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onMove={onMove}
+                        onReativarProcesso={onReativarProcesso}
+                        siteSettings={siteSettings}
+                        unreadProcessIds={unreadProcessIds}
+                        onReadProcess={onReadProcess}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
+                    {colunasPAAssessores.map((a) => (
+                      <AssessorGroup
+                        key={`${grupo.tipo}-${a.nome}`}
+                        responsavel={a.nome}
+                        tipo={grupo.tipo}
+                        processos={a.itensAtivos}
+                        processosConcluidos={a.itensConcluidos}
+                        ehAdmin={ehAdmin}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onMove={onMove}
+                        onReativarProcesso={onReativarProcesso}
+                        siteSettings={siteSettings}
+                        unreadProcessIds={unreadProcessIds}
+                        onReadProcess={onReadProcess}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
+                  {grupo.assessores.map((a) => (
+                    <AssessorGroup
+                      key={`${grupo.tipo}-${a.nome}`}
+                      responsavel={a.nome}
+                      tipo={grupo.tipo}
+                      processos={a.itensAtivos}
+                      processosConcluidos={a.itensConcluidos}
+                      ehAdmin={ehAdmin}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      onMove={onMove}
+                      onReativarProcesso={onReativarProcesso}
+                      siteSettings={siteSettings}
+                      unreadProcessIds={unreadProcessIds}
+                      onReadProcess={onReadProcess}
+                    />
+                  ))}
+                </div>
+              )}
             </section>
           );
         })}

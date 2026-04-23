@@ -47,8 +47,21 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       .toUpperCase();
 
     if (!txt) return "";
-    if (txt === "DU" || txt.includes("DEFESA") || txt.includes("USUARIO")) return "DU";
-    if (txt === "PA" || txt.includes("PROCESSO") || txt.includes("ADMIN")) return "PA";
+    if (
+      txt === "DU"
+      || /(^|\s)DU($|\s)/.test(txt)
+      || txt.includes("DEFESA")
+      || txt.includes("USUARIO")
+    ) return "DU";
+    if (
+      txt === "PA"
+      || /(^|\s)PA($|\s)/.test(txt)
+      || txt.includes("PROCESSO")
+      || txt.includes("ASSESSOR PA")
+      || txt.includes("CHEFE PA")
+      || txt.includes("ASSJUR")
+      || txt.includes("ADMIN")
+    ) return "PA";
     return "";
   };
 
@@ -227,7 +240,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                 vara: procData.vara || "N/A",
                 parteContraria: procData.parteContraria || "N/A",
                 tipoAcao: procData.assunto || procData.tipoAcao || "Sem assunto",
-                responsavel: procData.responsavel || responsavelLegado || "",
+                responsavel: procData.responsavel || responsavelLegado || (setorCanonico === "PA" ? (procData.criadoPorNome || procData.atualizadoPorNome || "") : ""),
                 prazo: procData.prazoInternoDU || procData.prazo || procData.pedidoSubsidios?.dataPrazo || procData.pedidoSubsidios?.prazoResposta,
                 prazoFatal: prazoFatalProcesso,
                 descricao: descricaoUltimoMovimento,
