@@ -811,6 +811,57 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
     }
   };
 
+  const recalcularPrazo = async () => {
+    if (!processoId || !processo) return;
+    try {
+      const prorrogacoes = Array.isArray(processo.prorrogacoes) ? processo.prorrogacoes : [];
+      if (prorrogacoes.length === 0) {
+        toast.info("Nenhuma prorrogação registrada.");
+        return;
+      }
+
+      const dataInicio = processo.dataInicioPrazo || "";
+      const dataAssin = processo.dataAssinatura || "";
+
+      const prazoCalculado = calcularPrazoFinalPA({
+        tipoPA: processo.tipoPA,
+        dataInicioPrazo: dataInicio,
+        dataAssinatura: dataAssin,
+        prorrogacoes,
+      }, siteSettings);
+
+      if (!prazoCalculado) {
+        toast.error("Não foi possível calcular o prazo.");
+        return;
+      }
+
+      const prazoAtual = processo.prazoFatal || processo.finalPrazo;
+      if (prazoAtual === prazoCalculado) {
+        toast.info(`Prazo já está correto: ${formatarData(prazoCalculado)}`);
+        return;
+      }
+
+      await updateDoc(doc(db, "processos", processoId), {
+        prazoFatal: prazoCalculado,
+        finalPrazo: prazoCalculado,
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+      });
+
+      setProcesso({
+        ...processo,
+        prazoFatal: prazoCalculado,
+        finalPrazo: prazoCalculado,
+      });
+
+      toast.success(`✅ Prazo recalculado e atualizado para ${formatarData(prazoCalculado)}`);
+      if (onSuccess) onSuccess();
+    } catch (error) {
+      console.error("Erro ao recalcular prazo:", error);
+      toast.error("Erro ao recalcular prazo.");
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={(opening) => {
       if (!opening) {
@@ -835,10 +886,23 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
           <div className="space-y-4">
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 flex items-center justify-between text-xs">
               <span className="text-slate-600">Perfil atual</span>
-              <span className="font-bold text-slate-800 flex items-center gap-1">
-                {role === "assessor_pa" ? <User className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
-                {role === "assessor_pa" ? "Assessor PA" : "Chefe AssJur"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-800 flex items-center gap-1">
+                  {role === "assessor_pa" ? <User className="w-3.5 h-3.5" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                  {role === "assessor_pa" ? "Assessor PA" : "Chefe AssJur"}
+                </span>
+                {isAdmin(user) && historicoProrrogacoes.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={recalcularPrazo}
+                    className="text-[10px] h-6 border-amber-300 text-amber-700 hover:bg-amber-50"
+                    title="Recalcula prazo baseado em prorrogações"
+                  >
+                    Recalcular Prazo
+                  </Button>
+                )}
+              </div>
             </div>
 
             {isConselho

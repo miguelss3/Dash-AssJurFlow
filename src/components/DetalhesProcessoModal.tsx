@@ -43,6 +43,7 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
   const setor = processo.setor || processo.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
+  const prorrogacoesPA = isPA && Array.isArray(processo.prorrogacoes) ? processo.prorrogacoes : [];
   const pedido = processo.pedidoSubsidios;
   const respostaDU = processo.respostaDU;
   const situacaoFluxo = pedido?.situacaoFluxo || "";
@@ -224,6 +225,31 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
               })}
             </div>
           </div>
+
+          {prorrogacoesPA.length > 0 && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="text-sm font-bold text-amber-800 uppercase tracking-wide mb-3">
+                  Prorrogações Registradas ({prorrogacoesPA.length})
+                </h4>
+                <div className="space-y-2 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  {prorrogacoesPA.map((item, index) => (
+                    <div
+                      key={`${item.doc || "sem-doc"}-${item.em || index}`}
+                      className="text-sm text-amber-900 bg-white border border-amber-100 rounded p-3"
+                    >
+                      <div className="font-semibold">{item.doc || "Documento não informado"}</div>
+                      <div className="text-xs text-amber-800 mt-1">
+                        Data: {item.em ? formatarData(item.em) : "—"} | +{item.dias ?? "?"} dias
+                        {item.por ? ` | Por: ${item.por}` : ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
 
           {/* Observações */}
           {processo.observacoes && (

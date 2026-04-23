@@ -71,6 +71,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const setor = p.setor || p.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
+  const prorrogacoesPA = isPA && Array.isArray(p.prorrogacoes) ? p.prorrogacoes : [];
   const rotuloPrazoLimite = isPA ? "Final" : "Fatal";
   const situacaoSubsidio = p.pedidoSubsidios?.situacaoFluxo;
   const statusNormalizado = (p.status || "").toString().trim().toLowerCase();
@@ -321,7 +322,27 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
             )}
           </div>
 
-
+          {prorrogacoesPA.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+              <div className="text-[10px] font-black uppercase tracking-wide text-amber-700 mb-1">
+                Prorrogações Registradas ({prorrogacoesPA.length})
+              </div>
+              <div className="space-y-1.5">
+                {prorrogacoesPA.map((item, index) => (
+                  <div
+                    key={`${item.doc || "sem-doc"}-${item.em || index}`}
+                    className="text-[11px] text-amber-900 bg-white/80 border border-amber-100 rounded px-2 py-1"
+                  >
+                    <div className="font-semibold">{item.doc || "Documento não informado"}</div>
+                    <div className="text-amber-800">
+                      Data: {item.em ? formatarData(item.em) : "—"} | +{item.dias ?? "?"} dias
+                      {item.por ? ` | Por: ${item.por}` : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Botões de Ação */}
           {showActions && (
@@ -445,6 +466,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
               </div>
             </div>
           )}
+
         </div>
       </Card>
 
