@@ -11,6 +11,8 @@ type ProrrogacaoPA = {
   dias?: number | null;
 } | null | undefined;
 
+const PADRAO_HISTORICO_INICIO_PRAZO_PA = /^Prazo do PA iniciado em .*\.$/i;
+
 export function ehConselhoPA(tipoPA: string | undefined | null): boolean {
   return tipoPA === "Conselho de Disciplina" || tipoPA === "Conselho de Justificação";
 }
@@ -62,7 +64,8 @@ function normalizarDataPrazoPA(valor: string | undefined | null): string | undef
 
   const texto = String(valor).trim();
   if (!texto) return undefined;
-  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto;
+  const prefixoData = texto.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (prefixoData) return prefixoData;
 
   try {
     const data = parseISO(texto);
@@ -96,11 +99,22 @@ export function calcularPrazoFinalPA(params: {
     const dataFinal = parseISO(`${dataBase}T00:00:00`);
     if (Number.isNaN(dataFinal.getTime())) return undefined;
 
-    dataFinal.setDate(dataFinal.getDate() + diasIniciais + diasExtras);
+    dataFinal.setDate(dataFinal.getDate() + diasIniciais + diasExtras - 1);
     return format(dataFinal, "yyyy-MM-dd");
   } catch {
     return undefined;
   }
+}
+
+export function normalizarTextoHistoricoPrazoPA(
+  texto: string | undefined | null,
+  dataInicioPrazo: string | undefined | null,
+): string {
+  if (!texto) return "";
+  if (!dataInicioPrazo || !PADRAO_HISTORICO_INICIO_PRAZO_PA.test(texto)) return texto;
+
+  const dataFormatada = formatarData(dataInicioPrazo);
+  return dataFormatada === "—" ? texto : `Prazo do PA iniciado em ${dataFormatada}.`;
 }
 
 export function diasRestantes(prazoISO: string | undefined | null): number {
@@ -141,6 +155,16 @@ export function rotuloPrazoLongo(prazoISO: string | undefined | null): string {
 
 export function formatarData(prazoISO: string | undefined | null): string {
   if (!prazoISO) return "—";
+
+  const dataCivil = normalizarDataPrazoPA(prazoISO);
+  if (dataCivil) {
+    try {
+      return format(parseISO(`${dataCivil}T00:00:00`), "dd/MM/yyyy", { locale: ptBR });
+    } catch {
+      return "—";
+    }
+  }
+
   try {
     return format(parseISO(prazoISO), "dd/MM/yyyy", { locale: ptBR });
   } catch {

@@ -8,6 +8,7 @@ import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import type { Processo } from "@/types/processo";
+import { normalizarTextoHistoricoPrazoPA } from "@/lib/prazo";
 
 interface ChatModalProps {
   open: boolean;
@@ -58,7 +59,7 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
             id: doc.id,
             autor: data.autor || "Sistema",
             autorId: data.autorId || "",
-            texto: data.texto || "",
+                    texto: normalizarTextoHistoricoPrazoPA(data.texto || "", processo.dataInicioPrazo),
             timestamp: data.timestamp?.toDate?.()?.toISOString() || data.timestamp || new Date().toISOString(),
           });
         });
@@ -75,7 +76,7 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
                     id: msg.id || crypto.randomUUID(),
                     autor: msg.autor || "Sistema",
                     autorId: msg.autorId || "",
-                    texto: msg.texto || "",
+                    texto: normalizarTextoHistoricoPrazoPA(msg.texto || "", processo.dataInicioPrazo),
                     timestamp: msg.timestamp || new Date().toISOString(),
                   });
                 });
@@ -92,7 +93,7 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
             id: `fallback-${processo.id}`,
             autor: processo.atualizadoPorNome || processo.criadoPorNome || "Sistema",
             autorId: "",
-            texto: processo.descricao,
+            texto: normalizarTextoHistoricoPrazoPA(processo.descricao, processo.dataInicioPrazo),
             timestamp: processo.atualizadoEm || processo.criadoEm || new Date().toISOString(),
           });
         }

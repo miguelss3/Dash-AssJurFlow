@@ -15,7 +15,7 @@ import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import type { Processo, StatusProcesso } from "@/types/processo";
 import { isAdmin, type AuthUser } from "./useAuth";
-import { calcularPrazoFinalPA } from "@/lib/prazo";
+import { calcularPrazoFinalPA, normalizarTextoHistoricoPrazoPA } from "@/lib/prazo";
 import type { SiteSettings } from "@/types/siteSettings";
 
 export function useProcessos(siteSettings?: SiteSettings) {
@@ -153,7 +153,7 @@ export function useProcessos(siteSettings?: SiteSettings) {
         // Prioriza o array historico (sistema antigo), depois tenta outros campos
         const historico = Array.isArray(procData.historico) ? procData.historico : [];
         const ultimaMensagem = historico.length > 0 ? historico[historico.length - 1] : null;
-        const descricaoUltimoMovimento = ultimaMensagem?.texto 
+        const descricaoUltimoMovimentoOriginal = ultimaMensagem?.texto 
           || procData.ultimaAtualizacaoDescricao 
           || procData.ultimaAcaoDescricao 
           || procData.descricao 
@@ -161,6 +161,7 @@ export function useProcessos(siteSettings?: SiteSettings) {
 
         const dataAssinatura = toIsoString(procData.dataAssinatura) || procData.dataAssinatura;
         const dataInicioPrazo = toIsoString(procData.dataInicioPrazo) || procData.dataInicioPrazo;
+        const descricaoUltimoMovimento = normalizarTextoHistoricoPrazoPA(descricaoUltimoMovimentoOriginal, dataInicioPrazo);
         const prorrogacoes = Array.isArray(procData.prorrogacoes) ? procData.prorrogacoes : undefined;
         const prazoFinalPA = calcularPrazoFinalPA({
           tipoPA: procData.tipoPA,

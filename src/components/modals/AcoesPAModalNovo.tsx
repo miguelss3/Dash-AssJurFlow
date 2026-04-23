@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { calcularPrazoFinalPA, obterRegraPrazoPA } from "@/lib/prazo";
+import { calcularPrazoFinalPA, formatarData, obterRegraPrazoPA } from "@/lib/prazo";
 import { toast } from "sonner";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
@@ -159,11 +159,6 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
     }, siteSettings);
 
     return prazoFinal ? { prazoFatal: prazoFinal, finalPrazo: prazoFinal } : {};
-  };
-
-  const formatarDataLocal = (valor: string) => {
-    if (!valor) return "";
-    return new Date(`${valor}T00:00:00`).toLocaleDateString("pt-BR");
   };
 
   const encarregadoAtual = useMemo(() => {
@@ -366,7 +361,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
   const iniciarPrazoPadrao = () => {
     void avancarFluxo(
       "EM_CURSO",
-      `Prazo do PA iniciado em ${formatarDataLocal(dataInicioPrazo)}.`,
+      `Prazo do PA iniciado em ${formatarData(dataInicioPrazo)}.`,
       {
         dataInicioPrazo,
         ...calcularCamposPrazo({ dataInicioPrazo }),
