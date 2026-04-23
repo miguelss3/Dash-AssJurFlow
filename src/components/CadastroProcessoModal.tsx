@@ -27,6 +27,7 @@ const ASSUNTOS_SINDICANCIA = [
   "Apuração de Fato",
   "Dano ao Erário",
   "Despesa de Exercícios Anteriores",
+  "Exame de Pagamento",
   "FUSEx",
   "Transgressão Disciplinar",
   "OUTROS",
