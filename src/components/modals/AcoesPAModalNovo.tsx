@@ -142,6 +142,15 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
     setDocProrrogacao("");
   };
 
+  // Helper para pegar o valor correto, ignorando strings vazias e undefined
+  const obterValorData = (estadoLocal: string, processoField?: string): string => {
+    const local = estadoLocal?.trim();
+    const procValue = processoField?.trim?.();
+    if (local) return local;
+    if (procValue) return procValue;
+    return "";
+  };
+
   const tipoProcesso = processo?.tipoPA || "";
   const isConselho = tipoProcesso === "Conselho de Disciplina" || tipoProcesso === "Conselho de Justificação";
   const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoProcesso, siteSettings);
@@ -197,15 +206,48 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       const data = snap.data() as ProcessoPA;
       setProcesso(data);
       setSituacaoFluxo(estadoInicial(data));
-      setDataAssinatura((data.dataAssinatura || "").toString());
-      setDataInicioPrazo((data.dataInicioPrazo || "").toString());
-      setDespachoFinal((data.despachoFinal || "").toString());
+      setDataAssinatura(data.dataAssinatura || "");
+      setDataInicioPrazo(data.dataInicioPrazo || "");
+      setDespachoFinal(data.despachoFinal || "");
       setHistoricoProrrogacoes(Array.isArray(data.prorrogacoes) ? data.prorrogacoes : []);
-      setMembrosConselho((data.membrosConselho || "").toString());
-      setDecisaoAutNomeante((data.decisaoAutNomeante || "").toString());
-      setNumeroDIExRemessa((data.numeroDIExRemessa || "").toString());
-      setResultadoFinalConselho((data.resultadoFinalConselho || "").toString());
+      setMembrosConselho(data.membrosConselho || "");
+      setDecisaoAutNomeante(data.decisaoAutNomeante || "");
+      setNumeroDIExRemessa(data.numeroDIExRemessa || "");
+      setResultadoFinalConselho(data.resultadoFinalConselho || "");
       setTeveRecurso(data.teveRecurso === true);
+
+      // Verifica se há prorrogações e se o prazo precisa ser recalculado
+      const prorrogacoes = Array.isArray(data.prorrogacoes) ? data.prorrogacoes : [];
+      if (prorrogacoes.length > 0) {
+        const dataInicio = data.dataInicioPrazo || "";
+        const dataAssin = data.dataAssinatura || "";
+        
+        const prazoCalculado = calcularPrazoFinalPA({
+          tipoPA: data.tipoPA,
+          dataInicioPrazo: dataInicio,
+          dataAssinatura: dataAssin,
+          prorrogacoes,
+        }, siteSettings);
+
+        // Se o prazo calculado é diferente do que está no banco, atualiza
+        if (prazoCalculado && (data.prazoFatal !== prazoCalculado || data.finalPrazo !== prazoCalculado)) {
+          try {
+            await updateDoc(processoRef, {
+              prazoFatal: prazoCalculado,
+              finalPrazo: prazoCalculado,
+              atualizadoEm: Timestamp.now(),
+            });
+            // Atualiza o estado local com o novo prazo
+            setProcesso({
+              ...data,
+              prazoFatal: prazoCalculado,
+              finalPrazo: prazoCalculado,
+            });
+          } catch (updateError) {
+            console.warn("Não foi possível atualizar prazo recalculado:", updateError);
+          }
+        }
+      }
     } catch (error) {
       console.error("Erro ao carregar processo PA:", error);
       toast.error("Não foi possível carregar o fluxo do PA.");
@@ -299,6 +341,20 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
     }
     try {
       const agoraISO = new Date().toISOString();
+      
+      // Usa função helper para garantir que os valores estão corretos (ignora strings vazias)
+      const dataInicioParaCalculo = obterValorData(dataInicioPrazo, processo?.dataInicioPrazo);
+      const dataAssinaturaParaCalculo = obterValorData(dataAssinatura, processo?.dataAssinatura);
+      
+      const prazoCalculado = calcularPrazoFinalPA({
+        tipoPA: tipoProcesso,
+        dataInicioPrazo: dataInicioParaCalculo,
+        dataAssinatura: dataAssinaturaParaCalculo,
+        prorrogacoes: historicoProrrogacoes,
+      }, siteSettings);
+      
+      const camposPrazoCalculados = prazoCalculado ? { prazoFatal: prazoCalculado, finalPrazo: prazoCalculado } : {};
+      
       await updateDoc(doc(db, "processos", processoId), {
         encarregado: novoEncarregado.trim(),
         substituicaoEncarregado: {
@@ -311,7 +367,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
         descricao: `Substituição de encarregado registrada: ${novoEncarregado.trim()} (${novaPortaria.trim()}).`,
-        ...calcularCamposPrazo(),
+        ...camposPrazoCalculados,
       });
       await registrarHistorico(`Substituição de encarregado: ${novoEncarregado.trim()} - ${novaPortaria.trim()}.`);
       setIsSubstituindo(false);
@@ -339,12 +395,26 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         por: autorMilitar,
       };
       const novasProrrogacoes = [...historicoProrrogacoes, item];
+      
+      // Usa função helper para garantir que os valores estão corretos (ignora strings vazias)
+      const dataInicioParaCalculo = obterValorData(dataInicioPrazo, processo?.dataInicioPrazo);
+      const dataAssinaturaParaCalculo = obterValorData(dataAssinatura, processo?.dataAssinatura);
+      
+      const prazoCalculado = calcularPrazoFinalPA({
+        tipoPA: tipoProcesso,
+        dataInicioPrazo: dataInicioParaCalculo,
+        dataAssinatura: dataAssinaturaParaCalculo,
+        prorrogacoes: novasProrrogacoes,
+      }, siteSettings);
+      
+      const camposPrazoCalculados = prazoCalculado ? { prazoFatal: prazoCalculado, finalPrazo: prazoCalculado } : {};
+      
       await updateDoc(doc(db, "processos", processoId), {
         prorrogacoes: novasProrrogacoes,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
         descricao: `Prazo prorrogado em +${diasProrrogacao} dias (${item.doc}).`,
-        ...calcularCamposPrazo({ prorrogacoes: novasProrrogacoes }),
+        ...camposPrazoCalculados,
       });
       await registrarHistorico(`Prorrogação registrada: +${diasProrrogacao} dias (${item.doc}).`);
       setHistoricoProrrogacoes(novasProrrogacoes);
@@ -359,24 +429,44 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
   };
 
   const iniciarPrazoPadrao = () => {
+    const dataInicioParaCalculo = obterValorData(dataInicioPrazo, processo?.dataInicioPrazo);
+    const dataAssinaturaParaCalculo = obterValorData(dataAssinatura, processo?.dataAssinatura);
+    
+    const prazoCalculado = calcularPrazoFinalPA({
+      tipoPA: tipoProcesso,
+      dataInicioPrazo: dataInicioParaCalculo,
+      dataAssinatura: dataAssinaturaParaCalculo,
+      prorrogacoes: historicoProrrogacoes,
+    }, siteSettings);
+    
+    const camposPrazoCalculados = prazoCalculado ? { prazoFatal: prazoCalculado, finalPrazo: prazoCalculado } : {};
+    
     void avancarFluxo(
       "EM_CURSO",
-      `Prazo do PA iniciado em ${formatarData(dataInicioPrazo)}.`,
+      `Prazo do PA iniciado em ${formatarData(dataInicioParaCalculo)}.`,
       {
-        dataInicioPrazo,
-        ...calcularCamposPrazo({ dataInicioPrazo }),
+        dataInicioPrazo: dataInicioParaCalculo,
+        ...camposPrazoCalculados,
       },
     );
   };
 
   const confirmarInstalacaoConselho = () => {
+    const dataAssinaturaParaCalculo = obterValorData(dataAssinatura, processo?.dataAssinatura);
+    
+    const prazoCalculado = calcularPrazoFinalPA({
+      tipoPA: tipoProcesso,
+      dataInicioPrazo: dataAssinaturaParaCalculo,
+      dataAssinatura: dataAssinaturaParaCalculo,
+      prorrogacoes: historicoProrrogacoes,
+    }, siteSettings);
+    
+    const camposPrazoCalculados = prazoCalculado ? { prazoFatal: prazoCalculado, finalPrazo: prazoCalculado } : {};
+    
     void avancarFluxo("C_EM_CURSO", "Portaria assinada e Conselho instalado.", {
-      dataAssinatura,
-      dataInicioPrazo: dataAssinatura,
-      ...calcularCamposPrazo({
-        dataAssinatura,
-        dataInicioPrazo: dataAssinatura,
-      }),
+      dataAssinatura: dataAssinaturaParaCalculo,
+      dataInicioPrazo: dataAssinaturaParaCalculo,
+      ...camposPrazoCalculados,
     });
   };
 
