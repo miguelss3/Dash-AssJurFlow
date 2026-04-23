@@ -47,6 +47,13 @@ service cloud.firestore {
         (setor in ['DU', 'PA'] && userSetor() == setor);
     }
 
+    function canReadProcessData(data) {
+      return isSignedIn() && (
+        data.userId == request.auth.uid ||
+        (data.setor in ['DU', 'PA'] && canManageSetor(data.setor))
+      );
+    }
+
     function processDocById(processoId) {
       return get(/databases/$(database)/documents/processos/$(processoId)).data;
     }
@@ -58,7 +65,7 @@ service cloud.firestore {
     function canAccessProcessById(processoId) {
       return isSignedIn() &&
         processExists(processoId) &&
-        canManageSetor(processDocById(processoId).setor);
+        canReadProcessData(processDocById(processoId));
     }
 
     function isOwnerPayload(data) {
@@ -96,7 +103,7 @@ service cloud.firestore {
     
     // Regras para a coleção de processos
     match /processos/{processoId} {
-      allow read:   if isSignedIn();
+      allow get, list: if canReadProcessData(resource.data);
       allow create: if canCreateProcess(request.resource.data);
       allow update: if canUpdateProcess(resource.data, request.resource.data);
       allow delete: if canDeleteProcess(resource.data);
@@ -120,7 +127,8 @@ service cloud.firestore {
     
     // Regras para a coleção de distribuições
     match /distribuicoes/{distribuicaoId} {
-      allow read: if isSignedIn();
+      allow get, list: if resource.data.processoId is string &&
+        canAccessProcessById(resource.data.processoId);
       allow create: if isSignedIn() &&
         request.resource.data.processoId is string &&
         canAccessProcessById(request.resource.data.processoId);

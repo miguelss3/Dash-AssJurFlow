@@ -165,7 +165,7 @@ function Index() {
     loading: siteSettingsLoading,
     saveSettings: persistSiteSettings,
   } = useSiteSettings(ready && !!user);
-  const { processos, criar, atualizar, remover } = useProcessos(siteSettings);
+  const { processos, criar, atualizar, remover } = useProcessos(siteSettings, user);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Processo | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<StatusProcesso>("novo");
