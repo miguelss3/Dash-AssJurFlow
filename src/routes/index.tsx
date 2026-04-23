@@ -904,7 +904,7 @@ function Index() {
   }, [tabs, aba]);
 
   // Renderiza tela de carregamento enquanto a sessão não foi sincronizada
-  if (!ready) {
+  if (!ready && !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="text-center">
@@ -1383,6 +1383,7 @@ function Index() {
                   value={perfilEmail}
                   onChange={(e) => setPerfilEmail(e.target.value)}
                   placeholder="usuario@dominio.mil.br"
+                  autoComplete="email"
                 />
               </div>
               <div className="space-y-2">
@@ -1392,6 +1393,7 @@ function Index() {
                   value={perfilTelefone}
                   onChange={(e) => setPerfilTelefone(e.target.value)}
                   placeholder="(92) 99999-9999"
+                  autoComplete="tel"
                 />
               </div>
             </div>
@@ -1405,6 +1407,7 @@ function Index() {
                   value={perfilSenha}
                   onChange={(e) => setPerfilSenha(e.target.value)}
                   placeholder="Deixe em branco para manter"
+                  autoComplete="new-password"
                 />
               </div>
               <div className="space-y-2">
@@ -1415,6 +1418,7 @@ function Index() {
                   value={perfilSenhaConfirmacao}
                   onChange={(e) => setPerfilSenhaConfirmacao(e.target.value)}
                   placeholder="Repita a nova senha"
+                  autoComplete="new-password"
                 />
               </div>
             </div>

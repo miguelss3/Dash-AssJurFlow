@@ -69,7 +69,7 @@ function readStored(): AuthUser | null {
  * Auth integrado com Firebase Authentication
  */
 export function useAuth() {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(() => readStored());
   const [ready, setReady] = useState(false);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
 
