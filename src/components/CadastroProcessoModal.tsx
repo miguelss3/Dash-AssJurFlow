@@ -14,6 +14,7 @@ import { db } from "@/lib/firebase";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { calcularFaixasProrrogacaoPA, calcularPrazoFinalPA } from "@/lib/prazo";
 
 interface CadastroProcessoModalProps {
   open: boolean;
@@ -44,6 +45,15 @@ const ORIGENS_DU = ["SAPIENS", "Email", "MPF", "Justiça Federal", "Justiça Est
 const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 const POSTOS_CONSELHO = ["Cap", "Maj", "TC", "Cel"];
 const POSTOS_ENCARREGADO = ["Sgt", "Ten", "Cap", "Maj", "TC", "Cel"];
+
+type ProrrogacaoEditavel = {
+  dias: number;
+  doc: string;
+  inicio: string;
+  fim: string;
+  em?: string;
+  por?: string;
+};
 
 // LOG DE VERIFICAÇÃO - ESTE LOG DEVE APARECER SEMPRE
 // console.log("🚀🚀🚀 ARQUIVO CadastroProcessoModal.tsx CARREGADO - VERSÃO NOVA COM LOGS! 🚀🚀🚀");
@@ -103,6 +113,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
   const [assuntoSindicancia, setAssuntoSindicancia] = useState("");
   const [especificidadesSindicancia, setEspecificidadesSindicancia] = useState("");
   const [omPresidenteConselho, setOmPresidenteConselho] = useState("");
+  const [prorrogacoesEditaveis, setProrrogacoesEditaveis] = useState<ProrrogacaoEditavel[]>([]);
 
   const [loading, setLoading] = useState(false);
 
@@ -148,6 +159,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
     setAssuntoSindicancia("");
     setEspecificidadesSindicancia("");
     setOmPresidenteConselho("");
+    setProrrogacoesEditaveis([]);
   };
 
   const preencherParaEdicao = (p: Processo) => {
@@ -213,7 +225,110 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           setAssunto(p.tipoAcao);
         }
       }
+
+      const faixasProrrogacao = calcularFaixasProrrogacaoPA({
+        tipoPA: p.tipoPA,
+        dataInicioPrazo: p.dataInicioPrazo,
+        dataAssinatura: p.dataAssinatura,
+        prorrogacoes: p.prorrogacoes,
+      });
+
+      const listaEditavel = faixasProrrogacao.map((faixa, index) => ({
+        dias: faixa.dias,
+        doc: p.prorrogacoes?.[index]?.doc || "",
+        inicio: faixa.inicio,
+        fim: faixa.fim,
+        em: p.prorrogacoes?.[index]?.em,
+        por: p.prorrogacoes?.[index]?.por,
+      }));
+
+      setProrrogacoesEditaveis(listaEditavel);
     }
+  };
+
+  const toDataCivil = (valor: string): string => {
+    const texto = (valor || "").trim();
+    const prefixo = texto.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+    return prefixo || "";
+  };
+
+  const somarDias = (dataISO: string, dias: number): string => {
+    const base = toDataCivil(dataISO);
+    if (!base) return "";
+    const data = new Date(`${base}T00:00:00`);
+    if (Number.isNaN(data.getTime())) return "";
+    data.setDate(data.getDate() + dias);
+    return data.toISOString().slice(0, 10);
+  };
+
+  const diferencaDias = (inicioISO: string, fimISO: string): number => {
+    const inicio = toDataCivil(inicioISO);
+    const fim = toDataCivil(fimISO);
+    if (!inicio || !fim) return 0;
+    const dataInicio = new Date(`${inicio}T00:00:00`);
+    const dataFim = new Date(`${fim}T00:00:00`);
+    if (Number.isNaN(dataInicio.getTime()) || Number.isNaN(dataFim.getTime())) return 0;
+    const msDia = 24 * 60 * 60 * 1000;
+    return Math.max(0, Math.round((dataFim.getTime() - dataInicio.getTime()) / msDia));
+  };
+
+  const atualizarProrrogacao = (
+    index: number,
+    campo: "doc" | "dias" | "inicio" | "fim",
+    valor: string,
+  ) => {
+    setProrrogacoesEditaveis((atual) => {
+      const copia = [...atual];
+      const item = { ...copia[index] };
+
+      if (campo === "doc") {
+        item.doc = valor;
+      }
+
+      if (campo === "dias") {
+        const dias = Math.max(0, Math.trunc(Number(valor) || 0));
+        item.dias = dias;
+        if (toDataCivil(item.inicio)) {
+          item.fim = somarDias(item.inicio, dias);
+        }
+      }
+
+      if (campo === "inicio") {
+        item.inicio = toDataCivil(valor);
+        if (item.inicio) {
+          item.fim = somarDias(item.inicio, item.dias || 0);
+        }
+      }
+
+      if (campo === "fim") {
+        item.fim = toDataCivil(valor);
+        if (toDataCivil(item.inicio) && toDataCivil(item.fim)) {
+          item.dias = diferencaDias(item.inicio, item.fim);
+        }
+      }
+
+      copia[index] = item;
+      return copia;
+    });
+  };
+
+  const adicionarProrrogacaoEditavel = () => {
+    setProrrogacoesEditaveis((atual) => {
+      const ultimaFim = atual.length > 0 ? toDataCivil(atual[atual.length - 1].fim) : "";
+      return [
+        ...atual,
+        {
+          dias: 20,
+          doc: "",
+          inicio: ultimaFim,
+          fim: ultimaFim ? somarDias(ultimaFim, 20) : "",
+        },
+      ];
+    });
+  };
+
+  const removerProrrogacaoEditavel = (index: number) => {
+    setProrrogacoesEditaveis((atual) => atual.filter((_, i) => i !== index));
   };
 
   const isConselhoPA = (tipo: string) => {
@@ -458,6 +573,31 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
           dados.presidenteConselhoPosto = postoEncarregado;
           dados.presidenteConselhoNome = nomeEncarregado.trim();
           dados.omPresidenteConselho = omPresidenteConselho.trim();
+        }
+
+        if (processo?.id) {
+          const prorrogacoesNormalizadas = prorrogacoesEditaveis.map((item) => ({
+            dias: Math.max(0, Math.trunc(Number(item.dias) || 0)),
+            doc: (item.doc || "").trim() || "Documento não informado",
+            inicio: toDataCivil(item.inicio) || undefined,
+            fim: toDataCivil(item.fim) || undefined,
+            em: item.em || undefined,
+            por: item.por || undefined,
+          }));
+
+          dados.prorrogacoes = prorrogacoesNormalizadas;
+
+          const prazoCalculado = calcularPrazoFinalPA({
+            tipoPA,
+            dataInicioPrazo: processo.dataInicioPrazo,
+            dataAssinatura: processo.dataAssinatura,
+            prorrogacoes: prorrogacoesNormalizadas,
+          });
+
+          if (prazoCalculado) {
+            dados.prazoFatal = prazoCalculado;
+            dados.finalPrazo = prazoCalculado;
+          }
         }
       }
 
@@ -1031,6 +1171,79 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
 
           {setor && (
             <>
+              {processo?.id && setor === "PA" && (
+                <div className="space-y-3 p-4 border rounded-lg bg-amber-50 border-amber-200">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-sm text-amber-900">Prorrogações (editar início e fim)</h4>
+                    <Button type="button" variant="outline" className="border-amber-300 text-amber-800" onClick={adicionarProrrogacaoEditavel}>
+                      + Nova prorrogação
+                    </Button>
+                  </div>
+
+                  {prorrogacoesEditaveis.length === 0 ? (
+                    <p className="text-xs text-amber-800">Sem prorrogações registradas.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {prorrogacoesEditaveis.map((item, index) => (
+                        <div key={`prorrogacao-edit-${index}`} className="rounded-md border border-amber-200 bg-white p-3 space-y-2">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Documento</Label>
+                              <Input
+                                value={item.doc}
+                                onChange={(e) => atualizarProrrogacao(index, "doc", e.target.value)}
+                                placeholder="Documento concessório"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Dias</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={item.dias}
+                                onChange={(e) => atualizarProrrogacao(index, "dias", e.target.value)}
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Início da prorrogação</Label>
+                              <Input
+                                type="date"
+                                value={item.inicio}
+                                onChange={(e) => atualizarProrrogacao(index, "inicio", e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Fim da prorrogação</Label>
+                              <Input
+                                type="date"
+                                value={item.fim}
+                                onChange={(e) => atualizarProrrogacao(index, "fim", e.target.value)}
+                              />
+                            </div>
+                            <div className="flex items-end">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full border-red-300 text-red-700"
+                                onClick={() => removerProrrogacaoEditavel(index)}
+                              >
+                                Remover
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-amber-900">
+                    Regra: a contagem da prorrogação começa na data em que termina o prazo anterior.
+                  </p>
+                </div>
+              )}
+
               {/* Data de Entrada */}
               <div className="space-y-2">
                 <Label htmlFor="dataEntrada" className="uppercase text-xs font-semibold">Data de Entrada *</Label>

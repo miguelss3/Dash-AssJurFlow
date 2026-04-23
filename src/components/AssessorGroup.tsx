@@ -8,6 +8,7 @@ interface Props {
   responsavel: string;
   tipo: TipoProcesso;
   processos: Processo[];
+  processosAtrasados?: Processo[];
   processosConcluidos?: Processo[];
   ehAdmin?: boolean;
   onEdit: (p: Processo) => void;
@@ -19,8 +20,8 @@ interface Props {
   onReadProcess?: (processoId: string) => void;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess }: Props) {
-  const [aba, setAba] = useState<"ativos" | "concluidos">("ativos");
+export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess }: Props) {
+  const [aba, setAba] = useState<"andamento" | "atraso" | "concluidos">("andamento");
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
   });
@@ -60,7 +61,28 @@ export function AssessorGroup({ responsavel, tipo, processos, processosConcluido
     });
   }, [processos, tipo]);
 
-  const processosDaAba = aba === "ativos" ? processosAtivosOrdenados : processosConcluidos;
+  const processosAtrasadosOrdenados = useMemo(() => {
+    if (tipo !== "PA") return processosAtrasados;
+
+    const toTime = (valor?: string) => {
+      if (!valor) return Number.POSITIVE_INFINITY;
+      const data = new Date(`${valor.slice(0, 10)}T00:00:00`).getTime();
+      return Number.isNaN(data) ? Number.POSITIVE_INFINITY : data;
+    };
+
+    return [...processosAtrasados].sort((a, b) => {
+      const prazoA = toTime(a.prazoFatal || a.finalPrazo);
+      const prazoB = toTime(b.prazoFatal || b.finalPrazo);
+      if (prazoA !== prazoB) return prazoA - prazoB;
+      return (a.numero || "").localeCompare(b.numero || "");
+    });
+  }, [processosAtrasados, tipo]);
+
+  const processosDaAba = aba === "andamento"
+    ? processosAtivosOrdenados
+    : aba === "atraso"
+      ? processosAtrasadosOrdenados
+      : processosConcluidos;
 
   return (
     <div 
@@ -79,24 +101,38 @@ export function AssessorGroup({ responsavel, tipo, processos, processosConcluido
           </span>
         </div>
 
-        <div className="grid grid-cols-2 rounded-xl bg-muted p-1 gap-1">
+        <div className={`rounded-xl bg-muted p-1 gap-1 grid ${tipo === "PA" ? "grid-cols-3" : "grid-cols-2"}`}>
           <button
             type="button"
-            onClick={() => setAba("ativos")}
-            className={`h-9 px-2 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors ${
-              aba === "ativos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            onClick={() => setAba("andamento")}
+            className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
+              aba === "andamento" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Ativos ({processos.length})
+            <span className="block">Em Andamento</span>
+            <span className="block mt-1 text-[11px]">({processos.length})</span>
           </button>
+          {tipo === "PA" && (
+            <button
+              type="button"
+              onClick={() => setAba("atraso")}
+              className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
+                aba === "atraso" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <span className="block">Em Atraso</span>
+              <span className="block mt-1 text-[11px]">({processosAtrasados.length})</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setAba("concluidos")}
-            className={`h-9 px-2 rounded-lg text-[11px] font-bold uppercase tracking-wide transition-colors ${
+            className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
               aba === "concluidos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            Concluídos ({processosConcluidos.length})
+            <span className="block">Concluídos</span>
+            <span className="block mt-1 text-[11px]">({processosConcluidos.length})</span>
           </button>
         </div>
       </div>
@@ -105,7 +141,11 @@ export function AssessorGroup({ responsavel, tipo, processos, processosConcluido
       <div className="flex-1 p-3 space-y-2.5 min-h-[140px] max-h-[calc(100vh-22rem)] overflow-y-auto scrollbar-thin">
         {processosDaAba.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-border py-10 text-center text-xs text-muted-foreground/60 font-semibold">
-            {aba === "ativos" ? "Sem processos ativos" : "Sem processos concluídos"}
+            {aba === "andamento"
+              ? "Sem processos em andamento"
+              : aba === "atraso"
+                ? "Sem processos em atraso"
+                : "Sem processos concluídos"}
           </div>
         ) : (
           processosDaAba.map((p) => (

@@ -82,6 +82,8 @@ export interface Processo {
   prorrogacoes?: Array<{
     dias: number;
     doc: string;
+    inicio?: string;
+    fim?: string;
     em?: string;
     por?: string;
   }>;

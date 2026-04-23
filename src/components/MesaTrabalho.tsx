@@ -18,6 +18,7 @@ import { db } from "@/lib/firebase";
 import type { AuthUser } from "@/hooks/useAuth";
 import type { SiteSettings } from "@/types/siteSettings";
 import { normalizarSetorUsuario } from "@/lib/userProfiles";
+import { diasRestantes } from "@/lib/prazo";
 
 interface Props {
   processos: Processo[];
@@ -41,9 +42,9 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   const [responsaveisOtimizados, setResponsaveisOtimizados] = useState<Record<string, string>>({});
 
   const COLUNAS_PA_EM_ANDAMENTO = [
-    "📗 Sindicâncias em Andamento",
-    "📘 IPM em Andamento",
-    "⚖ Conselhos em Andamento",
+    "📗 Sindicâncias",
+    "📘 IPM",
+    "⚖ Conselhos",
   ] as const;
 
   const processosEfetivos = useMemo(() => {
@@ -197,7 +198,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
 
     const result: {
       tipo: TipoProcesso;
-      assessores: { nome: string; itensAtivos: Processo[]; itensConcluidos: Processo[] }[];
+      assessores: { nome: string; itensAtivos: Processo[]; itensAtrasados: Processo[]; itensConcluidos: Processo[] }[];
     }[] = [];
 
     for (const tipo of tipos) {
@@ -242,10 +243,18 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           .replace(/[\u0300-\u036f]/g, "")
           .toLowerCase();
 
-        if (tipoPANormalizado.includes("conselho")) return "⚖ Conselhos em Andamento";
-        if (tipoPANormalizado.includes("ipm")) return "📘 IPM em Andamento";
-        if (tipoPANormalizado.includes("sindic")) return "📗 Sindicâncias em Andamento";
+        if (tipoPANormalizado.includes("conselho")) return "⚖ Conselhos";
+        if (tipoPANormalizado.includes("ipm")) return "📘 IPM";
+        if (tipoPANormalizado.includes("sindic")) return "📗 Sindicâncias";
         return null;
+      };
+
+      const isPAAtrasado = (p: Processo) => {
+        if (tipo !== "PA") return false;
+        const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
+        if (situacaoFluxo !== "EM_CURSO" && situacaoFluxo !== "C_EM_CURSO") return false;
+        const prazoBase = p.prazoFatal || p.finalPrazo;
+        return !!prazoBase && diasRestantes(prazoBase) < 0;
       };
 
       const aguardandoRespostaDU = tipo === "DU" ? doTipo.filter(isAguardandoResposta) : [];
@@ -255,11 +264,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         : (tipo === "DU" ? doTipo.filter((p) => !isAguardandoResposta(p)) : doTipo);
       
       const mapAtivos = new Map<string, Processo[]>();
+      const mapAtrasados = new Map<string, Processo[]>();
       const mapConcluidos = new Map<string, Processo[]>();
 
       if (tipo === "PA") {
         COLUNAS_PA_EM_ANDAMENTO.forEach((coluna) => {
           mapAtivos.set(coluna, []);
+          mapAtrasados.set(coluna, []);
           mapConcluidos.set(coluna, []);
         });
       }
@@ -276,7 +287,11 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       doTipoSemPendenciasChefia.forEach((p) => {
         const colunaEspecialPA = colunaPAEmAndamento(p);
         if (colunaEspecialPA) {
-          mapAtivos.get(colunaEspecialPA)!.push(p);
+          if (isPAAtrasado(p)) {
+            mapAtrasados.get(colunaEspecialPA)!.push(p);
+          } else {
+            mapAtivos.get(colunaEspecialPA)!.push(p);
+          }
           return;
         }
 
@@ -288,6 +303,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         if (!responsavelKey) return;
         if (!mapAtivos.has(responsavelKey)) mapAtivos.set(responsavelKey, []);
         mapAtivos.get(responsavelKey)!.push(p);
+        if (!mapAtrasados.has(responsavelKey)) mapAtrasados.set(responsavelKey, []);
       });
 
       concluidosDoTipo.forEach((p) => {
@@ -306,6 +322,9 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         if (!mapAtivos.has(assessor.nome)) {
           mapAtivos.set(assessor.nome, []); // Coluna vazia
         }
+        if (!mapAtrasados.has(assessor.nome)) {
+          mapAtrasados.set(assessor.nome, []);
+        }
         if (!mapConcluidos.has(assessor.nome)) {
           mapConcluidos.set(assessor.nome, []);
         }
@@ -320,12 +339,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         .map((nome) => ({
           nome,
           itensAtivos: mapAtivos.get(nome) || [],
+          itensAtrasados: mapAtrasados.get(nome) || [],
           itensConcluidos: mapConcluidos.get(nome) || [],
         }))
-        .filter(({ nome, itensAtivos, itensConcluidos }) => {
+        .filter(({ nome, itensAtivos, itensAtrasados, itensConcluidos }) => {
           // Só mostra "Aguardando Distribuição" e colunas especiais se tiver processos
           if (nome.includes("📥 Aguardando") || nome.includes("📩 Aguardando")) {
-            return itensAtivos.length > 0 || itensConcluidos.length > 0;
+            return itensAtivos.length > 0 || itensAtrasados.length > 0 || itensConcluidos.length > 0;
           }
           return true; // Outros assessores sempre aparecem
         })
@@ -404,6 +424,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         responsavel={a.nome}
                         tipo={grupo.tipo}
                         processos={a.itensAtivos}
+                        processosAtrasados={a.itensAtrasados}
                         processosConcluidos={a.itensConcluidos}
                         ehAdmin={ehAdmin}
                         onEdit={onEdit}
@@ -423,6 +444,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         responsavel={a.nome}
                         tipo={grupo.tipo}
                         processos={a.itensAtivos}
+                        processosAtrasados={a.itensAtrasados}
                         processosConcluidos={a.itensConcluidos}
                         ehAdmin={ehAdmin}
                         onEdit={onEdit}
@@ -444,6 +466,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                       responsavel={a.nome}
                       tipo={grupo.tipo}
                       processos={a.itensAtivos}
+                      processosAtrasados={a.itensAtrasados}
                       processosConcluidos={a.itensConcluidos}
                       ehAdmin={ehAdmin}
                       onEdit={onEdit}

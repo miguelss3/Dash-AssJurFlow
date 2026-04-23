@@ -9,6 +9,8 @@ export type StatusPrazo = "overdue" | "today" | "soon" | "safe";
 
 type ProrrogacaoPA = {
   dias?: number | null;
+  inicio?: string | null;
+  fim?: string | null;
 } | null | undefined;
 
 const PADRAO_HISTORICO_INICIO_PRAZO_PA = /^Prazo do PA iniciado em .*\.$/i;
@@ -76,6 +78,82 @@ function normalizarDataPrazoPA(valor: string | undefined | null): string | undef
   }
 }
 
+function adicionarDiasDataCivil(dataISO: string, dias: number): string | undefined {
+  try {
+    const data = parseISO(`${dataISO}T00:00:00`);
+    if (Number.isNaN(data.getTime())) return undefined;
+    data.setDate(data.getDate() + dias);
+    return format(data, "yyyy-MM-dd");
+  } catch {
+    return undefined;
+  }
+}
+
+function diferencaDiasDataCivil(inicioISO: string, fimISO: string): number | undefined {
+  try {
+    const inicio = parseISO(`${inicioISO}T00:00:00`);
+    const fim = parseISO(`${fimISO}T00:00:00`);
+    if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return undefined;
+    return differenceInCalendarDays(fim, inicio);
+  } catch {
+    return undefined;
+  }
+}
+
+export function calcularFaixasProrrogacaoPA(params: {
+  tipoPA?: string | null;
+  dataInicioPrazo?: string | null;
+  dataAssinatura?: string | null;
+  prorrogacoes?: ProrrogacaoPA[] | null;
+}, configuracao?: Partial<ProcessualDeadlineSettings> | null): Array<{
+  dias: number;
+  inicio: string;
+  fim: string;
+}> {
+  const { tipoPA, dataInicioPrazo, dataAssinatura, prorrogacoes } = params;
+  const dataBase =
+    normalizarDataPrazoPA(dataInicioPrazo)
+    || (ehConselhoPA(tipoPA) ? normalizarDataPrazoPA(dataAssinatura) : undefined);
+
+  if (!dataBase) return [];
+
+  const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoPA, configuracao);
+  const prazoInicialFim = adicionarDiasDataCivil(dataBase, diasIniciais - 1);
+  if (!prazoInicialFim) return [];
+
+  let fimAnterior = prazoInicialFim;
+  const itens = Array.isArray(prorrogacoes) ? prorrogacoes : [];
+
+  return itens.reduce<Array<{ dias: number; inicio: string; fim: string }>>((acc, item) => {
+    const diasInformados = item?.dias;
+    const diasPadrao = typeof diasInformados === "number" && Number.isFinite(diasInformados)
+      ? diasInformados
+      : diasProrrogacao;
+
+    const inicioInformado = normalizarDataPrazoPA(item?.inicio || undefined);
+    const fimInformado = normalizarDataPrazoPA(item?.fim || undefined);
+
+    let inicio = inicioInformado || fimAnterior;
+    let fim = fimInformado || adicionarDiasDataCivil(inicio, diasPadrao) || inicio;
+
+    let dias = diasPadrao;
+    const diasPeloIntervalo = diferencaDiasDataCivil(inicio, fim);
+    if (typeof diasPeloIntervalo === "number" && daysPeloIntervaloValido(diasPeloIntervalo)) {
+      dias = diasPeloIntervalo;
+    } else {
+      fim = adicionarDiasDataCivil(inicio, dias) || fim;
+    }
+
+    fimAnterior = fim;
+    acc.push({ dias, inicio, fim });
+    return acc;
+  }, []);
+}
+
+function daysPeloIntervaloValido(valor: number): boolean {
+  return Number.isFinite(valor) && valor >= 0;
+}
+
 export function calcularPrazoFinalPA(params: {
   tipoPA?: string | null;
   dataInicioPrazo?: string | null;
@@ -89,17 +167,23 @@ export function calcularPrazoFinalPA(params: {
 
   if (!dataBase) return undefined;
 
-  const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoPA, configuracao);
-  const diasExtras = (prorrogacoes || []).reduce((total, item) => {
-    const dias = item?.dias;
-    return total + (typeof dias === "number" && Number.isFinite(dias) ? dias : diasProrrogacao);
-  }, 0);
+  const { diasIniciais } = obterRegraPrazoPA(tipoPA, configuracao);
+  const faixasProrrogacao = calcularFaixasProrrogacaoPA({
+    tipoPA,
+    dataInicioPrazo,
+    dataAssinatura,
+    prorrogacoes,
+  }, configuracao);
+
+  if (faixasProrrogacao.length > 0) {
+    return faixasProrrogacao[faixasProrrogacao.length - 1].fim;
+  }
 
   try {
     const dataFinal = parseISO(`${dataBase}T00:00:00`);
     if (Number.isNaN(dataFinal.getTime())) return undefined;
 
-    dataFinal.setDate(dataFinal.getDate() + diasIniciais + diasExtras - 1);
+    dataFinal.setDate(dataFinal.getDate() + diasIniciais - 1);
     return format(dataFinal, "yyyy-MM-dd");
   } catch {
     return undefined;

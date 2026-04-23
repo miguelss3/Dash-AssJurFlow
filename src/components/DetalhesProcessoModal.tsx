@@ -11,7 +11,7 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-import { formatarData, diasRestantes } from "@/lib/prazo";
+import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
 import { Separator } from "@/components/ui/separator";
 
 interface DetalhesProcessoModalProps {
@@ -43,7 +43,19 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
   const setor = processo.setor || processo.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
-  const prorrogacoesPA = isPA && Array.isArray(processo.prorrogacoes) ? processo.prorrogacoes : [];
+  const prorrogacoesPA = isPA
+    ? calcularFaixasProrrogacaoPA({
+        tipoPA: processo.tipoPA,
+        dataInicioPrazo: processo.dataInicioPrazo,
+        dataAssinatura: processo.dataAssinatura,
+        prorrogacoes: processo.prorrogacoes,
+      }).map((faixa, index) => ({
+        ...faixa,
+        doc: processo.prorrogacoes?.[index]?.doc || "Documento não informado",
+        por: processo.prorrogacoes?.[index]?.por,
+        em: processo.prorrogacoes?.[index]?.em,
+      }))
+    : [];
   const pedido = processo.pedidoSubsidios;
   const respostaDU = processo.respostaDU;
   const situacaoFluxo = pedido?.situacaoFluxo || "";
@@ -241,9 +253,14 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                     >
                       <div className="font-semibold">{item.doc || "Documento não informado"}</div>
                       <div className="text-xs text-amber-800 mt-1">
-                        Data: {item.em ? formatarData(item.em) : "—"} | +{item.dias ?? "?"} dias
+                        Início: {formatarData(item.inicio)} | Fim: {formatarData(item.fim)} | +{item.dias ?? "?"} dias
                         {item.por ? ` | Por: ${item.por}` : ""}
                       </div>
+                      {item.em && (
+                        <div className="text-[10px] text-amber-700 mt-1">
+                          Registro: {formatarData(item.em)}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

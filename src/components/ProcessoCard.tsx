@@ -32,7 +32,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
-import { formatarData, diasRestantes } from "@/lib/prazo";
+import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
 import { AcoesDUModalNovo } from "./modals/AcoesDUModalNovo";
 import { AcoesPAModalNovo } from "./modals/AcoesPAModalNovo";
 import { DetalhesProcessoModal } from "./DetalhesProcessoModal";
@@ -71,7 +71,19 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const setor = p.setor || p.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
-  const prorrogacoesPA = isPA && Array.isArray(p.prorrogacoes) ? p.prorrogacoes : [];
+  const prorrogacoesPA = isPA
+    ? calcularFaixasProrrogacaoPA({
+        tipoPA: p.tipoPA,
+        dataInicioPrazo: p.dataInicioPrazo,
+        dataAssinatura: p.dataAssinatura,
+        prorrogacoes: p.prorrogacoes,
+      }).map((faixa, index) => ({
+        ...faixa,
+        doc: p.prorrogacoes?.[index]?.doc || "Documento não informado",
+        por: p.prorrogacoes?.[index]?.por,
+        em: p.prorrogacoes?.[index]?.em,
+      }))
+    : [];
   const rotuloPrazoLimite = isPA ? "Final" : "Fatal";
   const situacaoSubsidio = p.pedidoSubsidios?.situacaoFluxo;
   const statusNormalizado = (p.status || "").toString().trim().toLowerCase();
@@ -335,9 +347,14 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                   >
                     <div className="font-semibold">{item.doc || "Documento não informado"}</div>
                     <div className="text-amber-800">
-                      Data: {item.em ? formatarData(item.em) : "—"} | +{item.dias ?? "?"} dias
+                      Início: {formatarData(item.inicio)} | Fim: {formatarData(item.fim)} | +{item.dias ?? "?"} dias
                       {item.por ? ` | Por: ${item.por}` : ""}
                     </div>
+                    {item.em && (
+                      <div className="text-[10px] text-amber-700 mt-0.5">
+                        Registro: {formatarData(item.em)}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { calcularPrazoFinalPA, formatarData, obterRegraPrazoPA } from "@/lib/prazo";
+import { calcularFaixasProrrogacaoPA, calcularPrazoFinalPA, formatarData, obterRegraPrazoPA } from "@/lib/prazo";
 import { toast } from "sonner";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,8 @@ type SituacaoFluxoPA =
 type ProrrogacaoItem = {
   dias: number;
   doc: string;
+  inicio?: string;
+  fim?: string;
   em: string;
   por?: string;
 };
@@ -400,24 +402,37 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       const dataInicioParaCalculo = obterValorData(dataInicioPrazo, processo?.dataInicioPrazo);
       const dataAssinaturaParaCalculo = obterValorData(dataAssinatura, processo?.dataAssinatura);
       
-      const prazoCalculado = calcularPrazoFinalPA({
+      const faixasProrrogacao = calcularFaixasProrrogacaoPA({
         tipoPA: tipoProcesso,
         dataInicioPrazo: dataInicioParaCalculo,
         dataAssinatura: dataAssinaturaParaCalculo,
         prorrogacoes: novasProrrogacoes,
       }, siteSettings);
+
+      const novasProrrogacoesComFaixa = novasProrrogacoes.map((prorrogacao, index) => ({
+        ...prorrogacao,
+        inicio: faixasProrrogacao[index]?.inicio || prorrogacao.inicio,
+        fim: faixasProrrogacao[index]?.fim || prorrogacao.fim,
+      }));
+
+      const prazoCalculado = calcularPrazoFinalPA({
+        tipoPA: tipoProcesso,
+        dataInicioPrazo: dataInicioParaCalculo,
+        dataAssinatura: dataAssinaturaParaCalculo,
+        prorrogacoes: novasProrrogacoesComFaixa,
+      }, siteSettings);
       
       const camposPrazoCalculados = prazoCalculado ? { prazoFatal: prazoCalculado, finalPrazo: prazoCalculado } : {};
       
       await updateDoc(doc(db, "processos", processoId), {
-        prorrogacoes: novasProrrogacoes,
+        prorrogacoes: novasProrrogacoesComFaixa,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
         descricao: `Prazo prorrogado em +${diasProrrogacao} dias (${item.doc}).`,
         ...camposPrazoCalculados,
       });
       await registrarHistorico(`Prorrogação registrada: +${diasProrrogacao} dias (${item.doc}).`);
-      setHistoricoProrrogacoes(novasProrrogacoes);
+      setHistoricoProrrogacoes(novasProrrogacoesComFaixa);
       setDocProrrogacao("");
       setIsProrrogando(false);
       if (onSuccess) onSuccess();
@@ -520,7 +535,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
                   <ul className="mt-1 space-y-1">
                     {historicoProrrogacoes.map((p, i) => (
                       <li key={`${p.doc}-${i}`} className="text-[11px] bg-white text-rose-800 px-2 py-1 rounded border border-rose-100 flex justify-between">
-                        <span>{p.doc}</span>
+                        <span>{p.doc} {p.inicio && p.fim ? `(${formatarData(p.inicio)} a ${formatarData(p.fim)})` : ""}</span>
                         <span className="font-bold">+{p.dias}d</span>
                       </li>
                     ))}
@@ -705,7 +720,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
                   <ul className="mt-1 space-y-1">
                     {historicoProrrogacoes.map((p, i) => (
                       <li key={`${p.doc}-${i}`} className="text-[11px] bg-white text-amber-800 px-2 py-1 rounded border border-amber-100 flex justify-between">
-                        <span>{p.doc}</span>
+                        <span>{p.doc} {p.inicio && p.fim ? `(${formatarData(p.inicio)} a ${formatarData(p.fim)})` : ""}</span>
                         <span className="font-bold">+{p.dias}d</span>
                       </li>
                     ))}
