@@ -63,6 +63,7 @@ interface Props {
 interface DiaItem {
   tipo: "prazo-fatal" | TipoEvento;
   titulo: string;
+  rotuloTipo?: string;
   ref?: string; // numero processo
   responsavel?: string;
   evento?: EventoCalendario;
@@ -135,10 +136,12 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
       .filter((p) => p.status !== "concluido")
       .forEach((p) => {
         if (p.prazoFatal) {
+          const isPA = (p.setor || p.tipo) === "PA";
           const k2 = p.prazoFatal.slice(0, 10);
           push(k2, {
             tipo: "prazo-fatal",
-            titulo: `FATAL • ${p.numero}`,
+            titulo: `${isPA ? "FINAL" : "FATAL"} • ${p.numero}`,
+            rotuloTipo: isPA ? "Prazo Final" : "Prazo Fatal",
             ref: p.numero,
             responsavel: p.responsavel,
             processo: p,
@@ -385,7 +388,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
               Lançar prazo, feriado ou dia sem expediente
             </h4>
             <p className="text-xs text-muted-foreground mt-1">
-              O prazo fatal dos processos ativos aparece automaticamente. Use o botão
+              O prazo fatal ou final dos processos ativos aparece automaticamente. Use o botão
               "Lançar evento" no topo para registrar eventos manuais.
             </p>
           </div>
@@ -423,7 +426,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
             }}
           >
             <AlertTriangle className="h-3 w-3" />
-            Prazo Fatal (auto)
+            Prazo Fatal / Final (auto)
           </span>
         </div>
       </div>
@@ -496,7 +499,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
                             color: cor,
                           }}
                         >
-                          {labelTipo(item.tipo)}
+                          {item.rotuloTipo || labelTipo(item.tipo)}
                         </span>
                         {ehAuto && (
                           <span className="text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">

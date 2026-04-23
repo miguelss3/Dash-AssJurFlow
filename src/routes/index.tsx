@@ -14,7 +14,6 @@ import {
   Settings,
   LogOut,
   Calendar,
-  History,
   FolderArchive,
   Users,
   ListFilter,
@@ -240,13 +239,19 @@ function Index() {
         }
       }
       if (busca.trim()) {
-        const q = busca.toLowerCase();
-        const hit =
-          p.numero.toLowerCase().includes(q) ||
-          p.cliente.toLowerCase().includes(q) ||
-          p.parteContraria.toLowerCase().includes(q) ||
-          p.responsavel.toLowerCase().includes(q) ||
-          p.tipoAcao.toLowerCase().includes(q);
+        const q = normalizarTexto(busca);
+        const camposBusca = [
+          p.numero,
+          p.cliente,
+          p.parteContraria,
+          p.responsavel,
+          p.tipoAcao,
+          p.descricao,
+          p.observacoes,
+          p.pedidoSubsidios?.observacoes,
+          p.respostaDU?.observacoes,
+        ];
+        const hit = camposBusca.some((campo) => normalizarTexto(campo).includes(q));
         if (!hit) return false;
       }
       if (filtro === "todos") return true;
@@ -875,7 +880,6 @@ function Index() {
 
   const navSec: { id: Aba; label: string; icon: typeof LayoutGrid }[] = [
     { id: "prazos", label: "Controle de Prazos", icon: Calendar },
-    ...(ehAdmin ? [{ id: "arquivo" as Aba, label: "Processos Antigos", icon: History }] : []),
   ];
 
   // Tabs principais (estilo AssJur)

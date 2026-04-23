@@ -15,6 +15,7 @@ import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import type { Processo, StatusProcesso } from "@/types/processo";
 import { isAdmin, type AuthUser } from "./useAuth";
+import { calcularPrazoFinalPA } from "@/lib/prazo";
 
 export function useProcessos() {
   const [processos, setProcessos] = useState<Processo[]>([]);
@@ -157,6 +158,18 @@ export function useProcessos() {
           || procData.descricao 
           || "Sem movimentação";
 
+        const dataAssinatura = toIsoString(procData.dataAssinatura) || procData.dataAssinatura;
+        const dataInicioPrazo = toIsoString(procData.dataInicioPrazo) || procData.dataInicioPrazo;
+        const prorrogacoes = Array.isArray(procData.prorrogacoes) ? procData.prorrogacoes : undefined;
+        const prazoFinalPA = calcularPrazoFinalPA({
+          tipoPA: procData.tipoPA,
+          dataInicioPrazo,
+          dataAssinatura,
+          prorrogacoes,
+        });
+        const prazoFatalProcesso = procData.prazoFatalDU || procData.prazoFatal || procData.finalPrazo || prazoFinalPA;
+        const finalPrazoProcesso = procData.prazoFatalDU || procData.finalPrazo || procData.prazoFatal || prazoFinalPA;
+
         const processoMapeado: Processo = {
           id: procData.id,
           // Mapeamento de campos Firebase → Interface Processo
@@ -169,7 +182,7 @@ export function useProcessos() {
           // Se nenhum dos dois existir, deixa vazio (não coloca "Sem responsável")
           responsavel: distribuicao?.assessorNome || procData.encarregado || procData.responsavel || "",
           prazo: procData.prazoInternoDU || procData.prazo || procData.pedidoSubsidios?.dataPrazo || procData.pedidoSubsidios?.prazoResposta,
-          prazoFatal: procData.prazoFatalDU || procData.prazoFatal || procData.finalPrazo,
+          prazoFatal: prazoFatalProcesso,
           descricao: descricaoUltimoMovimento,
           status: statusMapeado,
           criadoEm: toIsoString(procData.criadoEm) || toIsoString(procData.dataEntrada) || new Date().toISOString(),
@@ -182,7 +195,7 @@ export function useProcessos() {
           subtipo: procData.tipoPA || procData.subtipo,
           faseAtual: procData.status || procData.faseAtual,
           inicioPrazo: procData.dataInicialPrazo || procData.inicioPrazo,
-          finalPrazo: procData.prazoFatalDU || procData.finalPrazo,
+          finalPrazo: finalPrazoProcesso,
           entrada: procData.dataEntrada || procData.entrada,
           userId: procData.userId || procData.criadoPorId,
           userEmail: procData.userEmail,
@@ -204,10 +217,10 @@ export function useProcessos() {
           situacaoFluxo: procData.situacaoFluxo,
           primeiraPortaria: procData.primeiraPortaria,
           interessado: procData.interessado || procData.parte,
-          dataAssinatura: toIsoString(procData.dataAssinatura) || procData.dataAssinatura,
-          dataInicioPrazo: toIsoString(procData.dataInicioPrazo) || procData.dataInicioPrazo,
+          dataAssinatura,
+          dataInicioPrazo,
           despachoFinal: procData.despachoFinal,
-          prorrogacoes: Array.isArray(procData.prorrogacoes) ? procData.prorrogacoes : undefined,
+          prorrogacoes,
           decisaoAutNomeante: procData.decisaoAutNomeante,
           numeroDIExRemessa: procData.numeroDIExRemessa,
           resultadoFinalConselho: procData.resultadoFinalConselho,

@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { calcularPrazoFinalPA, obterRegraPrazoPA } from "@/lib/prazo";
 import { toast } from "sonner";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
@@ -141,8 +142,27 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
 
   const tipoProcesso = processo?.tipoPA || "";
   const isConselho = tipoProcesso === "Conselho de Disciplina" || tipoProcesso === "Conselho de Justificação";
-  const diasIniciais = tipoProcesso === "IPM" ? 40 : 30;
-  const diasProrrogacao = tipoProcesso === "Sindicância" ? 30 : 20;
+  const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoProcesso);
+
+  const calcularCamposPrazo = (overrides?: {
+    dataInicioPrazo?: string;
+    dataAssinatura?: string;
+    prorrogacoes?: ProrrogacaoItem[];
+  }) => {
+    const prazoFinal = calcularPrazoFinalPA({
+      tipoPA: tipoProcesso,
+      dataInicioPrazo: overrides?.dataInicioPrazo ?? dataInicioPrazo,
+      dataAssinatura: overrides?.dataAssinatura ?? dataAssinatura,
+      prorrogacoes: overrides?.prorrogacoes ?? historicoProrrogacoes,
+    });
+
+    return prazoFinal ? { prazoFatal: prazoFinal, finalPrazo: prazoFinal } : {};
+  };
+
+  const formatarDataLocal = (valor: string) => {
+    if (!valor) return "";
+    return new Date(`${valor}T00:00:00`).toLocaleDateString("pt-BR");
+  };
 
   const encarregadoAtual = useMemo(() => {
     if (!processo) return "Não definido";
@@ -294,6 +314,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
         descricao: `Substituição de encarregado registrada: ${novoEncarregado.trim()} (${novaPortaria.trim()}).`,
+        ...calcularCamposPrazo(),
       });
       await registrarHistorico(`Substituição de encarregado: ${novoEncarregado.trim()} - ${novaPortaria.trim()}.`);
       setIsSubstituindo(false);
@@ -326,6 +347,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
         descricao: `Prazo prorrogado em +${diasProrrogacao} dias (${item.doc}).`,
+        ...calcularCamposPrazo({ prorrogacoes: novasProrrogacoes }),
       });
       await registrarHistorico(`Prorrogação registrada: +${diasProrrogacao} dias (${item.doc}).`);
       setHistoricoProrrogacoes(novasProrrogacoes);
@@ -337,6 +359,28 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       console.error("Erro ao registrar prorrogação:", error);
       toast.error("Não foi possível registrar a prorrogação.");
     }
+  };
+
+  const iniciarPrazoPadrao = () => {
+    void avancarFluxo(
+      "EM_CURSO",
+      `Prazo do PA iniciado em ${formatarDataLocal(dataInicioPrazo)}.`,
+      {
+        dataInicioPrazo,
+        ...calcularCamposPrazo({ dataInicioPrazo }),
+      },
+    );
+  };
+
+  const confirmarInstalacaoConselho = () => {
+    void avancarFluxo("C_EM_CURSO", "Portaria assinada e Conselho instalado.", {
+      dataAssinatura,
+      dataInicioPrazo: dataAssinatura,
+      ...calcularCamposPrazo({
+        dataAssinatura,
+        dataInicioPrazo: dataAssinatura,
+      }),
+    });
   };
 
   const cabecalhoReadOnly = (
@@ -486,7 +530,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <Label htmlFor="assinatura-chefia-conselho">Data da Assinatura</Label>
               <Input id="assinatura-chefia-conselho" type="date" value={dataAssinatura} onChange={(e) => setDataAssinatura(e.target.value)} className="mt-1" />
             </div>
-            <Button disabled={!dataAssinatura} onClick={() => avancarFluxo("C_EM_CURSO", "Portaria assinada e Conselho instalado.", { dataAssinatura })} className="w-full bg-indigo-600 hover:bg-indigo-700">
+            <Button disabled={!dataAssinatura} onClick={confirmarInstalacaoConselho} className="w-full bg-indigo-600 hover:bg-indigo-700">
               Confirmar Assinatura e Instalar
             </Button>
           </div>
@@ -557,7 +601,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <Input id="inicio-prazo-pa" type="date" value={dataInicioPrazo} onChange={(e) => setDataInicioPrazo(e.target.value)} className="mt-1" />
               <p className="text-xs text-emerald-700 mt-2">Prazo legal inicial: {diasIniciais} dias.</p>
             </div>
-            <Button disabled={!dataInicioPrazo} onClick={() => avancarFluxo("EM_CURSO", `Prazo do PA iniciado em ${new Date(dataInicioPrazo).toLocaleDateString("pt-BR")}.`, { dataInicioPrazo })} className="w-full bg-emerald-600 hover:bg-emerald-700">
+            <Button disabled={!dataInicioPrazo} onClick={iniciarPrazoPadrao} className="w-full bg-emerald-600 hover:bg-emerald-700">
               Confirmar Data e Iniciar Prazo
             </Button>
           </div>

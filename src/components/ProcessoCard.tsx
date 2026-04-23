@@ -69,6 +69,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const setor = p.setor || p.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
+  const rotuloPrazoLimite = isPA ? "Final" : "Fatal";
   const situacaoSubsidio = p.pedidoSubsidios?.situacaoFluxo;
   const statusNormalizado = (p.status || "").toString().trim().toLowerCase();
   const acaoDUBloqueada = false;
@@ -256,7 +257,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                 diasRestantes(p.prazoFatal) <= 5 ? 'text-red-600 font-bold' : 'text-orange-600'
               }`}>
                 <AlertCircle className="w-3 h-3" />
-                <span className="font-semibold">Fatal:</span>
+                <span className="font-semibold">{rotuloPrazoLimite}:</span>
                 <span>{formatarData(p.prazoFatal)}</span>
               </div>
             )}

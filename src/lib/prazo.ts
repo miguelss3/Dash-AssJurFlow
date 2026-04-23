@@ -3,6 +3,75 @@ import { ptBR } from "date-fns/locale";
 
 export type StatusPrazo = "overdue" | "today" | "soon" | "safe";
 
+type ProrrogacaoPA = {
+  dias?: number | null;
+} | null | undefined;
+
+export function ehConselhoPA(tipoPA: string | undefined | null): boolean {
+  return tipoPA === "Conselho de Disciplina" || tipoPA === "Conselho de Justificação";
+}
+
+export function obterRegraPrazoPA(tipoPA: string | undefined | null): {
+  diasIniciais: number;
+  diasProrrogacao: number;
+} {
+  if (tipoPA === "IPM") {
+    return { diasIniciais: 40, diasProrrogacao: 20 };
+  }
+
+  if (tipoPA === "Sindicância" || tipoPA === "Sindicancia") {
+    return { diasIniciais: 30, diasProrrogacao: 20 };
+  }
+
+  return { diasIniciais: 30, diasProrrogacao: 20 };
+}
+
+function normalizarDataPrazoPA(valor: string | undefined | null): string | undefined {
+  if (!valor) return undefined;
+
+  const texto = String(valor).trim();
+  if (!texto) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto;
+
+  try {
+    const data = parseISO(texto);
+    if (Number.isNaN(data.getTime())) return undefined;
+    return format(data, "yyyy-MM-dd");
+  } catch {
+    return undefined;
+  }
+}
+
+export function calcularPrazoFinalPA(params: {
+  tipoPA?: string | null;
+  dataInicioPrazo?: string | null;
+  dataAssinatura?: string | null;
+  prorrogacoes?: ProrrogacaoPA[] | null;
+}): string | undefined {
+  const { tipoPA, dataInicioPrazo, dataAssinatura, prorrogacoes } = params;
+  const dataBase =
+    normalizarDataPrazoPA(dataInicioPrazo)
+    || (ehConselhoPA(tipoPA) ? normalizarDataPrazoPA(dataAssinatura) : undefined);
+
+  if (!dataBase) return undefined;
+
+  const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoPA);
+  const diasExtras = (prorrogacoes || []).reduce((total, item) => {
+    const dias = item?.dias;
+    return total + (typeof dias === "number" && Number.isFinite(dias) ? dias : diasProrrogacao);
+  }, 0);
+
+  try {
+    const dataFinal = parseISO(`${dataBase}T00:00:00`);
+    if (Number.isNaN(dataFinal.getTime())) return undefined;
+
+    dataFinal.setDate(dataFinal.getDate() + diasIniciais + diasExtras);
+    return format(dataFinal, "yyyy-MM-dd");
+  } catch {
+    return undefined;
+  }
+}
+
 export function diasRestantes(prazoISO: string | undefined | null): number {
   if (!prazoISO) return 999; // Sem prazo = prazo distante
   try {
