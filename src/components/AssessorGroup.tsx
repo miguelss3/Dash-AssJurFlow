@@ -1,7 +1,8 @@
 import { ProcessoCard } from "./ProcessoCard";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
+import type { SiteSettings } from "@/types/siteSettings";
 import { useDroppable } from "@dnd-kit/core";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 interface Props {
   responsavel: string;
@@ -13,11 +14,12 @@ interface Props {
   onDelete: (id: string) => void;
   onMove: (id: string, status: StatusProcesso) => void;
   onReativarProcesso?: (processoId: string, payload?: { motivo: string; novoPrazoFatal: string }) => void | Promise<void>;
+  siteSettings?: SiteSettings;
   unreadProcessIds?: Set<string>;
   onReadProcess?: (processoId: string) => void;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, unreadProcessIds, onReadProcess }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess }: Props) {
   const [aba, setAba] = useState<"ativos" | "concluidos">("ativos");
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
@@ -34,7 +36,31 @@ export function AssessorGroup({ responsavel, tipo, processos, processosConcluido
   const bgClass = isAguardandoDistribuicao ? "bg-orange-50" : tipoBg;
   const textClass = isAguardandoDistribuicao ? "text-orange-700" : tipoText;
   const borderClass = isAguardandoDistribuicao ? "border-orange-300" : tipoBorder;
-  const processosDaAba = aba === "ativos" ? processos : processosConcluidos;
+
+  const processosAtivosOrdenados = useMemo(() => {
+    if (tipo !== "PA") return processos;
+
+    const toTime = (valor?: string) => {
+      if (!valor) return Number.POSITIVE_INFINITY;
+      const data = new Date(`${valor.slice(0, 10)}T00:00:00`).getTime();
+      return Number.isNaN(data) ? Number.POSITIVE_INFINITY : data;
+    };
+
+    return [...processos].sort((a, b) => {
+      const prazoA = toTime(a.prazoFatal || a.finalPrazo);
+      const prazoB = toTime(b.prazoFatal || b.finalPrazo);
+
+      if (prazoA !== prazoB) return prazoA - prazoB;
+
+      const inicioA = toTime(a.dataInicioPrazo || a.inicioPrazo);
+      const inicioB = toTime(b.dataInicioPrazo || b.inicioPrazo);
+      if (inicioA !== inicioB) return inicioA - inicioB;
+
+      return (a.numero || "").localeCompare(b.numero || "");
+    });
+  }, [processos, tipo]);
+
+  const processosDaAba = aba === "ativos" ? processosAtivosOrdenados : processosConcluidos;
 
   return (
     <div 
@@ -91,6 +117,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosConcluido
               onDelete={onDelete}
               onMove={onMove}
               onReativarProcesso={onReativarProcesso}
+              siteSettings={siteSettings}
               showActions
               naoLido={!!unreadProcessIds?.has(p.id)}
               onMarcarComoLido={onReadProcess}

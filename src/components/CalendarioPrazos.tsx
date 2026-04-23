@@ -64,11 +64,15 @@ interface DiaItem {
   tipo: "prazo-fatal" | TipoEvento;
   titulo: string;
   rotuloTipo?: string;
+  corPersonalizada?: string;
   ref?: string; // numero processo
   responsavel?: string;
   evento?: EventoCalendario;
   processo?: Processo;
 }
+
+const COR_PRAZO_DU = "oklch(0.55 0.22 25)";
+const COR_PRAZO_PA = "oklch(0.62 0.22 305)";
 
 const TIPOS_EVENTO: { id: TipoEvento; label: string; icon: typeof CalendarIcon; cor: string }[] = [
   { id: "prazo", label: "Prazo / Tarefa", icon: FileClock, cor: "oklch(0.6 0.16 230)" },
@@ -79,9 +83,13 @@ const TIPOS_EVENTO: { id: TipoEvento; label: string; icon: typeof CalendarIcon; 
 ];
 
 function corDoTipo(t: TipoEvento | "prazo-fatal"): string {
-  if (t === "prazo-fatal") return "oklch(0.55 0.22 25)";
+  if (t === "prazo-fatal") return COR_PRAZO_DU;
   const m = TIPOS_EVENTO.find((x) => x.id === t);
   return m?.cor ?? "oklch(0.6 0.05 240)";
+}
+
+function corDoItem(item: DiaItem): string {
+  return item.corPersonalizada || corDoTipo(item.tipo);
 }
 
 function iconeDoTipo(t: TipoEvento | "prazo-fatal") {
@@ -142,6 +150,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
             tipo: "prazo-fatal",
             titulo: `${isPA ? "FINAL" : "FATAL"} • ${p.numero}`,
             rotuloTipo: isPA ? "Prazo Final" : "Prazo Fatal",
+            corPersonalizada: isPA ? COR_PRAZO_PA : COR_PRAZO_DU,
             ref: p.numero,
             responsavel: p.responsavel,
             processo: p,
@@ -328,7 +337,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
 
                 <div className="space-y-0.5">
                   {items.slice(0, 3).map((item, i) => {
-                    const cor = corDoTipo(item.tipo);
+                    const cor = corDoItem(item);
                     const ehPrazo = item.tipo === "prazo-fatal";
                     const conteudo = (
                       <>
@@ -420,13 +429,24 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
           <span
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border"
             style={{
-              color: "oklch(0.55 0.22 25)",
+              color: COR_PRAZO_DU,
               borderColor: "oklch(0.55 0.22 25 / 0.35)",
               backgroundColor: "oklch(0.55 0.22 25 / 0.1)",
             }}
           >
             <AlertTriangle className="h-3 w-3" />
-            Prazo Fatal / Final (auto)
+            DU • Prazo Fatal (auto)
+          </span>
+          <span
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border"
+            style={{
+              color: COR_PRAZO_PA,
+              borderColor: "oklch(0.62 0.22 305 / 0.35)",
+              backgroundColor: "oklch(0.62 0.22 305 / 0.1)",
+            }}
+          >
+            <AlertTriangle className="h-3 w-3" />
+            PA • Sind., IPM e Conselhos
           </span>
         </div>
       </div>
@@ -471,7 +491,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
             <ul className="space-y-2">
               {itensDoDiaSelecionado.map((item, i) => {
                 const Icon = iconeDoTipo(item.tipo);
-                const cor = corDoTipo(item.tipo);
+                const cor = corDoItem(item);
                 const ehAuto = item.tipo === "prazo-fatal";
                 const status = item.processo
                   ? statusPrazo(item.processo.prazoFatal)

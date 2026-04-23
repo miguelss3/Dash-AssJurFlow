@@ -157,6 +157,43 @@ service cloud.firestore {
         resource.data.setor in ['DU', 'PA'] &&
         canManageSetor(resource.data.setor);
     }
+
+    match /configuracoesSistema/{configId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() &&
+        isAdminUniversal() &&
+        configId == 'layoutPrincipal' &&
+        request.resource.data.keys().hasOnly([
+          'sidebarTitle',
+          'sidebarSubtitle',
+          'dashboardTitle',
+          'dashboardDescription',
+          'newProcessLabel',
+          'footerText',
+          'prazoIPMInicialDias',
+          'prazoIPMProrrogacaoDias',
+          'prazoSindicanciaInicialDias',
+          'prazoSindicanciaProrrogacaoDias',
+          'prazoConselhoInicialDias',
+          'prazoConselhoProrrogacaoDias',
+          'updatedAt',
+          'updatedByName',
+          'updatedByEmail'
+        ]) &&
+        request.resource.data.sidebarTitle is string &&
+        request.resource.data.sidebarSubtitle is string &&
+        request.resource.data.dashboardTitle is string &&
+        request.resource.data.dashboardDescription is string &&
+        request.resource.data.newProcessLabel is string &&
+        request.resource.data.footerText is string &&
+        request.resource.data.prazoIPMInicialDias is number &&
+        request.resource.data.prazoIPMProrrogacaoDias is number &&
+        request.resource.data.prazoSindicanciaInicialDias is number &&
+        request.resource.data.prazoSindicanciaProrrogacaoDias is number &&
+        request.resource.data.prazoConselhoInicialDias is number &&
+        request.resource.data.prazoConselhoProrrogacaoDias is number;
+      allow delete: if false;
+    }
     
     // Regra padrão: negar acesso a outras coleções não especificadas
     match /{document=**} {

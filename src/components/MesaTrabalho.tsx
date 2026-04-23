@@ -16,6 +16,7 @@ import { ProcessoCard } from "./ProcessoCard";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { AuthUser } from "@/hooks/useAuth";
+import type { SiteSettings } from "@/types/siteSettings";
 
 interface Props {
   processos: Processo[];
@@ -29,9 +30,10 @@ interface Props {
   ehAdmin?: boolean;
   unreadProcessIds?: Set<string>;
   onReadProcess?: (processoId: string) => void;
+  siteSettings?: SiteSettings;
 }
 
-export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess }: Props) {
+export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess, siteSettings }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
@@ -334,6 +336,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                     onDelete={onDelete}
                     onMove={onMove}
                     onReativarProcesso={onReativarProcesso}
+                    siteSettings={siteSettings}
                     unreadProcessIds={unreadProcessIds}
                     onReadProcess={onReadProcess}
                   />

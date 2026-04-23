@@ -16,8 +16,9 @@ import { onAuthStateChanged } from "firebase/auth";
 import type { Processo, StatusProcesso } from "@/types/processo";
 import { isAdmin, type AuthUser } from "./useAuth";
 import { calcularPrazoFinalPA } from "@/lib/prazo";
+import type { SiteSettings } from "@/types/siteSettings";
 
-export function useProcessos() {
+export function useProcessos(siteSettings?: SiteSettings) {
   const [processos, setProcessos] = useState<Processo[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -166,9 +167,13 @@ export function useProcessos() {
           dataInicioPrazo,
           dataAssinatura,
           prorrogacoes,
-        });
-        const prazoFatalProcesso = procData.prazoFatalDU || procData.prazoFatal || procData.finalPrazo || prazoFinalPA;
-        const finalPrazoProcesso = procData.prazoFatalDU || procData.finalPrazo || procData.prazoFatal || prazoFinalPA;
+        }, siteSettings);
+        const prazoFatalProcesso = setorCanonico === "PA"
+          ? (prazoFinalPA || procData.prazoFatal || procData.finalPrazo)
+          : (procData.prazoFatalDU || procData.prazoFatal || procData.finalPrazo);
+        const finalPrazoProcesso = setorCanonico === "PA"
+          ? (prazoFinalPA || procData.finalPrazo || procData.prazoFatal)
+          : (procData.prazoFatalDU || procData.finalPrazo || procData.prazoFatal);
 
         const processoMapeado: Processo = {
           id: procData.id,

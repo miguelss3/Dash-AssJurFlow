@@ -192,6 +192,10 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                 <InfoRow icon={Calendar} label="Data de Entrada" value={formatarData(processo.dataEntrada)} />
               )}
 
+              {isPA && processo.dataInicioPrazo && (
+                <InfoRow icon={Calendar} label="Início do Prazo" value={formatarData(processo.dataInicioPrazo)} />
+              )}
+
               {prazoItens.map((item) => {
                 const dias = diasRestantes(item.valor);
                 const isFatal = item.tipo === "fatal";

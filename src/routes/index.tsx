@@ -23,9 +23,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useProcessos } from "@/hooks/useProcessos";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Dashboard } from "@/components/Dashboard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
+import type { SiteSettings } from "@/types/siteSettings";
 import { statusPrazo } from "@/lib/prazo";
 import { toast } from "sonner";
 
@@ -43,6 +45,9 @@ const CalendarioPrazos = lazy(() =>
 );
 const GestaoEquipe = lazy(() =>
   import("@/components/GestaoEquipe").then((m) => ({ default: m.GestaoEquipe })),
+);
+const AjustesSite = lazy(() =>
+  import("@/components/AjustesSite").then((m) => ({ default: m.AjustesSite })),
 );
 const AcoesDUModalNovo = lazy(() =>
   import("@/components/modals/AcoesDUModalNovo").then((m) => ({ default: m.AcoesDUModalNovo })),
@@ -103,7 +108,7 @@ export const Route = createFileRoute("/")({
   },
 });
 
-type Aba = "mesa" | "prazos" | "arquivo" | "indicadores" | "equipe";
+type Aba = "mesa" | "prazos" | "ajustes" | "arquivo" | "indicadores" | "equipe";
 type FiltroTipo = "todos" | "DU" | "PA";
 
 type NotificacaoItem = {
@@ -155,7 +160,12 @@ function processoTimestampMs(p: Processo | undefined): number {
 function Index() {
   const navigate = useNavigate();
   const { user, ready, logout } = useAuth();
-  const { processos, criar, atualizar, remover } = useProcessos();
+  const {
+    settings: siteSettings,
+    loading: siteSettingsLoading,
+    saveSettings: persistSiteSettings,
+  } = useSiteSettings(ready && !!user);
+  const { processos, criar, atualizar, remover } = useProcessos(siteSettings);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Processo | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<StatusProcesso>("novo");
@@ -269,6 +279,37 @@ function Index() {
     const nomeBase = user.nomeGuerra || user.nome || user.email?.split("@")[0] || "Usuário";
     return user.posto ? `${user.posto} ${nomeBase}`.trim() : nomeBase;
   }, [user]);
+
+  const cabecalhoAtual = useMemo(() => {
+    const mapa: Record<Aba, { titulo: string; descricao: string }> = {
+      mesa: {
+        titulo: siteSettings.dashboardTitle,
+        descricao: siteSettings.dashboardDescription,
+      },
+      prazos: {
+        titulo: "Controle de Prazos",
+        descricao: "Calendário consolidado com prazos automáticos e lançamentos manuais.",
+      },
+      ajustes: {
+        titulo: "Ajustes do Site",
+        descricao: "Edite textos e rótulos do layout principal visível para os usuários autenticados.",
+      },
+      arquivo: {
+        titulo: "Arquivo / Encerrados",
+        descricao: "Histórico dos processos finalizados e reaberturas registradas.",
+      },
+      indicadores: {
+        titulo: "Indicadores de Gestão",
+        descricao: "Acompanhe produtividade, carga de trabalho e desempenho geral do setor.",
+      },
+      equipe: {
+        titulo: "Gestão da Equipe",
+        descricao: "Cadastre, atualize e acompanhe os integrantes autorizados no sistema.",
+      },
+    };
+
+    return mapa[aba] || mapa.mesa;
+  }, [aba, siteSettings.dashboardDescription, siteSettings.dashboardTitle]);
 
   const chaveNotificacoes = useMemo(
     () => (user?.uid ? `assjur:notificacoes:lastSeen:${user.uid}` : ""),
@@ -648,6 +689,20 @@ function Index() {
     });
   };
 
+  const handleSalvarAjustesSite = async (nextSettings: SiteSettings) => {
+    try {
+      await persistSiteSettings(nextSettings, {
+        name: nomeMilitarAtual,
+        email: user?.email || "",
+      });
+      toast.success("Ajustes do site publicados com sucesso.");
+    } catch (error) {
+      console.error("Erro ao salvar ajustes do site:", error);
+      toast.error("Não foi possível publicar os ajustes do site.");
+      throw error;
+    }
+  };
+
   const handleSave = (dados: Omit<Processo, "id" | "criadoEm">) => {
     if (editing) {
       toast.promise(atualizar(editing.id, dados), {
@@ -880,6 +935,7 @@ function Index() {
 
   const navSec: { id: Aba; label: string; icon: typeof LayoutGrid }[] = [
     { id: "prazos", label: "Controle de Prazos", icon: Calendar },
+    ...(ehAdmin ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
   ];
 
   // Tabs principais (estilo AssJur)
@@ -889,6 +945,7 @@ function Index() {
   const tabsCompletas: { id: Aba; label: string }[] = [
     { id: "mesa", label: "Mesa de Trabalho" },
     { id: "prazos", label: "Controle de Prazos" },
+    { id: "ajustes", label: "Ajustes do Site" },
     { id: "indicadores", label: "Indicadores de Gestão" },
     { id: "equipe", label: "Gestão da Equipe" },
   ];
@@ -936,10 +993,10 @@ function Index() {
               </div>
               <div>
                 <h1 className="font-bold text-lg tracking-tight leading-none font-display text-white">
-                  AssJur Flow
+                  {siteSettings.sidebarTitle}
                 </h1>
                 <p className="text-[9px] text-[oklch(0.78_0.18_145)] mt-1 tracking-[0.2em] uppercase font-bold">
-                  12ª Região Militar
+                  {siteSettings.sidebarSubtitle}
                 </p>
               </div>
             </div>
@@ -1065,10 +1122,10 @@ function Index() {
 
             <div className="min-w-0 flex-1">
               <h2 className="font-bold text-2xl sm:text-3xl tracking-tight leading-tight font-display text-foreground">
-                Painel de Controle
+                {cabecalhoAtual.titulo}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Mesa de trabalho e acompanhamento dos processos em andamento
+                {cabecalhoAtual.descricao}
               </p>
             </div>
 
@@ -1134,7 +1191,7 @@ function Index() {
                 className="h-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary-glow font-semibold px-4 shadow-md"
               >
                 <Plus className="h-4 w-4 sm:mr-1.5" />
-                <span className="hidden sm:inline">Novo Processo</span>
+                <span className="hidden sm:inline">{siteSettings.newProcessLabel}</span>
               </Button>
             </div>
           </div>
@@ -1258,6 +1315,7 @@ function Index() {
                 onRedistribuir={handleRedistribuir}
                 usuario={user || undefined}
                 ehAdmin={ehAdmin}
+                siteSettings={siteSettings}
                 unreadProcessIds={processosNaoLidosIds}
                 onReadProcess={marcarProcessoComoLido}
               />
@@ -1271,6 +1329,16 @@ function Index() {
                 usuario={usuario}
                 ehAdmin={ehAdmin}
                 onNovoLancamento={handleNovoLancamentoCalendario}
+              />
+            </Suspense>
+          )}
+
+          {aba === "ajustes" && ehAdmin && (
+            <Suspense fallback={<TabLoading label="Carregando ajustes do site..." />}>
+              <AjustesSite
+                settings={siteSettings}
+                loading={siteSettingsLoading}
+                onSave={handleSalvarAjustesSite}
               />
             </Suspense>
           )}
@@ -1303,7 +1371,7 @@ function Index() {
         {/* Footer copyright */}
         <footer className="py-3 px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-[11px] text-muted-foreground/50">
-            &copy; {new Date().getFullYear()} Maj Cav Miguel &mdash; AssJur Flow &middot; 12ª Região Militar &middot; Todos os direitos reservados.
+            &copy; {new Date().getFullYear()} {siteSettings.footerText}
           </p>
         </footer>
       </div>

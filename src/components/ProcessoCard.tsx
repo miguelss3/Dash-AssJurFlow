@@ -39,6 +39,7 @@ import { DetalhesProcessoModal } from "./DetalhesProcessoModal";
 import { ChatModal } from "./ChatModal";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import type { SiteSettings } from "@/types/siteSettings";
 
 interface ProcessoCardProps {
   processo?: Processo;
@@ -48,13 +49,14 @@ interface ProcessoCardProps {
   onDelete?: (id: string) => void;
   onMove?: (id: string, status: StatusProcesso) => void;
   onReativarProcesso?: (processoId: string, payload?: { motivo: string; novoPrazoFatal: string }) => void | Promise<void>;
+  siteSettings?: SiteSettings;
   showActions?: boolean;
   isDragging?: boolean; // Flag para quando está sendo arrastado no overlay
   naoLido?: boolean;
   onMarcarComoLido?: (processoId: string) => void;
 }
 
-export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onReativarProcesso, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido }: ProcessoCardProps) => {
+export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido }: ProcessoCardProps) => {
   const p = processo || pAntigo!;
   const marcarComoLido = () => onMarcarComoLido?.(p.id);
   
@@ -277,6 +279,13 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
                 <strong>Entrada:</strong> {formatarData(p.dataEntrada)}
               </p>
             )}
+
+            {isPA && p.dataInicioPrazo && (
+              <p className="flex items-center gap-1 text-purple-700 font-medium">
+                <Calendar className="w-3 h-3" />
+                <strong>Início do Prazo:</strong> {formatarData(p.dataInicioPrazo)}
+              </p>
+            )}
             
             {/* DU - Seção e Origem */}
             {isDU && (
@@ -446,6 +455,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
         onOpenChange={setModalAcoesPA}
         processoId={p.id}
         numeroProcesso={p.numero}
+        siteSettings={siteSettings}
         onSuccess={() => {}}
       />
 

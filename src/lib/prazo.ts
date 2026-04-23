@@ -1,5 +1,9 @@
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  DEFAULT_PROCESSUAL_DEADLINES,
+  type ProcessualDeadlineSettings,
+} from "@/types/siteSettings";
 
 export type StatusPrazo = "overdue" | "today" | "soon" | "safe";
 
@@ -11,19 +15,46 @@ export function ehConselhoPA(tipoPA: string | undefined | null): boolean {
   return tipoPA === "Conselho de Disciplina" || tipoPA === "Conselho de Justificação";
 }
 
+function obterConfiguracaoPrazosProcessuais(
+  configuracao?: Partial<ProcessualDeadlineSettings> | null,
+): ProcessualDeadlineSettings {
+  return {
+    ...DEFAULT_PROCESSUAL_DEADLINES,
+    ...(configuracao || {}),
+  };
+}
+
 export function obterRegraPrazoPA(tipoPA: string | undefined | null): {
   diasIniciais: number;
   diasProrrogacao: number;
+}
+export function obterRegraPrazoPA(
+  tipoPA: string | undefined | null,
+  configuracao?: Partial<ProcessualDeadlineSettings> | null,
+): {
+  diasIniciais: number;
+  diasProrrogacao: number;
 } {
+  const regras = obterConfiguracaoPrazosProcessuais(configuracao);
+
   if (tipoPA === "IPM") {
-    return { diasIniciais: 40, diasProrrogacao: 20 };
+    return {
+      diasIniciais: regras.prazoIPMInicialDias,
+      diasProrrogacao: regras.prazoIPMProrrogacaoDias,
+    };
   }
 
   if (tipoPA === "Sindicância" || tipoPA === "Sindicancia") {
-    return { diasIniciais: 30, diasProrrogacao: 20 };
+    return {
+      diasIniciais: regras.prazoSindicanciaInicialDias,
+      diasProrrogacao: regras.prazoSindicanciaProrrogacaoDias,
+    };
   }
 
-  return { diasIniciais: 30, diasProrrogacao: 20 };
+  return {
+    diasIniciais: regras.prazoConselhoInicialDias,
+    diasProrrogacao: regras.prazoConselhoProrrogacaoDias,
+  };
 }
 
 function normalizarDataPrazoPA(valor: string | undefined | null): string | undefined {
@@ -47,7 +78,7 @@ export function calcularPrazoFinalPA(params: {
   dataInicioPrazo?: string | null;
   dataAssinatura?: string | null;
   prorrogacoes?: ProrrogacaoPA[] | null;
-}): string | undefined {
+}, configuracao?: Partial<ProcessualDeadlineSettings> | null): string | undefined {
   const { tipoPA, dataInicioPrazo, dataAssinatura, prorrogacoes } = params;
   const dataBase =
     normalizarDataPrazoPA(dataInicioPrazo)
@@ -55,7 +86,7 @@ export function calcularPrazoFinalPA(params: {
 
   if (!dataBase) return undefined;
 
-  const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoPA);
+  const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoPA, configuracao);
   const diasExtras = (prorrogacoes || []).reduce((total, item) => {
     const dias = item?.dias;
     return total + (typeof dias === "number" && Number.isFinite(dias) ? dias : diasProrrogacao);

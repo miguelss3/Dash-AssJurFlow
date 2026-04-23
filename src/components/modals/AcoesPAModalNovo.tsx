@@ -9,6 +9,7 @@ import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { SiteSettings } from "@/types/siteSettings";
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -87,10 +88,11 @@ interface AcoesPAModalNovoProps {
   onOpenChange: (open: boolean) => void;
   processoId: string;
   numeroProcesso: string;
+  siteSettings?: SiteSettings;
   onSuccess?: () => void;
 }
 
-export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcesso, onSuccess }: AcoesPAModalNovoProps) {
+export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcesso, siteSettings, onSuccess }: AcoesPAModalNovoProps) {
   const { user } = useAuth();
   const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
   const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
@@ -142,7 +144,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
 
   const tipoProcesso = processo?.tipoPA || "";
   const isConselho = tipoProcesso === "Conselho de Disciplina" || tipoProcesso === "Conselho de Justificação";
-  const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoProcesso);
+  const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoProcesso, siteSettings);
 
   const calcularCamposPrazo = (overrides?: {
     dataInicioPrazo?: string;
@@ -154,7 +156,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       dataInicioPrazo: overrides?.dataInicioPrazo ?? dataInicioPrazo,
       dataAssinatura: overrides?.dataAssinatura ?? dataAssinatura,
       prorrogacoes: overrides?.prorrogacoes ?? historicoProrrogacoes,
-    });
+    }, siteSettings);
 
     return prazoFinal ? { prazoFatal: prazoFinal, finalPrazo: prazoFinal } : {};
   };
