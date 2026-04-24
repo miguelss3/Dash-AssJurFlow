@@ -631,6 +631,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       fromState: "MESA_ASSESSOR",
       toState: "CHEFIA_DILIGENCIA",
       role: "assessor_du",
+      tipo: "ambos",
       enabled: true,
       order: maiorOrdem + 10,
     };

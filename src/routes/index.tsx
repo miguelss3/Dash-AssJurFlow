@@ -243,8 +243,10 @@ function Index() {
       if (filtroTipo !== "todos" && setorProcesso !== filtroTipo) return false;
       
       // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
+      // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
+      // Processos com setor vazio/corrompido nunca vazam para assessores
       if (!ehAdmin && setorUsuario) {
-        if (setorProcesso !== setorUsuario) {
+        if (setorProcesso === "" || setorProcesso !== setorUsuario) {
           return false;
         }
       }
