@@ -1382,6 +1382,7 @@ function Index() {
             open={dialogOpen}
             onOpenChange={setDialogOpen}
             processo={editing}
+            siteSettings={siteSettings}
             onSuccess={() => {
               setDialogOpen(false);
               setEditing(null);

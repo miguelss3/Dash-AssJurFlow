@@ -3,7 +3,11 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
 import {
+  DEFAULT_ASSUNTOS_PA_SINDICANCIA,
+  DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
   DEFAULT_SITE_SETTINGS,
+  normalizarAssuntosPA,
+  normalizarAssuntosDU,
   SITE_SETTINGS_DOC_ID,
   type SiteSettings,
 } from "@/types/siteSettings";
@@ -26,9 +30,18 @@ export function useSiteSettings(enabled: boolean) {
       const ref = doc(db, COLLECTION_NAME, SITE_SETTINGS_DOC_ID);
       const snap = await getDoc(ref);
       if (snap.exists()) {
+        const data = snap.data() as Partial<SiteSettings>;
         setSettings({
           ...DEFAULT_SITE_SETTINGS,
-          ...(snap.data() as Partial<SiteSettings>),
+          ...data,
+          assuntosPASindicancia: normalizarAssuntosPA(
+            data.assuntosPASindicancia,
+            DEFAULT_ASSUNTOS_PA_SINDICANCIA,
+          ),
+          assuntosDUPrincipais: normalizarAssuntosDU(
+            data.assuntosDUPrincipais,
+            DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
+          ),
         });
       } else {
         setSettings(DEFAULT_SITE_SETTINGS);
@@ -50,6 +63,14 @@ export function useSiteSettings(enabled: boolean) {
       const normalized: SiteSettings = {
         ...DEFAULT_SITE_SETTINGS,
         ...nextSettings,
+        assuntosPASindicancia: normalizarAssuntosPA(
+          nextSettings.assuntosPASindicancia,
+          DEFAULT_ASSUNTOS_PA_SINDICANCIA,
+        ),
+        assuntosDUPrincipais: normalizarAssuntosDU(
+          nextSettings.assuntosDUPrincipais,
+          DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
+        ),
         updatedAt: new Date().toISOString(),
         updatedByName: meta?.name || undefined,
         updatedByEmail: meta?.email || undefined,

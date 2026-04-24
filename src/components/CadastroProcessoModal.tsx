@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,32 +15,23 @@ import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calcularFaixasProrrogacaoPA, calcularPrazoFinalPA } from "@/lib/prazo";
+import {
+  DEFAULT_ASSUNTOS_PA_SINDICANCIA,
+  DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
+  normalizarAssuntosPA,
+  normalizarAssuntosDU,
+  type SiteSettings,
+} from "@/types/siteSettings";
 
 interface CadastroProcessoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   processo?: Processo | null;
   onSuccess?: () => void;
+  siteSettings?: SiteSettings;
 }
 
 const TIPOS_PA = ["IPM", "Sindicância", "Conselho de Disciplina", "Conselho de Justificação", "Investigação Preliminar", "Outros"];
-const ASSUNTOS_SINDICANCIA = [
-  "Apuração de Fato",
-  "Dano ao Erário",
-  "Despesa de Exercícios Anteriores",
-  "Exame de Pagamento",
-  "FUSEx",
-  "Transgressão Disciplinar",
-  "OUTROS",
-];
-const ASSUNTOS_DU_PRINCIPAIS = [
-  "Saúde e FUSEx",
-  "Movimentação e Transferência",
-  "SFPC / CAC",
-  "Carreira e Remuneração",
-  "Disciplina e Justiça",
-  "Licitações e Contratos",
-];
 const ORIGENS_DU = ["SAPIENS", "Email", "MPF", "Justiça Federal", "Justiça Estadual", "Outros"];
 const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 const POSTOS_CONSELHO = ["Cap", "Maj", "TC", "Cel"];
@@ -58,9 +49,25 @@ type ProrrogacaoEditavel = {
 // LOG DE VERIFICAÇÃO - ESTE LOG DEVE APARECER SEMPRE
 // console.log("🚀🚀🚀 ARQUIVO CadastroProcessoModal.tsx CARREGADO - VERSÃO NOVA COM LOGS! 🚀🚀🚀");
 
-export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess }: CadastroProcessoModalProps) {
+export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess, siteSettings }: CadastroProcessoModalProps) {
   const { user } = useAuth();
   const ehAdminOuChefe = isAdmin(user);
+  const assuntosDUPrincipais = useMemo(
+    () =>
+      normalizarAssuntosDU(
+        siteSettings?.assuntosDUPrincipais,
+        DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
+      ),
+    [siteSettings?.assuntosDUPrincipais],
+  );
+  const assuntosPASindicancia = useMemo(
+    () =>
+      normalizarAssuntosPA(
+        siteSettings?.assuntosPASindicancia,
+        DEFAULT_ASSUNTOS_PA_SINDICANCIA,
+      ),
+    [siteSettings?.assuntosPASindicancia],
+  );
 
   const inferirSetorUsuario = () => {
     const candidatos = [user?.setor, user?.role, user?.secao, user?.cargo]
@@ -928,9 +935,12 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {ASSUNTOS_SINDICANCIA.map((ass) => (
+                    {assuntosPASindicancia.map((ass) => (
                       <SelectItem key={ass} value={ass}>{ass}</SelectItem>
                     ))}
+                    {!!assuntoSindicancia && !assuntosPASindicancia.includes(assuntoSindicancia) && (
+                      <SelectItem value={assuntoSindicancia}>{assuntoSindicancia}</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -955,10 +965,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess 
                       <SelectValue placeholder="Selecione o assunto principal" />
                     </SelectTrigger>
                     <SelectContent>
-                      {ASSUNTOS_DU_PRINCIPAIS.map((ass) => (
+                      {assuntosDUPrincipais.map((ass) => (
                         <SelectItem key={ass} value={ass}>{ass}</SelectItem>
                       ))}
-                      {!!assunto && !ASSUNTOS_DU_PRINCIPAIS.includes(assunto) && (
+                      {!!assunto && !assuntosDUPrincipais.includes(assunto) && (
                         <SelectItem value={assunto}>{assunto}</SelectItem>
                       )}
                     </SelectContent>
