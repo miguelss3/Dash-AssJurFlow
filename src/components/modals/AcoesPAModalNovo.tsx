@@ -9,7 +9,12 @@ import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { SiteSettings } from "@/types/siteSettings";
+import {
+  DEFAULT_PA_FLOW_ACTIONS,
+  normalizarPAFlowActions,
+  type PAFlowActionSetting,
+  type SiteSettings,
+} from "@/types/siteSettings";
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -156,6 +161,70 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
   const tipoProcesso = processo?.tipoPA || "";
   const isConselho = tipoProcesso === "Conselho de Disciplina" || tipoProcesso === "Conselho de Justificação";
   const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoProcesso, siteSettings);
+  const fluxoAtual = isConselho ? "conselho" : "padrao";
+
+  const acoesFluxoPA = useMemo(
+    () => normalizarPAFlowActions(siteSettings?.paFlowActions, DEFAULT_PA_FLOW_ACTIONS),
+    [siteSettings?.paFlowActions],
+  );
+
+  const resolverAcaoConfigurada = (actionId: string): PAFlowActionSetting | undefined => {
+    return acoesFluxoPA.find((item) => {
+      if (item.id !== actionId) return false;
+      if (!item.enabled) return false;
+      if (item.fromState !== situacaoFluxo) return false;
+      if (item.role !== "ambos" && item.role !== role) return false;
+      if (item.track !== "todos" && item.track !== fluxoAtual) return false;
+      return true;
+    });
+  };
+
+  const proximaSituacaoConfigurada = (actionId: string, fallback: SituacaoFluxoPA): SituacaoFluxoPA => {
+    const acao = resolverAcaoConfigurada(actionId);
+    return (acao?.toState as SituacaoFluxoPA | undefined) || fallback;
+  };
+
+  const labelAcaoConfigurada = (actionId: string, fallback: string): string => {
+    const acao = resolverAcaoConfigurada(actionId);
+    return acao?.label || fallback;
+  };
+
+  const renderAcoesCustomizadas = (idsPadrao: string[]) => {
+    const idsPadraoSet = new Set(idsPadrao);
+    const extras = acoesFluxoPA
+      .filter((acao) => {
+        if (!acao.enabled) return false;
+        if (idsPadraoSet.has(acao.id)) return false;
+        if (acao.fromState !== situacaoFluxo) return false;
+        if (acao.role !== "ambos" && acao.role !== role) return false;
+        if (acao.track !== "todos" && acao.track !== fluxoAtual) return false;
+        return true;
+      })
+      .sort((a, b) => a.order - b.order);
+
+    if (extras.length === 0) return null;
+
+    return (
+      <div className="space-y-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600">Ações extras configuradas</p>
+        {extras.map((acao) => (
+          <Button
+            key={acao.id}
+            variant="outline"
+            className="w-full justify-start"
+            onClick={() => {
+              void avancarFluxo(
+                acao.toState as SituacaoFluxoPA,
+                `${acao.label} (fluxo configurável).`,
+              );
+            }}
+          >
+            {acao.label}
+          </Button>
+        ))}
+      </div>
+    );
+  };
 
   const calcularCamposPrazo = (overrides?: {
     dataInicioPrazo?: string;
@@ -457,7 +526,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
     const camposPrazoCalculados = prazoCalculado ? { prazoFatal: prazoCalculado, finalPrazo: prazoCalculado } : {};
     
     void avancarFluxo(
-      "EM_CURSO",
+      proximaSituacaoConfigurada("PA_INICIAR_PRAZO", "EM_CURSO"),
       `Prazo do PA iniciado em ${formatarData(dataInicioParaCalculo)}.`,
       {
         dataInicioPrazo: dataInicioParaCalculo,
@@ -478,7 +547,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
     
     const camposPrazoCalculados = prazoCalculado ? { prazoFatal: prazoCalculado, finalPrazo: prazoCalculado } : {};
     
-    void avancarFluxo("C_EM_CURSO", "Portaria assinada e Conselho instalado.", {
+    void avancarFluxo(proximaSituacaoConfigurada("C_CHEFIA_ASSINA_PORTARIA", "C_EM_CURSO"), "Portaria assinada e Conselho instalado.", {
       dataAssinatura: dataAssinaturaParaCalculo,
       dataInicioPrazo: dataAssinaturaParaCalculo,
       ...camposPrazoCalculados,
@@ -516,11 +585,12 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
             {cabecalhoReadOnly}
             <Button
-              onClick={() => avancarFluxo("C_PORTARIA", "Memória elaborada e enviada à chefia para assinatura da portaria.")}
+              onClick={() => avancarFluxo(proximaSituacaoConfigurada("C_ENVIAR_MEMORIA", "C_PORTARIA"), "Memória elaborada e enviada à chefia para assinatura da portaria.")}
               className="w-full bg-rose-600 hover:bg-rose-700"
             >
-              Elaborar Memória e Enviar à Chefia
+              {labelAcaoConfigurada("C_ENVIAR_MEMORIA", "Elaborar Memória e Enviar à Chefia")}
             </Button>
+            {renderAcoesCustomizadas(["C_ENVIAR_MEMORIA"])}
           </div>
         );
 
@@ -564,9 +634,10 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               </div>
             )}
 
-            <Button onClick={() => avancarFluxo("C_DECISAO_AUT_NOMEANTE", "Conselho concluído e remetido para decisão da autoridade nomeante.")} className="w-full bg-slate-800 hover:bg-black">
+            <Button onClick={() => avancarFluxo(proximaSituacaoConfigurada("C_ENVIAR_DECISAO_AUT", "C_DECISAO_AUT_NOMEANTE"), "Conselho concluído e remetido para decisão da autoridade nomeante.")} className="w-full bg-slate-800 hover:bg-black">
               <PenTool className="w-4 h-4 mr-1" /> Enviar p/ Decisão da Autoridade
             </Button>
+            {renderAcoesCustomizadas(["C_ENVIAR_DECISAO_AUT"])}
           </div>
         );
 
@@ -584,21 +655,22 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
             <div className="flex flex-col gap-2">
               <Button className="w-full bg-amber-600 hover:bg-amber-700" onClick={() => {
                 setTeveRecurso(true);
-                void avancarFluxo("C_ENCAMINHAMENTO_CMTEX", "Recurso do acusado recebido. Encaminhar ao Cmt Ex.", { teveRecurso: true });
+                void avancarFluxo(proximaSituacaoConfigurada("C_RECURSO_SIM", "C_ENCAMINHAMENTO_CMTEX"), "Recurso do acusado recebido. Encaminhar ao Cmt Ex.", { teveRecurso: true });
               }}>
-                <FileText className="w-4 h-4 mr-1" /> Sim, apresentou recurso
+                <FileText className="w-4 h-4 mr-1" /> {labelAcaoConfigurada("C_RECURSO_SIM", "Sim, apresentou recurso")}
               </Button>
               <Button className="w-full bg-slate-900 hover:bg-black" onClick={() => {
                 setTeveRecurso(false);
                 setResultadoFinalConselho("Transitou em Julgado - Sem Recurso");
-                void avancarFluxo("CONCLUIDO", "Conselho encerrado sem recurso do acusado.", {
+                void avancarFluxo(proximaSituacaoConfigurada("C_RECURSO_NAO", "CONCLUIDO"), "Conselho encerrado sem recurso do acusado.", {
                   teveRecurso: false,
                   resultadoFinalConselho: "Transitou em Julgado - Sem Recurso",
                 });
               }}>
-                <CheckCircle2 className="w-4 h-4 mr-1" /> Não apresentou recurso (finalizar)
+                <CheckCircle2 className="w-4 h-4 mr-1" /> {labelAcaoConfigurada("C_RECURSO_NAO", "Não apresentou recurso (finalizar)")}
               </Button>
             </div>
+            {renderAcoesCustomizadas(["C_RECURSO_SIM", "C_RECURSO_NAO"])}
           </div>
         );
 
@@ -610,9 +682,10 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <Label htmlFor="dieg-remessa" className="text-[11px] uppercase text-amber-900">Nº DIEx/Ofício de Remessa</Label>
               <Input id="dieg-remessa" value={numeroDIExRemessa} onChange={(e) => setNumeroDIExRemessa(e.target.value)} className="mt-1" />
             </div>
-            <Button disabled={!numeroDIExRemessa.trim()} onClick={() => avancarFluxo("C_DECISAO_CMTEX", "Remessa ao Cmt Ex confirmada.", { numeroDIExRemessa: numeroDIExRemessa.trim(), teveRecurso: true })} className="w-full bg-amber-600 hover:bg-amber-700">
-              Confirmar Remessa ao Cmt Ex
+            <Button disabled={!numeroDIExRemessa.trim()} onClick={() => avancarFluxo(proximaSituacaoConfigurada("C_CONFIRMAR_REMESSA", "C_DECISAO_CMTEX"), "Remessa ao Cmt Ex confirmada.", { numeroDIExRemessa: numeroDIExRemessa.trim(), teveRecurso: true })} className="w-full bg-amber-600 hover:bg-amber-700">
+              {labelAcaoConfigurada("C_CONFIRMAR_REMESSA", "Confirmar Remessa ao Cmt Ex")}
             </Button>
+            {renderAcoesCustomizadas(["C_CONFIRMAR_REMESSA"])}
           </div>
         );
 
@@ -633,8 +706,9 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <Input id="assinatura-chefia-conselho" type="date" value={dataAssinatura} onChange={(e) => setDataAssinatura(e.target.value)} className="mt-1" />
             </div>
             <Button disabled={!dataAssinatura} onClick={confirmarInstalacaoConselho} className="w-full bg-indigo-600 hover:bg-indigo-700">
-              Confirmar Assinatura e Instalar
+              {labelAcaoConfigurada("C_CHEFIA_ASSINA_PORTARIA", "Confirmar Assinatura e Instalar")}
             </Button>
+            {renderAcoesCustomizadas(["C_CHEFIA_ASSINA_PORTARIA"])}
           </div>
         );
 
@@ -645,9 +719,10 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <h4 className="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2"><Scale className="w-4 h-4" /> Decisão da Autoridade Nomeante</h4>
               <Textarea value={decisaoAutNomeante} onChange={(e) => setDecisaoAutNomeante(e.target.value)} rows={4} />
             </div>
-            <Button disabled={!decisaoAutNomeante.trim()} onClick={() => avancarFluxo("C_INTIMACAO_ACUSADO", "Decisão da autoridade nomeante registrada e devolvida ao assessor.", { decisaoAutNomeante: decisaoAutNomeante.trim() })} className="w-full bg-indigo-600 hover:bg-indigo-700">
-              Exarar Decisão e Devolver ao Assessor
+            <Button disabled={!decisaoAutNomeante.trim()} onClick={() => avancarFluxo(proximaSituacaoConfigurada("C_AUT_NOMEANTE_DECIDE", "C_INTIMACAO_ACUSADO"), "Decisão da autoridade nomeante registrada e devolvida ao assessor.", { decisaoAutNomeante: decisaoAutNomeante.trim() })} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              {labelAcaoConfigurada("C_AUT_NOMEANTE_DECIDE", "Exarar Decisão e Devolver ao Assessor")}
             </Button>
+            {renderAcoesCustomizadas(["C_AUT_NOMEANTE_DECIDE"])}
           </div>
         );
 
@@ -667,9 +742,10 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
                 <option value="Arquivamento (Absolvição/Justificação)">Arquivamento (Absolvição/Justificação)</option>
               </select>
             </div>
-            <Button disabled={!resultadoFinalConselho} onClick={() => avancarFluxo("CONCLUIDO", "Decisão final do Cmt Ex registrada e Conselho encerrado.", { resultadoFinalConselho, teveRecurso })} className="w-full bg-rose-700 hover:bg-rose-800">
-              Registar Decisão Final e Encerrar
+            <Button disabled={!resultadoFinalConselho} onClick={() => avancarFluxo(proximaSituacaoConfigurada("C_REGISTRAR_DECISAO_FINAL", "CONCLUIDO"), "Decisão final do Cmt Ex registrada e Conselho encerrado.", { resultadoFinalConselho, teveRecurso })} className="w-full bg-rose-700 hover:bg-rose-800">
+              {labelAcaoConfigurada("C_REGISTRAR_DECISAO_FINAL", "Registar Decisão Final e Encerrar")}
             </Button>
+            {renderAcoesCustomizadas(["C_REGISTRAR_DECISAO_FINAL"])}
           </div>
         );
 
@@ -688,9 +764,10 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <h4 className="font-semibold text-slate-800 mb-2 flex items-center gap-2"><Send className="w-5 h-5 text-sky-600" /> Passo 1: Enviar Portaria</h4>
               <p className="text-sm text-slate-600">Encaminha para validação e assinatura da chefia da AssJur.</p>
             </div>
-            <Button onClick={() => avancarFluxo("AGUARDANDO_CHEFIA", "Processo PA enviado à chefia para assinatura da portaria.")} className="w-full bg-sky-600 hover:bg-sky-700">
-              Enviar para a Chefia da AssJur
+            <Button onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_ENVIAR_CHEFIA", "AGUARDANDO_CHEFIA"), "Processo PA enviado à chefia para assinatura da portaria.")} className="w-full bg-sky-600 hover:bg-sky-700">
+              {labelAcaoConfigurada("PA_ENVIAR_CHEFIA", "Enviar para a Chefia da AssJur")}
             </Button>
+            {renderAcoesCustomizadas(["PA_ENVIAR_CHEFIA"])}
           </div>
         );
 
@@ -704,8 +781,9 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <p className="text-xs text-emerald-700 mt-2">Prazo legal inicial: {diasIniciais} dias.</p>
             </div>
             <Button disabled={!dataInicioPrazo} onClick={iniciarPrazoPadrao} className="w-full bg-emerald-600 hover:bg-emerald-700">
-              Confirmar Data e Iniciar Prazo
+              {labelAcaoConfigurada("PA_INICIAR_PRAZO", "Confirmar Data e Iniciar Prazo")}
             </Button>
+            {renderAcoesCustomizadas(["PA_INICIAR_PRAZO"])}
           </div>
         );
 
@@ -767,9 +845,10 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               </div>
             </div>
 
-            <Button onClick={() => avancarFluxo("AGUARDANDO_CHEFIA_SOLUCAO", "Solução do PA elaborada e encaminhada à chefia para despacho.")} className="w-full bg-slate-900 hover:bg-black">
-              <PenTool className="w-4 h-4 mr-1" /> Elaborar Solução e Enviar à Chefia
+            <Button onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_ENVIAR_SOLUCAO", "AGUARDANDO_CHEFIA_SOLUCAO"), "Solução do PA elaborada e encaminhada à chefia para despacho.")} className="w-full bg-slate-900 hover:bg-black">
+              <PenTool className="w-4 h-4 mr-1" /> {labelAcaoConfigurada("PA_ENVIAR_SOLUCAO", "Elaborar Solução e Enviar à Chefia")}
             </Button>
+            {renderAcoesCustomizadas(["PA_ENVIAR_SOLUCAO"])}
           </div>
         );
 
@@ -780,9 +859,10 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <h4 className="font-bold text-slate-800 mb-3">Transcrever Despachos</h4>
               <Textarea value={despachoFinal} onChange={(e) => setDespachoFinal(e.target.value)} rows={4} />
             </div>
-            <Button disabled={!despachoFinal.trim()} onClick={() => avancarFluxo("CONCLUIDO", "Despacho final registrado e PA encerrado.", { despachoFinal: despachoFinal.trim() })} className="w-full bg-slate-900 hover:bg-black">
-              Registar Despachos e Finalizar
+            <Button disabled={!despachoFinal.trim()} onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_FINALIZAR_PADRAO", "CONCLUIDO"), "Despacho final registrado e PA encerrado.", { despachoFinal: despachoFinal.trim() })} className="w-full bg-slate-900 hover:bg-black">
+              {labelAcaoConfigurada("PA_FINALIZAR_PADRAO", "Registar Despachos e Finalizar")}
             </Button>
+            {renderAcoesCustomizadas(["PA_FINALIZAR_PADRAO"])}
           </div>
         );
 
@@ -802,9 +882,10 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <Label htmlFor="assinatura-chefia-pa">Data da assinatura</Label>
               <Input id="assinatura-chefia-pa" type="date" value={dataAssinatura} onChange={(e) => setDataAssinatura(e.target.value)} className="mt-1" />
             </div>
-            <Button disabled={!dataAssinatura} onClick={() => avancarFluxo("AGUARDANDO_PRAZO", "Assinatura da portaria confirmada pela chefia.", { dataAssinatura, portariaAssinadaEm: new Date().toISOString() })} className="w-full bg-indigo-600 hover:bg-indigo-700">
-              Confirmar Assinatura e Devolver
+            <Button disabled={!dataAssinatura} onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_CHEFIA_CONFIRMA_ASSINATURA", "AGUARDANDO_PRAZO"), "Assinatura da portaria confirmada pela chefia.", { dataAssinatura, portariaAssinadaEm: new Date().toISOString() })} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              {labelAcaoConfigurada("PA_CHEFIA_CONFIRMA_ASSINATURA", "Confirmar Assinatura e Devolver")}
             </Button>
+            {renderAcoesCustomizadas(["PA_CHEFIA_CONFIRMA_ASSINATURA"])}
           </div>
         );
 
@@ -815,9 +896,10 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <h4 className="font-bold text-indigo-900 flex items-center gap-2 mb-2"><FileText className="w-5 h-5" /> Despacho Final do Comandante</h4>
               <p className="text-sm text-indigo-800">Despacho da chefia confirmado e liberado para transcrição final pelo assessor.</p>
             </div>
-            <Button onClick={() => avancarFluxo("APTO_FINALIZAR", "Despacho final confirmado pela chefia e devolvido ao assessor.")} className="w-full bg-indigo-600 hover:bg-indigo-700">
-              Confirmar Despacho e Devolver
+            <Button onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_CHEFIA_CONFIRMA_DESPACHO", "APTO_FINALIZAR"), "Despacho final confirmado pela chefia e devolvido ao assessor.")} className="w-full bg-indigo-600 hover:bg-indigo-700">
+              {labelAcaoConfigurada("PA_CHEFIA_CONFIRMA_DESPACHO", "Confirmar Despacho e Devolver")}
             </Button>
+            {renderAcoesCustomizadas(["PA_CHEFIA_CONFIRMA_DESPACHO"])}
           </div>
         );
 

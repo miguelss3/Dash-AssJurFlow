@@ -5,9 +5,11 @@ import { db } from "@/lib/firebase";
 import {
   DEFAULT_ASSUNTOS_PA_SINDICANCIA,
   DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
+  DEFAULT_PA_FLOW_ACTIONS,
   DEFAULT_SITE_SETTINGS,
   normalizarAssuntosPA,
   normalizarAssuntosDU,
+  normalizarPAFlowActions,
   SITE_SETTINGS_DOC_ID,
   type SiteSettings,
 } from "@/types/siteSettings";
@@ -42,6 +44,10 @@ export function useSiteSettings(enabled: boolean) {
             data.assuntosDUPrincipais,
             DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
           ),
+          paFlowActions: normalizarPAFlowActions(
+            data.paFlowActions,
+            DEFAULT_PA_FLOW_ACTIONS,
+          ),
         });
       } else {
         setSettings(DEFAULT_SITE_SETTINGS);
@@ -70,6 +76,10 @@ export function useSiteSettings(enabled: boolean) {
         assuntosDUPrincipais: normalizarAssuntosDU(
           nextSettings.assuntosDUPrincipais,
           DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
+        ),
+        paFlowActions: normalizarPAFlowActions(
+          nextSettings.paFlowActions,
+          DEFAULT_PA_FLOW_ACTIONS,
         ),
         updatedAt: new Date().toISOString(),
         updatedByName: meta?.name || undefined,
