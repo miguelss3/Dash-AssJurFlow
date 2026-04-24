@@ -309,10 +309,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       };
 
       const aguardandoRespostaDU = tipo === "DU" ? doTipo.filter(isAguardandoResposta) : [];
-      const pendenciasChefia = ehAdmin ? doTipo.filter((p) => isPendenteChefia(p) && (tipo !== "DU" || !isAguardandoResposta(p))) : [];
-      const doTipoSemPendenciasChefia = ehAdmin
+      const considerarPendenciaChefia = tipo === "DU" || ehAdmin;
+      const pendenciasChefia = considerarPendenciaChefia
+        ? doTipo.filter((p) => isPendenteChefia(p) && (tipo !== "DU" || !isAguardandoResposta(p)))
+        : [];
+      const doTipoSemPendenciasChefia = considerarPendenciaChefia
         ? doTipo.filter((p) => !isPendenteChefia(p) && (tipo !== "DU" || !isAguardandoResposta(p)))
-        : (tipo === "DU" ? doTipo.filter((p) => !isAguardandoResposta(p)) : doTipo);
+        : doTipo;
       
       const mapAtivos = new Map<string, Processo[]>();
       const mapAtrasados = new Map<string, Processo[]>();
@@ -336,6 +339,12 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         mapAtivos.set(duColunaAguardandoResposta, aguardandoRespostaDU);
         if (!mapAtrasados.has(duColunaAguardandoResposta)) mapAtrasados.set(duColunaAguardandoResposta, []);
         if (!mapConcluidos.has(duColunaAguardandoResposta)) mapConcluidos.set(duColunaAguardandoResposta, []);
+      }
+
+      if (tipo === "DU") {
+        if (!mapAtivos.has(duColunaAguardandoDistribuicao)) mapAtivos.set(duColunaAguardandoDistribuicao, []);
+        if (!mapAtrasados.has(duColunaAguardandoDistribuicao)) mapAtrasados.set(duColunaAguardandoDistribuicao, []);
+        if (!mapConcluidos.has(duColunaAguardandoDistribuicao)) mapConcluidos.set(duColunaAguardandoDistribuicao, []);
       }
       
       // Adiciona os processos aos seus responsáveis
@@ -399,7 +408,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         }))
         .filter(({ nome, itensAtivos, itensAtrasados, itensConcluidos }) => {
           // Só mostra "Aguardando Distribuição" e colunas especiais se tiver processos
-          if (tipo === "DU" && (nome === "MESA DO CHEFE" || nome === duColunaAguardandoResposta)) {
+          if (tipo === "DU" && (nome === "MESA DO CHEFE" || nome === duColunaAguardandoResposta || nome === duColunaAguardandoDistribuicao)) {
             return true;
           }
           if (nome.includes("📥 Aguardando") || nome.includes("📩 Aguardando")) {
@@ -465,10 +474,18 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
             : grupo.assessores;
           const colunasDUFixas = isDUDuasLinhas
             ? grupo.assessores
-                .filter((a) => a.nome === "MESA DO CHEFE" || a.nome === duColunaAguardandoResposta)
+                .filter((a) => (
+                  a.nome === "MESA DO CHEFE"
+                  || a.nome === duColunaAguardandoResposta
+                  || a.nome === duColunaAguardandoDistribuicao
+                ))
                 .sort((a, b) => {
                   if (a.nome === "MESA DO CHEFE") return -1;
                   if (b.nome === "MESA DO CHEFE") return 1;
+                  if (a.nome === duColunaAguardandoResposta) return -1;
+                  if (b.nome === duColunaAguardandoResposta) return 1;
+                  if (a.nome === duColunaAguardandoDistribuicao) return -1;
+                  if (b.nome === duColunaAguardandoDistribuicao) return 1;
                   return 0;
                 })
             : [];
@@ -481,7 +498,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
               )
             : [];
           const colunasDUEsperaDistribuicao = isDUDuasLinhas
-            ? grupo.assessores.filter((a) => a.nome === duColunaAguardandoDistribuicao)
+            ? []
             : [];
           return (
             <section key={grupo.tipo}>
