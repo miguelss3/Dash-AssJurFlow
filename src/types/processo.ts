@@ -26,6 +26,8 @@ export interface PedidoSubsidios {
   situacaoFluxo?: string;
   solicitadoEm?: string;
   solicitadoPorNome?: string;
+  assinaturaChefiaEm?: string;
+  assinaturaChemEm?: string;
   reiteracoes?: number;
 }
 
@@ -39,6 +41,13 @@ export interface RespostaDU {
   situacao?: string;
   registradoEm?: string;
   registradoPorNome?: string;
+}
+
+export interface UltimaAcaoFluxo {
+  tipo?: "DU" | "PA";
+  criadoEm?: string;
+  criadoPorNome?: string;
+  previousDoc?: Record<string, unknown>;
 }
 
 export interface Processo {
@@ -108,6 +117,7 @@ export interface Processo {
   reabertoPorNome?: string;
   pedidoSubsidios?: PedidoSubsidios;
   respostaDU?: RespostaDU;
+  ultimaAcaoFluxo?: UltimaAcaoFluxo;
 }
 
 export interface Coluna {

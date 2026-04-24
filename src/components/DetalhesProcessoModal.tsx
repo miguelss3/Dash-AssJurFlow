@@ -59,6 +59,16 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
   const pedido = processo.pedidoSubsidios;
   const respostaDU = processo.respostaDU;
   const situacaoFluxo = pedido?.situacaoFluxo || "";
+  const dataPedidoDU = (() => {
+    if (!pedido) return undefined;
+    if (pedido.tipoDiligencia === "INTERNO") {
+      return pedido.assinaturaChefiaEm || pedido.solicitadoEm;
+    }
+    if (pedido.tipoDiligencia === "EXTERNO") {
+      return pedido.assinaturaChemEm || pedido.solicitadoEm;
+    }
+    return pedido.solicitadoEm;
+  })();
 
   const rotuloSituacaoFluxo = (situacao?: string) => {
     const mapa: Record<string, string> = {
@@ -164,7 +174,7 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                   <InfoRow icon={FileText} label="Destino" value={processo.pedidoSubsidios.tipoDestino === "interno" ? "Interno" : "Externo"} />
                   <InfoRow icon={Building2} label="Seção/OM" value={processo.pedidoSubsidios.tipoDestino === "interno" ? processo.pedidoSubsidios.secaoInterna : processo.pedidoSubsidios.omExterna} />
                   <InfoRow icon={Mail} label="DIEx" value={processo.pedidoSubsidios.numeroDiex || "Pendente"} />
-                  <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(processo.pedidoSubsidios.solicitadoEm)} />
+                  <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(dataPedidoDU)} />
                   <InfoRow icon={Clock} label="Prazo de Resposta" value={processo.pedidoSubsidios.prazoResposta ? formatarData(processo.pedidoSubsidios.prazoResposta) : "—"} />
                   <InfoRow icon={AlertCircle} label="Situação" value={rotuloSituacaoFluxo(processo.pedidoSubsidios.situacaoFluxo)} />
                 </div>

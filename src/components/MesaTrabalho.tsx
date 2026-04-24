@@ -16,7 +16,7 @@ import { ProcessoCard } from "./ProcessoCard";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import type { AuthUser } from "@/hooks/useAuth";
-import type { SiteSettings } from "@/types/siteSettings";
+import { DEFAULT_DU_BOARD_COLUMNS, DEFAULT_PA_EM_ANDAMENTO_COLUMNS, type SiteSettings } from "@/types/siteSettings";
 import { normalizarSetorUsuario } from "@/lib/userProfiles";
 import { diasRestantes } from "@/lib/prazo";
 
@@ -41,11 +41,62 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
   const [responsaveisOtimizados, setResponsaveisOtimizados] = useState<Record<string, string>>({});
 
-  const COLUNAS_PA_EM_ANDAMENTO = [
-    "📗 Sindicâncias",
-    "📘 IPM",
-    "⚖ Conselhos",
-  ] as const;
+  const paColunasEmAndamento = useMemo(() => {
+    const base = siteSettings?.paEmAndamentoColumns?.length
+      ? siteSettings.paEmAndamentoColumns
+      : DEFAULT_PA_EM_ANDAMENTO_COLUMNS;
+
+    const habilitadas = [...base]
+      .filter((coluna) => coluna.enabled !== false)
+      .sort((a, b) => a.order - b.order)
+      .map((coluna) => ({
+        ...coluna,
+        label: String(coluna.label || "").trim() || coluna.id,
+      }));
+
+    return habilitadas.length > 0
+      ? habilitadas
+      : [...DEFAULT_PA_EM_ANDAMENTO_COLUMNS].sort((a, b) => a.order - b.order);
+  }, [siteSettings?.paEmAndamentoColumns]);
+
+  const paColunaLabelPorId = useMemo(
+    () => new Map(paColunasEmAndamento.map((coluna) => [coluna.id, coluna.label])),
+    [paColunasEmAndamento],
+  );
+
+  const paColunaLabels = useMemo(
+    () => paColunasEmAndamento.map((coluna) => coluna.label),
+    [paColunasEmAndamento],
+  );
+
+  const paColunaLabelSet = useMemo(
+    () => new Set(paColunaLabels),
+    [paColunaLabels],
+  );
+
+  const duBoardColumns = useMemo(() => {
+    const base = siteSettings?.duBoardColumns?.length
+      ? siteSettings.duBoardColumns
+      : DEFAULT_DU_BOARD_COLUMNS;
+
+    return [...base]
+      .filter((coluna) => coluna.enabled !== false)
+      .sort((a, b) => a.order - b.order)
+      .map((coluna) => ({
+        ...coluna,
+        label: String(coluna.label || "").trim() || coluna.id,
+      }));
+  }, [siteSettings?.duBoardColumns]);
+
+  const duColunaAguardandoResposta = useMemo(
+    () => duBoardColumns.find((c) => c.id === "aguardando_resposta")?.label || "📩 Aguardando Resposta",
+    [duBoardColumns],
+  );
+
+  const duColunaAguardandoDistribuicao = useMemo(
+    () => duBoardColumns.find((c) => c.id === "aguardando_distribuicao")?.label || "📥 Aguardando Distribuicao",
+    [duBoardColumns],
+  );
 
   const processosEfetivos = useMemo(() => {
     return processos.map((p) => {
@@ -149,8 +200,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     const novoResponsavel = over.id as string;
     if (
       novoResponsavel === "MESA DO CHEFE"
-      || novoResponsavel === "📩 Aguardando Resposta"
-      || COLUNAS_PA_EM_ANDAMENTO.includes(novoResponsavel as typeof COLUNAS_PA_EM_ANDAMENTO[number])
+      || novoResponsavel === duColunaAguardandoResposta
+      || paColunaLabelSet.has(novoResponsavel)
     ) {
       setActiveId(null);
       setActiveProcesso(null);
@@ -243,9 +294,9 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           .replace(/[\u0300-\u036f]/g, "")
           .toLowerCase();
 
-        if (tipoPANormalizado.includes("conselho")) return "⚖ Conselhos";
-        if (tipoPANormalizado.includes("ipm")) return "📘 IPM";
-        if (tipoPANormalizado.includes("sindic")) return "📗 Sindicâncias";
+        if (tipoPANormalizado.includes("conselho")) return paColunaLabelPorId.get("conselho") || null;
+        if (tipoPANormalizado.includes("ipm")) return paColunaLabelPorId.get("ipm") || null;
+        if (tipoPANormalizado.includes("sindic")) return paColunaLabelPorId.get("sindicancia") || null;
         return null;
       };
 
@@ -268,19 +319,23 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       const mapConcluidos = new Map<string, Processo[]>();
 
       if (tipo === "PA") {
-        COLUNAS_PA_EM_ANDAMENTO.forEach((coluna) => {
+        paColunaLabels.forEach((coluna) => {
           mapAtivos.set(coluna, []);
           mapAtrasados.set(coluna, []);
           mapConcluidos.set(coluna, []);
         });
       }
 
-      if (ehAdmin && pendenciasChefia.length > 0) {
+      if (pendenciasChefia.length > 0 || tipo === "DU") {
         mapAtivos.set("MESA DO CHEFE", pendenciasChefia);
+        if (!mapAtrasados.has("MESA DO CHEFE")) mapAtrasados.set("MESA DO CHEFE", []);
+        if (!mapConcluidos.has("MESA DO CHEFE")) mapConcluidos.set("MESA DO CHEFE", []);
       }
 
-      if (aguardandoRespostaDU.length > 0) {
-        mapAtivos.set("📩 Aguardando Resposta", aguardandoRespostaDU);
+      if (aguardandoRespostaDU.length > 0 || tipo === "DU") {
+        mapAtivos.set(duColunaAguardandoResposta, aguardandoRespostaDU);
+        if (!mapAtrasados.has(duColunaAguardandoResposta)) mapAtrasados.set(duColunaAguardandoResposta, []);
+        if (!mapConcluidos.has(duColunaAguardandoResposta)) mapConcluidos.set(duColunaAguardandoResposta, []);
       }
       
       // Adiciona os processos aos seus responsáveis
@@ -298,7 +353,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         // Processos sem responsável ou com "Sem responsável" vão para "Aguardando Distribuição"
         let responsavelKey = p.responsavel || "";
         if (!responsavelKey || responsavelKey === "Sem responsável" || responsavelKey.trim() === "") {
-          responsavelKey = tipo === "PA" ? "" : "📥 Aguardando Distribuição";
+          responsavelKey = tipo === "PA" ? "" : duColunaAguardandoDistribuicao;
         }
         if (!responsavelKey) return;
         if (!mapAtivos.has(responsavelKey)) mapAtivos.set(responsavelKey, []);
@@ -309,7 +364,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       concluidosDoTipo.forEach((p) => {
         let responsavelKey = p.responsavel || "";
         if (!responsavelKey || responsavelKey === "Sem responsável" || responsavelKey.trim() === "") {
-          responsavelKey = tipo === "PA" ? "" : "📥 Aguardando Distribuição";
+          responsavelKey = tipo === "PA" ? "" : duColunaAguardandoDistribuicao;
         }
         if (!responsavelKey) return;
         if (!mapConcluidos.has(responsavelKey)) mapConcluidos.set(responsavelKey, []);
@@ -344,6 +399,9 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         }))
         .filter(({ nome, itensAtivos, itensAtrasados, itensConcluidos }) => {
           // Só mostra "Aguardando Distribuição" e colunas especiais se tiver processos
+          if (tipo === "DU" && (nome === "MESA DO CHEFE" || nome === duColunaAguardandoResposta)) {
+            return true;
+          }
           if (nome.includes("📥 Aguardando") || nome.includes("📩 Aguardando")) {
             return itensAtivos.length > 0 || itensAtrasados.length > 0 || itensConcluidos.length > 0;
           }
@@ -352,15 +410,17 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         .sort((a, b) => {
           if (a.nome.includes("MESA DO CHEFE")) return -1;
           if (b.nome.includes("MESA DO CHEFE")) return 1;
-          if (COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]) && !COLUNAS_PA_EM_ANDAMENTO.includes(b.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number])) return -1;
-          if (!COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]) && COLUNAS_PA_EM_ANDAMENTO.includes(b.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number])) return 1;
-          if (COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]) && COLUNAS_PA_EM_ANDAMENTO.includes(b.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number])) {
-            return COLUNAS_PA_EM_ANDAMENTO.indexOf(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]) - COLUNAS_PA_EM_ANDAMENTO.indexOf(b.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]);
+          const aEhColunaPA = paColunaLabelSet.has(a.nome);
+          const bEhColunaPA = paColunaLabelSet.has(b.nome);
+          if (aEhColunaPA && !bEhColunaPA) return -1;
+          if (!aEhColunaPA && bEhColunaPA) return 1;
+          if (aEhColunaPA && bEhColunaPA) {
+            return paColunaLabels.indexOf(a.nome) - paColunaLabels.indexOf(b.nome);
           }
-          if (a.nome.includes("📩 Aguardando Resposta")) return -1;
-          if (b.nome.includes("📩 Aguardando Resposta")) return 1;
-          if (a.nome.includes("📥 Aguardando")) return -1;
-          if (b.nome.includes("📥 Aguardando")) return 1;
+          if (a.nome === duColunaAguardandoResposta) return -1;
+          if (b.nome === duColunaAguardandoResposta) return 1;
+          if (a.nome === duColunaAguardandoDistribuicao) return -1;
+          if (b.nome === duColunaAguardandoDistribuicao) return 1;
           return a.nome.localeCompare(b.nome);
         });
       if (assessores.length > 0) {
@@ -370,7 +430,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     
     // console.log("📊 Resultado final:", result);
     return result;
-  }, [processosEfetivos, filtroTipo, assessoresDoSetor]);
+  }, [processosEfetivos, filtroTipo, assessoresDoSetor, paColunaLabelPorId, paColunaLabelSet, paColunaLabels, ehAdmin, duColunaAguardandoResposta, duColunaAguardandoDistribuicao]);
 
   if (grupos.length === 0) {
     return (
@@ -396,12 +456,33 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       <div className="space-y-6">
         {grupos.map((grupo) => {
           const isDU = grupo.tipo === "DU";
+          const isDUDuasLinhas = grupo.tipo === "DU";
           const colunasPAEmAndamento = grupo.tipo === "PA"
-            ? grupo.assessores.filter((a) => COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]))
+            ? grupo.assessores.filter((a) => paColunaLabelSet.has(a.nome))
             : [];
           const colunasPAAssessores = grupo.tipo === "PA"
-            ? grupo.assessores.filter((a) => !COLUNAS_PA_EM_ANDAMENTO.includes(a.nome as typeof COLUNAS_PA_EM_ANDAMENTO[number]))
+            ? grupo.assessores.filter((a) => !paColunaLabelSet.has(a.nome))
             : grupo.assessores;
+          const colunasDUFixas = isDUDuasLinhas
+            ? grupo.assessores
+                .filter((a) => a.nome === "MESA DO CHEFE" || a.nome === duColunaAguardandoResposta)
+                .sort((a, b) => {
+                  if (a.nome === "MESA DO CHEFE") return -1;
+                  if (b.nome === "MESA DO CHEFE") return 1;
+                  return 0;
+                })
+            : [];
+          const colunasDUAssessores = isDUDuasLinhas
+            ? grupo.assessores.filter(
+                (a) =>
+                  a.nome !== "MESA DO CHEFE"
+                  && a.nome !== duColunaAguardandoResposta
+                  && a.nome !== duColunaAguardandoDistribuicao,
+              )
+            : [];
+          const colunasDUEsperaDistribuicao = isDUDuasLinhas
+            ? grupo.assessores.filter((a) => a.nome === duColunaAguardandoDistribuicao)
+            : [];
           return (
             <section key={grupo.tipo}>
               <div className="mb-3">
@@ -441,6 +522,49 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                     {colunasPAAssessores.map((a) => (
                       <AssessorGroup
                         key={`${grupo.tipo}-${a.nome}`}
+                        responsavel={a.nome}
+                        tipo={grupo.tipo}
+                        processos={a.itensAtivos}
+                        processosAtrasados={a.itensAtrasados}
+                        processosConcluidos={a.itensConcluidos}
+                        ehAdmin={ehAdmin}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onMove={onMove}
+                        onReativarProcesso={onReativarProcesso}
+                        siteSettings={siteSettings}
+                        unreadProcessIds={unreadProcessIds}
+                        onReadProcess={onReadProcess}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : isDUDuasLinhas ? (
+                <div className="space-y-4">
+                  <div className="flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
+                    {colunasDUFixas.map((a) => (
+                      <AssessorGroup
+                        key={`${grupo.tipo}-fixa-${a.nome}`}
+                        responsavel={a.nome}
+                        tipo={grupo.tipo}
+                        processos={a.itensAtivos}
+                        processosAtrasados={a.itensAtrasados}
+                        processosConcluidos={a.itensConcluidos}
+                        ehAdmin={ehAdmin}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onMove={onMove}
+                        onReativarProcesso={onReativarProcesso}
+                        siteSettings={siteSettings}
+                        unreadProcessIds={unreadProcessIds}
+                        onReadProcess={onReadProcess}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
+                    {[...colunasDUAssessores, ...colunasDUEsperaDistribuicao].map((a) => (
+                      <AssessorGroup
+                        key={`${grupo.tipo}-assessor-${a.nome}`}
                         responsavel={a.nome}
                         tipo={grupo.tipo}
                         processos={a.itensAtivos}

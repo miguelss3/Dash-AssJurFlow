@@ -363,6 +363,24 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
     });
   };
 
+  const atualizarComSnapshotPA = async (patch: Record<string, unknown>) => {
+    const processoRef = doc(db, "processos", processoId);
+    const snap = await getDoc(processoRef);
+    const dataAtual = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
+    const previousDoc = { ...dataAtual };
+    delete (previousDoc as Record<string, unknown>).ultimaAcaoFluxo;
+
+    await updateDoc(processoRef, {
+      ...patch,
+      ultimaAcaoFluxo: {
+        tipo: "PA",
+        criadoEm: new Date().toISOString(),
+        criadoPorNome: autorMilitar,
+        previousDoc,
+      },
+    });
+  };
+
   const avancarFluxo = async (
     novaSituacao: SituacaoFluxoPA,
     descricao: string,
@@ -394,7 +412,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         patch.aguardandoAssinaturaCmt = false;
       }
 
-      await updateDoc(doc(db, "processos", processoId), patch);
+      await atualizarComSnapshotPA(patch);
       await registrarHistorico(descricao);
       setSituacaoFluxo(novaSituacao);
       if (onSuccess) onSuccess();
@@ -426,7 +444,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       
       const camposPrazoCalculados = prazoCalculado ? { prazoFatal: prazoCalculado, finalPrazo: prazoCalculado } : {};
       
-      await updateDoc(doc(db, "processos", processoId), {
+      await atualizarComSnapshotPA({
         encarregado: novoEncarregado.trim(),
         substituicaoEncarregado: {
           novoEncarregado: novoEncarregado.trim(),
@@ -493,7 +511,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       
       const camposPrazoCalculados = prazoCalculado ? { prazoFatal: prazoCalculado, finalPrazo: prazoCalculado } : {};
       
-      await updateDoc(doc(db, "processos", processoId), {
+      await atualizarComSnapshotPA({
         prorrogacoes: novasProrrogacoesComFaixa,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
@@ -938,7 +956,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         return;
       }
 
-      await updateDoc(doc(db, "processos", processoId), {
+      await atualizarComSnapshotPA({
         prazoFatal: prazoCalculado,
         finalPrazo: prazoCalculado,
         atualizadoEm: Timestamp.now(),

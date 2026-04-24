@@ -7,6 +7,34 @@ export interface ProcessualDeadlineSettings {
   prazoConselhoProrrogacaoDias: number;
 }
 
+export type PAInProgressColumnId = "sindicancia" | "ipm" | "conselho";
+
+export interface PAInProgressColumnSetting {
+  id: PAInProgressColumnId;
+  label: string;
+  enabled: boolean;
+  order: number;
+}
+
+export type DUBoardColumnId = "aguardando_resposta" | "aguardando_distribuicao";
+
+export interface DUBoardColumnSetting {
+  id: DUBoardColumnId;
+  label: string;
+  enabled: boolean;
+  order: number;
+}
+
+export type ColumnTabId = "andamento" | "atraso" | "concluidos";
+
+export interface ColumnTabSetting {
+  id: ColumnTabId;
+  label: string;
+  enabled: boolean;
+  order: number;
+  scope: "PA" | "DU";
+}
+
 export type PAFlowRole = "assessor_pa" | "chefe_assjur" | "ambos";
 
 export type PAFlowTrack = "padrao" | "conselho" | "todos";
@@ -38,6 +66,30 @@ export interface PAFlowActionSetting {
   order: number;
 }
 
+export type DUFlowState =
+  | "MESA_ASSESSOR"
+  | "CHEFIA_DILIGENCIA"
+  | "AGUARDANDO_CHEM_DILIGENCIA"
+  | "AGUARDANDO_RESPOSTA"
+  | "CRIANDO_REITERACAO"
+  | "CHEFIA_DEFESA"
+  | "AGUARDANDO_CHEM_DEFESA"
+  | "APTO_FINALIZAR";
+
+export type DUFlowRole = "assessor_du" | "chefe_assjur" | "ambos";
+export type DUFlowTipo = "INTERNO" | "EXTERNO" | "ambos";
+
+export interface DUFlowActionSetting {
+  id: string;
+  label: string;
+  fromState: DUFlowState;
+  toState: DUFlowState;
+  role: DUFlowRole;
+  tipo: DUFlowTipo;
+  enabled: boolean;
+  order: number;
+}
+
 export interface SiteSettings extends ProcessualDeadlineSettings {
   sidebarTitle: string;
   sidebarSubtitle: string;
@@ -47,7 +99,12 @@ export interface SiteSettings extends ProcessualDeadlineSettings {
   footerText: string;
   assuntosPASindicancia: string[];
   assuntosDUPrincipais: string[];
+  origensDUDocumentos: string[];
+  paEmAndamentoColumns: PAInProgressColumnSetting[];
+  duBoardColumns: DUBoardColumnSetting[];
+  columnTabs: ColumnTabSetting[];
   paFlowActions: PAFlowActionSetting[];
+  duFlowActions: DUFlowActionSetting[];
   updatedAt?: string;
   updatedByName?: string;
   updatedByEmail?: string;
@@ -73,6 +130,15 @@ export const DEFAULT_ASSUNTOS_DU_PRINCIPAIS = [
   "Licitações e Contratos",
 ];
 
+export const DEFAULT_ORIGENS_DU_DOCUMENTOS = [
+  "SAPIENS",
+  "Email",
+  "MPF",
+  "Justiça Federal",
+  "Justiça Estadual",
+  "Outros",
+];
+
 export const DEFAULT_ASSUNTOS_PA_SINDICANCIA = [
   "Apuração de Fato",
   "Dano ao Erário",
@@ -81,6 +147,80 @@ export const DEFAULT_ASSUNTOS_PA_SINDICANCIA = [
   "FUSEx",
   "Transgressão Disciplinar",
   "OUTROS",
+];
+
+export const DEFAULT_PA_EM_ANDAMENTO_COLUMNS: PAInProgressColumnSetting[] = [
+  {
+    id: "sindicancia",
+    label: "📗 Sindicancias",
+    enabled: true,
+    order: 10,
+  },
+  {
+    id: "ipm",
+    label: "📘 IPM",
+    enabled: true,
+    order: 20,
+  },
+  {
+    id: "conselho",
+    label: "⚖ Conselhos",
+    enabled: true,
+    order: 30,
+  },
+];
+
+export const DEFAULT_DU_BOARD_COLUMNS: DUBoardColumnSetting[] = [
+  {
+    id: "aguardando_resposta",
+    label: "📩 Aguardando Resposta",
+    enabled: true,
+    order: 10,
+  },
+  {
+    id: "aguardando_distribuicao",
+    label: "📥 Aguardando Distribuicao",
+    enabled: true,
+    order: 20,
+  },
+];
+
+export const DEFAULT_COLUMN_TABS: ColumnTabSetting[] = [
+  {
+    id: "andamento",
+    label: "Em Andamento",
+    enabled: true,
+    order: 10,
+    scope: "PA",
+  },
+  {
+    id: "atraso",
+    label: "Em Atraso",
+    enabled: true,
+    order: 20,
+    scope: "PA",
+  },
+  {
+    id: "concluidos",
+    label: "Concluidos",
+    enabled: true,
+    order: 30,
+    scope: "PA",
+  },
+  {
+    id: "andamento",
+    label: "Em Andamento",
+    enabled: true,
+    order: 10,
+    scope: "DU",
+  },
+  {
+    id: "concluidos",
+    label: "Concluidos",
+    enabled: true,
+    order: 20,
+    scope: "DU",
+  },
 ];
 
 export const DEFAULT_PA_FLOW_ACTIONS: PAFlowActionSetting[] = [
@@ -226,6 +366,129 @@ export const DEFAULT_PA_FLOW_ACTIONS: PAFlowActionSetting[] = [
   },
 ];
 
+export const DEFAULT_DU_FLOW_ACTIONS: DUFlowActionSetting[] = [
+  {
+    id: "DU_ENVIAR_CHEFIA_DILIGENCIA",
+    label: "Enviar Diligência para a Chefia",
+    fromState: "MESA_ASSESSOR",
+    toState: "CHEFIA_DILIGENCIA",
+    role: "assessor_du",
+    tipo: "ambos",
+    enabled: true,
+    order: 10,
+  },
+  {
+    id: "DU_CHEFIA_ASSINAR_DIEX",
+    label: "Assinar DIEx e Iniciar Prazo",
+    fromState: "CHEFIA_DILIGENCIA",
+    toState: "AGUARDANDO_RESPOSTA",
+    role: "chefe_assjur",
+    tipo: "INTERNO",
+    enabled: true,
+    order: 20,
+  },
+  {
+    id: "DU_CHEFIA_APROVAR_DILIGENCIA_EXTERNO",
+    label: "Aprovar e Encaminhar para CHEM",
+    fromState: "CHEFIA_DILIGENCIA",
+    toState: "AGUARDANDO_CHEM_DILIGENCIA",
+    role: "chefe_assjur",
+    tipo: "EXTERNO",
+    enabled: true,
+    order: 25,
+  },
+  {
+    id: "DU_CHEFIA_DEVOLVER",
+    label: "Devolver ao Assessor",
+    fromState: "CHEFIA_DILIGENCIA",
+    toState: "MESA_ASSESSOR",
+    role: "chefe_assjur",
+    tipo: "ambos",
+    enabled: true,
+    order: 30,
+  },
+  {
+    id: "DU_REGISTRAR_SAIDA",
+    label: "Registrar Saída e Iniciar Prazo",
+    fromState: "AGUARDANDO_CHEM_DILIGENCIA",
+    toState: "AGUARDANDO_RESPOSTA",
+    role: "assessor_du",
+    tipo: "EXTERNO",
+    enabled: true,
+    order: 40,
+  },
+  {
+    id: "DU_GERAR_COBRANCA",
+    label: "Gerar Cobrança Oficial",
+    fromState: "AGUARDANDO_RESPOSTA",
+    toState: "CRIANDO_REITERACAO",
+    role: "assessor_du",
+    tipo: "ambos",
+    enabled: true,
+    order: 45,
+  },
+  {
+    id: "DU_ENVIAR_COBRANCA_CHEFIA",
+    label: "Enviar Cobrança para a Chefia",
+    fromState: "CRIANDO_REITERACAO",
+    toState: "CHEFIA_DILIGENCIA",
+    role: "assessor_du",
+    tipo: "ambos",
+    enabled: true,
+    order: 47,
+  },
+  {
+    id: "DU_REGISTRAR_RESPOSTA",
+    label: "Registrar Resposta Recebida",
+    fromState: "AGUARDANDO_RESPOSTA",
+    toState: "MESA_ASSESSOR",
+    role: "chefe_assjur",
+    tipo: "ambos",
+    enabled: true,
+    order: 50,
+  },
+  {
+    id: "DU_ENVIAR_CHEFIA_DEFESA",
+    label: "Enviar Defesa para a Chefia",
+    fromState: "MESA_ASSESSOR",
+    toState: "CHEFIA_DEFESA",
+    role: "assessor_du",
+    tipo: "ambos",
+    enabled: true,
+    order: 60,
+  },
+  {
+    id: "DU_CHEFIA_APROVAR_DEFESA",
+    label: "Aprovar Defesa e Encaminhar CHEM",
+    fromState: "CHEFIA_DEFESA",
+    toState: "AGUARDANDO_CHEM_DEFESA",
+    role: "chefe_assjur",
+    tipo: "ambos",
+    enabled: true,
+    order: 70,
+  },
+  {
+    id: "DU_REGISTRAR_DOC_FINAL",
+    label: "Registrar Documento Final",
+    fromState: "AGUARDANDO_CHEM_DEFESA",
+    toState: "APTO_FINALIZAR",
+    role: "assessor_du",
+    tipo: "ambos",
+    enabled: true,
+    order: 80,
+  },
+  {
+    id: "DU_FINALIZAR",
+    label: "Finalizar Processo DU",
+    fromState: "APTO_FINALIZAR",
+    toState: "APTO_FINALIZAR",
+    role: "ambos",
+    tipo: "ambos",
+    enabled: true,
+    order: 90,
+  },
+];
+
 export function normalizarListaTextual(
   value: unknown,
   fallback: string[],
@@ -264,11 +527,198 @@ export function normalizarAssuntosDU(
   return normalizarListaTextual(value, fallback);
 }
 
+export function normalizarOrigensDUDocumentos(
+  value: unknown,
+  fallback: string[] = DEFAULT_ORIGENS_DU_DOCUMENTOS,
+): string[] {
+  return normalizarListaTextual(value, fallback);
+}
+
 export function normalizarAssuntosPA(
   value: unknown,
   fallback: string[] = DEFAULT_ASSUNTOS_PA_SINDICANCIA,
 ): string[] {
   return normalizarListaTextual(value, fallback);
+}
+
+export function normalizarPAEmAndamentoColumns(
+  value: unknown,
+  fallback: PAInProgressColumnSetting[] = DEFAULT_PA_EM_ANDAMENTO_COLUMNS,
+): PAInProgressColumnSetting[] {
+  const fallbackPorId = new Map<PAInProgressColumnId, PAInProgressColumnSetting>(
+    fallback.map((item) => [item.id, item]),
+  );
+  const idsValidos = new Set<PAInProgressColumnId>(["sindicancia", "ipm", "conselho"]);
+
+  if (!Array.isArray(value)) {
+    return [...fallback].sort((a, b) => a.order - b.order);
+  }
+
+  const saneadas = value
+    .map((item, index) => {
+      const base = item as Partial<PAInProgressColumnSetting>;
+      const id = base.id as PAInProgressColumnId;
+      if (!idsValidos.has(id)) return null;
+
+      const fallbackItem = fallbackPorId.get(id);
+      const label = String(base.label || "").trim() || fallbackItem?.label || id;
+      const enabled = base.enabled !== false;
+      const order = Number.isFinite(Number(base.order))
+        ? Number(base.order)
+        : (index + 1) * 10;
+
+      return {
+        id,
+        label,
+        enabled,
+        order,
+      };
+    })
+    .filter((item): item is PAInProgressColumnSetting => !!item);
+
+  const unicasPorId = new Map<PAInProgressColumnId, PAInProgressColumnSetting>();
+  saneadas.forEach((item) => {
+    if (!unicasPorId.has(item.id)) {
+      unicasPorId.set(item.id, item);
+    }
+  });
+
+  const idsPadrao: PAInProgressColumnId[] = ["sindicancia", "ipm", "conselho"];
+  idsPadrao.forEach((id, index) => {
+    if (!unicasPorId.has(id)) {
+      const base = fallbackPorId.get(id) || fallback[index];
+      if (base) {
+        unicasPorId.set(id, {
+          id,
+          label: base.label,
+          enabled: base.enabled !== false,
+          order: base.order,
+        });
+      }
+    }
+  });
+
+  return Array.from(unicasPorId.values()).sort((a, b) => a.order - b.order);
+}
+
+export function normalizarDUBoardColumns(
+  value: unknown,
+  fallback: DUBoardColumnSetting[] = DEFAULT_DU_BOARD_COLUMNS,
+): DUBoardColumnSetting[] {
+  const fallbackPorId = new Map<DUBoardColumnId, DUBoardColumnSetting>(
+    fallback.map((item) => [item.id, item]),
+  );
+  const idsValidos = new Set<DUBoardColumnId>(["aguardando_resposta", "aguardando_distribuicao"]);
+
+  if (!Array.isArray(value)) {
+    return [...fallback].sort((a, b) => a.order - b.order);
+  }
+
+  const saneadas = value
+    .map((item, index) => {
+      const base = item as Partial<DUBoardColumnSetting>;
+      const id = base.id as DUBoardColumnId;
+      if (!idsValidos.has(id)) return null;
+
+      const fallbackItem = fallbackPorId.get(id);
+      const label = String(base.label || "").trim() || fallbackItem?.label || id;
+      const enabled = base.enabled !== false;
+      const order = Number.isFinite(Number(base.order))
+        ? Number(base.order)
+        : (index + 1) * 10;
+
+      return {
+        id,
+        label,
+        enabled,
+        order,
+      };
+    })
+    .filter((item): item is DUBoardColumnSetting => !!item);
+
+  const unicasPorId = new Map<DUBoardColumnId, DUBoardColumnSetting>();
+  saneadas.forEach((item) => {
+    if (!unicasPorId.has(item.id)) {
+      unicasPorId.set(item.id, item);
+    }
+  });
+
+  const idsPadrao: DUBoardColumnId[] = ["aguardando_resposta", "aguardando_distribuicao"];
+  idsPadrao.forEach((id, index) => {
+    if (!unicasPorId.has(id)) {
+      const base = fallbackPorId.get(id) || fallback[index];
+      if (base) {
+        unicasPorId.set(id, {
+          id,
+          label: base.label,
+          enabled: base.enabled !== false,
+          order: base.order,
+        });
+      }
+    }
+  });
+
+  return Array.from(unicasPorId.values()).sort((a, b) => a.order - b.order);
+}
+
+export function normalizarColumnTabs(
+  value: unknown,
+  fallback: ColumnTabSetting[] = DEFAULT_COLUMN_TABS,
+): ColumnTabSetting[] {
+  const scopes: Array<"PA" | "DU"> = ["PA", "DU"];
+  const idsValidos = new Set<ColumnTabId>(["andamento", "atraso", "concluidos"]);
+  const scopesValidos = new Set<"PA" | "DU">(scopes);
+
+  const fallbackMap = new Map<string, ColumnTabSetting>();
+  fallback.forEach((item) => {
+    fallbackMap.set(`${item.scope}:${item.id}`, item);
+  });
+
+  if (!Array.isArray(value)) {
+    return [...fallback].sort((a, b) => a.order - b.order);
+  }
+
+  const saneadas = value
+    .map((item, index) => {
+      const base = item as Partial<ColumnTabSetting>;
+      const id = base.id as ColumnTabId;
+      const scope = base.scope as "PA" | "DU";
+
+      if (!idsValidos.has(id)) return null;
+      if (!scopesValidos.has(scope)) return null;
+      if (scope === "DU" && id === "atraso") return null;
+
+      const fallbackItem = fallbackMap.get(`${scope}:${id}`);
+      const label = String(base.label || "").trim() || fallbackItem?.label || id;
+      const enabled = base.enabled !== false;
+      const order = Number.isFinite(Number(base.order)) ? Number(base.order) : (index + 1) * 10;
+
+      return {
+        id,
+        label,
+        enabled,
+        order,
+        scope,
+      };
+    })
+    .filter((item): item is ColumnTabSetting => !!item);
+
+  const unicas = new Map<string, ColumnTabSetting>();
+  saneadas.forEach((item) => {
+    const key = `${item.scope}:${item.id}`;
+    if (!unicas.has(key)) {
+      unicas.set(key, item);
+    }
+  });
+
+  fallback.forEach((item) => {
+    const key = `${item.scope}:${item.id}`;
+    if (!unicas.has(key)) {
+      unicas.set(key, item);
+    }
+  });
+
+  return Array.from(unicas.values()).sort((a, b) => a.order - b.order);
 }
 
 export function normalizarPAFlowActions(
@@ -340,6 +790,68 @@ export function normalizarPAFlowActions(
   return unicas.sort((a, b) => a.order - b.order);
 }
 
+export function normalizarDUFlowActions(
+  value: unknown,
+  fallback: DUFlowActionSetting[] = DEFAULT_DU_FLOW_ACTIONS,
+): DUFlowActionSetting[] {
+  if (!Array.isArray(value)) {
+    return [...fallback].sort((a, b) => a.order - b.order);
+  }
+
+  const estadosValidos = new Set<DUFlowState>([
+    "MESA_ASSESSOR",
+    "CHEFIA_DILIGENCIA",
+    "AGUARDANDO_CHEM_DILIGENCIA",
+    "AGUARDANDO_RESPOSTA",
+    "CRIANDO_REITERACAO",
+    "CHEFIA_DEFESA",
+    "AGUARDANDO_CHEM_DEFESA",
+    "APTO_FINALIZAR",
+  ]);
+  const rolesValidos = new Set<DUFlowRole>(["assessor_du", "chefe_assjur", "ambos"]);
+  const tiposValidos = new Set<DUFlowTipo>(["INTERNO", "EXTERNO", "ambos"]);
+
+  const saneadas: DUFlowActionSetting[] = value
+    .map((item, index) => {
+      const base = item as Partial<DUFlowActionSetting>;
+      const id = String(base.id || "").trim() || `acao_du_${index + 1}`;
+      const label = String(base.label || "").trim() || `Acao ${index + 1}`;
+      const fromState = base.fromState;
+      const toState = base.toState;
+      const role = base.role;
+      const tipo: DUFlowTipo = tiposValidos.has(base.tipo as DUFlowTipo) ? (base.tipo as DUFlowTipo) : "ambos";
+
+      if (!estadosValidos.has(fromState as DUFlowState)) return null;
+      if (!estadosValidos.has(toState as DUFlowState)) return null;
+      if (!rolesValidos.has(role as DUFlowRole)) return null;
+
+      return {
+        id,
+        label,
+        fromState: fromState as DUFlowState,
+        toState: toState as DUFlowState,
+        role: role as DUFlowRole,
+        tipo,
+        enabled: base.enabled !== false,
+        order: Number.isFinite(Number(base.order)) ? Number(base.order) : (index + 1) * 10,
+      };
+    })
+    .filter((item): item is DUFlowActionSetting => !!item);
+
+  if (saneadas.length === 0) {
+    return [...fallback].sort((a, b) => a.order - b.order);
+  }
+
+  const ids = new Set<string>();
+  const unicas = saneadas.filter((item) => {
+    if (ids.has(item.id)) return false;
+    ids.add(item.id);
+    return true;
+  });
+
+  return unicas.sort((a, b) => a.order - b.order);
+}
+
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   ...DEFAULT_PROCESSUAL_DEADLINES,
   sidebarTitle: "AssJur Flow",
@@ -350,5 +862,10 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   footerText: "Maj Cav Miguel — AssJur Flow · 12ª Região Militar · Todos os direitos reservados.",
   assuntosPASindicancia: [...DEFAULT_ASSUNTOS_PA_SINDICANCIA],
   assuntosDUPrincipais: [...DEFAULT_ASSUNTOS_DU_PRINCIPAIS],
+  origensDUDocumentos: [...DEFAULT_ORIGENS_DU_DOCUMENTOS],
+  paEmAndamentoColumns: [...DEFAULT_PA_EM_ANDAMENTO_COLUMNS],
+  duBoardColumns: [...DEFAULT_DU_BOARD_COLUMNS],
+  columnTabs: [...DEFAULT_COLUMN_TABS],
   paFlowActions: [...DEFAULT_PA_FLOW_ACTIONS],
+  duFlowActions: [...DEFAULT_DU_FLOW_ACTIONS],
 };

@@ -297,6 +297,12 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                       registradoEm: toIsoString(procData.respostaDU?.registradoEm) || procData.respostaDU?.registradoEm,
                     }
                   : undefined,
+                ultimaAcaoFluxo: procData.ultimaAcaoFluxo
+                  ? {
+                      ...procData.ultimaAcaoFluxo,
+                      criadoEm: toIsoString(procData.ultimaAcaoFluxo?.criadoEm) || procData.ultimaAcaoFluxo?.criadoEm,
+                    }
+                  : undefined,
               };
         
         // console.log(`📦 Processo ${processoMapeado.numero}: status="${processoMapeado.status}", responsavel="${processoMapeado.responsavel}", setor=${processoMapeado.setor}, finalizado_firebase=${procData.finalizado}`);

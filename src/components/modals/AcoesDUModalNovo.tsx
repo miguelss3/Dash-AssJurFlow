@@ -177,6 +177,26 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     });
   };
 
+  const atualizarComSnapshotDU = async (
+    patch: Record<string, unknown>,
+    dataAtual?: Record<string, any>,
+  ) => {
+    const processoRef = doc(db, "processos", processoId);
+    const atual = dataAtual || ((await getDoc(processoRef)).data() as Record<string, any>) || {};
+    const previousDoc = { ...atual };
+    delete (previousDoc as Record<string, unknown>).ultimaAcaoFluxo;
+
+    await updateDoc(processoRef, {
+      ...patch,
+      ultimaAcaoFluxo: {
+        tipo: "DU",
+        criadoEm: new Date().toISOString(),
+        criadoPorNome: autorMilitar,
+        previousDoc,
+      },
+    });
+  };
+
   const avancarFluxo = async (
     proximaSituacao: SituacaoFluxoDU,
     extras?: {
@@ -205,6 +225,17 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       const acaoPrincipalEfetiva = extras?.acaoPrincipal ?? acaoPrincipal;
       const tipoDiligenciaEfetiva = extras?.tipoDiligencia ?? tipoDiligencia;
       const reiteracoesEfetivas = extras?.reiteracoes ?? reiteracoes;
+      const agoraISO = new Date().toISOString();
+
+      const entrouEmAguardandoResposta = proximaSituacao === "AGUARDANDO_RESPOSTA";
+      const assinaturaChefiaInterno =
+        entrouEmAguardandoResposta
+        && tipoDiligenciaEfetiva === "INTERNO"
+        && situacaoFluxo === "CHEFIA_DILIGENCIA";
+      const assinaturaChemExterno =
+        entrouEmAguardandoResposta
+        && tipoDiligenciaEfetiva === "EXTERNO"
+        && situacaoFluxo === "AGUARDANDO_CHEM_DILIGENCIA";
 
       const numeroDiexHistorico = Array.from(
         new Set(
@@ -234,6 +265,10 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         numeroDiexHistorico,
         reiteracoes: reiteracoesEfetivas,
         situacaoFluxo: proximaSituacao,
+        solicitadoEm: entrouEmAguardandoResposta ? agoraISO : (pedidoAtual?.solicitadoEm || ""),
+        solicitadoPorNome: entrouEmAguardandoResposta ? autorMilitar : (pedidoAtual?.solicitadoPorNome || ""),
+        assinaturaChefiaEm: assinaturaChefiaInterno ? agoraISO : (pedidoAtual?.assinaturaChefiaEm || ""),
+        assinaturaChemEm: assinaturaChemExterno ? agoraISO : (pedidoAtual?.assinaturaChemEm || ""),
       };
 
       const respostaPatch = {
@@ -248,14 +283,14 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
 
       const descricao = descricaoPorSituacao[proximaSituacao];
 
-      await updateDoc(processoRef, {
+      await atualizarComSnapshotDU({
         pedidoSubsidios: pedidoSubsidiosPatch,
         respostaDU: respostaPatch,
         status: statusPorSituacao[proximaSituacao],
         descricao,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
-      });
+      }, dataAtual as Record<string, any>);
 
       await registrarHistorico(descricao);
 
@@ -282,13 +317,16 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       const processoRef = doc(db, "processos", processoId);
       const descricao = "Processo finalizado no fluxo DU.";
 
-      await updateDoc(processoRef, {
+      const snap = await getDoc(processoRef);
+      const dataAtual = snap.exists() ? (snap.data() as Record<string, any>) : {};
+
+      await atualizarComSnapshotDU({
         status: "concluido",
         descricao,
         finalizado: true,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
-      });
+      }, dataAtual);
 
       await registrarHistorico(descricao);
       toast.success("Processo finalizado com sucesso.");

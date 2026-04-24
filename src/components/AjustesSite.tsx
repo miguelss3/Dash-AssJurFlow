@@ -36,13 +36,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  DEFAULT_COLUMN_TABS,
+  DEFAULT_DU_BOARD_COLUMNS,
+  DEFAULT_DU_FLOW_ACTIONS,
+  DEFAULT_ORIGENS_DU_DOCUMENTOS,
   DEFAULT_ASSUNTOS_PA_SINDICANCIA,
   DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
+  DEFAULT_PA_EM_ANDAMENTO_COLUMNS,
   DEFAULT_PA_FLOW_ACTIONS,
   DEFAULT_SITE_SETTINGS,
+  normalizarColumnTabs,
+  normalizarDUBoardColumns,
+  normalizarPAEmAndamentoColumns,
   normalizarPAFlowActions,
+  normalizarOrigensDUDocumentos,
   normalizarAssuntosPA,
   normalizarAssuntosDU,
+  type ColumnTabId,
+  type ColumnTabSetting,
+  type DUBoardColumnId,
+  type DUBoardColumnSetting,
+  type DUFlowActionSetting,
+  type DUFlowRole,
+  type DUFlowState,
+  type DUFlowTipo,
+  type PAInProgressColumnId,
+  type PAInProgressColumnSetting,
   type PAFlowActionSetting,
   type PAFlowRole,
   type PAFlowState,
@@ -203,17 +222,64 @@ const PA_FLOW_SEQUENCE_BY_TRACK: Record<"padrao" | "conselho", PAFlowState[]> = 
   ],
 };
 
+const DU_FLOW_STATES: DUFlowState[] = [
+  "MESA_ASSESSOR",
+  "CHEFIA_DILIGENCIA",
+  "AGUARDANDO_CHEM_DILIGENCIA",
+  "AGUARDANDO_RESPOSTA",
+  "CRIANDO_REITERACAO",
+  "CHEFIA_DEFESA",
+  "AGUARDANDO_CHEM_DEFESA",
+  "APTO_FINALIZAR",
+];
+
+const DU_FLOW_STATE_LABELS: Record<DUFlowState, string> = {
+  MESA_ASSESSOR: "Mesa do Assessor",
+  CHEFIA_DILIGENCIA: "Chefia – Diligência",
+  AGUARDANDO_CHEM_DILIGENCIA: "Aguardando CHEM (Diligência)",
+  AGUARDANDO_RESPOSTA: "Aguardando Resposta",
+  CRIANDO_REITERACAO: "Criando Reiteração",
+  CHEFIA_DEFESA: "Chefia – Defesa",
+  AGUARDANDO_CHEM_DEFESA: "Aguardando CHEM (Defesa)",
+  APTO_FINALIZAR: "Apto para Finalização",
+};
+
+const DU_FLOW_ROLE_OPTIONS: Array<{ value: DUFlowRole; label: string }> = [
+  { value: "assessor_du", label: "Assessor DU" },
+  { value: "chefe_assjur", label: "Chefe AssJur" },
+  { value: "ambos", label: "Ambos" },
+];
+
+const DU_FLOW_TIPO_OPTIONS: Array<{ value: DUFlowTipo; label: string; color: string }> = [
+  { value: "INTERNO", label: "Interno (DIEx)", color: "text-violet-700" },
+  { value: "EXTERNO", label: "Externo", color: "text-sky-700" },
+  { value: "ambos", label: "Ambos os Fluxos", color: "text-slate-600" },
+];
+
 export function AjustesSite({ settings, loading = false, onSave }: AjustesSiteProps) {
   const [form, setForm] = useState<SiteSettings>(settings);
   const [novoAssuntoPA, setNovoAssuntoPA] = useState("");
   const [novoAssuntoDU, setNovoAssuntoDU] = useState("");
+  const [novaOrigemDUDocumento, setNovaOrigemDUDocumento] = useState("");
   const [openGeral, setOpenGeral] = useState(false);
   const [openPA, setOpenPA] = useState(false);
   const [openDU, setOpenDU] = useState(false);
   const [openPAAssuntos, setOpenPAAssuntos] = useState(false);
   const [openPAPrazos, setOpenPAPrazos] = useState(false);
+  const [openPAAbas, setOpenPAAbas] = useState(false);
   const [openPAFluxo, setOpenPAFluxo] = useState(false);
+  const [openDUColunas, setOpenDUColunas] = useState(false);
+  const [openDUFluxo, setOpenDUFluxo] = useState(false);
+  const [openDUAssuntos, setOpenDUAssuntos] = useState(false);
+  const [openDUOrigens, setOpenDUOrigens] = useState(false);
+  const [selectedPAPreviewColumnId, setSelectedPAPreviewColumnId] = useState<PAInProgressColumnId>("sindicancia");
+  const [selectedPAPreviewTabId, setSelectedPAPreviewTabId] = useState<ColumnTabId>("andamento");
+  const [selectedDUPreviewColumnId, setSelectedDUPreviewColumnId] = useState<DUBoardColumnId>("aguardando_resposta");
+  const [selectedDUPreviewTabId, setSelectedDUPreviewTabId] = useState<ColumnTabId>("andamento");
+  const [selectedDUFlowActionIndex, setSelectedDUFlowActionIndex] = useState<number | null>(null);
+  const selectedDUFlowEditorRef = useRef<HTMLDivElement | null>(null);
   const [modoPAAvancado, setModoPAAvancado] = useState(false);
+  const [modoDUAvancado, setModoDUAvancado] = useState(false);
   const [selectedFlowActionIndex, setSelectedFlowActionIndex] = useState<number | null>(null);
   const selectedFlowEditorRef = useRef<HTMLDivElement | null>(null);
   const [dragAssuntoPAId, setDragAssuntoPAId] = useState<string | null>(null);
@@ -379,6 +445,55 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     setNovoAssuntoDU("");
   };
 
+  const updateOrigemDUDocumento = (index: number, value: string) => {
+    setForm((prev) => {
+      const lista = [...prev.origensDUDocumentos];
+      lista[index] = value;
+      return {
+        ...prev,
+        origensDUDocumentos: lista,
+      };
+    });
+  };
+
+  const removeOrigemDUDocumento = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      origensDUDocumentos: prev.origensDUDocumentos.filter((_, i) => i !== index),
+    }));
+  };
+
+  const addOrigemDUDocumento = () => {
+    const texto = novaOrigemDUDocumento.trim();
+    if (!texto) {
+      toast.error("Informe uma origem válida para adicionar.");
+      return;
+    }
+
+    const chaveNova = texto
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    const existe = form.origensDUDocumentos.some((item) => {
+      const chaveAtual = String(item)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+      return chaveAtual === chaveNova;
+    });
+
+    if (existe) {
+      toast.error("Esta origem já existe na lista.");
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      origensDUDocumentos: [...prev.origensDUDocumentos, texto],
+    }));
+    setNovaOrigemDUDocumento("");
+  };
+
   const handleDragStartDU = (event: DragStartEvent) => {
     setDragAssuntoDUId(String(event.active.id));
   };
@@ -428,6 +543,102 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     });
   };
 
+  const updatePAEmAndamentoColumn = (
+    id: PAInProgressColumnId,
+    patch: Partial<PAInProgressColumnSetting>,
+  ) => {
+    setForm((prev) => {
+      const lista = prev.paEmAndamentoColumns.map((coluna) => {
+        if (coluna.id !== id) return coluna;
+        return {
+          ...coluna,
+          ...patch,
+        };
+      });
+
+      return {
+        ...prev,
+        paEmAndamentoColumns: lista,
+      };
+    });
+  };
+
+  const updateDUBoardColumn = (
+    id: DUBoardColumnId,
+    patch: Partial<DUBoardColumnSetting>,
+  ) => {
+    setForm((prev) => {
+      const lista = prev.duBoardColumns.map((coluna) => {
+        if (coluna.id !== id) return coluna;
+        return {
+          ...coluna,
+          ...patch,
+        };
+      });
+
+      return {
+        ...prev,
+        duBoardColumns: lista,
+      };
+    });
+  };
+
+  const updateColumnTab = (
+    scope: "PA" | "DU",
+    id: ColumnTabId,
+    patch: Partial<ColumnTabSetting>,
+  ) => {
+    setForm((prev) => {
+      const lista = prev.columnTabs.map((aba) => {
+        if (aba.scope !== scope || aba.id !== id) return aba;
+        return {
+          ...aba,
+          ...patch,
+        };
+      });
+
+      return {
+        ...prev,
+        columnTabs: lista,
+      };
+    });
+  };
+
+  const updateDUFlowAction = (index: number, patch: Partial<DUFlowActionSetting>) => {
+    setForm((prev) => {
+      const lista = [...prev.duFlowActions];
+      lista[index] = { ...lista[index], ...patch };
+      return { ...prev, duFlowActions: lista };
+    });
+  };
+
+  const removeDUFlowAction = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      duFlowActions: prev.duFlowActions.filter((_, i) => i !== index),
+    }));
+  };
+
+  const addDUFlowAction = () => {
+    const maiorOrdem = form.duFlowActions.reduce((max, item) => {
+      const atual = Number(item.order || 0);
+      return atual > max ? atual : max;
+    }, 0);
+    const novaAcao: DUFlowActionSetting = {
+      id: `DU_CUSTOM_${Date.now()}`,
+      label: "Nova ação DU",
+      fromState: "MESA_ASSESSOR",
+      toState: "CHEFIA_DILIGENCIA",
+      role: "assessor_du",
+      enabled: true,
+      order: maiorOrdem + 10,
+    };
+    setForm((prev) => ({
+      ...prev,
+      duFlowActions: [...prev.duFlowActions, novaAcao],
+    }));
+  };
+
   const removePAFlowAction = (index: number) => {
     setForm((prev) => ({
       ...prev,
@@ -462,6 +673,69 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     () => form.paFlowActions.map((acao, index) => ({ acao, index })),
     [form.paFlowActions],
   );
+
+  const paEmAndamentoColumnsOrdenadas = useMemo(
+    () => [...form.paEmAndamentoColumns].sort((a, b) => a.order - b.order),
+    [form.paEmAndamentoColumns],
+  );
+
+  const paColumnTabs = useMemo(
+    () => form.columnTabs
+      .filter((aba) => aba.scope === "PA")
+      .sort((a, b) => a.order - b.order),
+    [form.columnTabs],
+  );
+
+  const duColumnTabs = useMemo(
+    () => form.columnTabs
+      .filter((aba) => aba.scope === "DU")
+      .sort((a, b) => a.order - b.order),
+    [form.columnTabs],
+  );
+
+  const duBoardColumnsOrdenadas = useMemo(
+    () => [...form.duBoardColumns].sort((a, b) => a.order - b.order),
+    [form.duBoardColumns],
+  );
+
+  const paPreviewColumns = useMemo(
+    () => paEmAndamentoColumnsOrdenadas,
+    [paEmAndamentoColumnsOrdenadas],
+  );
+
+  const paPreviewTabs = useMemo(
+    () => paColumnTabs.filter((aba) => aba.enabled !== false),
+    [paColumnTabs],
+  );
+
+  const duPreviewColumns = useMemo(
+    () => duBoardColumnsOrdenadas,
+    [duBoardColumnsOrdenadas],
+  );
+
+  useEffect(() => {
+    if (paPreviewColumns.length === 0) return;
+    const existe = paPreviewColumns.some((coluna) => coluna.id === selectedPAPreviewColumnId);
+    if (!existe) {
+      setSelectedPAPreviewColumnId(paPreviewColumns[0].id);
+    }
+  }, [paPreviewColumns, selectedPAPreviewColumnId]);
+
+  useEffect(() => {
+    if (paPreviewTabs.length === 0) return;
+    const existe = paPreviewTabs.some((aba) => aba.id === selectedPAPreviewTabId);
+    if (!existe) {
+      setSelectedPAPreviewTabId(paPreviewTabs[0].id);
+    }
+  }, [paPreviewTabs, selectedPAPreviewTabId]);
+
+  useEffect(() => {
+    if (duPreviewColumns.length === 0) return;
+    const existe = duPreviewColumns.some((coluna) => coluna.id === selectedDUPreviewColumnId);
+    if (!existe) {
+      setSelectedDUPreviewColumnId(duPreviewColumns[0].id);
+    }
+  }, [duPreviewColumns, selectedDUPreviewColumnId]);
 
   const paFlowEditGroups = useMemo(() => ({
     padrao: paFlowActionsComIndice
@@ -503,6 +777,28 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       });
     });
   }, [selectedFlowActionIndex]);
+
+  const duFlowActionsComIndice = useMemo(
+    () => (form.duFlowActions ?? []).map((acao, index) => ({ acao, index })),
+    [form.duFlowActions],
+  );
+
+  const selectedDUFlowAction = useMemo(() => {
+    if (selectedDUFlowActionIndex === null) return null;
+    const lista = form.duFlowActions ?? [];
+    if (selectedDUFlowActionIndex < 0 || selectedDUFlowActionIndex >= lista.length) return null;
+    return { acao: lista[selectedDUFlowActionIndex], index: selectedDUFlowActionIndex };
+  }, [form.duFlowActions, selectedDUFlowActionIndex]);
+
+  useEffect(() => {
+    if (selectedDUFlowActionIndex === null) return;
+    requestAnimationFrame(() => {
+      selectedDUFlowEditorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }, [selectedDUFlowActionIndex]);
 
   const aplicarFluxoAutomaticoPorTrilha = (
     track: PAFlowTrack,
@@ -803,6 +1099,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     setForm(DEFAULT_SITE_SETTINGS);
     setNovoAssuntoPA("");
     setNovoAssuntoDU("");
+    setNovaOrigemDUDocumento("");
   };
 
   const handleSave = async () => {
@@ -833,6 +1130,26 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     const assuntosDUPrincipais = normalizarAssuntosDU(
       form.assuntosDUPrincipais,
       DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
+    );
+
+    const origensDUDocumentos = normalizarOrigensDUDocumentos(
+      form.origensDUDocumentos,
+      DEFAULT_ORIGENS_DU_DOCUMENTOS,
+    );
+
+    const paEmAndamentoColumns = normalizarPAEmAndamentoColumns(
+      form.paEmAndamentoColumns,
+      DEFAULT_PA_EM_ANDAMENTO_COLUMNS,
+    );
+
+    const duBoardColumns = normalizarDUBoardColumns(
+      form.duBoardColumns,
+      DEFAULT_DU_BOARD_COLUMNS,
+    );
+
+    const columnTabs = normalizarColumnTabs(
+      form.columnTabs,
+      DEFAULT_COLUMN_TABS,
     );
 
     const gerarIdSeguro = (valor: string, fallback: string) => {
@@ -889,8 +1206,44 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       return;
     }
 
+    if (origensDUDocumentos.length === 0) {
+      toast.error("Mantenha ao menos uma origem de documento DU para o cadastro.");
+      return;
+    }
+
     if (paFlowActions.length === 0) {
       toast.error("Mantenha ao menos uma ação no fluxo PA.");
+      return;
+    }
+
+    const duFlowActions = (form.duFlowActions ?? [])
+      .sort((a, b) => a.order - b.order)
+      .map((acao, index) => ({ ...acao, order: (index + 1) * 10 }));
+
+    if (duFlowActions.length === 0) {
+      toast.error("Mantenha ao menos uma ação no fluxo DU.");
+      return;
+    }
+
+    if (paEmAndamentoColumns.every((coluna) => coluna.enabled === false)) {
+      toast.error("Mantenha ao menos uma coluna de PA em andamento habilitada.");
+      return;
+    }
+
+    const paTabsAtivas = columnTabs.filter((aba) => aba.scope === "PA" && aba.enabled !== false);
+    if (paTabsAtivas.length === 0) {
+      toast.error("Mantenha ao menos uma aba ativa para as colunas de PA.");
+      return;
+    }
+
+    const duTabsAtivas = columnTabs.filter((aba) => aba.scope === "DU" && aba.enabled !== false);
+    if (duTabsAtivas.length === 0) {
+      toast.error("Mantenha ao menos uma aba ativa para as colunas de DU.");
+      return;
+    }
+
+    if (duBoardColumns.every((coluna) => coluna.enabled === false)) {
+      toast.error("Mantenha ao menos uma coluna ativa no setor DU.");
       return;
     }
 
@@ -906,7 +1259,12 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
         footerText: form.footerText.trim(),
         assuntosPASindicancia,
         assuntosDUPrincipais,
+        origensDUDocumentos,
+        paEmAndamentoColumns,
+        duBoardColumns,
+        columnTabs,
         paFlowActions,
+        duFlowActions,
         prazoIPMInicialDias: Math.trunc(Number(form.prazoIPMInicialDias)),
         prazoIPMProrrogacaoDias: Math.trunc(Number(form.prazoIPMProrrogacaoDias)),
         prazoSindicanciaInicialDias: Math.trunc(Number(form.prazoSindicanciaInicialDias)),
@@ -1219,6 +1577,134 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                   </section>
                 </Collapsible>
 
+                <Collapsible open={openPAAbas} onOpenChange={setOpenPAAbas}>
+                  <section className="space-y-4 border-t border-border pt-5">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+                      <div>
+                        <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                          <Settings2 className="h-4 w-4 text-[var(--tipo-pa)]" />
+                          Abas das Colunas
+                        </h4>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Renomeie e inclua/exclua abas de cada coluna usando habilitar/desabilitar.
+                        </p>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openPAAbas ? "rotate-180" : ""}`} />
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent className="pt-2 space-y-4">
+                      <div className="rounded-2xl border border-border bg-muted/20 p-3 space-y-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-700">Prévia visual das colunas PA</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Clique no chip da coluna ou na aba para editar diretamente nesta prévia.
+                        </p>
+
+                        <div className="flex gap-3 overflow-x-auto pb-2">
+                          {paPreviewColumns.map((coluna) => (
+                            <div
+                              key={`preview-pa-col-${coluna.id}`}
+                              className={`min-w-[260px] rounded-2xl border p-3 space-y-3 ${selectedPAPreviewColumnId === coluna.id ? "border-[var(--tipo-pa)]/40 bg-background" : "border-border bg-card"} ${coluna.enabled !== false ? "" : "opacity-60"}`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setSelectedPAPreviewColumnId(coluna.id)}
+                                className="inline-flex items-center rounded-full border border-[var(--tipo-pa)]/30 bg-[var(--tipo-pa-bg)] px-3 py-1 text-xs font-bold text-[var(--tipo-pa)]"
+                              >
+                                PA · {coluna.label}
+                              </button>
+
+                              <div
+                                className="rounded-xl bg-muted p-1 gap-1 grid"
+                                style={{ gridTemplateColumns: `repeat(${Math.max(1, paPreviewTabs.length)}, minmax(0, 1fr))` }}
+                              >
+                                {paPreviewTabs.map((aba) => {
+                                  const count = aba.id === "andamento" ? 2 : aba.id === "atraso" ? 1 : 0;
+                                  const active = selectedPAPreviewTabId === aba.id;
+
+                                  return (
+                                    <button
+                                      key={`preview-pa-tab-${coluna.id}-${aba.id}`}
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedPAPreviewColumnId(coluna.id);
+                                        setSelectedPAPreviewTabId(aba.id);
+                                      }}
+                                      className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
+                                        active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                    >
+                                      <span className="block">{aba.label}</span>
+                                      <span className="block mt-1 text-[11px]">({count})</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {(() => {
+                          const abaSelecionada = paColumnTabs.find((aba) => aba.id === selectedPAPreviewTabId);
+                          const colunaSelecionada = paEmAndamentoColumnsOrdenadas.find(
+                            (coluna) => coluna.id === selectedPAPreviewColumnId,
+                          );
+                          if (!abaSelecionada) return null;
+                          if (!colunaSelecionada) return null;
+
+                          return (
+                            <div className="rounded-xl border border-sky-200 bg-sky-50/40 p-3 space-y-3">
+                              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
+                                Edição direta da prévia
+                              </p>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="pa-preview-column-label">Nome da coluna (chip)</Label>
+                                <Input
+                                  id="pa-preview-column-label"
+                                  value={colunaSelecionada.label}
+                                  onChange={(e) => updatePAEmAndamentoColumn(colunaSelecionada.id, { label: e.target.value })}
+                                  placeholder="Ex: 📗 Sindicancias"
+                                />
+                              </div>
+
+                              <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={colunaSelecionada.enabled !== false}
+                                  onChange={(e) => updatePAEmAndamentoColumn(colunaSelecionada.id, { enabled: e.target.checked })}
+                                  className="h-4 w-4 rounded border-border"
+                                />
+                                Coluna habilitada
+                              </label>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="pa-preview-tab-label">Nome da aba</Label>
+                                <Input
+                                  id="pa-preview-tab-label"
+                                  value={abaSelecionada.label}
+                                  onChange={(e) => updateColumnTab("PA", abaSelecionada.id, { label: e.target.value })}
+                                  placeholder="Ex: Em Andamento"
+                                />
+                              </div>
+
+                              <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={abaSelecionada.enabled !== false}
+                                  onChange={(e) => updateColumnTab("PA", abaSelecionada.id, { enabled: e.target.checked })}
+                                  className="h-4 w-4 rounded border-border"
+                                />
+                                Habilitada
+                              </label>
+                            </div>
+                          );
+                        })()}
+                      </div>
+
+                    </CollapsibleContent>
+                  </section>
+                </Collapsible>
+
                 <Collapsible open={openPAFluxo} onOpenChange={setOpenPAFluxo}>
                   <section className="space-y-4 border-t border-border pt-5">
                     <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
@@ -1400,55 +1886,468 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openDU ? "rotate-180" : ""}`} />
               </CollapsibleTrigger>
 
-              <CollapsibleContent className="pt-4">
-                <section className="space-y-4">
-                  <div>
-                    <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
-                      <Settings2 className="h-4 w-4 text-[var(--tipo-pa)]" />
-                      Assuntos DU no Cadastro
-                    </h4>
-                  </div>
+              <CollapsibleContent className="pt-4 space-y-5">
+                <Collapsible open={openDUColunas} onOpenChange={setOpenDUColunas}>
+                  <section className="space-y-4">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+                      <div>
+                        <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                          <Settings2 className="h-4 w-4 text-[var(--tipo-du)]" />
+                          Colunas de DU
+                        </h4>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Edite os nomes das colunas especiais do quadro DU.
+                        </p>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openDUColunas ? "rotate-180" : ""}`} />
+                    </CollapsibleTrigger>
 
-                  <div className="space-y-3">
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragStart={handleDragStartDU}
-                      onDragCancel={handleDragCancelDU}
-                      onDragEnd={handleDragEndDU}
-                    >
-                      <SortableContext items={assuntoDUIds} strategy={verticalListSortingStrategy}>
-                        <div className="space-y-2">
-                          {form.assuntosDUPrincipais.map((assunto, index) => (
-                            <SortableAssuntoRow
-                              key={assuntoDUIds[index]}
-                              id={assuntoDUIds[index]}
-                              value={assunto}
-                              placeholder="Digite o assunto"
-                              onChange={(value) => updateAssuntoDU(index, value)}
-                              onDelete={() => removeAssuntoDU(index)}
-                            />
+                    <CollapsibleContent className="pt-2 space-y-3">
+                      <div className="rounded-2xl border border-border bg-muted/20 p-3 space-y-3">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-700">Prévia visual das colunas DU</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Clique no chip da coluna ou na aba para editar diretamente nesta prévia.
+                        </p>
+
+                        <div className="flex gap-3 overflow-x-auto pb-2">
+                          {duPreviewColumns.map((coluna) => (
+                            <div
+                              key={`preview-du-col-${coluna.id}`}
+                              className={`min-w-[260px] rounded-2xl border p-3 space-y-3 ${selectedDUPreviewColumnId === coluna.id ? "border-[var(--tipo-du)]/40 bg-background" : "border-border bg-card"} ${coluna.enabled !== false ? "" : "opacity-60"}`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setSelectedDUPreviewColumnId(coluna.id)}
+                                className="inline-flex items-center rounded-full border border-[var(--tipo-du)]/30 bg-[var(--tipo-du-bg)] px-3 py-1 text-xs font-bold text-[var(--tipo-du)]"
+                              >
+                                DU · {coluna.label}
+                              </button>
+
+                              <div
+                                className="rounded-xl bg-muted p-1 gap-1 grid"
+                                style={{ gridTemplateColumns: `repeat(${Math.max(1, duColumnTabs.filter((a) => a.enabled !== false).length)}, minmax(0, 1fr))` }}
+                              >
+                                {duColumnTabs.filter((a) => a.enabled !== false).map((aba) => {
+                                  const count = aba.id === "andamento" ? 1 : 0;
+                                  const active = selectedDUPreviewTabId === aba.id;
+
+                                  return (
+                                    <button
+                                      key={`preview-du-tab-${coluna.id}-${aba.id}`}
+                                      type="button"
+                                      onClick={() => {
+                                        setSelectedDUPreviewColumnId(coluna.id);
+                                        setSelectedDUPreviewTabId(aba.id);
+                                      }}
+                                      className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide leading-tight ${
+                                        active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                      }`}
+                                    >
+                                      <span className="block">{aba.label}</span>
+                                      <span className="block mt-1 text-[11px]">({count})</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
                           ))}
                         </div>
-                      </SortableContext>
-                      <DragOverlay>
-                        {dragAssuntoDULabel ? <AssuntoDragPreview label={dragAssuntoDULabel} /> : null}
-                      </DragOverlay>
-                    </DndContext>
 
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <Input
-                        value={novoAssuntoDU}
-                        onChange={(e) => setNovoAssuntoDU(e.target.value)}
-                        placeholder="Novo assunto DU"
-                      />
-                      <Button type="button" variant="secondary" onClick={addAssuntoDU} className="shrink-0">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Adicionar
-                      </Button>
-                    </div>
-                  </div>
-                </section>
+                        {(() => {
+                          const colunaSelecionada = duBoardColumnsOrdenadas.find((c) => c.id === selectedDUPreviewColumnId);
+                          const abaSelecionada = duColumnTabs.find((aba) => aba.id === selectedDUPreviewTabId);
+                          if (!colunaSelecionada || !abaSelecionada) return null;
+
+                          return (
+                            <div className="rounded-xl border border-sky-200 bg-sky-50/40 p-3 space-y-3">
+                              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">Edição da coluna DU selecionada</p>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="du-preview-column-label">Nome da coluna (chip)</Label>
+                                <Input
+                                  id="du-preview-column-label"
+                                  value={colunaSelecionada.label}
+                                  onChange={(e) => updateDUBoardColumn(colunaSelecionada.id, { label: e.target.value })}
+                                  placeholder="Ex: 📩 Aguardando Resposta"
+                                />
+                              </div>
+
+                              <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={colunaSelecionada.enabled !== false}
+                                  onChange={(e) => updateDUBoardColumn(colunaSelecionada.id, { enabled: e.target.checked })}
+                                  className="h-4 w-4 rounded border-border"
+                                />
+                                Coluna habilitada
+                              </label>
+
+                              <div className="space-y-2">
+                                <Label htmlFor="du-preview-tab-label">Nome da aba</Label>
+                                <Input
+                                  id="du-preview-tab-label"
+                                  value={abaSelecionada.label}
+                                  onChange={(e) => updateColumnTab("DU", abaSelecionada.id, { label: e.target.value })}
+                                  placeholder="Ex: Em Andamento"
+                                />
+                              </div>
+
+                              <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={abaSelecionada.enabled !== false}
+                                  onChange={(e) => updateColumnTab("DU", abaSelecionada.id, { enabled: e.target.checked })}
+                                  className="h-4 w-4 rounded border-border"
+                                />
+                                Aba habilitada
+                              </label>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </CollapsibleContent>
+                  </section>
+                </Collapsible>
+
+                <Collapsible open={openDUFluxo} onOpenChange={setOpenDUFluxo}>
+                  <section className="space-y-4 border-t border-border pt-5">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+                      <div>
+                        <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                          <Workflow className="h-4 w-4 text-[var(--tipo-du)]" />
+                          Ações do Fluxo DU
+                        </h4>
+                        <p className="mt-1 text-xs text-muted-foreground">Configure os botões de ação exibidos no modal do fluxo DU.</p>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openDUFluxo ? "rotate-180" : ""}`} />
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent className="pt-2 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-muted-foreground">
+                          {modoDUAvancado
+                            ? "Modo avançado: edição completa dos campos técnicos do fluxo DU."
+                            : "Modo simples: preencha o essencial. Use modo avançado para editar estados e perfis."}
+                        </p>
+                        <Button type="button" variant="outline" size="sm" onClick={() => setModoDUAvancado((prev) => !prev)}>
+                          {modoDUAvancado ? "Modo simples" : "Modo avançado"}
+                        </Button>
+                      </div>
+
+                      {/* Two-flow visual: Interno + Externo side by side */}
+                      <div className="rounded-2xl border border-border bg-background p-3 space-y-3">
+                        <h5 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-700">
+                          <Workflow className="h-4 w-4 text-[var(--tipo-du)]" />
+                          Fluxograma Visual das Ações
+                        </h5>
+                        <p className="text-[11px] text-muted-foreground">Clique em uma ação para editá-la. Ações com <span className="font-semibold text-slate-600">Ambos</span> aparecem nos dois fluxos.</p>
+
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {/* Fluxo Interno */}
+                          <div className="rounded-xl border border-violet-200 bg-violet-50/30 p-2 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-violet-700 flex items-center gap-1">
+                              <span className="inline-block h-2 w-2 rounded-full bg-violet-400" />
+                              Fluxo Interno (DIEx)
+                            </p>
+                            {duFlowActionsComIndice
+                              .filter(({ acao }) => acao.enabled && (acao.tipo === "INTERNO" || acao.tipo === "ambos"))
+                              .sort((a, b) => a.acao.order - b.acao.order)
+                              .map(({ acao, index }) => (
+                                <button
+                                  key={`du-visual-int-${acao.id}`}
+                                  type="button"
+                                  onClick={() => setSelectedDUFlowActionIndex(index)}
+                                  className={`w-full text-left rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                                    selectedDUFlowActionIndex === index
+                                      ? "border-violet-400 bg-violet-100/60 ring-1 ring-violet-200"
+                                      : "border-violet-100 bg-white hover:bg-violet-50"
+                                  }`}
+                                >
+                                  <p className="font-semibold text-slate-800">{acao.label}</p>
+                                  <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
+                                    <span>{DU_FLOW_STATE_LABELS[acao.fromState]}</span>
+                                    <ArrowRight className="h-2.5 w-2.5" />
+                                    <span>{DU_FLOW_STATE_LABELS[acao.toState]}</span>
+                                    {acao.tipo === "ambos" && <span className="ml-auto text-[9px] text-slate-400 italic">ambos</span>}
+                                  </div>
+                                </button>
+                              ))}
+                            {duFlowActionsComIndice.filter(({ acao }) => acao.enabled && (acao.tipo === "INTERNO" || acao.tipo === "ambos")).length === 0 && (
+                              <p className="text-[10px] text-muted-foreground">Nenhuma ação.</p>
+                            )}
+                          </div>
+
+                          {/* Fluxo Externo */}
+                          <div className="rounded-xl border border-sky-200 bg-sky-50/30 p-2 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-sky-700 flex items-center gap-1">
+                              <span className="inline-block h-2 w-2 rounded-full bg-sky-400" />
+                              Fluxo Externo
+                            </p>
+                            {duFlowActionsComIndice
+                              .filter(({ acao }) => acao.enabled && (acao.tipo === "EXTERNO" || acao.tipo === "ambos"))
+                              .sort((a, b) => a.acao.order - b.acao.order)
+                              .map(({ acao, index }) => (
+                                <button
+                                  key={`du-visual-ext-${acao.id}`}
+                                  type="button"
+                                  onClick={() => setSelectedDUFlowActionIndex(index)}
+                                  className={`w-full text-left rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                                    selectedDUFlowActionIndex === index
+                                      ? "border-sky-400 bg-sky-100/60 ring-1 ring-sky-200"
+                                      : "border-sky-100 bg-white hover:bg-sky-50"
+                                  }`}
+                                >
+                                  <p className="font-semibold text-slate-800">{acao.label}</p>
+                                  <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
+                                    <span>{DU_FLOW_STATE_LABELS[acao.fromState]}</span>
+                                    <ArrowRight className="h-2.5 w-2.5" />
+                                    <span>{DU_FLOW_STATE_LABELS[acao.toState]}</span>
+                                    {acao.tipo === "ambos" && <span className="ml-auto text-[9px] text-slate-400 italic">ambos</span>}
+                                  </div>
+                                </button>
+                              ))}
+                            {duFlowActionsComIndice.filter(({ acao }) => acao.enabled && (acao.tipo === "EXTERNO" || acao.tipo === "ambos")).length === 0 && (
+                              <p className="text-[10px] text-muted-foreground">Nenhuma ação.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {selectedDUFlowAction && (
+                        <div ref={selectedDUFlowEditorRef} className="rounded-2xl border border-sky-200 bg-sky-50/30 p-3 space-y-3">
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">Edição da Ação Selecionada</p>
+                          {(() => {
+                            const { acao, index } = selectedDUFlowAction;
+                            return (
+                              <div className="rounded-xl border border-border bg-background p-3 space-y-3">
+                                {modoDUAvancado ? (
+                                  <>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                      <div className="space-y-1.5">
+                                        <Label>ID da Ação</Label>
+                                        <Input value={acao.id} onChange={(e) => updateDUFlowAction(index, { id: e.target.value })} placeholder="ID único da ação" />
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <Label>Rótulo da Ação</Label>
+                                        <Input value={acao.label} onChange={(e) => updateDUFlowAction(index, { label: e.target.value })} placeholder="Texto exibido no botão" />
+                                      </div>
+                                    </div>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                      <div className="space-y-1.5">
+                                        <Label>Tipo de Fluxo</Label>
+                                        <select value={acao.tipo ?? "ambos"} onChange={(e) => updateDUFlowAction(index, { tipo: e.target.value as DUFlowTipo })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                          {DU_FLOW_TIPO_OPTIONS.map((opt) => (
+                                            <option key={`du-tipo-adv-${opt.value}`} value={opt.value}>{opt.label}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <Label>Perfil</Label>
+                                        <select value={acao.role} onChange={(e) => updateDUFlowAction(index, { role: e.target.value as DUFlowRole })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                          {DU_FLOW_ROLE_OPTIONS.map((opt) => (
+                                            <option key={`du-role-${opt.value}`} value={opt.value}>{opt.label}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    </div>
+                                    <div className="grid gap-3 md:grid-cols-3">
+                                      <div className="space-y-1.5">
+                                        <Label>Estado Atual</Label>
+                                        <select value={acao.fromState} onChange={(e) => updateDUFlowAction(index, { fromState: e.target.value as DUFlowState })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                          {DU_FLOW_STATES.map((estado) => (
+                                            <option key={`du-from-${estado}`} value={estado}>{DU_FLOW_STATE_LABELS[estado]}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <Label>Próximo Estado</Label>
+                                        <select value={acao.toState} onChange={(e) => updateDUFlowAction(index, { toState: e.target.value as DUFlowState })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                          {DU_FLOW_STATES.map((estado) => (
+                                            <option key={`du-to-${estado}`} value={estado}>{DU_FLOW_STATE_LABELS[estado]}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <Label>Ordem</Label>
+                                        <Input type="number" min={0} value={acao.order} onChange={(e) => updateDUFlowAction(index, { order: Number(e.target.value) || 0 })} />
+                                      </div>
+                                    </div>
+                                    <div className="flex items-end justify-between gap-2">
+                                      <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                                        <input type="checkbox" className="h-4 w-4" checked={acao.enabled} onChange={(e) => updateDUFlowAction(index, { enabled: e.target.checked })} />
+                                        Ação habilitada
+                                      </label>
+                                      <Button type="button" variant="outline" onClick={() => { removeDUFlowAction(index); setSelectedDUFlowActionIndex(null); }}>
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Excluir
+                                      </Button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="space-y-1.5">
+                                      <Label>Nome da Ação</Label>
+                                      <Input value={acao.label} onChange={(e) => updateDUFlowAction(index, { label: e.target.value })} placeholder="Texto exibido no botão" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                      <Label>Tipo de Fluxo</Label>
+                                      <select value={acao.tipo ?? "ambos"} onChange={(e) => updateDUFlowAction(index, { tipo: e.target.value as DUFlowTipo })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                        {DU_FLOW_TIPO_OPTIONS.map((opt) => (
+                                          <option key={`du-tipo-${opt.value}`} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div className="grid gap-3 md:grid-cols-2">
+                                      <div className="space-y-1.5">
+                                        <Label>De (estado atual)</Label>
+                                        <select value={acao.fromState} onChange={(e) => updateDUFlowAction(index, { fromState: e.target.value as DUFlowState })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                          {DU_FLOW_STATES.map((estado) => (
+                                            <option key={`du-from-simple-${estado}`} value={estado}>{DU_FLOW_STATE_LABELS[estado]}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        <Label>Para (próximo estado)</Label>
+                                        <select value={acao.toState} onChange={(e) => updateDUFlowAction(index, { toState: e.target.value as DUFlowState })} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+                                          {DU_FLOW_STATES.map((estado) => (
+                                            <option key={`du-to-simple-${estado}`} value={estado}>{DU_FLOW_STATE_LABELS[estado]}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                                        <input type="checkbox" className="h-4 w-4" checked={acao.enabled} onChange={(e) => updateDUFlowAction(index, { enabled: e.target.checked })} />
+                                        Ação habilitada
+                                      </label>
+                                      <Button type="button" variant="outline" onClick={() => { removeDUFlowAction(index); setSelectedDUFlowActionIndex(null); }}>
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Excluir
+                                      </Button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      <div className="space-y-3">
+                        <Button type="button" variant="secondary" onClick={addDUFlowAction}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Nova ação DU
+                        </Button>
+                      </div>
+                    </CollapsibleContent>
+                  </section>
+                </Collapsible>
+
+                <Collapsible open={openDUAssuntos} onOpenChange={setOpenDUAssuntos}>
+                  <section className="space-y-4 border-t border-border pt-5">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+                      <div>
+                        <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                          <Settings2 className="h-4 w-4 text-[var(--tipo-du)]" />
+                          Assuntos DU no Cadastro
+                        </h4>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openDUAssuntos ? "rotate-180" : ""}`} />
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent className="pt-2 space-y-3">
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStartDU}
+                        onDragCancel={handleDragCancelDU}
+                        onDragEnd={handleDragEndDU}
+                      >
+                        <SortableContext items={assuntoDUIds} strategy={verticalListSortingStrategy}>
+                          <div className="space-y-2">
+                            {form.assuntosDUPrincipais.map((assunto, index) => (
+                              <SortableAssuntoRow
+                                key={assuntoDUIds[index]}
+                                id={assuntoDUIds[index]}
+                                value={assunto}
+                                placeholder="Digite o assunto"
+                                onChange={(value) => updateAssuntoDU(index, value)}
+                                onDelete={() => removeAssuntoDU(index)}
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                        <DragOverlay>
+                          {dragAssuntoDULabel ? <AssuntoDragPreview label={dragAssuntoDULabel} /> : null}
+                        </DragOverlay>
+                      </DndContext>
+
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <Input
+                          value={novoAssuntoDU}
+                          onChange={(e) => setNovoAssuntoDU(e.target.value)}
+                          placeholder="Novo assunto DU"
+                        />
+                        <Button type="button" variant="secondary" onClick={addAssuntoDU} className="shrink-0">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      </div>
+                    </CollapsibleContent>
+                  </section>
+                </Collapsible>
+
+                <Collapsible open={openDUOrigens} onOpenChange={setOpenDUOrigens}>
+                  <section className="space-y-4 border-t border-border pt-5">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+                      <div>
+                        <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                          <Settings2 className="h-4 w-4 text-[var(--tipo-du)]" />
+                          Origens de Documentos DU no Cadastro
+                        </h4>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Edite as opções exibidas no dropdown de origem durante o cadastro de processos DU.
+                        </p>
+                      </div>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openDUOrigens ? "rotate-180" : ""}`} />
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent className="pt-2 space-y-3">
+                      <div className="space-y-2">
+                        {form.origensDUDocumentos.map((origem, index) => (
+                          <div key={`origem-du-${index}`} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Input
+                              value={origem}
+                              onChange={(e) => updateOrigemDUDocumento(index, e.target.value)}
+                              placeholder="Digite a origem do documento"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => removeOrigemDUDocumento(index)}
+                              className="shrink-0"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Excluir
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <Input
+                          value={novaOrigemDUDocumento}
+                          onChange={(e) => setNovaOrigemDUDocumento(e.target.value)}
+                          placeholder="Nova origem de documento DU"
+                        />
+                        <Button type="button" variant="secondary" onClick={addOrigemDUDocumento} className="shrink-0">
+                          <Plus className="mr-2 h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      </div>
+                    </CollapsibleContent>
+                  </section>
+                </Collapsible>
               </CollapsibleContent>
             </div>
           </Collapsible>

@@ -1,5 +1,6 @@
 import { ProcessoCard } from "./ProcessoCard";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
+import { DEFAULT_COLUMN_TABS } from "@/types/siteSettings";
 import type { SiteSettings } from "@/types/siteSettings";
 import { useDroppable } from "@dnd-kit/core";
 import { useMemo, useState } from "react";
@@ -84,6 +85,39 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
       ? processosAtrasadosOrdenados
       : processosConcluidos;
 
+  const abasConfiguradas = useMemo(() => {
+    const scope = tipo === "PA" ? "PA" : "DU";
+    const base = siteSettings?.columnTabs?.length
+      ? siteSettings.columnTabs
+      : DEFAULT_COLUMN_TABS;
+
+    const lista = base
+      .filter((item) => item.scope === scope)
+      .filter((item) => item.enabled !== false)
+      .sort((a, b) => a.order - b.order)
+      .map((item) => ({
+        ...item,
+        label: String(item.label || "").trim() || item.id,
+      }));
+
+    const fallback = DEFAULT_COLUMN_TABS
+      .filter((item) => item.scope === scope)
+      .sort((a, b) => a.order - b.order);
+
+    return lista.length > 0 ? lista : fallback;
+  }, [siteSettings?.columnTabs, tipo]);
+
+  const abaAtiva = useMemo(() => {
+    const existe = abasConfiguradas.some((item) => item.id === aba);
+    return existe ? aba : abasConfiguradas[0]?.id || "andamento";
+  }, [aba, abasConfiguradas]);
+
+  const processosDaAbaAtiva = abaAtiva === "andamento"
+    ? processosAtivosOrdenados
+    : abaAtiva === "atraso"
+      ? processosAtrasadosOrdenados
+      : processosConcluidos;
+
   return (
     <div 
       ref={setNodeRef}
@@ -101,54 +135,43 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
           </span>
         </div>
 
-        <div className={`rounded-xl bg-muted p-1 gap-1 grid ${tipo === "PA" ? "grid-cols-3" : "grid-cols-2"}`}>
-          <button
-            type="button"
-            onClick={() => setAba("andamento")}
-            className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
-              aba === "andamento" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <span className="block">Em Andamento</span>
-            <span className="block mt-1 text-[11px]">({processos.length})</span>
-          </button>
-          {tipo === "PA" && (
-            <button
-              type="button"
-              onClick={() => setAba("atraso")}
-              className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
-                aba === "atraso" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <span className="block">Em Atraso</span>
-              <span className="block mt-1 text-[11px]">({processosAtrasados.length})</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setAba("concluidos")}
-            className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
-              aba === "concluidos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <span className="block">Concluídos</span>
-            <span className="block mt-1 text-[11px]">({processosConcluidos.length})</span>
-          </button>
+        <div className="rounded-xl bg-muted p-1 gap-1 grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, abasConfiguradas.length)}, minmax(0, 1fr))` }}>
+          {abasConfiguradas.map((tab) => {
+            const count = tab.id === "andamento"
+              ? processos.length
+              : tab.id === "atraso"
+                ? processosAtrasados.length
+                : processosConcluidos.length;
+
+            return (
+              <button
+                key={`${responsavel}-${tab.id}`}
+                type="button"
+                onClick={() => setAba(tab.id)}
+                className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
+                  abaAtiva === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <span className="block">{tab.label}</span>
+                <span className="block mt-1 text-[11px]">({count})</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* Lista */}
       <div className="flex-1 p-3 space-y-2.5 min-h-[140px] max-h-[calc(100vh-22rem)] overflow-y-auto scrollbar-thin">
-        {processosDaAba.length === 0 ? (
+        {processosDaAbaAtiva.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-border py-10 text-center text-xs text-muted-foreground/60 font-semibold">
-            {aba === "andamento"
+            {abaAtiva === "andamento"
               ? "Sem processos em andamento"
-              : aba === "atraso"
+              : abaAtiva === "atraso"
                 ? "Sem processos em atraso"
                 : "Sem processos concluídos"}
           </div>
         ) : (
-          processosDaAba.map((p) => (
+          processosDaAbaAtiva.map((p) => (
             <ProcessoCard
               key={p.id}
               processo={p}

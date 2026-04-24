@@ -32,6 +32,9 @@ import {
   AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
+import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
 import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
 import { AcoesDUModalNovo } from "./modals/AcoesDUModalNovo";
 import { AcoesPAModalNovo } from "./modals/AcoesPAModalNovo";
@@ -58,6 +61,7 @@ interface ProcessoCardProps {
 
 export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido }: ProcessoCardProps) => {
   const p = processo || pAntigo!;
+  const { user } = useAuth();
   const marcarComoLido = () => onMarcarComoLido?.(p.id);
   
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
@@ -112,6 +116,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const [motivoReabertura, setMotivoReabertura] = useState("");
   const [novoPrazoFatal, setNovoPrazoFatal] = useState("");
   const [reativando, setReativando] = useState(false);
+  const [desfazendo, setDesfazendo] = useState(false);
   
   // Função para abrir o chat do processo
   const abrirChat = () => {
@@ -169,6 +174,67 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
     if (onDelete) {
       onDelete(p.id);
       setAlertExcluir(false);
+    }
+  };
+
+  const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
+  const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
+  const autorId = user?.uid || "sistema";
+
+  const registrarHistoricoDesfazer = async (texto: string) => {
+    const agoraISO = new Date().toISOString();
+    const historicoRef = collection(db, `processos/${p.id}/historico`);
+    await addDoc(historicoRef, {
+      autor: autorMilitar,
+      autorId,
+      texto,
+      timestamp: agoraISO,
+    });
+
+    const mensagensRef = doc(db, "mensagens", p.id);
+    const mensagensSnap = await getDoc(mensagensRef);
+    const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
+    await setMensagemDoc(mensagensRef, {
+      historico: [
+        ...historicoExistente,
+        {
+          id: crypto.randomUUID(),
+          autor: autorMilitar,
+          autorId,
+          texto,
+          timestamp: agoraISO,
+        },
+      ],
+    });
+  };
+
+  const desfazerUltimaAcao = async () => {
+    const snapshot = p.ultimaAcaoFluxo?.previousDoc;
+    if (!snapshot) {
+      toast.error("Não há ação para desfazer neste processo.");
+      return;
+    }
+
+    try {
+      setDesfazendo(true);
+      const textoMovimento = `Última ação desfeita por ${autorMilitar}.`;
+      const processoRef = doc(db, "processos", p.id);
+
+      await setDoc(processoRef, {
+        ...snapshot,
+        descricao: textoMovimento,
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+        ultimaAcaoFluxo: null,
+      });
+
+      await registrarHistoricoDesfazer(textoMovimento);
+      toast.success("Última ação desfeita com sucesso.");
+    } catch (error) {
+      console.error("Erro ao desfazer última ação:", error);
+      toast.error("Não foi possível desfazer a última ação.");
+    } finally {
+      setDesfazendo(false);
     }
   };
 
@@ -434,7 +500,24 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
               </div>
 
               {/* Linha 2: Reativar (concluídos) + Excluir */}
-              <div className={`grid gap-2 ${p.status === "concluido" ? "grid-cols-2" : "grid-cols-1"}`}>
+              <div className={`grid gap-2 ${p.status === "concluido" ? "grid-cols-3" : "grid-cols-2"}`}>
+                {/* Botão Desfazer Última Ação */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs h-9"
+                  disabled={!p.ultimaAcaoFluxo?.previousDoc || desfazendo}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    marcarComoLido();
+                    void desfazerUltimaAcao();
+                  }}
+                  title={!p.ultimaAcaoFluxo?.previousDoc ? "Sem ação recente para desfazer" : "Desfazer última ação"}
+                >
+                  <RotateCcw className="w-3 h-3 mr-1" />
+                  {desfazendo ? "Desfazendo..." : "Desfazer"}
+                </Button>
+
                 {/* Botão Reativar (apenas para concluído) */}
                 {p.status === "concluido" && (
                   <Button

@@ -16,8 +16,10 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calcularFaixasProrrogacaoPA, calcularPrazoFinalPA } from "@/lib/prazo";
 import {
+  DEFAULT_ORIGENS_DU_DOCUMENTOS,
   DEFAULT_ASSUNTOS_PA_SINDICANCIA,
   DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
+  normalizarOrigensDUDocumentos,
   normalizarAssuntosPA,
   normalizarAssuntosDU,
   type SiteSettings,
@@ -32,7 +34,6 @@ interface CadastroProcessoModalProps {
 }
 
 const TIPOS_PA = ["IPM", "Sindicância", "Conselho de Disciplina", "Conselho de Justificação", "Investigação Preliminar", "Outros"];
-const ORIGENS_DU = ["SAPIENS", "Email", "MPF", "Justiça Federal", "Justiça Estadual", "Outros"];
 const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 const POSTOS_CONSELHO = ["Cap", "Maj", "TC", "Cel"];
 const POSTOS_ENCARREGADO = ["Sgt", "Ten", "Cap", "Maj", "TC", "Cel"];
@@ -67,6 +68,14 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         DEFAULT_ASSUNTOS_PA_SINDICANCIA,
       ),
     [siteSettings?.assuntosPASindicancia],
+  );
+  const origensDUDocumentos = useMemo(
+    () =>
+      normalizarOrigensDUDocumentos(
+        siteSettings?.origensDUDocumentos,
+        DEFAULT_ORIGENS_DU_DOCUMENTOS,
+      ),
+    [siteSettings?.origensDUDocumentos],
   );
 
   const inferirSetorUsuario = () => {
@@ -1000,7 +1009,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {ORIGENS_DU.map((orig) => (
+                      {origensDUDocumentos.map((orig) => (
                         <SelectItem key={orig} value={orig}>{orig}</SelectItem>
                       ))}
                     </SelectContent>
