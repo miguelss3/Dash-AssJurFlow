@@ -285,6 +285,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [dragAssuntoPAId, setDragAssuntoPAId] = useState<string | null>(null);
   const [dragAssuntoDUId, setDragAssuntoDUId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [previewTab, setPreviewTab] = useState<"PA" | "DU">("PA");
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -793,10 +794,9 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   useEffect(() => {
     if (selectedDUFlowActionIndex === null) return;
     requestAnimationFrame(() => {
-      selectedDUFlowEditorRef.current?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      const el = selectedDUFlowEditorRef.current;
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   }, [selectedDUFlowActionIndex]);
 
@@ -860,6 +860,38 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
         ...prev,
         paFlowActions: lista,
       };
+    });
+  };
+
+  const handleDUFlowDragEnd = (tipo: "INTERNO" | "EXTERNO", event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeIndex = Number(String(active.id).split("-").pop());
+    const overIndex = Number(String(over.id).split("-").pop());
+    if (Number.isNaN(activeIndex) || Number.isNaN(overIndex)) return;
+
+    setForm((prev) => {
+      const lista = [...prev.duFlowActions];
+      const indicesGrupo = lista
+        .map((acao, index) => ({ acao, index }))
+        .filter(({ acao }) => acao.tipo === tipo || acao.tipo === "ambos")
+        .sort((a, b) => a.acao.order - b.acao.order)
+        .map(({ index }) => index);
+
+      const origemNoGrupo = indicesGrupo.indexOf(activeIndex);
+      const destinoNoGrupo = indicesGrupo.indexOf(overIndex);
+      if (origemNoGrupo < 0 || destinoNoGrupo < 0) return prev;
+
+      const ordemIndices = arrayMove(indicesGrupo, origemNoGrupo, destinoNoGrupo);
+      ordemIndices.forEach((indexOriginal, posicao) => {
+        lista[indexOriginal] = {
+          ...lista[indexOriginal],
+          order: (posicao + 1) * 10,
+        };
+      });
+
+      return { ...prev, duFlowActions: lista };
     });
   };
 
@@ -1741,15 +1773,17 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                           <Workflow className="h-4 w-4 text-[var(--tipo-pa)]" />
                           Fluxograma Visual das Ações
                         </h5>
-                        <p className="text-[11px] text-muted-foreground">
-                          Arraste as ações aqui para reordenar o fluxo automaticamente.
-                        </p>
+                        <p className="text-[11px] text-muted-foreground">Clique em uma ação para editá-la. Arraste para <span className="font-semibold text-slate-600">reordenar</span> o fluxo.</p>
 
-                        <div className="grid gap-3 xl:grid-cols-2">
-                          <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
-                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">Sindicância / IPM</p>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {/* Trilha Sindicância / IPM */}
+                          <div className="rounded-xl border border-amber-200 bg-amber-50/30 p-2 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 flex items-center gap-1">
+                              <span className="inline-block h-2 w-2 rounded-full bg-amber-400" />
+                              Sindicância / IPM
+                            </p>
                             {paFlowVisual.padrao.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">Nenhuma ação habilitada nesta trilha.</p>
+                              <p className="text-[10px] text-muted-foreground">Nenhuma ação.</p>
                             ) : (
                               <DndContext
                                 sensors={sensors}
@@ -1760,7 +1794,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                                   items={paFlowVisual.padrao.map(({ index }) => `pa-flow-visual-padrao-${index}`)}
                                   strategy={verticalListSortingStrategy}
                                 >
-                                  <div className="space-y-2">
+                                  <div className="space-y-1.5">
                                     {paFlowVisual.padrao.map(({ acao, index }) => (
                                       <SortableFlowActionCard
                                         key={`flow-padrao-${acao.id}`}
@@ -1768,11 +1802,15 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                                         onClick={() => setSelectedFlowActionIndex(index)}
                                         selected={selectedFlowActionIndex === index}
                                       >
-                                        <div className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs">
+                                        <div className={`rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                                          selectedFlowActionIndex === index
+                                            ? "border-amber-400 bg-amber-100/60 ring-1 ring-amber-200"
+                                            : "border-amber-100 bg-white hover:bg-amber-50"
+                                        }`}>
                                           <p className="font-semibold text-slate-800">{acao.label}</p>
-                                          <div className="mt-1 flex items-center gap-1 text-slate-600">
+                                          <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
                                             <span>{PA_FLOW_STATE_LABELS[acao.fromState]}</span>
-                                            <ArrowRight className="h-3 w-3" />
+                                            <ArrowRight className="h-2.5 w-2.5" />
                                             <span>{PA_FLOW_STATE_LABELS[acao.toState]}</span>
                                           </div>
                                         </div>
@@ -1784,10 +1822,14 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                             )}
                           </div>
 
-                          <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
-                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">Conselhos</p>
+                          {/* Trilha Conselhos */}
+                          <div className="rounded-xl border border-indigo-200 bg-indigo-50/30 p-2 space-y-1.5">
+                            <p className="text-[10px] font-bold uppercase tracking-wide text-indigo-700 flex items-center gap-1">
+                              <span className="inline-block h-2 w-2 rounded-full bg-indigo-400" />
+                              Conselhos
+                            </p>
                             {paFlowVisual.conselho.length === 0 ? (
-                              <p className="text-xs text-muted-foreground">Nenhuma ação habilitada nesta trilha.</p>
+                              <p className="text-[10px] text-muted-foreground">Nenhuma ação.</p>
                             ) : (
                               <DndContext
                                 sensors={sensors}
@@ -1798,7 +1840,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                                   items={paFlowVisual.conselho.map(({ index }) => `pa-flow-visual-conselho-${index}`)}
                                   strategy={verticalListSortingStrategy}
                                 >
-                                  <div className="space-y-2">
+                                  <div className="space-y-1.5">
                                     {paFlowVisual.conselho.map(({ acao, index }) => (
                                       <SortableFlowActionCard
                                         key={`flow-conselho-${acao.id}`}
@@ -1806,11 +1848,15 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                                         onClick={() => setSelectedFlowActionIndex(index)}
                                         selected={selectedFlowActionIndex === index}
                                       >
-                                        <div className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs">
+                                        <div className={`rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                                          selectedFlowActionIndex === index
+                                            ? "border-indigo-400 bg-indigo-100/60 ring-1 ring-indigo-200"
+                                            : "border-indigo-100 bg-white hover:bg-indigo-50"
+                                        }`}>
                                           <p className="font-semibold text-slate-800">{acao.label}</p>
-                                          <div className="mt-1 flex items-center gap-1 text-slate-600">
+                                          <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
                                             <span>{PA_FLOW_STATE_LABELS[acao.fromState]}</span>
-                                            <ArrowRight className="h-3 w-3" />
+                                            <ArrowRight className="h-2.5 w-2.5" />
                                             <span>{PA_FLOW_STATE_LABELS[acao.toState]}</span>
                                           </div>
                                         </div>
@@ -2040,7 +2086,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                           <Workflow className="h-4 w-4 text-[var(--tipo-du)]" />
                           Fluxograma Visual das Ações
                         </h5>
-                        <p className="text-[11px] text-muted-foreground">Clique em uma ação para editá-la. Ações com <span className="font-semibold text-slate-600">Ambos</span> aparecem nos dois fluxos.</p>
+                        <p className="text-[11px] text-muted-foreground">Clique em uma ação para editá-la. Arraste para <span className="font-semibold text-slate-600">reordenar</span>. Ações com <span className="font-semibold text-slate-600">Ambos</span> aparecem nos dois fluxos.</p>
 
                         <div className="grid gap-3 md:grid-cols-2">
                           {/* Fluxo Interno */}
@@ -2049,31 +2095,50 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                               <span className="inline-block h-2 w-2 rounded-full bg-violet-400" />
                               Fluxo Interno (DIEx)
                             </p>
-                            {duFlowActionsComIndice
-                              .filter(({ acao }) => acao.enabled && (acao.tipo === "INTERNO" || acao.tipo === "ambos"))
-                              .sort((a, b) => a.acao.order - b.acao.order)
-                              .map(({ acao, index }) => (
-                                <button
-                                  key={`du-visual-int-${acao.id}`}
-                                  type="button"
-                                  onClick={() => setSelectedDUFlowActionIndex(index)}
-                                  className={`w-full text-left rounded-lg border px-2 py-1.5 text-xs transition-colors ${
-                                    selectedDUFlowActionIndex === index
-                                      ? "border-violet-400 bg-violet-100/60 ring-1 ring-violet-200"
-                                      : "border-violet-100 bg-white hover:bg-violet-50"
-                                  }`}
-                                >
-                                  <p className="font-semibold text-slate-800">{acao.label}</p>
-                                  <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
-                                    <span>{DU_FLOW_STATE_LABELS[acao.fromState]}</span>
-                                    <ArrowRight className="h-2.5 w-2.5" />
-                                    <span>{DU_FLOW_STATE_LABELS[acao.toState]}</span>
-                                    {acao.tipo === "ambos" && <span className="ml-auto text-[9px] text-slate-400 italic">ambos</span>}
-                                  </div>
-                                </button>
-                              ))}
-                            {duFlowActionsComIndice.filter(({ acao }) => acao.enabled && (acao.tipo === "INTERNO" || acao.tipo === "ambos")).length === 0 && (
+                            {duFlowActionsComIndice.filter(({ acao }) => acao.enabled && (acao.tipo === "INTERNO" || acao.tipo === "ambos")).length === 0 ? (
                               <p className="text-[10px] text-muted-foreground">Nenhuma ação.</p>
+                            ) : (
+                              <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={(event) => handleDUFlowDragEnd("INTERNO", event)}
+                              >
+                                <SortableContext
+                                  items={duFlowActionsComIndice
+                                    .filter(({ acao }) => acao.enabled && (acao.tipo === "INTERNO" || acao.tipo === "ambos"))
+                                    .sort((a, b) => a.acao.order - b.acao.order)
+                                    .map(({ index }) => `du-flow-visual-int-${index}`)}
+                                  strategy={verticalListSortingStrategy}
+                                >
+                                  <div className="space-y-1.5">
+                                    {duFlowActionsComIndice
+                                      .filter(({ acao }) => acao.enabled && (acao.tipo === "INTERNO" || acao.tipo === "ambos"))
+                                      .sort((a, b) => a.acao.order - b.acao.order)
+                                      .map(({ acao, index }) => (
+                                        <SortableFlowActionCard
+                                          key={`du-flow-int-${acao.id}`}
+                                          id={`du-flow-visual-int-${index}`}
+                                          onClick={() => setSelectedDUFlowActionIndex(index)}
+                                          selected={selectedDUFlowActionIndex === index}
+                                        >
+                                          <div className={`rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                                            selectedDUFlowActionIndex === index
+                                              ? "border-violet-400 bg-violet-100/60 ring-1 ring-violet-200"
+                                              : "border-violet-100 bg-white hover:bg-violet-50"
+                                          }`}>
+                                            <p className="font-semibold text-slate-800">{acao.label}</p>
+                                            <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
+                                              <span>{DU_FLOW_STATE_LABELS[acao.fromState]}</span>
+                                              <ArrowRight className="h-2.5 w-2.5" />
+                                              <span>{DU_FLOW_STATE_LABELS[acao.toState]}</span>
+                                              {acao.tipo === "ambos" && <span className="ml-auto text-[9px] text-slate-400 italic">ambos</span>}
+                                            </div>
+                                          </div>
+                                        </SortableFlowActionCard>
+                                      ))}
+                                  </div>
+                                </SortableContext>
+                              </DndContext>
                             )}
                           </div>
 
@@ -2083,31 +2148,50 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                               <span className="inline-block h-2 w-2 rounded-full bg-sky-400" />
                               Fluxo Externo
                             </p>
-                            {duFlowActionsComIndice
-                              .filter(({ acao }) => acao.enabled && (acao.tipo === "EXTERNO" || acao.tipo === "ambos"))
-                              .sort((a, b) => a.acao.order - b.acao.order)
-                              .map(({ acao, index }) => (
-                                <button
-                                  key={`du-visual-ext-${acao.id}`}
-                                  type="button"
-                                  onClick={() => setSelectedDUFlowActionIndex(index)}
-                                  className={`w-full text-left rounded-lg border px-2 py-1.5 text-xs transition-colors ${
-                                    selectedDUFlowActionIndex === index
-                                      ? "border-sky-400 bg-sky-100/60 ring-1 ring-sky-200"
-                                      : "border-sky-100 bg-white hover:bg-sky-50"
-                                  }`}
-                                >
-                                  <p className="font-semibold text-slate-800">{acao.label}</p>
-                                  <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
-                                    <span>{DU_FLOW_STATE_LABELS[acao.fromState]}</span>
-                                    <ArrowRight className="h-2.5 w-2.5" />
-                                    <span>{DU_FLOW_STATE_LABELS[acao.toState]}</span>
-                                    {acao.tipo === "ambos" && <span className="ml-auto text-[9px] text-slate-400 italic">ambos</span>}
-                                  </div>
-                                </button>
-                              ))}
-                            {duFlowActionsComIndice.filter(({ acao }) => acao.enabled && (acao.tipo === "EXTERNO" || acao.tipo === "ambos")).length === 0 && (
+                            {duFlowActionsComIndice.filter(({ acao }) => acao.enabled && (acao.tipo === "EXTERNO" || acao.tipo === "ambos")).length === 0 ? (
                               <p className="text-[10px] text-muted-foreground">Nenhuma ação.</p>
+                            ) : (
+                              <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={(event) => handleDUFlowDragEnd("EXTERNO", event)}
+                              >
+                                <SortableContext
+                                  items={duFlowActionsComIndice
+                                    .filter(({ acao }) => acao.enabled && (acao.tipo === "EXTERNO" || acao.tipo === "ambos"))
+                                    .sort((a, b) => a.acao.order - b.acao.order)
+                                    .map(({ index }) => `du-flow-visual-ext-${index}`)}
+                                  strategy={verticalListSortingStrategy}
+                                >
+                                  <div className="space-y-1.5">
+                                    {duFlowActionsComIndice
+                                      .filter(({ acao }) => acao.enabled && (acao.tipo === "EXTERNO" || acao.tipo === "ambos"))
+                                      .sort((a, b) => a.acao.order - b.acao.order)
+                                      .map(({ acao, index }) => (
+                                        <SortableFlowActionCard
+                                          key={`du-flow-ext-${acao.id}`}
+                                          id={`du-flow-visual-ext-${index}`}
+                                          onClick={() => setSelectedDUFlowActionIndex(index)}
+                                          selected={selectedDUFlowActionIndex === index}
+                                        >
+                                          <div className={`rounded-lg border px-2 py-1.5 text-xs transition-colors ${
+                                            selectedDUFlowActionIndex === index
+                                              ? "border-sky-400 bg-sky-100/60 ring-1 ring-sky-200"
+                                              : "border-sky-100 bg-white hover:bg-sky-50"
+                                          }`}>
+                                            <p className="font-semibold text-slate-800">{acao.label}</p>
+                                            <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
+                                              <span>{DU_FLOW_STATE_LABELS[acao.fromState]}</span>
+                                              <ArrowRight className="h-2.5 w-2.5" />
+                                              <span>{DU_FLOW_STATE_LABELS[acao.toState]}</span>
+                                              {acao.tipo === "ambos" && <span className="ml-auto text-[9px] text-slate-400 italic">ambos</span>}
+                                            </div>
+                                          </div>
+                                        </SortableFlowActionCard>
+                                      ))}
+                                  </div>
+                                </SortableContext>
+                              </DndContext>
                             )}
                           </div>
                         </div>
@@ -2364,40 +2448,241 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
           </div>
         </div>
 
-        <div className="space-y-6 rounded-3xl border border-border bg-card p-5 shadow-sm">
+        <div className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm sticky top-4 self-start">
           <div>
             <h4 className="text-sm font-bold uppercase tracking-wide text-slate-700">Pré-visualização</h4>
             <p className="mt-1 text-xs text-muted-foreground">
-              Esta prévia mostra como os textos ficam no layout principal após a publicação.
+              Atualiza em tempo real conforme você edita as configurações.
             </p>
           </div>
 
-          <div className="rounded-3xl bg-gradient-sidebar p-5 text-sidebar-foreground shadow-card">
-            <p className="font-display text-lg font-bold leading-none text-white">{form.sidebarTitle}</p>
-            <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[oklch(0.78_0.18_145)]">
+          {/* Header / Sidebar preview */}
+          <div className="rounded-2xl bg-gradient-sidebar p-4 text-sidebar-foreground shadow-card">
+            <p className="font-display text-base font-bold leading-none text-white">{form.sidebarTitle}</p>
+            <p className="mt-1.5 text-[9px] font-bold uppercase tracking-[0.2em] text-[oklch(0.78_0.18_145)]">
               {form.sidebarSubtitle}
             </p>
-          </div>
-
-          <div className="rounded-3xl border border-border bg-background p-5">
-            <p className="font-display text-2xl font-bold text-foreground">{form.dashboardTitle}</p>
-            <p className="mt-2 text-sm text-muted-foreground">{form.dashboardDescription}</p>
-
-            <div className="mt-5 inline-flex items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md">
-              {form.newProcessLabel}
+            <div className="mt-3 flex items-center gap-2">
+              <div className="h-px flex-1 bg-white/10" />
+              <span className="text-[9px] text-white/40 uppercase tracking-wider">{form.dashboardTitle}</span>
+              <div className="h-px flex-1 bg-white/10" />
+            </div>
+            <p className="mt-1.5 text-[10px] text-white/50 line-clamp-1">{form.dashboardDescription}</p>
+            <div className="mt-3 inline-flex items-center rounded-lg bg-white/10 px-3 py-1.5 text-[10px] font-semibold text-white/90">
+              + {form.newProcessLabel}
             </div>
           </div>
 
-          <div className="rounded-3xl border border-border bg-background p-5 space-y-3">
-            <p className="text-sm font-bold uppercase tracking-wide text-slate-700">Regras Processuais Ativas</p>
-            <div className="grid gap-2 text-sm text-slate-700">
-              <p>IPM: <span className="font-semibold">{form.prazoIPMInicialDias}d</span> + <span className="font-semibold">{form.prazoIPMProrrogacaoDias}d</span> por prorrogação</p>
-              <p>Sindicância: <span className="font-semibold">{form.prazoSindicanciaInicialDias}d</span> + <span className="font-semibold">{form.prazoSindicanciaProrrogacaoDias}d</span> por prorrogação</p>
-              <p>Conselhos: <span className="font-semibold">{form.prazoConselhoInicialDias}d</span> + <span className="font-semibold">{form.prazoConselhoProrrogacaoDias}d</span> por prorrogação</p>
-            </div>
+          {/* Abas PA / DU */}
+          <div>
+                <div className="flex rounded-xl border border-border bg-muted/30 p-0.5 text-xs font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab("PA")}
+                    className={`flex-1 rounded-lg py-1.5 transition-all ${previewTab === "PA" ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    📋 Processo Administrativo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab("DU")}
+                    className={`flex-1 rounded-lg py-1.5 transition-all ${previewTab === "DU" ? "bg-sky-100 text-sky-700 shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    📩 Defesa da União
+                  </button>
+                </div>
+
+                {previewTab === "PA" && (
+                  <div className="mt-3 space-y-3">
+                    {/* Abas do PA */}
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Abas de navegação</p>
+                      <div className="flex gap-1 flex-wrap">
+                        {paColumnTabs.filter(a => a.enabled).length === 0 ? (
+                          <span className="text-[10px] text-muted-foreground italic">Nenhuma aba ativa</span>
+                        ) : (
+                          paColumnTabs.filter(a => a.enabled).map((aba) => (
+                            <span
+                              key={aba.id}
+                              className="inline-flex items-center rounded-md bg-[var(--tipo-pa-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--tipo-pa)]"
+                            >
+                              {aba.label}
+                            </span>
+                          ))
+                        )}
+                        {paColumnTabs.filter(a => !a.enabled).map((aba) => (
+                          <span
+                            key={aba.id}
+                            className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] text-muted-foreground line-through opacity-50"
+                          >
+                            {aba.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Colunas "Em Andamento" PA */}
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Colunas em andamento</p>
+                      <div className="flex gap-1.5 overflow-x-auto pb-1">
+                        {paEmAndamentoColumnsOrdenadas.length === 0 ? (
+                          <span className="text-[10px] text-muted-foreground italic">Nenhuma coluna configurada</span>
+                        ) : (
+                          paEmAndamentoColumnsOrdenadas.map((coluna) => (
+                            <div
+                              key={coluna.id}
+                              className={`flex-shrink-0 w-28 rounded-xl border p-2 space-y-1.5 ${coluna.enabled ? "border-[var(--tipo-pa)]/30 bg-[var(--tipo-pa-bg)]" : "border-border bg-muted/30 opacity-40"}`}
+                            >
+                              <p className="text-[10px] font-bold text-[var(--tipo-pa)] leading-tight line-clamp-2">{coluna.label}</p>
+                              <div className="space-y-1">
+                                {[1, 2].map((i) => (
+                                  <div key={i} className="h-5 rounded-md bg-white/70 border border-[var(--tipo-pa)]/10 flex items-center px-1.5 gap-1">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-[var(--tipo-pa)]/40 flex-shrink-0" />
+                                    <div className="h-1 flex-1 rounded bg-[var(--tipo-pa)]/20" />
+                                  </div>
+                                ))}
+                              </div>
+                              {!coluna.enabled && (
+                                <p className="text-[8px] text-center text-muted-foreground font-semibold uppercase">oculta</p>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Prazos PA */}
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Prazos processuais</p>
+                      <div className="space-y-1">
+                        {[
+                          { label: "IPM", inicial: form.prazoIPMInicialDias, prorrog: form.prazoIPMProrrogacaoDias },
+                          { label: "Sindicância", inicial: form.prazoSindicanciaInicialDias, prorrog: form.prazoSindicanciaProrrogacaoDias },
+                          { label: "Conselho", inicial: form.prazoConselhoInicialDias, prorrog: form.prazoConselhoProrrogacaoDias },
+                        ].map(({ label, inicial, prorrog }) => {
+                          const total = inicial + prorrog;
+                          const pct = Math.round((inicial / total) * 100);
+                          return (
+                            <div key={label} className="flex items-center gap-2">
+                              <span className="w-18 text-[10px] font-semibold text-slate-600 shrink-0">{label}</span>
+                              <div className="flex flex-1 h-3 rounded-full overflow-hidden bg-muted">
+                                <div
+                                  className="h-full bg-[var(--tipo-pa)] transition-all duration-300"
+                                  style={{ width: `${pct}%` }}
+                                />
+                                <div className="h-full flex-1 bg-[var(--tipo-pa)]/25" />
+                              </div>
+                              <span className="text-[9px] text-muted-foreground shrink-0">{inicial}+{prorrog}d</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Assuntos PA */}
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Assuntos (sindicância)</p>
+                      <div className="flex flex-wrap gap-1">
+                        {form.assuntosPASindicancia.slice(0, 6).map((a, i) => (
+                          <span key={i} className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[9px] text-slate-600">{a}</span>
+                        ))}
+                        {form.assuntosPASindicancia.length > 6 && (
+                          <span className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">+{form.assuntosPASindicancia.length - 6}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {previewTab === "DU" && (
+                  <div className="mt-3 space-y-3">
+                    {/* Abas do DU */}
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Abas de navegação</p>
+                      <div className="flex gap-1 flex-wrap">
+                        {duColumnTabs.filter(a => a.enabled).length === 0 ? (
+                          <span className="text-[10px] text-muted-foreground italic">Nenhuma aba ativa</span>
+                        ) : (
+                          duColumnTabs.filter(a => a.enabled).map((aba) => (
+                            <span
+                              key={aba.id}
+                              className="inline-flex items-center rounded-md bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-700"
+                            >
+                              {aba.label}
+                            </span>
+                          ))
+                        )}
+                        {duColumnTabs.filter(a => !a.enabled).map((aba) => (
+                          <span
+                            key={aba.id}
+                            className="inline-flex items-center rounded-md bg-muted px-2 py-0.5 text-[10px] text-muted-foreground line-through opacity-50"
+                          >
+                            {aba.label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Colunas DU */}
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Colunas do quadro</p>
+                      <div className="flex gap-1.5 overflow-x-auto pb-1">
+                        {duBoardColumnsOrdenadas.length === 0 ? (
+                          <span className="text-[10px] text-muted-foreground italic">Nenhuma coluna configurada</span>
+                        ) : (
+                          duBoardColumnsOrdenadas.map((coluna) => (
+                            <div
+                              key={coluna.id}
+                              className={`flex-shrink-0 w-28 rounded-xl border p-2 space-y-1.5 ${coluna.enabled ? "border-sky-200 bg-sky-50" : "border-border bg-muted/30 opacity-40"}`}
+                            >
+                              <p className="text-[10px] font-bold text-sky-700 leading-tight line-clamp-2">{coluna.label}</p>
+                              <div className="space-y-1">
+                                {[1, 2, 3].map((i) => (
+                                  <div key={i} className="h-5 rounded-md bg-white/80 border border-sky-100 flex items-center px-1.5 gap-1">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-sky-400/50 flex-shrink-0" />
+                                    <div className="h-1 flex-1 rounded bg-sky-200/50" />
+                                  </div>
+                                ))}
+                              </div>
+                              {!coluna.enabled && (
+                                <p className="text-[8px] text-center text-muted-foreground font-semibold uppercase">oculta</p>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Assuntos DU */}
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Assuntos principais</p>
+                      <div className="flex flex-wrap gap-1">
+                        {form.assuntosDUPrincipais.slice(0, 6).map((a, i) => (
+                          <span key={i} className="inline-flex rounded-md bg-sky-50 border border-sky-100 px-1.5 py-0.5 text-[9px] text-sky-700">{a}</span>
+                        ))}
+                        {form.assuntosDUPrincipais.length > 6 && (
+                          <span className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">+{form.assuntosDUPrincipais.length - 6}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Origens DU */}
+                    <div>
+                      <p className="mb-1.5 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Origens de documentos</p>
+                      <div className="flex flex-wrap gap-1">
+                        {form.origensDUDocumentos.slice(0, 5).map((o, i) => (
+                          <span key={i} className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[9px] text-slate-600">{o}</span>
+                        ))}
+                        {form.origensDUDocumentos.length > 5 && (
+                          <span className="inline-flex rounded-md bg-muted px-1.5 py-0.5 text-[9px] text-muted-foreground">+{form.origensDUDocumentos.length - 5}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
           </div>
 
-          <div className="rounded-2xl border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
+          <div className="rounded-2xl border border-border bg-muted/30 p-3 text-[10px] text-muted-foreground">
             {previewFooter}
           </div>
         </div>

@@ -121,8 +121,8 @@ service cloud.firestore {
     // Regras para a coleção de usuários
     match /usuarios/{userId} {
       allow read:  if isSignedIn();
-      // Escrita restrita: apenas o admin universal por email
-      allow write: if isSignedIn() && isAdminUniversal();
+      // Escrita restrita: admin universal por email ou usuário com perfil de Chefe
+      allow write: if isSignedIn() && (isAdminUniversal() || isChefePerfil());
     }
     
     // Regras para a coleção de distribuições

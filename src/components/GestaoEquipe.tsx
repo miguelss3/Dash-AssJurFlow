@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, deleteField } from "firebase/firestore";
 import { createUserWithEmailAndPassword, Auth } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 import { Button } from "./ui/button";
@@ -89,7 +89,7 @@ export function GestaoEquipe() {
         email: formData.email,
         isChefe: formData.isChefe === "Sim",
         role: formData.isChefe === "Sim" ? `Chefe ${formData.setor}` : "ASSESSOR",
-        cargo: formData.isChefe === "Sim" ? `Chefe ${formData.setor}` : undefined,
+        cargo: formData.isChefe === "Sim" ? `Chefe ${formData.setor}` : deleteField() as any,
         secao: formData.setor,
         ativo: true,
       };
