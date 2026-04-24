@@ -24,6 +24,20 @@ interface Mensagem {
   timestamp: string;
 }
 
+function toMs(timestamp: unknown): number {
+  if (!timestamp) return 0;
+
+  if (typeof (timestamp as { toDate?: () => Date }).toDate === "function") {
+    const dt = (timestamp as { toDate: () => Date }).toDate();
+    const ms = dt.getTime();
+    return Number.isNaN(ms) ? 0 : ms;
+  }
+
+  const dt = new Date(String(timestamp));
+  const ms = dt.getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
 export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
   const { user } = useAuth();
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
@@ -98,6 +112,7 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
           });
         }
         
+        msgs.sort((a, b) => toMs(a.timestamp) - toMs(b.timestamp));
         setMensagens(msgs);
         setLoading(false);
       },
