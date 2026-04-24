@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { getFirestore, collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB2Pk4plzDbRJSrQdaIAu7P4fOPpvefAG0",
@@ -41,6 +41,14 @@ function canonicalizarStatus(raw) {
   return null;
 }
 
+function dividirEmLotes(itens, tamanho) {
+  const lotes = [];
+  for (let i = 0; i < itens.length; i += tamanho) {
+    lotes.push(itens.slice(i, i + tamanho));
+  }
+  return lotes;
+}
+
 async function auditar() {
   if (!password) {
     throw new Error("FIREBASE_AUDIT_PASSWORD não informado.");
@@ -49,17 +57,32 @@ async function auditar() {
   console.log(`Audit login email: ${email}`);
   await signInWithEmailAndPassword(auth, email, password);
 
-  const [processosSnap, distribuicoesSnap, usuariosSnap, mensagensSnap] = await Promise.all([
-    getDocs(collection(db, "processos")),
-    getDocs(collection(db, "distribuicoes")),
+  const [processosDUSnap, processosPASnap, usuariosSnap] = await Promise.all([
+    getDocs(query(collection(db, "processos"), where("setor", "==", "DU"))),
+    getDocs(query(collection(db, "processos"), where("setor", "==", "PA"))),
     getDocs(collection(db, "usuarios")),
-    getDocs(collection(db, "mensagens")),
   ]);
 
-  const processos = processosSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const distribuicoes = distribuicoesSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const processos = [...processosDUSnap.docs, ...processosPASnap.docs].map((d) => ({ id: d.id, ...d.data() }));
   const usuarios = usuariosSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const mensagens = mensagensSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+  const idsProcessosArray = processos.map((p) => p.id);
+  const distribuicoes = [];
+  const mensagens = [];
+
+  for (const lote of dividirEmLotes(idsProcessosArray, 10)) {
+    const distSnap = await getDocs(query(collection(db, "distribuicoes"), where("processoId", "in", lote)));
+    distSnap.docs.forEach((d) => distribuicoes.push({ id: d.id, ...d.data() }));
+  }
+
+  await Promise.all(
+    idsProcessosArray.map(async (processoId) => {
+      const msgSnap = await getDoc(doc(db, "mensagens", processoId));
+      if (msgSnap.exists()) {
+        mensagens.push({ id: msgSnap.id, ...msgSnap.data() });
+      }
+    }),
+  );
 
   const inconsistencias = {
     statusNaoCanonico: [],
@@ -70,6 +93,8 @@ async function auditar() {
     concluidoSemFinalizado: [],
     processoSemMensagem: [],
     processoSemDistribuicao: [],
+    duPendenciaChefiaComResponsavel: [],
+    responsavelDivergenteDistribuicao: [],
     distribuicaoOrfa: [],
     mensagemOrfa: [],
   };
@@ -77,6 +102,22 @@ async function auditar() {
   const idsProcessos = new Set(processos.map((p) => p.id));
   const idsMensagens = new Set(mensagens.map((m) => m.id));
   const idsDistribuidos = new Set(distribuicoes.map((d) => d.processoId).filter(Boolean));
+  const distribuicaoPorProcesso = new Map();
+  for (const d of distribuicoes) {
+    const processoId = String(d.processoId || "").trim();
+    if (!processoId) continue;
+    if (!distribuicaoPorProcesso.has(processoId)) {
+      distribuicaoPorProcesso.set(processoId, d);
+    }
+  }
+
+  const situacoesPendenciaChefiaDU = new Set([
+    "CHEFIA_DILIGENCIA",
+    "CHEFIA_DEFESA",
+    "aguardando_assinatura_secao",
+    "aguardando_aprovacao_externa",
+    "enviado_admin",
+  ]);
 
   for (const p of processos) {
     const statusRaw = p.status;
@@ -113,6 +154,30 @@ async function auditar() {
 
     if (!idsDistribuidos.has(p.id)) {
       inconsistencias.processoSemDistribuicao.push({ id: p.id, numero: p.numeroProcesso || p.numero });
+    }
+
+    const setor = String(p.setor || "").trim().toUpperCase();
+    const responsavel = String(p.responsavel || "").trim();
+    const situacaoFluxoDU = String(p?.pedidoSubsidios?.situacaoFluxo || "").trim();
+    if (setor === "DU" && situacoesPendenciaChefiaDU.has(situacaoFluxoDU) && responsavel) {
+      inconsistencias.duPendenciaChefiaComResponsavel.push({
+        id: p.id,
+        numero: p.numeroProcesso || p.numero,
+        situacaoFluxo: situacaoFluxoDU,
+        responsavel,
+      });
+    }
+
+    const d = distribuicaoPorProcesso.get(p.id);
+    const assessorDistribuido = String(d?.assessorNome || "").trim();
+    if (responsavel !== assessorDistribuido) {
+      inconsistencias.responsavelDivergenteDistribuicao.push({
+        id: p.id,
+        numero: p.numeroProcesso || p.numero,
+        setor,
+        responsavelProcesso: responsavel,
+        responsavelDistribuicao: assessorDistribuido,
+      });
     }
   }
 
