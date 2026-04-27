@@ -147,6 +147,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
   useEffect(() => {
     if (!open) return;
     carregarFluxo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, processoId]);
 
   const registrarHistorico = async (texto: string) => {

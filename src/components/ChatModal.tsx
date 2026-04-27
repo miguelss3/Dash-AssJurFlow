@@ -124,6 +124,7 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
     );
 
     return () => unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, processo?.id]);
 
   const enviarMensagem = async () => {

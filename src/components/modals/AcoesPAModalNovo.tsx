@@ -333,6 +333,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
       return;
     }
     carregarProcesso();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, processoId]);
 
   const registrarHistorico = async (texto: string) => {

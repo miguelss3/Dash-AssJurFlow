@@ -133,7 +133,7 @@ export function calcularFaixasProrrogacaoPA(params: {
     const inicioInformado = normalizarDataPrazoPA(item?.inicio || undefined);
     const fimInformado = normalizarDataPrazoPA(item?.fim || undefined);
 
-    let inicio = inicioInformado || fimAnterior;
+    const inicio = inicioInformado || fimAnterior;
     let fim = fimInformado || adicionarDiasDataCivil(inicio, diasPadrao) || inicio;
 
     let dias = diasPadrao;

@@ -54,6 +54,7 @@ function DefaultErrorComponent({ error, reset }: { error: Error; reset: () => vo
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const getRouter = () => {
   const router = createRouter({
     routeTree,
