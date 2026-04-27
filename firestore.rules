@@ -184,6 +184,14 @@ service cloud.firestore {
           'prazoSindicanciaProrrogacaoDias',
           'prazoConselhoInicialDias',
           'prazoConselhoProrrogacaoDias',
+          'assuntosPASindicancia',
+          'assuntosDUPrincipais',
+          'origensDUDocumentos',
+          'paEmAndamentoColumns',
+          'duBoardColumns',
+          'columnTabs',
+          'paFlowActions',
+          'duFlowActions',
           'updatedAt',
           'updatedByName',
           'updatedByEmail'
@@ -199,7 +207,15 @@ service cloud.firestore {
         request.resource.data.prazoSindicanciaInicialDias is number &&
         request.resource.data.prazoSindicanciaProrrogacaoDias is number &&
         request.resource.data.prazoConselhoInicialDias is number &&
-        request.resource.data.prazoConselhoProrrogacaoDias is number;
+        request.resource.data.prazoConselhoProrrogacaoDias is number &&
+        request.resource.data.assuntosPASindicancia is list &&
+        request.resource.data.assuntosDUPrincipais is list &&
+        request.resource.data.origensDUDocumentos is list &&
+        request.resource.data.paEmAndamentoColumns is list &&
+        request.resource.data.duBoardColumns is list &&
+        request.resource.data.columnTabs is list &&
+        request.resource.data.paFlowActions is list &&
+        request.resource.data.duFlowActions is list;
       allow delete: if false;
     }
     

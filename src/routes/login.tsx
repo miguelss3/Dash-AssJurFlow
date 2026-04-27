@@ -72,6 +72,8 @@ function LoginPage() {
         setErro("Usuário não encontrado.");
       } else if (error.code === "auth/too-many-requests") {
         setErro("Muitas tentativas. Tente novamente mais tarde.");
+      } else if (error.code === "auth/network-request-failed") {
+        setErro("Sem conexão com o servidor de autenticação. Verifique sua internet ou tente pelo site: assjur-flow-12rm.web.app");
       } else {
         setErro("Erro ao autenticar. Verifique suas credenciais.");
       }
