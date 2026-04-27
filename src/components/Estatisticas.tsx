@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -21,7 +21,7 @@ import { COLUNAS } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
 import { Button } from "@/components/ui/button";
 import {
-  exportIndicadoresGeraisPdf,
+  exportIndicadoresGeraisPdfFromElement,
   exportSindicanciasPdf,
   exportIPMPdf,
 } from "@/lib/indicadoresPdf";
@@ -69,9 +69,20 @@ function normalizarChaveAssunto(value: string) {
 }
 
 export function Estatisticas({ processos }: Props) {
-  const handleExportEstatisticas = () => {
-    exportIndicadoresGeraisPdf(processos);
-    toast.success("PDF de estatísticas gerado.");
+  const indicadoresPrintRef = useRef<HTMLDivElement | null>(null);
+
+  const handleExportEstatisticas = async () => {
+    if (!indicadoresPrintRef.current) {
+      toast.error("Não foi possível localizar a área de impressão dos indicadores.");
+      return;
+    }
+
+    try {
+      await exportIndicadoresGeraisPdfFromElement(indicadoresPrintRef.current);
+      toast.success("PDF dos indicadores gerado com sucesso.");
+    } catch {
+      toast.error("Falha ao gerar o PDF dos indicadores.");
+    }
   };
 
   const handleExportSindicancias = () => {
@@ -197,30 +208,33 @@ export function Estatisticas({ processos }: Props) {
     return s === "today" || s === "soon";
   }).length;
 
-  const dadosIndicesDashboard = useMemo(
-    () => [
-      { name: "Entradas", valor: ativos },
-      { name: "Concluídos", valor: concluidos },
-      { name: "Acervo", valor: ativos },
-    ],
-    [ativos, concluidos],
-  );
+  const now = new Date();
+  const mesNome = now.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const mesAtual = now.getMonth();
+  const anoAtual = now.getFullYear();
 
-  const dadosPrazosDashboard = useMemo(
-    () => [
-      { name: "Vencidos", valor: vencidos, fill: "var(--deadline-overdue)" },
-      { name: "Hoje", valor: hoje, fill: "var(--deadline-today)" },
-      { name: "7 dias", valor: proximos7, fill: "oklch(0.6 0.16 230)" },
-    ],
-    [vencidos, hoje, proximos7],
-  );
+  const noMesAtual = (data?: string) => {
+    if (!data) return false;
+    const d = new Date(data);
+    if (Number.isNaN(d.getTime())) return false;
+    return d.getMonth() === mesAtual && d.getFullYear() === anoAtual;
+  };
+
+  const cadastradosMes = processos.filter((p) => noMesAtual(p.criadoEm || p.dataEntrada || p.entrada)).length;
+  const finalizadosMes = processos.filter(
+    (p) => p.status === "concluido" && noMesAtual(p.atualizadoEm || p.criadoEm),
+  ).length;
+  const resolutividadeMes = cadastradosMes > 0 ? Math.round((finalizadosMes / cadastradosMes) * 100) : 0;
+
+  const totalDU = processos.filter((p) => p.tipo === "DU").length;
+  const totalPA = processos.filter((p) => p.tipo === "PA").length;
 
   const taxaSucesso = total ? Math.round((concluidos / total) * 100) : 0;
   const topResp = dadosResponsavel[0];
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+    <div className="space-y-5" ref={indicadoresPrintRef}>
+      <div data-print-ignore="true" className="rounded-2xl border border-border bg-card p-4 shadow-card">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
@@ -282,71 +296,82 @@ export function Estatisticas({ processos }: Props) {
         />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4 sm:gap-5">
-        <ChartCard
-          title="Índices do Dashboard"
-          subtitle="Entradas, concluídos e acervo"
-          icon={TrendingUp}
-        >
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart
-              data={dadosIndicesDashboard}
-              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-              />
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Bar dataKey="valor" fill={ACCENT} radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-          <p className="text-xs text-muted-foreground mt-2">
-            Índice de resolutividade atual: <span className="font-semibold">{taxaSucesso}%</span>
-          </p>
-        </ChartCard>
+      <div className="grid lg:grid-cols-3 gap-4 sm:gap-5">
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-card">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-10 w-10 rounded-2xl items-center justify-center bg-[oklch(0.6_0.16_230_/_0.12)]">
+              <TrendingUp className="h-5 w-5 text-[oklch(0.55_0.17_230)]" />
+            </span>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-foreground">Índice Mensal</p>
+              <p className="text-sm text-muted-foreground capitalize">{mesNome}</p>
+            </div>
+          </div>
 
-        <ChartCard
-          title="Prazos do Dashboard"
-          subtitle="Vencidos, hoje e próximos 7 dias"
-          icon={AlertTriangle}
-        >
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart
-              data={dadosPrazosDashboard}
-              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
-              <XAxis
-                dataKey="name"
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
-                axisLine={false}
-                tickLine={false}
+          <div className="mt-6 space-y-2.5 text-base">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Cadastrados</span>
+              <span className="font-bold tabular-nums">{cadastradosMes}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Finalizados</span>
+              <span className="font-bold tabular-nums text-[var(--deadline-safe)]">{finalizadosMes}</span>
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-muted-foreground">Resolutividade</span>
+              <span className="font-bold tabular-nums">{resolutividadeMes}%</span>
+            </div>
+            <div className="h-3 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[oklch(0.6_0.16_230)] to-[oklch(0.78_0.18_145)]"
+                style={{ width: `${resolutividadeMes}%` }}
               />
-              <YAxis
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
-                axisLine={false}
-                tickLine={false}
-                allowDecimals={false}
-              />
-              <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Bar dataKey="valor" radius={[8, 8, 0, 0]}>
-                {dadosPrazosDashboard.map((d, i) => (
-                  <Cell key={i} fill={d.fill} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </ChartCard>
+            </div>
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 rounded-3xl bg-gradient-to-br from-[oklch(0.22_0.05_258)] to-[oklch(0.32_0.1_245)] text-white p-6 shadow-elegant relative overflow-hidden">
+          <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
+
+          <div className="relative">
+            <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-[oklch(0.78_0.18_145)] mb-4">
+              Acervo Processual
+            </p>
+
+            <div className="grid sm:grid-cols-2 gap-6">
+              <div>
+                <div className="text-6xl font-bold font-display tabular-nums leading-none">{total}</div>
+                <p className="text-2xl text-white/85 mt-3">Processos cadastrados</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">DU: {totalDU}</span>
+                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">PA: {totalPA}</span>
+                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">Ativos: {ativos}</span>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-end gap-2 leading-none">
+                  <span className="text-6xl font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
+                    {concluidos}
+                  </span>
+                  <span className="text-3xl font-bold text-[oklch(0.78_0.18_145)] mb-1">{taxaSucesso}%</span>
+                </div>
+                <p className="text-2xl text-white/85 mt-3">Finalizados</p>
+                <p className="text-lg text-white/60 mt-0.5">{taxaSucesso}% do total cadastrado</p>
+
+                <div className="mt-4 h-2.5 rounded-full bg-white/15 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-[oklch(0.78_0.18_145)]"
+                    style={{ width: `${taxaSucesso}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Gráficos linha 1 */}
@@ -403,7 +428,7 @@ export function Estatisticas({ processos }: Props) {
                 allowDecimals={false}
               />
               <Tooltip cursor={{ fill: "oklch(0.95 0 0 / 0.5)" }} contentStyle={TOOLTIP_STYLE} />
-              <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+              <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={42}>
                 {dadosPrazos.map((d, i) => (
                   <Cell key={i} fill={d.fill} />
                 ))}

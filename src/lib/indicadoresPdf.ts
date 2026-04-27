@@ -3,6 +3,10 @@ import autoTable from "jspdf-autotable";
 import type { Processo } from "@/types/processo";
 import { statusPrazo, diasRestantes } from "@/lib/prazo";
 
+type Html2CanvasModule = {
+  default: (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+};
+
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
   const d = new Date(dateStr);
@@ -105,6 +109,64 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
   });
 
   doc.save("indicadores-estatisticas.pdf");
+}
+
+export async function exportIndicadoresGeraisPdfFromElement(element: HTMLElement) {
+  const html2canvasModule = (await import("html2canvas")) as Html2CanvasModule;
+  const html2canvas = html2canvasModule.default;
+
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.style.width = `${element.scrollWidth}px`;
+  clone.style.background = "white";
+  clone.style.padding = "16px";
+  clone.querySelectorAll('[data-print-ignore="true"]').forEach((node) => node.remove());
+
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "fixed";
+  wrapper.style.left = "-100000px";
+  wrapper.style.top = "0";
+  wrapper.style.width = `${element.scrollWidth + 40}px`;
+  wrapper.style.background = "white";
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  try {
+    const canvas = await html2canvas(clone, {
+      scale: 2,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+    });
+
+    const imgData = canvas.toDataURL("image/png", 1);
+    const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 8;
+    const usableWidth = pageWidth - margin * 2;
+    const usableHeight = pageHeight - margin * 2;
+
+    const imgWidth = usableWidth;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    let yRemaining = imgHeight;
+    let position = margin;
+
+    doc.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+    yRemaining -= usableHeight;
+
+    while (yRemaining > 0) {
+      position = yRemaining - imgHeight + margin;
+      doc.addPage();
+      doc.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      yRemaining -= usableHeight;
+    }
+
+    doc.save("indicadores-gestao-dashboard.pdf");
+  } finally {
+    document.body.removeChild(wrapper);
+  }
 }
 
 function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
