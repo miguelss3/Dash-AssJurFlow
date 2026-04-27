@@ -1032,7 +1032,7 @@ function Index() {
     <div className="min-h-screen bg-background">
       {/* ===================== SIDEBAR (estilo AssJur Flow) ===================== */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-sidebar text-sidebar-foreground transform transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-56 bg-gradient-sidebar text-sidebar-foreground transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -1159,7 +1159,7 @@ function Index() {
       )}
 
       {/* ===================== MAIN ===================== */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-56">
         {/* Header */}
         <header className="px-4 sm:px-6 lg:px-8 pt-5">
           <div className="flex items-start sm:items-center gap-3 flex-wrap">
