@@ -115,6 +115,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
   const [isMS, setIsMS] = useState(false);
   const [prazoInternoDU, setPrazoInternoDU] = useState("");
   const [prazoFatalDU, setPrazoFatalDU] = useState("");
+  const [duDataPrazoFluxo, setDuDataPrazoFluxo] = useState("");
+  const [duNumeroSaida, setDuNumeroSaida] = useState("");
+  const [duNumeroRecebido, setDuNumeroRecebido] = useState("");
+  const [duNumeroDocFinal, setDuNumeroDocFinal] = useState("");
 
   // Campos PA
   const [tipoPA, setTipoPA] = useState("");
@@ -163,6 +167,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
     setIsMS(false);
     setPrazoInternoDU("");
     setPrazoFatalDU("");
+    setDuDataPrazoFluxo("");
+    setDuNumeroSaida("");
+    setDuNumeroRecebido("");
+    setDuNumeroDocFinal("");
     setTipoPA("");
     setFluxoIPM("Novo");
     setAnoLegado("");
@@ -192,6 +200,13 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
       setIsMS(p.isMS || false);
       setPrazoInternoDU(p.prazo || "");
       setPrazoFatalDU(p.prazoFatal || "");
+
+      const pedido = p.pedidoSubsidios || {};
+      const resposta = p.respostaDU || {};
+      setDuDataPrazoFluxo(pedido.dataPrazo || pedido.prazoResposta || "");
+      setDuNumeroSaida(pedido.numeroSaida || pedido.numeroDiex || resposta.numeroDiex || "");
+      setDuNumeroRecebido(pedido.numeroRecebido || resposta.numeroRecebido || "");
+      setDuNumeroDocFinal(pedido.numeroDocFinal || resposta.numeroOficio || "");
     }
 
     if (p.setor === "PA") {
@@ -563,6 +578,32 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         dados.notificacaoAdminEm = agoraISO;
         dados.notificacaoAdminPorNome = autorCadastro;
         dados.notificacaoAdminDescricao = "Novo processo DU aguardando distribuição.";
+
+        if (processo?.id) {
+          const numeroSaidaNormalizado = duNumeroSaida.trim();
+          const numeroRecebidoNormalizado = duNumeroRecebido.trim();
+          const numeroDocFinalNormalizado = duNumeroDocFinal.trim();
+          const dataPrazoNormalizada = duDataPrazoFluxo.trim();
+          const pedidoAtual = processo.pedidoSubsidios || {};
+          const respostaAtual = processo.respostaDU || {};
+
+          dados.pedidoSubsidios = {
+            ...pedidoAtual,
+            dataPrazo: dataPrazoNormalizada || null,
+            prazoResposta: dataPrazoNormalizada || null,
+            numeroSaida: numeroSaidaNormalizado || null,
+            numeroDiex: numeroSaidaNormalizado || pedidoAtual.numeroDiex || null,
+            numeroRecebido: numeroRecebidoNormalizado || null,
+            numeroDocFinal: numeroDocFinalNormalizado || null,
+          };
+
+          dados.respostaDU = {
+            ...respostaAtual,
+            numeroDiex: numeroSaidaNormalizado || null,
+            numeroRecebido: numeroRecebidoNormalizado || null,
+            numeroOficio: numeroDocFinalNormalizado || null,
+          };
+        }
       }
 
       if (setor === "PA") {
@@ -1060,6 +1101,54 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
                   />
                 </div>
               </div>
+
+              {processo?.id && (
+                <div className="space-y-4 rounded-lg border border-sky-200 bg-sky-50 p-4">
+                  <h4 className="text-sm font-semibold text-sky-900">Resultados DU</h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="duDataPrazoFluxo">Data de prazo (fluxo)</Label>
+                      <Input
+                        id="duDataPrazoFluxo"
+                        type="date"
+                        value={duDataPrazoFluxo}
+                        onChange={(e) => setDuDataPrazoFluxo(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="duNumeroSaida">Nº envio/saída</Label>
+                      <Input
+                        id="duNumeroSaida"
+                        value={duNumeroSaida}
+                        onChange={(e) => setDuNumeroSaida(e.target.value)}
+                        placeholder="Ex: DIEx 123/2026"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="duNumeroRecebido">Nº documento recebido</Label>
+                      <Input
+                        id="duNumeroRecebido"
+                        value={duNumeroRecebido}
+                        onChange={(e) => setDuNumeroRecebido(e.target.value)}
+                        placeholder="Ex: DIEx 456/2026"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="duNumeroDocFinal">Nº documento final</Label>
+                      <Input
+                        id="duNumeroDocFinal"
+                        value={duNumeroDocFinal}
+                        onChange={(e) => setDuNumeroDocFinal(e.target.value)}
+                        placeholder="Ex: Ofício 789/2026"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
