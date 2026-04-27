@@ -21,7 +21,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useProcessos } from "@/hooks/useProcessos";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Dashboard } from "@/components/Dashboard";
@@ -80,13 +87,24 @@ export const Route = createFileRoute("/")({
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <div className="max-w-md rounded-2xl bg-white p-8 text-center shadow-lg">
           <div className="mb-4 text-red-500">
-            <svg className="mx-auto h-16 w-16" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <svg
+              className="mx-auto h-16 w-16"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-slate-900">Erro ao Carregar Dashboard</h1>
           <p className="mt-3 text-sm text-slate-600">
-            {error.message || "Ocorreu um erro ao carregar os dados. Verifique sua conexão e as regras do Firebase."}
+            {error.message ||
+              "Ocorreu um erro ao carregar os dados. Verifique sua conexão e as regras do Firebase."}
           </p>
           <div className="mt-6 space-x-2">
             <button
@@ -198,22 +216,26 @@ function Index() {
   // Usuário logado (sem fallback fixo para evitar flicker visual no reload)
   const usuario = user ?? { posto: "", nome: "", role: "", setor: "" };
   const ehAdmin = isAdmin(user);
-  const setorUsuario = normalizarSetor(usuario.setor || usuario.role || usuario.secao || usuario.cargo);
+  const setorUsuario = normalizarSetor(
+    usuario.setor || usuario.role || usuario.secao || usuario.cargo,
+  );
 
   const isPendenteChefia = (p: Processo) => {
     const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
     const statusNorm = (p.status || "").toString().toLowerCase();
-    return [
-      "aguardando_assinatura_secao",
-      "aguardando_aprovacao_externa",
-      "enviado_admin",
-      "assinado_externo",
-      "CHEFIA_DILIGENCIA",
-      "CHEFIA_DEFESA",
-      "AGUARDANDO_RESPOSTA",
-    ].includes(situacaoFluxo)
-      || statusNorm.includes("aguardando assinatura")
-      || statusNorm.includes("aguardando conferencia da chefia");
+    return (
+      [
+        "aguardando_assinatura_secao",
+        "aguardando_aprovacao_externa",
+        "enviado_admin",
+        "assinado_externo",
+        "CHEFIA_DILIGENCIA",
+        "CHEFIA_DEFESA",
+        "AGUARDANDO_RESPOSTA",
+      ].includes(situacaoFluxo) ||
+      statusNorm.includes("aguardando assinatura") ||
+      statusNorm.includes("aguardando conferencia da chefia")
+    );
   };
 
   // Todos operam na Visão do Setor
@@ -229,7 +251,7 @@ function Index() {
     if (ehAdmin) {
       return processos;
     }
-    
+
     return processos.filter((p) => {
       const setorProcesso = normalizarSetor(p.setor || p.tipo);
       return setorProcesso === setorUsuario;
@@ -241,7 +263,7 @@ function Index() {
       const setorProcesso = normalizarSetor(p.setor || p.tipo);
 
       if (filtroTipo !== "todos" && setorProcesso !== filtroTipo) return false;
-      
+
       // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
       // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
       // Processos com setor vazio/corrompido nunca vazam para assessores
@@ -274,7 +296,7 @@ function Index() {
       if (filtro === "semana") return s === "today" || s === "soon";
       return true;
     });
-  }, [processos, filtro, busca, filtroTipo, usuario.posto, usuario.nome, setorUsuario, ehAdmin]);
+  }, [processos, filtro, busca, filtroTipo, setorUsuario, ehAdmin]);
 
   const nomeMilitarAtual = useMemo(() => {
     if (!user) return "Sistema";
@@ -294,7 +316,8 @@ function Index() {
       },
       ajustes: {
         titulo: "Ajustes do Site",
-        descricao: "Edite textos e rótulos do layout principal visível para os usuários autenticados.",
+        descricao:
+          "Edite textos e rótulos do layout principal visível para os usuários autenticados.",
       },
       arquivo: {
         titulo: "Arquivo / Encerrados",
@@ -506,7 +529,7 @@ function Index() {
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [notificacoesOpen]);
-  
+
   const handleEdit = (p: Processo) => {
     setEditing(p);
     setDialogOpen(true);
@@ -571,6 +594,12 @@ function Index() {
       return;
     }
 
+    const extrairCodigoErro = (error: unknown): string | undefined => {
+      if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
+      const code = (error as { code?: unknown }).code;
+      return typeof code === "string" ? code : undefined;
+    };
+
     setPerfilSaving(true);
     try {
       const [{ auth, db }, authSdk, fsSdk] = await Promise.all([
@@ -622,9 +651,12 @@ function Index() {
             });
           }
         }
-      } catch (error: any) {
-        if (error?.code === "permission-denied") {
-          toast.info("Senha/e-mail atualizados. Perfil no Firestore sera sincronizado pela administracao.");
+      } catch (error: unknown) {
+        const codigoErro = extrairCodigoErro(error);
+        if (codigoErro === "permission-denied") {
+          toast.info(
+            "Senha/e-mail atualizados. Perfil no Firestore sera sincronizado pela administracao.",
+          );
         } else {
           console.warn("Falha ao sincronizar perfil no Firestore:", error);
         }
@@ -650,11 +682,12 @@ function Index() {
       setPerfilOpen(false);
       toast.success("Perfil atualizado com sucesso!");
       window.location.reload();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const codigoErro = extrairCodigoErro(error);
       console.error("Erro ao atualizar perfil:", error);
-      if (error?.code === "auth/requires-recent-login") {
+      if (codigoErro === "auth/requires-recent-login") {
         toast.error("Para alterar e-mail ou senha, entre novamente no sistema e tente outra vez.");
-      } else if (error?.code === "auth/email-already-in-use") {
+      } else if (codigoErro === "auth/email-already-in-use") {
         toast.error("Este e-mail ja esta em uso.");
       } else {
         toast.error("Nao foi possivel atualizar seu perfil.");
@@ -670,13 +703,20 @@ function Index() {
     setDialogOpen(true);
   };
 
-  const handleNovoLancamentoCalendario = (payload: { id: string; titulo: string; descricao?: string; criadoEm: string }) => {
+  const handleNovoLancamentoCalendario = (payload: {
+    id: string;
+    titulo: string;
+    descricao?: string;
+    criadoEm: string;
+  }) => {
     if (!chaveNotificacoesCalendario) return;
 
     const item: NotificacaoItem = {
       id: `cal-${payload.id}`,
       titulo: "Novo lançamento no calendário",
-      texto: payload.descricao?.trim() ? `${payload.titulo} - ${payload.descricao}` : payload.titulo,
+      texto: payload.descricao?.trim()
+        ? `${payload.titulo} - ${payload.descricao}`
+        : payload.titulo,
       momentoISO: payload.criadoEm,
     };
 
@@ -723,7 +763,8 @@ function Index() {
 
   const registrarMovimentacao = async (processoId: string, texto: string) => {
     const { db } = await import("@/lib/firebase");
-    const { collection, addDoc, doc, getDoc, setDoc, Timestamp } = await import("firebase/firestore");
+    const { collection, addDoc, doc, getDoc, setDoc, Timestamp } =
+      await import("firebase/firestore");
 
     const agoraISO = new Date().toISOString();
     const autor = nomeMilitarAtual;
@@ -739,30 +780,36 @@ function Index() {
 
     const mensagensRef = doc(db, "mensagens", processoId);
     const mensagensSnap = await getDoc(mensagensRef);
-    const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
+    const historicoExistente = mensagensSnap.exists() ? mensagensSnap.data()?.historico || [] : [];
     await setDoc(mensagensRef, {
-      historico: [...historicoExistente, {
-        id: crypto.randomUUID(),
-        autor,
-        autorId,
-        texto,
-        timestamp: agoraISO,
-      }]
+      historico: [
+        ...historicoExistente,
+        {
+          id: crypto.randomUUID(),
+          autor,
+          autorId,
+          texto,
+          timestamp: agoraISO,
+        },
+      ],
     });
   };
 
   const handleRedistribuir = async (processoId: string, novoResponsavel: string) => {
-    const toastId = toast.loading(novoResponsavel?.trim() ? "Redistribuindo processo..." : "Removendo distribuição...");
+    const toastId = toast.loading(
+      novoResponsavel?.trim() ? "Redistribuindo processo..." : "Removendo distribuição...",
+    );
     try {
       const { db } = await import("@/lib/firebase");
-      const { collection, addDoc, getDocs, query, updateDoc, where } = await import("firebase/firestore");
-      
+      const { collection, addDoc, getDocs, query, updateDoc, where } =
+        await import("firebase/firestore");
+
       const processo = processos.find((p) => p.id === processoId);
       if (!processo) {
         toast.dismiss(toastId);
         return;
       }
-      
+
       const tinhaResponsavelAntes = !!processo.responsavel?.trim();
       const vaiParaAguardando = !novoResponsavel?.trim();
 
@@ -771,10 +818,10 @@ function Index() {
         : tinhaResponsavelAntes
           ? `Processo redistribuído para ${novoResponsavel}`
           : `Processo distribuído para ${novoResponsavel}`;
-      
+
       const agoraISO = new Date().toISOString();
       const autorNome = nomeMilitarAtual;
-      
+
       // Atualiza o processo com responsável, data e autor
       const atualizarProcessoPromise = atualizar(processoId, {
         responsavel: novoResponsavel,
@@ -806,15 +853,18 @@ function Index() {
               assessorNome: novoResponsavel,
               dataDistribuicao: agoraISO,
               atualizadoEm: agoraISO,
-            })
+            }),
           );
           await Promise.all(updates);
         }
       })();
-      
+
       await atualizarProcessoPromise;
       toast.success(msgHistorico, { id: toastId });
-      Promise.all([sincronizarDistribuicaoPromise, registrarMovimentacao(processoId, msgHistorico)]).catch((error) => {
+      Promise.all([
+        sincronizarDistribuicaoPromise,
+        registrarMovimentacao(processoId, msgHistorico),
+      ]).catch((error) => {
         console.error("❌ Erro em pós-processamento da redistribuição:", error);
       });
     } catch (error) {
@@ -951,13 +1001,13 @@ function Index() {
     { id: "indicadores", label: "Indicadores de Gestão" },
     { id: "equipe", label: "Gestão da Equipe" },
   ];
-  
+
   const tabsAssessor: { id: Aba; label: string }[] = [
     { id: "mesa", label: "Mesa de Trabalho" },
     { id: "prazos", label: "Controle de Prazos" },
     { id: "indicadores", label: "Indicadores de Gestão" },
   ];
-  
+
   const tabs = ehAdmin ? tabsCompletas : tabsAssessor;
 
   useEffect(() => {
@@ -1126,9 +1176,7 @@ function Index() {
               <h2 className="font-bold text-2xl sm:text-3xl tracking-tight leading-tight font-display text-foreground">
                 {cabecalhoAtual.titulo}
               </h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                {cabecalhoAtual.descricao}
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">{cabecalhoAtual.descricao}</p>
             </div>
 
             <div className="flex items-center gap-2 ml-auto shrink-0">
@@ -1174,7 +1222,9 @@ function Index() {
                                 className="w-full text-left px-4 py-3 hover:bg-muted/60 transition-colors"
                               >
                                 <p className="text-xs font-semibold text-foreground">{n.titulo}</p>
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.texto}</p>
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                                  {n.texto}
+                                </p>
                                 <p className="text-[11px] text-muted-foreground/80 mt-1">
                                   {formatarDataHora(n.momentoISO)}
                                 </p>
@@ -1209,9 +1259,7 @@ function Index() {
                   key={t.id}
                   onClick={() => startTransition(() => setAba(t.id))}
                   className={`shrink-0 px-4 py-3 text-sm font-semibold relative transition-colors ${
-                    active
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                    active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {t.label}
@@ -1277,7 +1325,7 @@ function Index() {
                           : "bg-card text-muted-foreground border-border hover:border-foreground/30"
                       }`}
                     >
-                    PA
+                      PA
                     </button>
                   </div>
                 )}
@@ -1395,7 +1443,8 @@ function Index() {
 
       {processoAcaoSelecionado && (
         <Suspense fallback={null}>
-          {normalizarSetor(processoAcaoSelecionado.setor || processoAcaoSelecionado.tipo) === "DU" ? (
+          {normalizarSetor(processoAcaoSelecionado.setor || processoAcaoSelecionado.tipo) ===
+          "DU" ? (
             <AcoesDUModalNovo
               open={processoAcaoOpen}
               onOpenChange={(open) => {
