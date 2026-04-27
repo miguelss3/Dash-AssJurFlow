@@ -4,9 +4,9 @@ import {
   CalendarRange,
   TrendingUp,
   Trophy,
-  Zap,
   CheckCircle2,
   Inbox,
+  BarChart2,
 } from "lucide-react";
 import type { Processo, FiltroPrazo } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
@@ -27,105 +27,125 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
   }).length;
   const concluidos = processos.filter((p) => p.status === "concluido").length;
   const total = processos.length;
-  const totalAtos = total + concluidos * 3 + ativos.length * 2; // mock produtividade
-  const movimentacoes = ativos.length * 3;
   const indiceResolutividade =
     total > 0 ? Math.round((concluidos / total) * 100) : 0;
 
-  const temposReatividadeHoras = processos
-    .filter((p) => Boolean((p.responsavel || "").trim()))
-    .map((p) => {
-      const inicioBruto = p.criadoEm || p.dataEntrada;
-      const fimBruto = p.atualizadoEm || p.criadoEm;
-      const inicio = inicioBruto ? new Date(inicioBruto) : null;
-      const fim = fimBruto ? new Date(fimBruto) : null;
-      if (!inicio || !fim) return null;
-      if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) return null;
-      const horas = (fim.getTime() - inicio.getTime()) / (1000 * 60 * 60);
-      return horas >= 0 ? horas : null;
-    })
-    .filter((h): h is number => typeof h === "number");
+  const totalDU = processos.filter((p) => p.tipo === "DU").length;
+  const totalPA = processos.filter((p) => p.tipo === "PA").length;
+  const taxaConclusao = total > 0 ? Math.round((concluidos / total) * 100) : 0;
 
-  const mediaReatividadeHoras =
-    temposReatividadeHoras.length > 0
-      ? temposReatividadeHoras.reduce((acc, h) => acc + h, 0) / temposReatividadeHoras.length
-      : null;
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const mesNome = now.toLocaleString("pt-BR", { month: "long", year: "numeric" });
 
-  const taxaReatividade =
-    mediaReatividadeHoras !== null
-      ? `${mediaReatividadeHoras.toFixed(1).replace(".", ",")} h`
-      : "--";
+  const isCurrentMonth = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    return !Number.isNaN(d.getTime()) && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  };
 
-  const casosAte24h = temposReatividadeHoras.filter((h) => h <= 24).length;
-  const percentualAte24h =
-    temposReatividadeHoras.length > 0
-      ? Math.round((casosAte24h / temposReatividadeHoras.length) * 100)
-      : 0;
+  const processosMes = processos.filter((p) => isCurrentMonth(p.criadoEm)).length;
+  const finalizadosMes = processos.filter(
+    (p) => p.status === "concluido" && isCurrentMonth(p.atualizadoEm),
+  ).length;
+  const resolutividadeMes =
+    processosMes > 0 ? Math.round((finalizadosMes / processosMes) * 100) : 0;
 
   return (
     <div className="space-y-4">
-      {/* === HERO BANNER: Produtividade Acumulada (estilo AssJur) === */}
+      {/* === HERO BANNER: Acervo Processual === */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-[oklch(0.22_0.05_258)] to-[oklch(0.32_0.1_245)] text-white p-6 shadow-elegant relative overflow-hidden">
-          <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
-          <div className="relative flex items-start justify-between gap-6 flex-wrap">
-            <div>
-              <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-[oklch(0.78_0.18_145)] flex items-center gap-1.5 mb-3">
-                <Trophy className="h-3 w-3" />
-                Produtividade Acumulada
+        {/* Índice Mensal (esquerdo) */}
+        <div className="rounded-2xl bg-card border border-border p-5 shadow-card flex flex-col gap-4">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 rounded-lg bg-[oklch(0.6_0.16_230_/_0.12)] items-center justify-center shrink-0">
+              <BarChart2 className="h-4 w-4 text-[oklch(0.55_0.17_230)]" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-foreground leading-tight">
+                Índice Mensal
               </p>
-              <div className="text-6xl font-bold font-display tabular-nums leading-none">
-                {totalAtos}
-              </div>
-              <p className="text-sm text-white/70 mt-3 max-w-md">
-                Total de atos jurídicos processados no sistema.
+              <p className="text-[10px] text-muted-foreground capitalize leading-tight">
+                {mesNome}
               </p>
             </div>
-            <div className="rounded-xl bg-white/5 border border-white/10 px-4 py-3 backdrop-blur-sm min-w-[180px]">
-              <p className="text-[9px] uppercase tracking-wider text-white/50 font-bold mb-2">
-                Composição
-              </p>
-              <ul className="text-xs space-y-1.5 font-medium">
-                <li className="flex justify-between gap-3">
-                  <span className="text-white/70">Processos:</span>
-                  <span className="font-bold tabular-nums">{total}</span>
-                </li>
-                <li className="flex justify-between gap-3">
-                  <span className="text-white/70">Movimentações:</span>
-                  <span className="font-bold tabular-nums">{movimentacoes}</span>
-                </li>
-                <li className="flex justify-between gap-3">
-                  <span className="text-white/70">Mensagens:</span>
-                  <span className="font-bold tabular-nums">0</span>
-                </li>
-              </ul>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground font-medium">Cadastrados</span>
+              <span className="text-sm font-bold tabular-nums text-foreground">{processosMes}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground font-medium">Finalizados</span>
+              <span className="text-sm font-bold tabular-nums text-[var(--deadline-safe)]">{finalizadosMes}</span>
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-muted-foreground font-medium">Resolutividade</span>
+              <span className="text-xs font-bold tabular-nums text-foreground">{resolutividadeMes}%</span>
+            </div>
+            <div className="h-2 rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[oklch(0.6_0.16_230)] to-[oklch(0.78_0.18_145)] transition-all"
+                style={{ width: `${resolutividadeMes}%` }}
+              />
             </div>
           </div>
         </div>
 
-        {/* Reatividade */}
-        <div className="rounded-2xl bg-card border border-border p-5 shadow-card">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="inline-flex h-8 w-8 rounded-lg bg-[oklch(0.7_0.17_50_/_0.15)] items-center justify-center">
-              <Zap className="h-4 w-4 text-[oklch(0.7_0.17_50)]" />
-            </span>
-            <p className="text-[10px] uppercase tracking-wider font-bold text-foreground">
-              Taxa de Reatividade
+        {/* Acervo Processual (direito — destaque) */}
+        <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-[oklch(0.22_0.05_258)] to-[oklch(0.32_0.1_245)] text-white p-6 shadow-elegant relative overflow-hidden">
+          <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
+          <div className="relative">
+            <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-[oklch(0.78_0.18_145)] flex items-center gap-1.5 mb-5">
+              <Inbox className="h-3 w-3" />
+              Acervo Processual
             </p>
-          </div>
-          <div className="text-4xl font-bold font-display text-foreground tabular-nums">
-            {taxaReatividade}
-          </div>
-          <p className="text-xs text-muted-foreground mt-2 leading-snug">
-            Tempo médio do cadastro até a mesa do assessor.
-          </p>
-          <div className="flex gap-2 mt-3 flex-wrap">
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-[var(--deadline-safe-bg)] text-[var(--deadline-safe)]">
-              {percentualAte24h}% em até 24h
-            </span>
-            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold bg-muted text-muted-foreground">
-              {temposReatividadeHoras.length} apuradas
-            </span>
+
+            <div className="grid grid-cols-2 gap-6">
+              {/* Cadastrados */}
+              <div>
+                <div className="text-5xl font-bold font-display tabular-nums leading-none">
+                  {total}
+                </div>
+                <p className="text-sm text-white/70 mt-2">Processos cadastrados</p>
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
+                    DU: {totalDU}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
+                    PA: {totalPA}
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
+                    Ativos: {ativos.length}
+                  </span>
+                </div>
+              </div>
+
+              {/* Finalizados */}
+              <div>
+                <div className="flex items-end gap-2 leading-none">
+                  <div className="text-5xl font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
+                    {concluidos}
+                  </div>
+                  <div className="mb-1 text-base font-bold text-[oklch(0.78_0.18_145)] opacity-80">
+                    {taxaConclusao}%
+                  </div>
+                </div>
+                <p className="text-sm text-white/70 mt-2">Finalizados</p>
+                <p className="text-xs text-white/50 mt-0.5">{taxaConclusao}% do total cadastrado</p>
+                <div className="mt-3 h-1.5 rounded-full bg-white/15 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-[oklch(0.78_0.18_145)] transition-all"
+                    style={{ width: `${taxaConclusao}%` }}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
