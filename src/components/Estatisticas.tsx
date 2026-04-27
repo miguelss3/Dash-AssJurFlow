@@ -14,10 +14,17 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { TrendingUp, Award, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
+import { TrendingUp, Award, AlertTriangle, CheckCircle2, Clock, FileText } from "lucide-react";
+import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
 import { COLUNAS } from "@/types/processo";
-import { statusPrazo, diasRestantes } from "@/lib/prazo";
+import { statusPrazo } from "@/lib/prazo";
+import { Button } from "@/components/ui/button";
+import {
+  exportIndicadoresGeraisPdf,
+  exportSindicanciasPdf,
+  exportIPMPdf,
+} from "@/lib/indicadoresPdf";
 
 interface Props {
   processos: Processo[];
@@ -46,6 +53,21 @@ const ACCENT = "oklch(0.6 0.16 230)";
 const ACCENT_LIME = "oklch(0.78 0.18 145)";
 
 export function Estatisticas({ processos }: Props) {
+  const handleExportEstatisticas = () => {
+    exportIndicadoresGeraisPdf(processos);
+    toast.success("PDF de estatísticas gerado.");
+  };
+
+  const handleExportSindicancias = () => {
+    exportSindicanciasPdf(processos);
+    toast.success("PDF de sindicâncias gerado.");
+  };
+
+  const handleExportIPM = () => {
+    exportIPMPdf(processos);
+    toast.success("PDF de IPM gerado.");
+  };
+
   const dadosStatus = useMemo(
     () =>
       COLUNAS.map((c) => ({
@@ -109,22 +131,32 @@ export function Estatisticas({ processos }: Props) {
       .slice(0, 5);
   }, [processos]);
 
-  const dadosTimeline = useMemo(() => {
-    const bins = [
-      { name: "Vencidos", min: -Infinity, max: -1 },
-      { name: "0-3d", min: 0, max: 3 },
-      { name: "4-7d", min: 4, max: 7 },
-      { name: "8-15d", min: 8, max: 15 },
-      { name: "16-30d", min: 16, max: 30 },
-      { name: "30+d", min: 31, max: Infinity },
-    ];
-    return bins.map((b) => ({
-      name: b.name,
-      processos: processos.filter((p) => {
-        if (p.status === "concluido") return false;
-        const d = diasRestantes(p.prazo);
-        return d >= b.min && d <= b.max;
-      }).length,
+  const dadosCadastros = useMemo(() => {
+    const now = new Date();
+    const meses = Array.from({ length: 6 }).map((_, index) => {
+      const ref = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+      return {
+        key: `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`,
+        name: ref.toLocaleDateString("pt-BR", { month: "short" }),
+      };
+    });
+
+    const map = new Map<string, number>();
+    meses.forEach((m) => map.set(m.key, 0));
+
+    processos.forEach((p) => {
+      const dataBase = p.criadoEm || p.dataEntrada || p.entrada;
+      if (!dataBase) return;
+      const d = new Date(dataBase);
+      if (Number.isNaN(d.getTime())) return;
+      const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!map.has(chave)) return;
+      map.set(chave, (map.get(chave) || 0) + 1);
+    });
+
+    return meses.map((m) => ({
+      name: m.name,
+      cadastros: map.get(m.key) || 0,
     }));
   }, [processos]);
 
@@ -139,6 +171,34 @@ export function Estatisticas({ processos }: Props) {
 
   return (
     <div className="space-y-5">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+              Relatórios em PDF
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Exporte os indicadores gerais, sindicâncias e IPM em documentos prontos para
+              impressão.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={handleExportEstatisticas}>
+              <FileText className="mr-2 h-4 w-4" />
+              Estatísticas
+            </Button>
+            <Button type="button" variant="outline" onClick={handleExportSindicancias}>
+              <FileText className="mr-2 h-4 w-4" />
+              Sindicâncias
+            </Button>
+            <Button type="button" variant="outline" onClick={handleExportIPM}>
+              <FileText className="mr-2 h-4 w-4" />
+              IPM
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Hero KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiHero
@@ -281,12 +341,12 @@ export function Estatisticas({ processos }: Props) {
         </ChartCard>
 
         <ChartCard
-          title="Linha de prazos"
-          subtitle="Quando os prazos vencem"
+          title="Linha de cadastros"
+          subtitle="Cadastros por mês (últimos 6 meses)"
           icon={Clock}
         >
           <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={dadosTimeline} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={dadosCadastros} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor={ACCENT_LIME} stopOpacity={0.6} />
@@ -309,7 +369,7 @@ export function Estatisticas({ processos }: Props) {
               <Tooltip contentStyle={TOOLTIP_STYLE} />
               <Area
                 type="monotone"
-                dataKey="processos"
+                dataKey="cadastros"
                 stroke={ACCENT_LIME}
                 strokeWidth={2.5}
                 fill="url(#grad-area)"
