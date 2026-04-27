@@ -176,68 +176,34 @@ export function useAuth() {
   }, []);
 
   const login = useCallback(async (email: string, senha: string) => {
-    try {
-      // console.log("🔐 Tentando login com:", email);
-      
-      try {
-        // Tenta autenticar no Firebase
-        const userCredential = await signInWithEmailAndPassword(auth, email, senha);
-        const fbUser = userCredential.user;
-        
-        // console.log("✅ Firebase Auth bem-sucedido para:", fbUser.email);
-        
-        // Busca dados do usuário na coleção "usuarios" por email
-        let userData: AuthUser | null = await carregarPerfilPrivado(fbUser);
-        
-        // Se não encontrou dados no Firestore, usa dados básicos
-        if (!userData) {
-          console.warn("⚠️ Usuário não encontrado na coleção usuarios. Usando dados padrão.");
-          const nomeUsuario = fbUser.displayName || (email ? email.split("@")[0] : "Usuário");
-          userData = {
-            posto: "",
-            nome: nomeUsuario,
-            role: "ASSESSOR",
-            secao: "AssJur",
-            email: fbUser.email || email,
-            uid: fbUser.uid,
-          };
-          
-          // Se é admin por email, ajusta o role
-          if (isAdmin(userData)) {
-            userData.role = "ADMIN UNIVERSAL";
-          }
-        }
-        
-        // Salva dados no localStorage
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
-        setUser(userData);
-        
-        // console.log("✅ Login concluído. Admin:", isAdmin(userData));
-        return;
-      } catch (firebaseError: any) {
-        // Se falhar (usuário não existe ou Firebase não configurado), usa modo local
-        console.warn("⚠️ Firebase Auth falhou, usando autenticação local:", firebaseError.code);
-        
-        // Cria usuário local baseado no email
-        const nomeLocal = email.split("@")[0] || "Usuário";
-        const userData: AuthUser = {
-          posto: "",
-          nome: nomeLocal,
-          role: "ASSESSOR",
-          secao: "AssJur",
-          email: email,
-        };
-        
-        // Salva dados no localStorage
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
-        setUser(userData);
-        
-        // console.log("✅ Login local realizado com sucesso");
-      }
-    } catch (error: any) {
-      console.error("❌ Erro no login:", error.message);
-      throw error;
+    // Autentica no Firebase — qualquer falha (senha errada, usuário inexistente, etc.)
+    // é propagada para a tela de login exibir a mensagem correta ao usuário.
+    const userCredential = await signInWithEmailAndPassword(auth, email, senha);
+    const fbUser = userCredential.user;
+
+    // Busca dados do perfil no Firestore
+    let userData: AuthUser | null = await carregarPerfilPrivado(fbUser);
+
+    // Autenticado mas sem perfil no Firestore: usa dados mínimos do Firebase Auth
+    if (!userData) {
+      console.warn("⚠️ Usuário autenticado mas sem perfil na coleção usuarios. Usando dados mínimos.");
+      const nomeUsuario = fbUser.displayName || (fbUser.email ? fbUser.email.split("@")[0] : "Usuário");
+      userData = {
+        posto: "",
+        nome: nomeUsuario,
+        role: "ASSESSOR",
+        secao: "AssJur",
+        email: fbUser.email || email,
+        uid: fbUser.uid,
+      };
     }
+
+    if (isAdmin(userData)) {
+      userData.role = userData.cargo || userData.setor || "ADMIN UNIVERSAL";
+    }
+
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+    setUser(userData);
   }, []);
 
   const logout = useCallback(async () => {
