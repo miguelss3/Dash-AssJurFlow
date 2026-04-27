@@ -10,6 +10,7 @@ import {
   Clock,
   AlertCircle,
   CheckCircle2,
+  type LucideIcon,
 } from "lucide-react";
 import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
 import { Separator } from "@/components/ui/separator";
@@ -112,7 +113,7 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
       return dataA - dataB;
     });
 
-  const InfoRow = ({ icon: Icon, label, value }: { icon: any; label: string; value?: string | null }) => {
+  const InfoRow = ({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value?: string | null }) => {
     if (!value) return null;
     return (
       <div className="flex items-start gap-3">

@@ -157,7 +157,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           const q = query(usuariosRef, where("setor", "==", setorParaBuscar));
           const snapshot = await getDocs(q);
           snapshot.docs.forEach(doc => {
-            const data = doc.data() as Record<string, any>;
+            const data = doc.data() as { ativo?: boolean; nomeGuerra?: string; nome?: string; email?: string; posto?: string; setor?: string };
             if (data.ativo === false) return;
             const nomeExibicao = data.nomeGuerra || data.nome || data.email?.split("@")[0] || "Assessor";
             const nomeCompleto = data.posto ? `${data.posto} ${nomeExibicao}`.trim() : nomeExibicao;

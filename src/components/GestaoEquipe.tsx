@@ -89,7 +89,7 @@ export function GestaoEquipe() {
         email: formData.email,
         isChefe: formData.isChefe === "Sim",
         role: formData.isChefe === "Sim" ? `Chefe ${formData.setor}` : "ASSESSOR",
-        cargo: formData.isChefe === "Sim" ? `Chefe ${formData.setor}` : deleteField() as any,
+        cargo: formData.isChefe === "Sim" ? `Chefe ${formData.setor}` : deleteField() as unknown as string,
         secao: formData.setor,
         ativo: true,
       };
@@ -119,8 +119,9 @@ export function GestaoEquipe() {
           // Salvar no Firestore
           await addDoc(collection(db, "usuarios"), dadosUsuario);
           // console.log("✅ Novo usuário criado:", formData.email);
-        } catch (authError: any) {
-          if (authError.code === "auth/email-already-in-use") {
+        } catch (authError: unknown) {
+          const err = authError as { code?: string };
+          if (err.code === "auth/email-already-in-use") {
             alert("Este email já está em uso!");
           } else {
             console.error("Erro ao criar usuário:", authError);

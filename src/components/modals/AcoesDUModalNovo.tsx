@@ -180,10 +180,10 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
 
   const atualizarComSnapshotDU = async (
     patch: Record<string, unknown>,
-    dataAtual?: Record<string, any>,
+    dataAtual?: Record<string, unknown>,
   ) => {
     const processoRef = doc(db, "processos", processoId);
-    const atual = dataAtual || ((await getDoc(processoRef)).data() as Record<string, any>) || {};
+    const atual = dataAtual || ((await getDoc(processoRef)).data() as Record<string, unknown>) || {};
     const previousDoc = { ...atual };
     delete (previousDoc as Record<string, unknown>).ultimaAcaoFluxo;
 
@@ -291,7 +291,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         descricao,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
-      }, dataAtual as Record<string, any>);
+      }, dataAtual as Record<string, unknown>);
 
       await registrarHistorico(descricao);
 
@@ -319,7 +319,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       const descricao = "Processo finalizado no fluxo DU.";
 
       const snap = await getDoc(processoRef);
-      const dataAtual = snap.exists() ? (snap.data() as Record<string, any>) : {};
+      const dataAtual = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
 
       await atualizarComSnapshotDU({
         status: "concluido",

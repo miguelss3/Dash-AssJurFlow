@@ -85,7 +85,7 @@ export function ChatModal({ open, onOpenChange, processo }: ChatModalProps) {
             if (mensagensDoc.exists()) {
               const historicoAntigo = mensagensDoc.data()?.historico || [];
               if (Array.isArray(historicoAntigo)) {
-                historicoAntigo.forEach((msg: any) => {
+                historicoAntigo.forEach((msg: { id?: string; autor?: string; autorId?: string; texto?: string; timestamp?: string }) => {
                   msgs.push({
                     id: msg.id || crypto.randomUUID(),
                     autor: msg.autor || "Sistema",

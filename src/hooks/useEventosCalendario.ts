@@ -24,11 +24,12 @@ export interface EventoCalendario {
   setor: "DU" | "PA";
 }
 
-function toIsoString(value: any): string {
+function toIsoString(value: unknown): string {
   if (!value) return new Date().toISOString();
   if (typeof value === "string") return value;
   if (value instanceof Date) return value.toISOString();
-  if (typeof value?.toDate === "function") return value.toDate().toISOString();
+  const v = value as Record<string, unknown>;
+  if (typeof v?.toDate === "function") return (v.toDate as () => Date)().toISOString();
   return new Date().toISOString();
 }
 

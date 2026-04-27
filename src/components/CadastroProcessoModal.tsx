@@ -145,6 +145,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
     } else {
       resetForm();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, processo]);
 
   useEffect(() => {
@@ -548,6 +549,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         else statusInicial = "Distribuído";
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dados: any = {
         numeroProcesso: numeroFinal,
         parte,
@@ -793,20 +795,21 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         // console.log("🔄 Notificando parent component para atualizar lista de processos...");
         onSuccess();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string; stack?: string };
       console.error("❌ ERRO ao salvar processo:", error);
-      console.error("❌ Código do erro:", error?.code);
-      console.error("❌ Mensagem:", error?.message);
-      console.error("❌ Stack:", error?.stack);
+      console.error("❌ Código do erro:", err?.code);
+      console.error("❌ Mensagem:", err?.message);
+      console.error("❌ Stack:", err?.stack);
       
       // Erro específico de permissão
-      if (error?.code === "permission-denied") {
+      if (err?.code === "permission-denied") {
         console.error("🔒 ERRO DE PERMISSÃO FIRESTORE!");
         console.error("🔒 User UID:", user?.uid);
         console.error("🔒 User Email:", user?.email);
         toast.error("Sem permissão para criar processo. Verifique se está logado corretamente.");
       } else {
-        toast.error(`Erro ao salvar: ${error?.message || "Erro desconhecido"}`);
+        toast.error(`Erro ao salvar: ${err?.message || "Erro desconhecido"}`);
       }
     } finally {
       setLoading(false);
@@ -899,7 +902,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
           {mostrarFluxoIPM && (
             <div className="space-y-3 p-4 border rounded-lg bg-slate-50">
               <Label className="text-base font-semibold">Fluxo de {tipoPA || "Procedimento"}</Label>
-              <RadioGroup value={fluxoIPM} onValueChange={(v) => setFluxoIPM(v as any)}>
+              <RadioGroup value={fluxoIPM} onValueChange={(v) => setFluxoIPM(v as "Novo" | "Diligência" | "Sindicância Antigo")}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="Novo" id="fluxo-novo" />
                   <Label htmlFor="fluxo-novo" className="font-normal cursor-pointer">Novo {tipoPA}</Label>

@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import type { Processo, StatusProcesso } from "@/types/processo";
+import type { Processo, StatusProcesso, TipoProcesso, Prioridade } from "@/types/processo";
 import { isAdmin, type AuthUser } from "./useAuth";
 import { calcularPrazoFinalPA, normalizarTextoHistoricoPrazoPA } from "@/lib/prazo";
 import type { SiteSettings } from "@/types/siteSettings";
@@ -24,22 +24,23 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
   const [erro, setErro] = useState<string | null>(null);
   const mergeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const limparCamposUndefined = <T extends Record<string, any>>(obj: T): Partial<T> => {
+  const limparCamposUndefined = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
     return Object.fromEntries(
       Object.entries(obj).filter(([, valor]) => valor !== undefined)
     ) as Partial<T>;
   };
 
-  const toIsoString = (valor: any): string | undefined => {
+  const toIsoString = (valor: unknown): string | undefined => {
     if (!valor) return undefined;
     if (typeof valor === "string") return valor;
     if (valor instanceof Date) return valor.toISOString();
-    if (typeof valor?.toDate === "function") return valor.toDate().toISOString();
-    if (typeof valor?.seconds === "number") return new Date(valor.seconds * 1000).toISOString();
+    const v = valor as Record<string, unknown>;
+    if (typeof v?.toDate === "function") return (v.toDate as () => Date)().toISOString();
+    if (typeof v?.seconds === "number") return new Date(v.seconds * 1000).toISOString();
     return undefined;
   };
 
-  const normalizarSetor = (valor: any): "DU" | "PA" | "" => {
+  const normalizarSetor = (valor: unknown): "DU" | "PA" | "" => {
     const txt = String(valor ?? "")
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
@@ -110,8 +111,10 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         usuarioEfetivo.setor || usuarioEfetivo.role || usuarioEfetivo.secao || usuarioEfetivo.cargo,
       );
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let processosCache: any[] = [];
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const carregarResponsaveisLegado = async (processosAtuais: any[]) => {
         const processosPendentes = processosAtuais.filter((procData) => {
           const setorCanonico = normalizarSetor(procData.setor || procData.tipo);
@@ -246,9 +249,9 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                 descricao: descricaoUltimoMovimento,
                 status: statusMapeado,
                 criadoEm: toIsoString(procData.criadoEm) || toIsoString(procData.dataEntrada) || new Date().toISOString(),
-                tipo: (setorCanonico || procData.tipo || "OUTRO") as any,
+                tipo: (setorCanonico || procData.tipo || "OUTRO") as TipoProcesso,
                 setor: setorCanonico || procData.setor,
-                prioridade: (procData.prioridade || "normal") as any,
+                prioridade: (procData.prioridade || "normal") as Prioridade,
                 secao: procData.secaoDU || procData.secao || "N/A",
                 origem: procData.origemDU || procData.origem || "N/A",
                 subtipo: procData.tipoPA || procData.subtipo,
@@ -399,7 +402,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       const novoDocRef = await addDoc(processosRef, novoProcessoLimpo);
       return novoDocRef.id;
       // console.log("✅ Processo criado com sucesso para", currentUser.email);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ Erro ao criar processo:", err);
       throw err;
     }
@@ -415,7 +418,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
 
       await updateDoc(processoRef, dadosLimpos);
       // console.log("✅ Processo atualizado com sucesso");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ Erro ao atualizar processo:", err);
       throw err;
     }
@@ -443,7 +446,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       await deleteDoc(processoRef);
       
       // console.log(`✅ Processo ${id} e todos os dados relacionados foram excluídos permanentemente`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ Erro ao remover processo:", err);
       throw err;
     }
@@ -454,7 +457,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
     try {
       await atualizar(id, { status: novoStatus });
       // console.log(`✅ Processo movido para: ${novoStatus}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("❌ Erro ao mover processo:", err);
       throw err;
     }
