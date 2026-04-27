@@ -134,6 +134,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
   const [especificidadesSindicancia, setEspecificidadesSindicancia] = useState("");
   const [omPresidenteConselho, setOmPresidenteConselho] = useState("");
   const [prorrogacoesEditaveis, setProrrogacoesEditaveis] = useState<ProrrogacaoEditavel[]>([]);
+  const [dataInicioPrazoPA, setDataInicioPrazoPA] = useState("");
 
   const [loading, setLoading] = useState(false);
 
@@ -185,6 +186,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
     setEspecificidadesSindicancia("");
     setOmPresidenteConselho("");
     setProrrogacoesEditaveis([]);
+    setDataInicioPrazoPA("");
   };
 
   const preencherParaEdicao = (p: Processo) => {
@@ -275,6 +277,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
       }));
 
       setProrrogacoesEditaveis(listaEditavel);
+      setDataInicioPrazoPA(p.dataInicioPrazo || "");
     }
   };
 
@@ -362,6 +365,39 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
   const removerProrrogacaoEditavel = (index: number) => {
     setProrrogacoesEditaveis((atual) => atual.filter((_, i) => i !== index));
   };
+
+  const recalcularProrrogacoesComBase = (
+    inicioPrazoBase: string,
+    itens: ProrrogacaoEditavel[],
+  ): ProrrogacaoEditavel[] => {
+    const dataBase = toDataCivil(inicioPrazoBase);
+    if (!dataBase || itens.length === 0) return itens;
+
+    const faixas = calcularFaixasProrrogacaoPA({
+      tipoPA,
+      dataInicioPrazo: dataBase,
+      dataAssinatura: processo?.dataAssinatura,
+      prorrogacoes: itens.map((item) => ({
+        dias: Math.max(0, Math.trunc(Number(item.dias) || 0)),
+        inicio: toDataCivil(item.inicio) || undefined,
+        fim: toDataCivil(item.fim) || undefined,
+      })),
+    });
+
+    return itens.map((item, index) => ({
+      ...item,
+      dias: faixas[index]?.dias ?? item.dias,
+      inicio: faixas[index]?.inicio ?? item.inicio,
+      fim: faixas[index]?.fim ?? item.fim,
+    }));
+  };
+
+  useEffect(() => {
+    if (setor !== "PA" || !processo?.id) return;
+    if (!toDataCivil(dataInicioPrazoPA)) return;
+
+    setProrrogacoesEditaveis((atual) => recalcularProrrogacoesComBase(dataInicioPrazoPA, atual));
+  }, [dataInicioPrazoPA, setor, processo?.id, tipoPA]);
 
   const isConselhoPA = (tipo: string) => {
     return tipo === "Conselho de Disciplina" || tipo === "Conselho de Justificação";
@@ -635,7 +671,12 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         }
 
         if (processo?.id) {
-          const prorrogacoesNormalizadas = prorrogacoesEditaveis.map((item) => ({
+          const dataInicioPAEditada = toDataCivil(dataInicioPrazoPA) || toDataCivil(processo.dataInicioPrazo || "");
+          if (dataInicioPAEditada) {
+            dados.dataInicioPrazo = dataInicioPAEditada;
+          }
+
+          const prorrogacoesBase = prorrogacoesEditaveis.map((item) => ({
             dias: Math.max(0, Math.trunc(Number(item.dias) || 0)),
             doc: (item.doc || "").trim() || "Documento não informado",
             inicio: toDataCivil(item.inicio) || undefined,
@@ -644,11 +685,26 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
             por: item.por || undefined,
           }));
 
+          const faixasRecalculadas = dataInicioPAEditada
+            ? calcularFaixasProrrogacaoPA({
+                tipoPA,
+                dataInicioPrazo: dataInicioPAEditada,
+                dataAssinatura: processo.dataAssinatura,
+                prorrogacoes: prorrogacoesBase,
+              })
+            : [];
+
+          const prorrogacoesNormalizadas = prorrogacoesBase.map((item, index) => ({
+            ...item,
+            inicio: faixasRecalculadas[index]?.inicio || item.inicio,
+            fim: faixasRecalculadas[index]?.fim || item.fim,
+          }));
+
           dados.prorrogacoes = prorrogacoesNormalizadas;
 
           const prazoCalculado = calcularPrazoFinalPA({
             tipoPA,
-            dataInicioPrazo: processo.dataInicioPrazo,
+            dataInicioPrazo: dataInicioPAEditada || processo.dataInicioPrazo,
             dataAssinatura: processo.dataAssinatura,
             prorrogacoes: prorrogacoesNormalizadas,
           });
@@ -1282,6 +1338,23 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
 
           {setor && (
             <>
+              {processo?.id && setor === "PA" && (
+                <div className="space-y-2 p-4 border rounded-lg bg-sky-50 border-sky-200">
+                  <Label htmlFor="dataInicioPrazoPA" className="text-sm font-semibold text-sky-900">
+                    Data inicial da contagem do prazo
+                  </Label>
+                  <Input
+                    id="dataInicioPrazoPA"
+                    type="date"
+                    value={dataInicioPrazoPA}
+                    onChange={(e) => setDataInicioPrazoPA(e.target.value)}
+                  />
+                  <p className="text-xs text-sky-800">
+                    Ao alterar esta data, o prazo final e as faixas de prorrogação são recalculados automaticamente.
+                  </p>
+                </div>
+              )}
+
               {processo?.id && setor === "PA" && (
                 <div className="space-y-3 p-4 border rounded-lg bg-amber-50 border-amber-200">
                   <div className="flex items-center justify-between">

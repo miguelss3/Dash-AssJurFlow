@@ -353,11 +353,65 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     return mapa[situacaoFluxo];
   }, [situacaoFluxo]);
 
+  const fluxoExternoPendenteRegistro =
+    acaoPrincipal === "DILIGENCIA"
+    && tipoDiligencia === "EXTERNO"
+    && !numeroSaida.trim();
+
+  const registrarNumeroAssinadoChem = () => {
+    const numero = numeroSaida.trim();
+    if (!numero) {
+      toast.error("Informe o número assinado pelo CHEM.");
+      return;
+    }
+
+    void avancarFluxo("AGUARDANDO_RESPOSTA", {
+      numeroSaida: numero,
+      acaoPrincipal: "DILIGENCIA",
+      tipoDiligencia: "EXTERNO",
+    });
+  };
+
+  const renderRegistroNumeroAssinadoChem = () => (
+    <div className="space-y-4 animate-in fade-in">
+      <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 text-center">
+        <FileSignature className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+        <h4 className="font-bold text-emerald-900 text-sm">Documento Assinado pelo CHEM</h4>
+        <p className="text-xs text-emerald-700 mb-3">Insira o número de saída (DIEx Externo / Ofício):</p>
+        <input
+          type="text"
+          aria-label="Número assinado pelo CHEM"
+          value={numeroSaida}
+          onChange={(e) => setNumeroSaida(e.target.value)}
+          placeholder="Ex: Ofício nº 45/2026"
+          className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none"
+        />
+      </div>
+      <button
+        disabled={!numeroSaida.trim()}
+        onClick={registrarNumeroAssinadoChem}
+        className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl disabled:bg-emerald-300"
+      >
+        Registrar Saída e Iniciar Prazo
+      </button>
+    </div>
+  );
+
   const renderVisaoAssessor = () => {
     switch (situacaoFluxo) {
       case "MESA_ASSESSOR":
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {fluxoExternoPendenteRegistro && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <h4 className="text-sm font-bold text-emerald-900">Pendência de registro do documento assinado</h4>
+                <p className="mt-1 text-[11px] text-emerald-800">
+                  Este fluxo externo retornou para a mesa com necessidade de registrar o número assinado pelo CHEM.
+                </p>
+                <div className="mt-3">{renderRegistroNumeroAssinadoChem()}</div>
+              </div>
+            )}
+
             {numeroRecebido && (
               <div className="bg-sky-50 border border-sky-200 p-3 rounded-xl flex items-start gap-2">
                 <CheckCircle2 className="w-4 h-4 text-sky-600 mt-0.5" />
@@ -426,19 +480,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         );
 
       case "AGUARDANDO_CHEM_DILIGENCIA":
-        return (
-          <div className="space-y-4 animate-in fade-in">
-            <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 text-center">
-              <FileSignature className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-              <h4 className="font-bold text-emerald-900 text-sm">Pedido Aprovado pelo CHEM</h4>
-              <p className="text-xs text-emerald-700 mb-3">Insira o numero gerado no SPED:</p>
-              <input type="text" aria-label="Número de saída do pedido aprovado" value={numeroSaida} onChange={(e) => setNumeroSaida(e.target.value)} placeholder="Ex: Oficio n° 45/2026" className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none" />
-            </div>
-            <button disabled={!numeroSaida} onClick={() => avancarFluxo("AGUARDANDO_RESPOSTA", { numeroSaida })} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl disabled:bg-emerald-300">
-              Registar Saida e Iniciar Prazo
-            </button>
-          </div>
-        );
+        return renderRegistroNumeroAssinadoChem();
 
       case "AGUARDANDO_RESPOSTA":
         return (
@@ -525,7 +567,35 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
   const renderVisaoChefe = () => {
     const isReit = reiteracoes > 0;
 
+    const devolverParaAssessorSemAcao = () => {
+      void avancarFluxo("MESA_ASSESSOR", {
+        acaoPrincipal: "DILIGENCIA",
+        tipoDiligencia,
+        numeroSaida: "",
+      });
+    };
+
+    const corrigirParaExternoEEncaminharChem = () => {
+      void avancarFluxo("AGUARDANDO_CHEM_DILIGENCIA", {
+        acaoPrincipal: "DILIGENCIA",
+        tipoDiligencia: "EXTERNO",
+        numeroSaida: "",
+      });
+    };
+
     switch (situacaoFluxo) {
+      case "MESA_ASSESSOR":
+        if (fluxoExternoPendenteRegistro) {
+          return renderRegistroNumeroAssinadoChem();
+        }
+        return (
+          <div className="bg-slate-50 p-6 rounded-xl border text-center border-dashed border-slate-300">
+            <ShieldCheck className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+            <h4 className="font-bold text-slate-600 text-sm">Sem Pendências</h4>
+            <p className="text-[11px] text-slate-500 mt-1">Nada a fazer neste processo por agora.</p>
+          </div>
+        );
+
       case "CHEFIA_DILIGENCIA":
         return (
           <div className="space-y-4 animate-in fade-in">
@@ -547,6 +617,30 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                 <p className="text-[11px] text-indigo-800 bg-white/50 p-2 rounded mt-2">Encaminhe este pedido para o CHEM assinar.</p>
               )}
             </div>
+
+            {tipoDiligencia === "INTERNO" && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <h5 className="text-sm font-bold text-amber-900">Correção de fluxo</h5>
+                <p className="mt-1 text-[11px] text-amber-800">
+                  Se o assessor marcou DIEx Simplificado por engano, você pode devolver para correção ou ajustar sozinho para DIEx Externo / Ofício.
+                </p>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    onClick={devolverParaAssessorSemAcao}
+                    className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100"
+                  >
+                    Devolver ao Assessor
+                  </button>
+                  <button
+                    onClick={corrigirParaExternoEEncaminharChem}
+                    className="w-full rounded-lg bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700"
+                  >
+                    Corrigir para Externo e Encaminhar ao CHEM
+                  </button>
+                </div>
+              </div>
+            )}
+
             <button
               disabled={tipoDiligencia === "INTERNO" && !numeroSaida}
               onClick={() =>
@@ -560,6 +654,9 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
             </button>
           </div>
         );
+
+      case "AGUARDANDO_CHEM_DILIGENCIA":
+        return renderRegistroNumeroAssinadoChem();
 
       case "AGUARDANDO_RESPOSTA":
         return (
