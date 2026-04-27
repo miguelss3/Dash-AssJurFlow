@@ -112,8 +112,10 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
 }
 
 export async function exportIndicadoresGeraisPdfFromElement(element: HTMLElement) {
-  const html2canvasModule = (await import("html2canvas")) as Html2CanvasModule;
-  const html2canvas = html2canvasModule.default;
+  const imported = (await import("html2canvas")) as Html2CanvasModule & {
+    (element: HTMLElement, options?: Record<string, unknown>): Promise<HTMLCanvasElement>;
+  };
+  const html2canvas = imported.default ?? imported;
 
   const clone = element.cloneNode(true) as HTMLElement;
   clone.style.width = `${element.scrollWidth}px`;
@@ -132,10 +134,12 @@ export async function exportIndicadoresGeraisPdfFromElement(element: HTMLElement
 
   try {
     const canvas = await html2canvas(clone, {
-      scale: 2,
+      scale: 1.6,
       backgroundColor: "#ffffff",
       useCORS: true,
       logging: false,
+      windowWidth: clone.scrollWidth,
+      windowHeight: clone.scrollHeight,
     });
 
     const imgData = canvas.toDataURL("image/png", 1);
