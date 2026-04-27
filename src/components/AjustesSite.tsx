@@ -276,6 +276,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const selectedFlowEditorRef = useRef<HTMLDivElement | null>(null);
   const [dragAssuntoPAId, setDragAssuntoPAId] = useState<string | null>(null);
   const [dragAssuntoDUId, setDragAssuntoDUId] = useState<string | null>(null);
+  const [dragOrigemDUId, setDragOrigemDUId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewTab, setPreviewTab] = useState<"PA" | "DU">("PA");
   const sensors = useSensors(
@@ -292,6 +293,10 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     () => form.assuntosDUPrincipais.map((_, index) => `du-${index}`),
     [form.assuntosDUPrincipais],
   );
+  const origemDUIds = useMemo(
+    () => form.origensDUDocumentos.map((_, index) => `orig-${index}`),
+    [form.origensDUDocumentos],
+  );
   const dragAssuntoPALabel = useMemo(() => {
     if (!dragAssuntoPAId) return "";
     const index = Number(dragAssuntoPAId.replace("pa-", ""));
@@ -302,6 +307,11 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     const index = Number(dragAssuntoDUId.replace("du-", ""));
     return Number.isNaN(index) ? "" : form.assuntosDUPrincipais[index] || "";
   }, [dragAssuntoDUId, form.assuntosDUPrincipais]);
+  const dragOrigemDULabel = useMemo(() => {
+    if (!dragOrigemDUId) return "";
+    const index = Number(dragOrigemDUId.replace("orig-", ""));
+    return Number.isNaN(index) ? "" : form.origensDUDocumentos[index] || "";
+  }, [dragOrigemDUId, form.origensDUDocumentos]);
 
   useEffect(() => {
     setForm(settings);
@@ -454,6 +464,30 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       ...prev,
       origensDUDocumentos: prev.origensDUDocumentos.filter((_, i) => i !== index),
     }));
+  };
+
+  const handleDragStartOrigemDU = (event: DragStartEvent) => {
+    setDragOrigemDUId(String(event.active.id));
+  };
+
+  const handleDragCancelOrigemDU = () => {
+    setDragOrigemDUId(null);
+  };
+
+  const handleDragEndOrigemDU = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      setDragOrigemDUId(null);
+      return;
+    }
+    const oldIndex = Number(String(active.id).replace("orig-", ""));
+    const newIndex = Number(String(over.id).replace("orig-", ""));
+    if (Number.isNaN(oldIndex) || Number.isNaN(newIndex)) return;
+    setForm((prev) => ({
+      ...prev,
+      origensDUDocumentos: arrayMove(prev.origensDUDocumentos, oldIndex, newIndex),
+    }));
+    setDragOrigemDUId(null);
   };
 
   const addOrigemDUDocumento = () => {
@@ -2787,35 +2821,43 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                     </CollapsibleTrigger>
 
                     <CollapsibleContent className="pt-2 space-y-3">
-                      <div className="space-y-2">
-                        {form.origensDUDocumentos.map((origem, index) => (
-                          <div
-                            key={`origem-du-${index}`}
-                            className="flex flex-col gap-2 sm:flex-row sm:items-center"
-                          >
-                            <Input
-                              value={origem}
-                              onChange={(e) => updateOrigemDUDocumento(index, e.target.value)}
-                              placeholder="Digite a origem do documento"
-                            />
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => removeOrigemDUDocumento(index)}
-                              className="shrink-0"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Excluir
-                            </Button>
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStartOrigemDU}
+                        onDragCancel={handleDragCancelOrigemDU}
+                        onDragEnd={handleDragEndOrigemDU}
+                      >
+                        <SortableContext
+                          items={origemDUIds}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="space-y-2">
+                            {form.origensDUDocumentos.map((origem, index) => (
+                              <SortableAssuntoRow
+                                key={origemDUIds[index]}
+                                id={origemDUIds[index]}
+                                value={origem}
+                                placeholder="Digite a origem do documento"
+                                onChange={(value) => updateOrigemDUDocumento(index, value)}
+                                onDelete={() => removeOrigemDUDocumento(index)}
+                              />
+                            ))}
                           </div>
-                        ))}
-                      </div>
+                        </SortableContext>
+                        <DragOverlay>
+                          {dragOrigemDULabel ? (
+                            <AssuntoDragPreview label={dragOrigemDULabel} />
+                          ) : null}
+                        </DragOverlay>
+                      </DndContext>
 
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                         <Input
                           value={novaOrigemDUDocumento}
                           onChange={(e) => setNovaOrigemDUDocumento(e.target.value)}
                           placeholder="Nova origem de documento DU"
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addOrigemDUDocumento(); } }}
                         />
                         <Button
                           type="button"

@@ -422,7 +422,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
   const anosLegado = Array.from({ length: 4 }, (_, idx) => new Date().getFullYear() - 4 + idx);
 
   const labelNumeroProcesso = () => {
-    if (setor === "DU") return "NUP / SAPIENS / Nº Documento";
+    if (setor === "DU") {
+      if (assunto === "Requerimento EXTRAJUDICIAL") return "NUP / SAPIENS / Nº Documento (opcional)";
+      return "NUP / SAPIENS / Nº Documento";
+    }
     if (setor === "PA") {
       const isSindicanciaAntiga = tipoPA === "Sindicância" && fluxoIPM === "Sindicância Antigo";
       const isDiligencia = aceitaDiligencia(tipoPA) && fluxoIPM === "Diligência";
@@ -434,7 +437,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
   };
 
   const placeholderNumeroProcesso = () => {
-    if (setor === "DU") return "Ex: 0001234-56...";
+    if (setor === "DU") {
+      if (assunto === "Requerimento EXTRAJUDICIAL") return "Sem nº de processo (opcional)";
+      return "Ex: 0001234-56...";
+    }
     if (setor === "PA") {
       const isSindicanciaAntiga = tipoPA === "Sindicância" && fluxoIPM === "Sindicância Antigo";
       if (isSindicanciaAntiga) return "Ex: 12";
@@ -474,7 +480,8 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         return;
       }
     }
-    if (!numeroProcesso.trim()) {
+    const isRequerimentoExtrajudicial = setor === "DU" && assunto === "Requerimento EXTRAJUDICIAL";
+    if (!numeroProcesso.trim() && !isRequerimentoExtrajudicial) {
       // console.log("❌ VALIDAÇÃO FALHOU: numeroProcesso vazio");
       toast.error("Informe o número do processo.");
       return;
