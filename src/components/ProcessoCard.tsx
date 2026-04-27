@@ -1,5 +1,5 @@
 import type { Processo, StatusProcesso } from "@/types/processo";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,13 +36,18 @@ import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Time
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
-import { AcoesDUModalNovo } from "./modals/AcoesDUModalNovo";
-import { AcoesPAModalNovo } from "./modals/AcoesPAModalNovo";
 import { DetalhesProcessoModal } from "./DetalhesProcessoModal";
 import { ChatModal } from "./ChatModal";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import type { SiteSettings } from "@/types/siteSettings";
+
+const AcoesDUModalNovo = lazy(() =>
+  import("./modals/AcoesDUModalNovo").then((m) => ({ default: m.AcoesDUModalNovo })),
+);
+const AcoesPAModalNovo = lazy(() =>
+  import("./modals/AcoesPAModalNovo").then((m) => ({ default: m.AcoesPAModalNovo })),
+);
 
 interface ProcessoCardProps {
   processo?: Processo;
@@ -571,22 +576,24 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
       </Card>
 
       {/* Modais de Ações */}
-      <AcoesDUModalNovo
-        open={modalAcoesDU}
-        onOpenChange={setModalAcoesDU}
-        processoId={p.id}
-        numeroProcesso={p.numero}
-        onSuccess={() => {}}
-      />
+      <Suspense fallback={null}>
+        <AcoesDUModalNovo
+          open={modalAcoesDU}
+          onOpenChange={setModalAcoesDU}
+          processoId={p.id}
+          numeroProcesso={p.numero}
+          onSuccess={() => {}}
+        />
 
-      <AcoesPAModalNovo
-        open={modalAcoesPA}
-        onOpenChange={setModalAcoesPA}
-        processoId={p.id}
-        numeroProcesso={p.numero}
-        siteSettings={siteSettings}
-        onSuccess={() => {}}
-      />
+        <AcoesPAModalNovo
+          open={modalAcoesPA}
+          onOpenChange={setModalAcoesPA}
+          processoId={p.id}
+          numeroProcesso={p.numero}
+          siteSettings={siteSettings}
+          onSuccess={() => {}}
+        />
+      </Suspense>
 
       {/* Modal de Detalhes */}
       <DetalhesProcessoModal

@@ -13,4 +13,22 @@ export default defineConfig({
 		tsconfigPaths(),
 		tailwindcss(),
 	],
+	build: {
+		chunkSizeWarningLimit: 600,
+		rollupOptions: {
+			output: {
+				manualChunks(id) {
+					if (id.includes("node_modules/firebase")) {
+						return "firebase-vendor";
+					}
+					if (id.includes("node_modules/recharts") || id.includes("node_modules/victory-vendor") || id.includes("node_modules/d3-")) {
+						return "recharts-vendor";
+					}
+					if (id.includes("node_modules/react-dom") || id.includes("node_modules/react/") || id.includes("node_modules/scheduler")) {
+						return "react-vendor";
+					}
+				},
+			},
+		},
+	},
 });
