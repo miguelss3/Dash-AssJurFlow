@@ -124,24 +124,28 @@ export function useAuth() {
       setFirebaseUser(fbUser);
       
       if (fbUser) {
-        // Se autenticado no Firebase, carrega dados do localStorage
-        const storedUser = readStored();
-        if (storedUser) {
-          const userData = { ...storedUser, email: fbUser.email || undefined, uid: fbUser.uid };
-          
-          // Se é admin, ajusta o role para refletir isso na UI
+        // Sempre busca o perfil atualizado do Firestore para não usar cache desatualizado.
+        // O estado inicial já foi populado pelo readStored() no useState, então a UI
+        // não trava enquanto a consulta ao Firestore acontece em segundo plano.
+        let userData: AuthUser | null = await carregarPerfilPrivado(fbUser);
+
+        if (userData) {
+          // Perfil encontrado no Firestore — dados sempre frescos
           if (isAdmin(userData)) {
             userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
           }
-          
-          setUser(userData);
         } else {
-          // Sem cache local: tenta reconstruir perfil pelo Firestore (preferindo o documento privado por UID)
-          let userData: AuthUser | null = await carregarPerfilPrivado(fbUser);
-
-          // Fallback final: cria um usuário básico
-          if (!userData) {
-          const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
+          // Firestore não retornou dados: usa cache local como fallback (ex: modo offline)
+          const storedUser = readStored();
+          if (storedUser) {
+            userData = { ...storedUser, email: fbUser.email || undefined, uid: fbUser.uid };
+            if (isAdmin(userData)) {
+              userData.role = userData.cargo || userData.setor || "CHEFE ASSEAPASSJUR";
+            }
+            console.warn("⚠️ Firestore indisponível, usando perfil em cache.");
+          } else {
+            // Último recurso: dados mínimos do Firebase Auth
+            const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
             userData = {
               posto: "",
               nome: fbUser.displayName || nomeExtraido,
@@ -150,18 +154,17 @@ export function useAuth() {
               email: fbUser.email || undefined,
               uid: fbUser.uid,
             };
-            console.warn("⚠️ Usuário sem dados no localStorage/Firestore, usando fallback:", userData);
+            console.warn("⚠️ Usuário sem perfil no Firestore/cache, usando dados mínimos:", userData);
           }
-          
-          // Se é admin por email, ajusta o role
-          if (isAdmin(userData)) {
-            userData.role = "ADMIN UNIVERSAL";
-          }
-
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
-          
-          setUser(userData);
         }
+
+        // Se é admin universal por email, garante role correto
+        if (isAdmin(userData) && !userData.role) {
+          userData.role = "ADMIN UNIVERSAL";
+        }
+
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+        setUser(userData);
       } else {
         setUser(null);
       }
