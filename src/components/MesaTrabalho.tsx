@@ -249,7 +249,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
 
     const result: {
       tipo: TipoProcesso;
-      assessores: { nome: string; itensAtivos: Processo[]; itensAtrasados: Processo[]; itensConcluidos: Processo[] }[];
+      assessores: {
+        nome: string;
+        itensAtivos: Processo[];
+        itensPortariaAssinada: Processo[];
+        itensAtrasados: Processo[];
+        itensConcluidos: Processo[];
+      }[];
     }[] = [];
 
     for (const tipo of tipos) {
@@ -307,6 +313,22 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         return null;
       };
 
+      const colunaPAPortariaAssinada = (p: Processo) => {
+        if (tipo !== "PA") return null;
+
+        const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
+        if (situacaoFluxo !== "AGUARDANDO_PRAZO") return null;
+
+        const tipoPANormalizado = (p.tipoPA || p.subtipo || "")
+          .toString()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+
+        if (!tipoPANormalizado.includes("sindic")) return null;
+        return paColunaLabelPorId.get("sindicancia") || null;
+      };
+
       const isPAAtrasado = (p: Processo) => {
         if (tipo !== "PA") return false;
         const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
@@ -330,12 +352,14 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         : doTipo;
       
       const mapAtivos = new Map<string, Processo[]>();
+      const mapPortariaAssinada = new Map<string, Processo[]>();
       const mapAtrasados = new Map<string, Processo[]>();
       const mapConcluidos = new Map<string, Processo[]>();
 
       if (tipo === "PA") {
         paColunaLabels.forEach((coluna) => {
           mapAtivos.set(coluna, []);
+          mapPortariaAssinada.set(coluna, []);
           mapAtrasados.set(coluna, []);
           mapConcluidos.set(coluna, []);
         });
@@ -343,6 +367,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
 
       if (pendenciasChefia.length > 0 || tipo === "DU") {
         mapAtivos.set("MESA DO CHEFE", pendenciasChefia);
+        if (!mapPortariaAssinada.has("MESA DO CHEFE")) mapPortariaAssinada.set("MESA DO CHEFE", []);
         if (!mapAtrasados.has("MESA DO CHEFE")) mapAtrasados.set("MESA DO CHEFE", []);
         if (!mapConcluidos.has("MESA DO CHEFE")) mapConcluidos.set("MESA DO CHEFE", []);
       }
@@ -350,17 +375,25 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       if (aguardandoRespostaDUAtivos.length > 0 || aguardandoRespostaDUVencidos.length > 0 || tipo === "DU") {
         mapAtivos.set(duColunaAguardandoResposta, aguardandoRespostaDUAtivos);
         mapAtrasados.set(duColunaAguardandoResposta, aguardandoRespostaDUVencidos);
+        if (!mapPortariaAssinada.has(duColunaAguardandoResposta)) mapPortariaAssinada.set(duColunaAguardandoResposta, []);
         if (!mapConcluidos.has(duColunaAguardandoResposta)) mapConcluidos.set(duColunaAguardandoResposta, []);
       }
 
       if (tipo === "DU") {
         if (!mapAtivos.has(duColunaAguardandoDistribuicao)) mapAtivos.set(duColunaAguardandoDistribuicao, []);
         if (!mapAtrasados.has(duColunaAguardandoDistribuicao)) mapAtrasados.set(duColunaAguardandoDistribuicao, []);
+        if (!mapPortariaAssinada.has(duColunaAguardandoDistribuicao)) mapPortariaAssinada.set(duColunaAguardandoDistribuicao, []);
         if (!mapConcluidos.has(duColunaAguardandoDistribuicao)) mapConcluidos.set(duColunaAguardandoDistribuicao, []);
       }
       
       // Adiciona os processos aos seus responsáveis
       doTipoSemPendenciasChefia.forEach((p) => {
+        const colunaPortariaAssinadaPA = colunaPAPortariaAssinada(p);
+        if (colunaPortariaAssinadaPA) {
+          mapPortariaAssinada.get(colunaPortariaAssinadaPA)!.push(p);
+          return;
+        }
+
         const colunaEspecialPA = colunaPAEmAndamento(p);
         if (colunaEspecialPA) {
           if (isPAAtrasado(p)) {
@@ -379,6 +412,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         if (!responsavelKey) return;
         if (!mapAtivos.has(responsavelKey)) mapAtivos.set(responsavelKey, []);
         mapAtivos.get(responsavelKey)!.push(p);
+        if (!mapPortariaAssinada.has(responsavelKey)) mapPortariaAssinada.set(responsavelKey, []);
         if (!mapAtrasados.has(responsavelKey)) mapAtrasados.set(responsavelKey, []);
       });
 
@@ -390,6 +424,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         if (!responsavelKey) return;
         if (!mapConcluidos.has(responsavelKey)) mapConcluidos.set(responsavelKey, []);
         mapConcluidos.get(responsavelKey)!.push(p);
+        if (!mapPortariaAssinada.has(responsavelKey)) mapPortariaAssinada.set(responsavelKey, []);
       });
       
       // Adiciona todos os assessores do setor (mesmo sem processos)
@@ -400,6 +435,9 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         }
         if (!mapAtrasados.has(assessor.nome)) {
           mapAtrasados.set(assessor.nome, []);
+        }
+        if (!mapPortariaAssinada.has(assessor.nome)) {
+          mapPortariaAssinada.set(assessor.nome, []);
         }
         if (!mapConcluidos.has(assessor.nome)) {
           mapConcluidos.set(assessor.nome, []);
@@ -415,16 +453,17 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         .map((nome) => ({
           nome,
           itensAtivos: mapAtivos.get(nome) || [],
+          itensPortariaAssinada: mapPortariaAssinada.get(nome) || [],
           itensAtrasados: mapAtrasados.get(nome) || [],
           itensConcluidos: mapConcluidos.get(nome) || [],
         }))
-        .filter(({ nome, itensAtivos, itensAtrasados, itensConcluidos }) => {
+        .filter(({ nome, itensAtivos, itensPortariaAssinada, itensAtrasados, itensConcluidos }) => {
           // Só mostra "Aguardando Distribuição" e colunas especiais se tiver processos
           if (tipo === "DU" && (nome === "MESA DO CHEFE" || nome === duColunaAguardandoResposta || nome === duColunaAguardandoDistribuicao)) {
             return true;
           }
           if (nome.includes("📥 Aguardando") || nome.includes("📩 Aguardando")) {
-            return itensAtivos.length > 0 || itensAtrasados.length > 0 || itensConcluidos.length > 0;
+            return itensAtivos.length > 0 || itensPortariaAssinada.length > 0 || itensAtrasados.length > 0 || itensConcluidos.length > 0;
           }
           return true; // Outros assessores sempre aparecem
         })
@@ -534,6 +573,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         responsavel={a.nome}
                         tipo={grupo.tipo}
                         processos={a.itensAtivos}
+                        processosPortariaAssinada={a.itensPortariaAssinada}
                         processosAtrasados={a.itensAtrasados}
                         processosConcluidos={a.itensConcluidos}
                         ehAdmin={ehAdmin}
@@ -554,6 +594,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         responsavel={a.nome}
                         tipo={grupo.tipo}
                         processos={a.itensAtivos}
+                        processosPortariaAssinada={a.itensPortariaAssinada}
                         processosAtrasados={a.itensAtrasados}
                         processosConcluidos={a.itensConcluidos}
                         ehAdmin={ehAdmin}
@@ -577,6 +618,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         responsavel={a.nome}
                         tipo={grupo.tipo}
                         processos={a.itensAtivos}
+                        processosPortariaAssinada={a.itensPortariaAssinada}
                         processosAtrasados={a.itensAtrasados}
                         processosConcluidos={a.itensConcluidos}
                         ehAdmin={ehAdmin}
@@ -597,6 +639,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         responsavel={a.nome}
                         tipo={grupo.tipo}
                         processos={a.itensAtivos}
+                        processosPortariaAssinada={a.itensPortariaAssinada}
                         processosAtrasados={a.itensAtrasados}
                         processosConcluidos={a.itensConcluidos}
                         ehAdmin={ehAdmin}
@@ -619,6 +662,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                       responsavel={a.nome}
                       tipo={grupo.tipo}
                       processos={a.itensAtivos}
+                      processosPortariaAssinada={a.itensPortariaAssinada}
                       processosAtrasados={a.itensAtrasados}
                       processosConcluidos={a.itensConcluidos}
                       ehAdmin={ehAdmin}

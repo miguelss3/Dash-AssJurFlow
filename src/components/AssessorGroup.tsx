@@ -1,6 +1,6 @@
 import { ProcessoCard } from "./ProcessoCard";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
-import { DEFAULT_COLUMN_TABS } from "@/types/siteSettings";
+import { DEFAULT_COLUMN_TABS, DEFAULT_PA_EM_ANDAMENTO_COLUMNS, normalizarPAEmAndamentoColumns } from "@/types/siteSettings";
 import type { SiteSettings } from "@/types/siteSettings";
 import { useDroppable } from "@dnd-kit/core";
 import { useMemo, useState } from "react";
@@ -9,6 +9,7 @@ interface Props {
   responsavel: string;
   tipo: TipoProcesso;
   processos: Processo[];
+  processosPortariaAssinada?: Processo[];
   processosAtrasados?: Processo[];
   processosConcluidos?: Processo[];
   ehAdmin?: boolean;
@@ -21,8 +22,8 @@ interface Props {
   onReadProcess?: (processoId: string) => void;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess }: Props) {
-  const [aba, setAba] = useState<"andamento" | "atraso" | "concluidos">("andamento");
+export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess }: Props) {
+  const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">("andamento");
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
   });
@@ -39,6 +40,16 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
   const bgClass = isAguardandoDistribuicao ? "bg-orange-50" : tipoBg;
   const textClass = isAguardandoDistribuicao ? "text-orange-700" : tipoText;
   const borderClass = isAguardandoDistribuicao ? "border-orange-300" : tipoBorder;
+
+  const labelSindicanciaPA = useMemo(() => {
+    const colunas = normalizarPAEmAndamentoColumns(
+      siteSettings?.paEmAndamentoColumns,
+      DEFAULT_PA_EM_ANDAMENTO_COLUMNS,
+    );
+    return colunas.find((coluna) => coluna.id === "sindicancia")?.label || "📗 Sindicancias";
+  }, [siteSettings?.paEmAndamentoColumns]);
+
+  const mostrarAbaPortariaAssinada = tipo === "PA" && responsavel.trim() === labelSindicanciaPA.trim();
 
   const processosAtivosOrdenados = useMemo(() => {
     if (tipo !== "PA") return processos;
@@ -80,11 +91,13 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
     });
   }, [processosAtrasados, tipo]);
 
-  const processosDaAba = aba === "andamento"
-    ? processosAtivosOrdenados
-    : aba === "atraso"
-      ? processosAtrasadosOrdenados
-      : processosConcluidos;
+  const processosDaAba = aba === "portaria_assinada"
+    ? processosPortariaAssinada
+    : aba === "andamento"
+      ? processosAtivosOrdenados
+      : aba === "atraso"
+        ? processosAtrasadosOrdenados
+        : processosConcluidos;
 
   const abasConfiguradas = useMemo(() => {
     if (isAguardandoRespostaDU) {
@@ -102,6 +115,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
 
     const lista = base
       .filter((item) => item.scope === scope)
+      .filter((item) => item.id !== "portaria_assinada" || mostrarAbaPortariaAssinada)
       .filter((item) => item.enabled !== false)
       .sort((a, b) => a.order - b.order)
       .map((item) => ({
@@ -111,21 +125,24 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
 
     const fallback = DEFAULT_COLUMN_TABS
       .filter((item) => item.scope === scope)
+      .filter((item) => item.id !== "portaria_assinada" || mostrarAbaPortariaAssinada)
       .sort((a, b) => a.order - b.order);
 
     return lista.length > 0 ? lista : fallback;
-  }, [isAguardandoRespostaDU, siteSettings?.columnTabs, tipo]);
+  }, [isAguardandoRespostaDU, mostrarAbaPortariaAssinada, siteSettings?.columnTabs, tipo]);
 
   const abaAtiva = useMemo(() => {
     const existe = abasConfiguradas.some((item) => item.id === aba);
     return existe ? aba : abasConfiguradas[0]?.id || "andamento";
   }, [aba, abasConfiguradas]);
 
-  const processosDaAbaAtiva = abaAtiva === "andamento"
-    ? processosAtivosOrdenados
-    : abaAtiva === "atraso"
-      ? processosAtrasadosOrdenados
-      : processosConcluidos;
+  const processosDaAbaAtiva = abaAtiva === "portaria_assinada"
+    ? processosPortariaAssinada
+    : abaAtiva === "andamento"
+      ? processosAtivosOrdenados
+      : abaAtiva === "atraso"
+        ? processosAtrasadosOrdenados
+        : processosConcluidos;
 
   return (
     <div 
@@ -148,6 +165,8 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
           {abasConfiguradas.map((tab) => {
             const count = tab.id === "andamento"
               ? processos.length
+              : tab.id === "portaria_assinada"
+                ? processosPortariaAssinada.length
               : tab.id === "atraso"
                 ? processosAtrasados.length
                 : processosConcluidos.length;
@@ -156,7 +175,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
               <button
                 key={`${responsavel}-${tab.id}`}
                 type="button"
-                onClick={() => setAba(tab.id as "andamento" | "atraso" | "concluidos")}
+                onClick={() => setAba(tab.id as "portaria_assinada" | "andamento" | "atraso" | "concluidos")}
                 className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
                   abaAtiva === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -175,6 +194,8 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
           <div className="rounded-2xl border-2 border-dashed border-border py-10 text-center text-xs text-muted-foreground/60 font-semibold">
             {abaAtiva === "andamento"
               ? "Sem processos em andamento"
+              : abaAtiva === "portaria_assinada"
+                ? "Sem portarias assinadas"
               : abaAtiva === "atraso"
                 ? isAguardandoRespostaDU
                   ? "Sem processos vencidos"

@@ -25,7 +25,7 @@ export interface DUBoardColumnSetting {
   order: number;
 }
 
-export type ColumnTabId = "andamento" | "atraso" | "concluidos";
+export type ColumnTabId = "portaria_assinada" | "andamento" | "atraso" | "concluidos";
 
 export interface ColumnTabSetting {
   id: ColumnTabId;
@@ -186,6 +186,13 @@ export const DEFAULT_DU_BOARD_COLUMNS: DUBoardColumnSetting[] = [
 ];
 
 export const DEFAULT_COLUMN_TABS: ColumnTabSetting[] = [
+  {
+    id: "portaria_assinada",
+    label: "Portaria Assinada",
+    enabled: true,
+    order: 5,
+    scope: "PA",
+  },
   {
     id: "andamento",
     label: "Em Andamento",
@@ -666,7 +673,7 @@ export function normalizarColumnTabs(
   fallback: ColumnTabSetting[] = DEFAULT_COLUMN_TABS,
 ): ColumnTabSetting[] {
   const scopes: Array<"PA" | "DU"> = ["PA", "DU"];
-  const idsValidos = new Set<ColumnTabId>(["andamento", "atraso", "concluidos"]);
+  const idsValidos = new Set<ColumnTabId>(["portaria_assinada", "andamento", "atraso", "concluidos"]);
   const scopesValidos = new Set<"PA" | "DU">(scopes);
 
   const fallbackMap = new Map<string, ColumnTabSetting>();
@@ -686,7 +693,7 @@ export function normalizarColumnTabs(
 
       if (!idsValidos.has(id)) return null;
       if (!scopesValidos.has(scope)) return null;
-      if (scope === "DU" && id === "atraso") return null;
+      if (scope === "DU" && (id === "atraso" || id === "portaria_assinada")) return null;
 
       const fallbackItem = fallbackMap.get(`${scope}:${id}`);
       const label = String(base.label || "").trim() || fallbackItem?.label || id;
