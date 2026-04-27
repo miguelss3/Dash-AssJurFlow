@@ -1,6 +1,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Processo } from "@/types/processo";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { 
   Calendar, 
   User, 
@@ -10,10 +12,17 @@ import {
   Clock,
   AlertCircle,
   CheckCircle2,
+  Pencil,
+  Save,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
 import { Separator } from "@/components/ui/separator";
+import { useEffect, useState } from "react";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 
 interface DetalhesProcessoModalProps {
   open: boolean;
@@ -22,7 +31,11 @@ interface DetalhesProcessoModalProps {
 }
 
 export function DetalhesProcessoModal({ open, onOpenChange, processo }: DetalhesProcessoModalProps) {
-  if (!processo) return null;
+  const [editandoPrazosDU, setEditandoPrazosDU] = useState(false);
+  const [savingPrazosDU, setSavingPrazosDU] = useState(false);
+  const [prazoInternoEdit, setPrazoInternoEdit] = useState("");
+  const [prazoFatalEdit, setPrazoFatalEdit] = useState("");
+  const [prazoRespostaEdit, setPrazoRespostaEdit] = useState("");
 
   const formatarDataHoraSegura = (valor?: string | null) => {
     if (!valor) return "—";
@@ -44,6 +57,36 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
   const setor = processo.setor || processo.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
+
+  useEffect(() => {
+    if (!open || !processo) return;
+    setPrazoInternoEdit(processo.prazo || "");
+    setPrazoFatalEdit(processo.prazoFatal || "");
+    setPrazoRespostaEdit(processo.pedidoSubsidios?.prazoResposta || "");
+    setEditandoPrazosDU(false);
+  }, [open, processo]);
+
+  if (!processo) return null;
+
+  const handleSalvarPrazosDU = async () => {
+    try {
+      setSavingPrazosDU(true);
+      const processoRef = doc(db, "processos", processo.id);
+      await updateDoc(processoRef, {
+        prazo: prazoInternoEdit || null,
+        prazoFatal: prazoFatalEdit || null,
+        "pedidoSubsidios.prazoResposta": prazoRespostaEdit || null,
+        atualizadoEm: new Date().toISOString(),
+      });
+      setEditandoPrazosDU(false);
+      toast.success("Prazos finais do DU atualizados com sucesso.");
+    } catch (error) {
+      console.error("Erro ao atualizar prazos DU:", error);
+      toast.error("Não foi possível salvar os prazos finais do DU.");
+    } finally {
+      setSavingPrazosDU(false);
+    }
+  };
   const prorrogacoesPA = isPA
     ? calcularFaixasProrrogacaoPA({
         tipoPA: processo.tipoPA,
@@ -210,10 +253,94 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
             </div>
 
             <div className="space-y-4">
-              <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
+                {isDU && (
+                  <div className="flex items-center gap-2">
+                    {editandoPrazosDU ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditandoPrazosDU(false);
+                            setPrazoInternoEdit(processo.prazo || "");
+                            setPrazoFatalEdit(processo.prazoFatal || "");
+                            setPrazoRespostaEdit(processo.pedidoSubsidios?.prazoResposta || "");
+                          }}
+                          disabled={savingPrazosDU}
+                        >
+                          <X className="w-3.5 h-3.5 mr-1" />
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleSalvarPrazosDU}
+                          disabled={savingPrazosDU}
+                        >
+                          <Save className="w-3.5 h-3.5 mr-1" />
+                          {savingPrazosDU ? "Salvando..." : "Salvar"}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditandoPrazosDU(true)}
+                      >
+                        <Pencil className="w-3.5 h-3.5 mr-1" />
+                        Editar prazos DU
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
               
               {processo.dataEntrada && (
                 <InfoRow icon={Calendar} label="Data de Entrada" value={formatarData(processo.dataEntrada)} />
+              )}
+
+              {isDU && editandoPrazosDU && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                        Prazo Interno
+                      </label>
+                      <Input
+                        type="date"
+                        value={prazoInternoEdit}
+                        onChange={(e) => setPrazoInternoEdit(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                        Prazo Fatal
+                      </label>
+                      <Input
+                        type="date"
+                        value={prazoFatalEdit}
+                        onChange={(e) => setPrazoFatalEdit(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">
+                        Prazo Subsídios
+                      </label>
+                      <Input
+                        type="date"
+                        value={prazoRespostaEdit}
+                        onChange={(e) => setPrazoRespostaEdit(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Você pode ajustar todos os prazos finais do DU por aqui.
+                  </p>
+                </div>
               )}
 
               {isPA && processo.dataInicioPrazo && (

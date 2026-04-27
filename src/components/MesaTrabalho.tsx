@@ -283,7 +283,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       const isDUAguardandoRespostaVencido = (p: Processo) => {
         if (tipo !== "DU") return false;
         if (!isAguardandoResposta(p)) return false;
-        const prazoBase = p.prazoFatal || p.finalPrazo || p.prazo;
+        const prazoBase = p.pedidoSubsidios?.prazoResposta;
         return !!prazoBase && diasRestantes(prazoBase) < 0;
       };
 

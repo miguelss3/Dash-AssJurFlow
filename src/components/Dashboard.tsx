@@ -19,10 +19,14 @@ interface Props {
 
 export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
   const ativos = processos.filter((p) => p.status !== "concluido");
-  const vencidos = ativos.filter((p) => statusPrazo(p.prazo) === "overdue").length;
-  const hoje = ativos.filter((p) => statusPrazo(p.prazo) === "today").length;
-  const semana = ativos.filter((p) => {
-    const s = statusPrazo(p.prazo);
+  const ativosDUFatal = ativos.filter((p) => {
+    const setor = (p.setor || p.tipo || "").toString().toUpperCase();
+    return setor === "DU" && Boolean(p.prazoFatal);
+  });
+  const vencidos = ativosDUFatal.filter((p) => statusPrazo(p.prazoFatal) === "overdue").length;
+  const hoje = ativosDUFatal.filter((p) => statusPrazo(p.prazoFatal) === "today").length;
+  const semana = ativosDUFatal.filter((p) => {
+    const s = statusPrazo(p.prazoFatal);
     return s === "today" || s === "soon";
   }).length;
   const concluidos = processos.filter((p) => p.status === "concluido").length;
