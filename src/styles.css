@@ -241,3 +241,32 @@
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
 }
+
+@media print {
+  @page {
+    size: auto;
+    margin: 8mm;
+  }
+
+  body.print-indicadores-active * {
+    visibility: hidden !important;
+  }
+
+  body.print-indicadores-active .indicadores-print-root,
+  body.print-indicadores-active .indicadores-print-root * {
+    visibility: visible !important;
+  }
+
+  body.print-indicadores-active .indicadores-print-root {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body.print-indicadores-active [data-print-ignore="true"] {
+    display: none !important;
+  }
+}

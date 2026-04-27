@@ -29,6 +29,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
 
   const isDU = tipo === "DU";
   const isAguardandoDistribuicao = responsavel.includes("📥 Aguardando");
+  const isAguardandoRespostaDU = isDU && responsavel.toLowerCase().includes("aguardando resposta");
   
   const tipoBg = isDU ? "bg-[var(--tipo-du-bg)]" : "bg-[var(--tipo-pa-bg)]";
   const tipoText = isDU ? "text-[var(--tipo-du)]" : "text-[var(--tipo-pa)]";
@@ -86,6 +87,14 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
       : processosConcluidos;
 
   const abasConfiguradas = useMemo(() => {
+    if (isAguardandoRespostaDU) {
+      return [
+        { id: "andamento", scope: "DU", label: "Em Andamento", order: 1, enabled: true },
+        { id: "atraso", scope: "DU", label: "Vencidos", order: 2, enabled: true },
+        { id: "concluidos", scope: "DU", label: "Concluídos", order: 3, enabled: true },
+      ];
+    }
+
     const scope = tipo === "PA" ? "PA" : "DU";
     const base = siteSettings?.columnTabs?.length
       ? siteSettings.columnTabs
@@ -105,7 +114,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
       .sort((a, b) => a.order - b.order);
 
     return lista.length > 0 ? lista : fallback;
-  }, [siteSettings?.columnTabs, tipo]);
+  }, [isAguardandoRespostaDU, siteSettings?.columnTabs, tipo]);
 
   const abaAtiva = useMemo(() => {
     const existe = abasConfiguradas.some((item) => item.id === aba);
@@ -147,7 +156,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
               <button
                 key={`${responsavel}-${tab.id}`}
                 type="button"
-                onClick={() => setAba(tab.id)}
+                onClick={() => setAba(tab.id as "andamento" | "atraso" | "concluidos")}
                 className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
                   abaAtiva === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -167,7 +176,9 @@ export function AssessorGroup({ responsavel, tipo, processos, processosAtrasados
             {abaAtiva === "andamento"
               ? "Sem processos em andamento"
               : abaAtiva === "atraso"
-                ? "Sem processos em atraso"
+                ? isAguardandoRespostaDU
+                  ? "Sem processos vencidos"
+                  : "Sem processos em atraso"
                 : "Sem processos concluídos"}
           </div>
         ) : (

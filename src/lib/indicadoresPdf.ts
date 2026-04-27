@@ -4,7 +4,8 @@ import type { Processo } from "@/types/processo";
 import { statusPrazo, diasRestantes } from "@/lib/prazo";
 
 type Html2CanvasModule = {
-  default: (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+  default?: (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
+  (element: HTMLElement, options?: Record<string, unknown>): Promise<HTMLCanvasElement>;
 };
 
 function formatDate(dateStr?: string) {
@@ -112,22 +113,24 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
 }
 
 export async function exportIndicadoresGeraisPdfFromElement(element: HTMLElement) {
-  const imported = (await import("html2canvas")) as Html2CanvasModule & {
-    (element: HTMLElement, options?: Record<string, unknown>): Promise<HTMLCanvasElement>;
-  };
+  const imported = (await import("html2canvas")) as Html2CanvasModule;
   const html2canvas = imported.default ?? imported;
+
+  if (typeof html2canvas !== "function") {
+    throw new Error("html2canvas não disponível em runtime");
+  }
 
   const clone = element.cloneNode(true) as HTMLElement;
   clone.style.width = `${element.scrollWidth}px`;
   clone.style.background = "white";
-  clone.style.padding = "16px";
+  clone.style.padding = "12px";
   clone.querySelectorAll('[data-print-ignore="true"]').forEach((node) => node.remove());
 
   const wrapper = document.createElement("div");
   wrapper.style.position = "fixed";
   wrapper.style.left = "-100000px";
   wrapper.style.top = "0";
-  wrapper.style.width = `${element.scrollWidth + 40}px`;
+  wrapper.style.width = `${element.scrollWidth + 24}px`;
   wrapper.style.background = "white";
   wrapper.appendChild(clone);
   document.body.appendChild(wrapper);
@@ -142,32 +145,50 @@ export async function exportIndicadoresGeraisPdfFromElement(element: HTMLElement
       windowHeight: clone.scrollHeight,
     });
 
+    if (!canvas || canvas.width === 0 || canvas.height === 0) {
+      throw new Error("Falha ao capturar área de indicadores");
+    }
+
     const imgData = canvas.toDataURL("image/png", 1);
     const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
 
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 8;
-    const usableWidth = pageWidth - margin * 2;
-    const usableHeight = pageHeight - margin * 2;
 
+    // Cabeçalho igual ao padrão anterior
+    doc.setFillColor(14, 43, 85);
+    doc.rect(0, 0, pageWidth, 30, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Indicadores de Gestao - Estatisticas", 14, 13);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text("Painel completo dos indicadores exibidos em tela", 14, 20);
+    doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 14, 25);
+
+    const marginX = 8;
+    const startY = 36;
+    const usableWidth = pageWidth - marginX * 2;
+    const usableHeight = pageHeight - startY - 8;
     const imgWidth = usableWidth;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
     let yRemaining = imgHeight;
-    let position = margin;
+    let position = startY;
 
-    doc.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+    doc.setTextColor(20, 20, 20);
+    doc.addImage(imgData, "PNG", marginX, position, imgWidth, imgHeight);
     yRemaining -= usableHeight;
 
     while (yRemaining > 0) {
-      position = yRemaining - imgHeight + margin;
+      position = yRemaining - imgHeight + startY;
       doc.addPage();
-      doc.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+      doc.addImage(imgData, "PNG", marginX, position, imgWidth, imgHeight);
       yRemaining -= usableHeight;
     }
 
-    doc.save("indicadores-gestao-dashboard.pdf");
+    doc.save("indicadores-estatisticas-geral.pdf");
   } finally {
     document.body.removeChild(wrapper);
   }

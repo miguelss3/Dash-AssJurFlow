@@ -21,6 +21,7 @@ import { COLUNAS } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
 import { Button } from "@/components/ui/button";
 import {
+  exportIndicadoresGeraisPdf,
   exportIndicadoresGeraisPdfFromElement,
   exportSindicanciasPdf,
   exportIPMPdf,
@@ -79,9 +80,11 @@ export function Estatisticas({ processos }: Props) {
 
     try {
       await exportIndicadoresGeraisPdfFromElement(indicadoresPrintRef.current);
-      toast.success("PDF dos indicadores gerado com sucesso.");
-    } catch {
-      toast.error("Falha ao gerar o PDF dos indicadores.");
+      toast.success("PDF de estatísticas gerais gerado e baixado com sucesso.");
+    } catch (error) {
+      console.error("Falha ao gerar PDF visual dos indicadores:", error);
+      exportIndicadoresGeraisPdf(processos);
+      toast.warning("Falha no layout visual. PDF simplificado foi gerado automaticamente.");
     }
   };
 
@@ -233,7 +236,7 @@ export function Estatisticas({ processos }: Props) {
   const topResp = dadosResponsavel[0];
 
   return (
-    <div className="space-y-5" ref={indicadoresPrintRef}>
+    <div className="space-y-5 indicadores-print-root" ref={indicadoresPrintRef}>
       <div data-print-ignore="true" className="rounded-2xl border border-border bg-card p-4 shadow-card">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
@@ -263,7 +266,7 @@ export function Estatisticas({ processos }: Props) {
       </div>
 
       {/* Hero KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         <KpiHero
           icon={CheckCircle2}
           label="Taxa de conclusão"
@@ -333,7 +336,7 @@ export function Estatisticas({ processos }: Props) {
           </div>
         </div>
 
-        <div className="lg:col-span-2 rounded-3xl bg-gradient-to-br from-[oklch(0.22_0.05_258)] to-[oklch(0.32_0.1_245)] text-white p-6 shadow-elegant relative overflow-hidden">
+        <div className="lg:col-span-2 rounded-3xl bg-gradient-to-br from-[oklch(0.22_0.05_258)] to-[oklch(0.32_0.1_245)] text-white p-5 sm:p-6 shadow-elegant relative overflow-hidden">
           <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
 
           <div className="relative">
@@ -343,8 +346,8 @@ export function Estatisticas({ processos }: Props) {
 
             <div className="grid sm:grid-cols-2 gap-6">
               <div>
-                <div className="text-6xl font-bold font-display tabular-nums leading-none">{total}</div>
-                <p className="text-2xl text-white/85 mt-3">Processos cadastrados</p>
+                <div className="text-4xl sm:text-5xl font-bold font-display tabular-nums leading-none">{total}</div>
+                <p className="text-lg sm:text-xl text-white/85 mt-3">Processos cadastrados</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-sm">
                   <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">DU: {totalDU}</span>
                   <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">PA: {totalPA}</span>
@@ -354,13 +357,13 @@ export function Estatisticas({ processos }: Props) {
 
               <div>
                 <div className="flex items-end gap-2 leading-none">
-                  <span className="text-6xl font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
+                  <span className="text-4xl sm:text-5xl font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
                     {concluidos}
                   </span>
-                  <span className="text-3xl font-bold text-[oklch(0.78_0.18_145)] mb-1">{taxaSucesso}%</span>
+                  <span className="text-2xl font-bold text-[oklch(0.78_0.18_145)] mb-1">{taxaSucesso}%</span>
                 </div>
-                <p className="text-2xl text-white/85 mt-3">Finalizados</p>
-                <p className="text-lg text-white/60 mt-0.5">{taxaSucesso}% do total cadastrado</p>
+                <p className="text-lg sm:text-xl text-white/85 mt-3">Finalizados</p>
+                <p className="text-base text-white/60 mt-0.5">{taxaSucesso}% do total cadastrado</p>
 
                 <div className="mt-4 h-2.5 rounded-full bg-white/15 overflow-hidden">
                   <div
@@ -600,7 +603,7 @@ function KpiHero({
       <div
         className={`font-bold tracking-tight font-display ${
           accent ? "text-accent-foreground" : "text-foreground"
-        } ${isText ? "text-xl truncate" : "text-3xl sm:text-4xl tabular-nums"}`}
+        } ${isText ? "text-lg sm:text-xl truncate" : "text-2xl sm:text-3xl tabular-nums"}`}
       >
         {value}
       </div>

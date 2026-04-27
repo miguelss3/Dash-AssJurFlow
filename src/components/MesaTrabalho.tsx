@@ -280,6 +280,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         return situacaoFluxo === "AGUARDANDO_RESPOSTA" || statusNorm === "aguardando resposta";
       };
 
+      const isDUAguardandoRespostaVencido = (p: Processo) => {
+        if (tipo !== "DU") return false;
+        if (!isAguardandoResposta(p)) return false;
+        const prazoBase = p.prazoFatal || p.finalPrazo || p.prazo;
+        return !!prazoBase && diasRestantes(prazoBase) < 0;
+      };
+
       const colunaPAEmAndamento = (p: Processo) => {
         if (tipo !== "PA") return null;
 
@@ -308,7 +315,12 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         return !!prazoBase && diasRestantes(prazoBase) < 0;
       };
 
-      const aguardandoRespostaDU = tipo === "DU" ? doTipo.filter(isAguardandoResposta) : [];
+      const aguardandoRespostaDUAtivos = tipo === "DU"
+        ? doTipo.filter((p) => isAguardandoResposta(p) && !isDUAguardandoRespostaVencido(p))
+        : [];
+      const aguardandoRespostaDUVencidos = tipo === "DU"
+        ? doTipo.filter((p) => isAguardandoResposta(p) && isDUAguardandoRespostaVencido(p))
+        : [];
       const considerarPendenciaChefia = tipo === "DU" || ehAdmin;
       const pendenciasChefia = considerarPendenciaChefia
         ? doTipo.filter((p) => isPendenteChefia(p) && (tipo !== "DU" || !isAguardandoResposta(p)))
@@ -335,9 +347,9 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         if (!mapConcluidos.has("MESA DO CHEFE")) mapConcluidos.set("MESA DO CHEFE", []);
       }
 
-      if (aguardandoRespostaDU.length > 0 || tipo === "DU") {
-        mapAtivos.set(duColunaAguardandoResposta, aguardandoRespostaDU);
-        if (!mapAtrasados.has(duColunaAguardandoResposta)) mapAtrasados.set(duColunaAguardandoResposta, []);
+      if (aguardandoRespostaDUAtivos.length > 0 || aguardandoRespostaDUVencidos.length > 0 || tipo === "DU") {
+        mapAtivos.set(duColunaAguardandoResposta, aguardandoRespostaDUAtivos);
+        mapAtrasados.set(duColunaAguardandoResposta, aguardandoRespostaDUVencidos);
         if (!mapConcluidos.has(duColunaAguardandoResposta)) mapConcluidos.set(duColunaAguardandoResposta, []);
       }
 
