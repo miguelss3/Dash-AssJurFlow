@@ -1,5 +1,5 @@
 import type { Processo, StatusProcesso } from "@/types/processo";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -59,12 +59,13 @@ interface ProcessoCardProps {
   onReativarProcesso?: (processoId: string, payload?: { motivo: string; novoPrazoFatal: string }) => void | Promise<void>;
   siteSettings?: SiteSettings;
   showActions?: boolean;
-  isDragging?: boolean; // Flag para quando está sendo arrastado no overlay
+  isDragging?: boolean;
   naoLido?: boolean;
   onMarcarComoLido?: (processoId: string) => void;
 }
 
-export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido }: ProcessoCardProps) => {
+// O componente interno que renderiza o visual
+const ProcessoCardComponent = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido }: ProcessoCardProps) => {
   const p = processo || pAntigo!;
   const { user } = useAuth();
   const marcarComoLido = () => onMarcarComoLido?.(p.id);
@@ -123,10 +124,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
   const [reativando, setReativando] = useState(false);
   const [desfazendo, setDesfazendo] = useState(false);
   
-  // Função para abrir o chat do processo
-  const abrirChat = () => {
-    setModalChat(true);
-  };
+  const abrirChat = () => setModalChat(true);
   
   const abrirReativacao = () => {
     setMotivoReabertura("");
@@ -136,7 +134,6 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
 
   const reativarProcesso = async () => {
     if (!onReativarProcesso) return;
-
     if (!ehAdmin) {
       if (!motivoReabertura.trim()) {
         toast.error("Informe o motivo da reabertura.");
@@ -147,7 +144,6 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
         return;
       }
     }
-
     try {
       setReativando(true);
       await Promise.resolve(
@@ -164,17 +160,9 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
     }
   };
   
-  // Função de ações DU
-  const abrirAcoesDU = () => {
-    setModalAcoesDU(true);
-  };
+  const abrirAcoesDU = () => setModalAcoesDU(true);
+  const abrirAcoesPA = () => setModalAcoesPA(true);
   
-  // Função de ações PA
-  const abrirAcoesPA = () => {
-    setModalAcoesPA(true);
-  };
-  
-  // Função para excluir processo
   const confirmarExclusao = () => {
     if (onDelete) {
       onDelete(p.id);
@@ -182,33 +170,21 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
     }
   };
 
-  const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
+  const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@") || "Sistema";
   const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
   const autorId = user?.uid || "sistema";
 
   const registrarHistoricoDesfazer = async (texto: string) => {
     const agoraISO = new Date().toISOString();
     const historicoRef = collection(db, `processos/${p.id}/historico`);
-    await addDoc(historicoRef, {
-      autor: autorMilitar,
-      autorId,
-      texto,
-      timestamp: agoraISO,
-    });
-
+    await addDoc(historicoRef, { autor: autorMilitar, autorId, texto, timestamp: agoraISO });
     const mensagensRef = doc(db, "mensagens", p.id);
     const mensagensSnap = await getDoc(mensagensRef);
     const historicoExistente = mensagensSnap.exists() ? (mensagensSnap.data()?.historico || []) : [];
     await setMensagemDoc(mensagensRef, {
       historico: [
         ...historicoExistente,
-        {
-          id: crypto.randomUUID(),
-          autor: autorMilitar,
-          autorId,
-          texto,
-          timestamp: agoraISO,
-        },
+        { id: crypto.randomUUID(), autor: autorMilitar, autorId, texto, timestamp: agoraISO },
       ],
     });
   };
@@ -219,12 +195,10 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
       toast.error("Não há ação para desfazer neste processo.");
       return;
     }
-
     try {
       setDesfazendo(true);
       const textoMovimento = `Última ação desfeita por ${autorMilitar}.`;
       const processoRef = doc(db, "processos", p.id);
-
       await setDoc(processoRef, {
         ...snapshot,
         descricao: textoMovimento,
@@ -232,7 +206,6 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
         atualizadoPorNome: autorMilitar,
         ultimaAcaoFluxo: null,
       });
-
       await registrarHistoricoDesfazer(textoMovimento);
       toast.success("Última ação desfeita com sucesso.");
     } catch (error) {
@@ -251,16 +224,9 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
         {...listeners}
         {...attributes}
         className={`p-4 shadow-sm border-l-4 transition-all relative group cursor-grab active:cursor-grabbing ${
-          p.isMS
-            ? "bg-red-50 border-red-200 border-l-red-600 hover:shadow-lg"
-            : "bg-white border-l-sky-600 hover:shadow-md"
-        } ${
-          isBeingDragged ? "opacity-30 scale-95" : ""
-        } ${
-          naoLido ? "font-bold" : ""
-        }`}
+          p.isMS ? "bg-red-50 border-red-200 border-l-red-600 hover:shadow-lg" : "bg-white border-l-sky-600 hover:shadow-md"
+        } ${isBeingDragged ? "opacity-30 scale-95" : ""} ${naoLido ? "font-bold" : ""}`}
         onClick={(e) => {
-          // Só abre detalhes se não estiver arrastando
           if (!isBeingDragged && !isDragging) {
             marcarComoLido();
             setModalDetalhes(true);
@@ -270,8 +236,7 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
         {p.isMS && (
           <div className="-mx-4 -mt-4 mb-3 px-4 py-2 bg-red-700 text-red-50 border-b border-red-800 rounded-t-md">
             <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.14em]">
-              <AlertCircle className="w-3.5 h-3.5" />
-              Mandado de Seguranca / Urgente
+              <AlertCircle className="w-3.5 h-3.5" /> Mandado de Seguranca / Urgente
             </div>
           </div>
         )}
@@ -287,18 +252,15 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
               </span>
               <span className="text-xs font-mono font-bold text-slate-500">{p.numero}</span>
               
-              {/* Badge Tipo PA (IPM, Sindicância, Conselho) */}
               {isPA && p.tipoPA && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-300">
                   {p.tipoPA}
                 </span>
               )}
               
-              {/* Badge Prioridade/MS */}
               {p.isMS && (
                 <Badge variant="destructive" className="text-[10px] h-5">
-                  <AlertCircle className="w-3 h-3 mr-1" />
-                  MS
+                  <AlertCircle className="w-3 h-3 mr-1" /> MS
                 </Badge>
               )}
               {p.prioridade === "urgente" && !p.isMS && (
@@ -325,369 +287,218 @@ export const ProcessoCard = ({ processo, p: pAntigo, ehAdmin = false, onEdit, on
           </div>
 
           {/* Título - Assunto */}
-          <h4 className="font-bold text-sm text-slate-800 leading-tight line-clamp-2">
-            {p.tipoAcao}
-          </h4>
+          <h4 className="font-bold text-sm text-slate-800 leading-tight line-clamp-2">{p.tipoAcao}</h4>
           
           {/* Badges de Prazos */}
           <div className="flex items-center gap-3 text-[11px]">
             {p.prazo && (
               <div className="flex items-center gap-1 text-blue-600">
-                <Clock className="w-3 h-3" />
-                <span className="font-semibold">Interno:</span>
-                <span>{formatarData(p.prazo)}</span>
+                <Clock className="w-3 h-3" /> <span className="font-semibold">Interno:</span> <span>{formatarData(p.prazo)}</span>
               </div>
             )}
             {p.prazoFatal && (
-              <div className={`flex items-center gap-1 ${
-                diasRestantes(p.prazoFatal) <= 5 ? 'text-red-600 font-bold' : 'text-orange-600'
-              }`}>
-                <AlertCircle className="w-3 h-3" />
-                <span className="font-semibold">{rotuloPrazoLimite}:</span>
-                <span>{formatarData(p.prazoFatal)}</span>
+              <div className={`flex items-center gap-1 ${diasRestantes(p.prazoFatal) <= 5 ? 'text-red-600 font-bold' : 'text-orange-600'}`}>
+                <AlertCircle className="w-3 h-3" /> <span className="font-semibold">{rotuloPrazoLimite}:</span> <span>{formatarData(p.prazoFatal)}</span>
               </div>
             )}
           </div>
           
           {/* Informações principais */}
           <div className="text-xs text-slate-600 space-y-1">
-            <p className="flex items-center gap-1">
-              <User className="w-3 h-3" />
-              <strong>Parte:</strong> {p.cliente}
-            </p>
-            
-            {/* Entrada */}
+            <p className="flex items-center gap-1"><User className="w-3 h-3" /> <strong>Parte:</strong> {p.cliente}</p>
             {p.dataEntrada && (
-              <p className="flex items-center gap-1 text-slate-500">
-                <Calendar className="w-3 h-3" />
-                <strong>Entrada:</strong> {formatarData(p.dataEntrada)}
-              </p>
+              <p className="flex items-center gap-1 text-slate-500"><Calendar className="w-3 h-3" /> <strong>Entrada:</strong> {formatarData(p.dataEntrada)}</p>
             )}
-
             {isPA && p.dataInicioPrazo && (
-              <p className="flex items-center gap-1 text-purple-700 font-medium">
-                <Calendar className="w-3 h-3" />
-                <strong>Início do Prazo:</strong> {formatarData(p.dataInicioPrazo)}
-              </p>
+              <p className="flex items-center gap-1 text-purple-700 font-medium"><Calendar className="w-3 h-3" /> <strong>Início do Prazo:</strong> {formatarData(p.dataInicioPrazo)}</p>
             )}
-            
-            {/* DU - Seção e Origem */}
             {isDU && (
               <div className="flex items-center gap-3">
-                {p.secaoDU && (
-                  <p className="flex items-center gap-1">
-                    <Building2 className="w-3 h-3" />
-                    <strong>Seção:</strong> {p.secaoDU}
-                  </p>
-                )}
-                {p.origemDU && (
-                  <p className="flex items-center gap-1">
-                    <Mail className="w-3 h-3" />
-                    <strong>Origem:</strong> {p.origemDU}
-                  </p>
-                )}
+                {p.secaoDU && <p className="flex items-center gap-1"><Building2 className="w-3 h-3" /> <strong>Seção:</strong> {p.secaoDU}</p>}
+                {p.origemDU && <p className="flex items-center gap-1"><Mail className="w-3 h-3" /> <strong>Origem:</strong> {p.origemDU}</p>}
               </div>
             )}
-            
-            {/* Responsável/Assessor */}
             {p.responsavel && (
-              <p className="flex items-center gap-1 text-sky-700 font-semibold">
-                <User className="w-3 h-3" />
-                Assessor: {p.responsavel}
-              </p>
+              <p className="flex items-center gap-1 text-sky-700 font-semibold"><User className="w-3 h-3" /> Assessor: {p.responsavel}</p>
             )}
-            {/* Encarregado real do PA (oficial designado) */}
             {isPA && p.encarregado && (
-              <p className="flex items-center gap-1 text-purple-700 font-medium">
-                <User className="w-3 h-3" />
-                <strong>Encarregado:</strong> {p.encarregado}
-              </p>
+              <p className="flex items-center gap-1 text-purple-700 font-medium"><User className="w-3 h-3" /> <strong>Encarregado:</strong> {p.encarregado}</p>
             )}
           </div>
 
           {prorrogacoesPA.length > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-              <div className="text-[10px] font-black uppercase tracking-wide text-amber-700 mb-1">
-                Prorrogações Registradas ({prorrogacoesPA.length})
-              </div>
+              <div className="text-[10px] font-black uppercase tracking-wide text-amber-700 mb-1">Prorrogações Registradas ({prorrogacoesPA.length})</div>
               <div className="space-y-1.5">
                 {prorrogacoesPA.map((item, index) => (
-                  <div
-                    key={`${item.doc || "sem-doc"}-${item.em || index}`}
-                    className="text-[11px] text-amber-900 bg-white/80 border border-amber-100 rounded px-2 py-1"
-                  >
+                  <div key={`${item.doc || "sem-doc"}-${item.em || index}`} className="text-[11px] text-amber-900 bg-white/80 border border-amber-100 rounded px-2 py-1">
                     <div className="font-semibold">{item.doc || "Documento não informado"}</div>
                     <div className="text-amber-800">
-                      Início: {formatarData(item.inicio)} | Fim: {formatarData(item.fim)} | +{item.dias ?? "?"} dias
-                      {item.por ? ` | Por: ${item.por}` : ""}
+                      Início: {formatarData(item.inicio)} | Fim: {formatarData(item.fim)} | +{item.dias ?? "?"} dias {item.por ? ` | Por: ${item.por}` : ""}
                     </div>
-                    {item.em && (
-                      <div className="text-[10px] text-amber-700 mt-0.5">
-                        Registro: {formatarData(item.em)}
-                      </div>
-                    )}
+                    {item.em && <div className="text-[10px] text-amber-700 mt-0.5">Registro: {formatarData(item.em)}</div>}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Botões de Ação */}
           {showActions && (
             <div className="space-y-2 mt-3 pt-3 border-t border-slate-100">
-              {/* Linha 1: Ação, Editar, Chat */}
               <div className="grid grid-cols-3 gap-2">
-                {/* Botão Ação (DU ou PA) */}
                 {isDU ? (
                   <Button
-                    size="sm"
-                    variant="outline"
+                    size="sm" variant="outline"
                     className="border-sky-300 text-sky-700 hover:bg-sky-50 text-[11px] h-9 disabled:opacity-60 whitespace-nowrap"
                     disabled={acaoDUBloqueada}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      marcarComoLido();
-                      if (acaoDUBloqueada) return;
-                      abrirAcoesDU();
-                    }}
-                    title={acaoDUBloqueada ? "Aguardando devolução do chefe/admin para liberar o preenchimento" : "Ações do processo"}
+                    onClick={(e) => { e.stopPropagation(); marcarComoLido(); if (acaoDUBloqueada) return; abrirAcoesDU(); }}
                   >
-                    <Send className="w-3 h-3 mr-1 shrink-0" />
-                    {acaoDUBloqueada ? "Aguard." : "Ação"}
+                    <Send className="w-3 h-3 mr-1 shrink-0" /> {acaoDUBloqueada ? "Aguard." : "Ação"}
                   </Button>
                 ) : (
                   <Button
-                    size="sm"
-                    variant="outline"
+                    size="sm" variant="outline"
                     className="border-purple-300 text-purple-700 hover:bg-purple-50 text-xs h-9"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      marcarComoLido();
-                      abrirAcoesPA();
-                    }}
+                    onClick={(e) => { e.stopPropagation(); marcarComoLido(); abrirAcoesPA(); }}
                   >
-                    <FileText className="w-3 h-3 mr-1" />
-                    Ação
+                    <FileText className="w-3 h-3 mr-1" /> Ação
                   </Button>
                 )}
-
-                {/* Botão Editar */}
                 {onEdit && (
                   <Button
-                    size="sm"
-                    variant="outline"
+                    size="sm" variant="outline"
                     className="border-amber-300 text-amber-700 hover:bg-amber-50 text-xs h-9"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      marcarComoLido();
-                      onEdit(p);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); marcarComoLido(); onEdit(p); }}
                   >
-                    <FileEdit className="w-3 h-3 mr-1" />
-                    Editar
+                    <FileEdit className="w-3 h-3 mr-1" /> Editar
                   </Button>
                 )}
-
-                {/* Botão Chat */}
                 <Button
-                  size="sm"
-                  variant="outline"
+                  size="sm" variant="outline"
                   className="border-slate-300 text-slate-600 hover:bg-slate-50 text-xs h-9"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                      marcarComoLido();
-                    abrirChat();
-                  }}
+                  onClick={(e) => { e.stopPropagation(); marcarComoLido(); abrirChat(); }}
                 >
-                  <MessageSquare className="w-3 h-3 mr-1" />
-                  Chat
+                  <MessageSquare className="w-3 h-3 mr-1" /> Chat
                 </Button>
               </div>
 
-              {/* Linha 2: Reativar (concluídos) + Excluir */}
               <div className={`grid gap-2 ${p.status === "concluido" ? "grid-cols-3" : "grid-cols-2"}`}>
-                {/* Botão Desfazer Última Ação */}
                 <Button
-                  size="sm"
-                  variant="outline"
+                  size="sm" variant="outline"
                   className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs h-9"
                   disabled={!p.ultimaAcaoFluxo?.previousDoc || desfazendo}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    marcarComoLido();
-                    void desfazerUltimaAcao();
-                  }}
-                  title={!p.ultimaAcaoFluxo?.previousDoc ? "Sem ação recente para desfazer" : "Desfazer última ação"}
+                  onClick={(e) => { e.stopPropagation(); marcarComoLido(); void desfazerUltimaAcao(); }}
                 >
-                  <RotateCcw className="w-3 h-3 mr-1" />
-                  {desfazendo ? "Desfazendo..." : "Desfazer"}
+                  <RotateCcw className="w-3 h-3 mr-1" /> {desfazendo ? "Desfazendo..." : "Desfazer"}
                 </Button>
-
-                {/* Botão Reativar (apenas para concluído) */}
                 {p.status === "concluido" && (
                   <Button
-                    size="sm"
-                    variant="outline"
+                    size="sm" variant="outline"
                     className="border-blue-300 text-blue-700 hover:bg-blue-50 text-xs h-9"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      marcarComoLido();
-                      abrirReativacao();
-                    }}
+                    onClick={(e) => { e.stopPropagation(); marcarComoLido(); abrirReativacao(); }}
                   >
-                    <RotateCcw className="w-3 h-3 mr-1" />
-                    Reabrir
+                    <RotateCcw className="w-3 h-3 mr-1" /> Reabrir
                   </Button>
                 )}
-                
-                {/* Botão Excluir (SEMPRE DISPONÍVEL) */}
                 {onDelete && (
                   <Button
-                    size="sm"
-                    variant="outline"
+                    size="sm" variant="outline"
                     className="border-red-300 text-red-600 hover:bg-red-50 text-xs h-9 font-semibold"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      marcarComoLido();
-                      setAlertExcluir(true);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); marcarComoLido(); setAlertExcluir(true); }}
                   >
-                    <Trash2 className="w-3 h-3 mr-1" />
-                    Excluir
+                    <Trash2 className="w-3 h-3 mr-1" /> Excluir
                   </Button>
                 )}
               </div>
             </div>
           )}
 
-          {/* Última movimentação */}
           {p.descricao && (
             <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <div className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">
-                Último Movimento
-              </div>
-              <div className="text-xs text-slate-700 leading-snug line-clamp-2">
-                {p.descricao}
-              </div>
+              <div className="text-[10px] font-black uppercase tracking-wide text-slate-500 mb-1">Último Movimento</div>
+              <div className="text-xs text-slate-700 leading-snug line-clamp-2">{p.descricao}</div>
             </div>
           )}
-
         </div>
       </Card>
 
-      {/* Modais de Ações */}
       <Suspense fallback={null}>
-        <AcoesDUModalNovo
-          open={modalAcoesDU}
-          onOpenChange={setModalAcoesDU}
-          processoId={p.id}
-          numeroProcesso={p.numero}
-          onSuccess={() => {}}
-        />
-
-        <AcoesPAModalNovo
-          open={modalAcoesPA}
-          onOpenChange={setModalAcoesPA}
-          processoId={p.id}
-          numeroProcesso={p.numero}
-          siteSettings={siteSettings}
-          onSuccess={() => {}}
-        />
+        {modalAcoesDU && <AcoesDUModalNovo open={modalAcoesDU} onOpenChange={setModalAcoesDU} processoId={p.id} numeroProcesso={p.numero} onSuccess={() => {}} />}
+        {modalAcoesPA && <AcoesPAModalNovo open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />}
       </Suspense>
 
-      {/* Modal de Detalhes */}
-      <DetalhesProcessoModal
-        open={modalDetalhes}
-        onOpenChange={setModalDetalhes}
-        processo={p}
-      />
+      {modalDetalhes && <DetalhesProcessoModal open={modalDetalhes} onOpenChange={setModalDetalhes} processo={p} />}
+      {modalChat && <ChatModal open={modalChat} onOpenChange={setModalChat} processo={p} />}
 
-      {/* Modal de Chat */}
-      <ChatModal
-        open={modalChat}
-        onOpenChange={setModalChat}
-        processo={p}
-      />
-
-      <Dialog open={modalReativar} onOpenChange={setModalReativar}>
-        <DialogContent onClick={(e) => e.stopPropagation()}>
-          <DialogHeader>
-            <DialogTitle>Reabrir Processo {p.numero}</DialogTitle>
-            <DialogDescription>
-              {ehAdmin
-                ? "Ao reabrir, o processo volta ao fluxo ativo."
-                : "Informe o motivo da reabertura e defina o novo prazo fatal."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor={`motivo-${p.id}`}>Motivo da reabertura {!ehAdmin ? "*" : ""}</Label>
-              <Textarea
-                id={`motivo-${p.id}`}
-                value={motivoReabertura}
-                onChange={(e) => setMotivoReabertura(e.target.value)}
-                placeholder="Descreva o motivo da reabertura"
-                rows={3}
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor={`prazo-fatal-${p.id}`}>Novo prazo fatal {!ehAdmin ? "*" : ""}</Label>
-              <Input
-                id={`prazo-fatal-${p.id}`}
-                type="date"
-                value={novoPrazoFatal}
-                onChange={(e) => setNovoPrazoFatal(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setModalReativar(false)} disabled={reativando}>
-              Cancelar
-            </Button>
-            <Button type="button" onClick={reativarProcesso} disabled={reativando || !onReativarProcesso}>
-              {reativando ? "Reabrindo..." : "Confirmar Reabertura"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* AlertDialog de Confirmação de Exclusão */}
-      <AlertDialog open={alertExcluir} onOpenChange={setAlertExcluir}>
-        <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-              <Trash2 className="w-5 h-5" />
-              Excluir Processo?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p className="font-semibold text-slate-900">Você está prestes a excluir permanentemente:</p>
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm">
-                <p><strong>Número:</strong> {p.numero}</p>
-                <p><strong>Tipo:</strong> {p.tipoAcao}</p>
-                <p><strong>Parte:</strong> {p.cliente}</p>
-                <p><strong>Responsável:</strong> {p.responsavel}</p>
+      {modalReativar && (
+        <Dialog open={modalReativar} onOpenChange={setModalReativar}>
+          <DialogContent onClick={(e) => e.stopPropagation()}>
+            <DialogHeader>
+              <DialogTitle>Reabrir Processo {p.numero}</DialogTitle>
+              <DialogDescription>
+                {ehAdmin ? "Ao reabrir, o processo volta ao fluxo ativo." : "Informe o motivo da reabertura e defina o novo prazo fatal."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor={`motivo-${p.id}`}>Motivo da reabertura {!ehAdmin ? "*" : ""}</Label>
+                <Textarea id={`motivo-${p.id}`} value={motivoReabertura} onChange={(e) => setMotivoReabertura(e.target.value)} placeholder="Descreva o motivo" rows={3} />
               </div>
-              <p className="text-red-600 font-semibold">⚠️ Esta ação não pode ser desfeita!</p>
-              <p className="text-sm text-slate-600">O processo será removido permanentemente do banco de dados.</p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.stopPropagation();
-                confirmarExclusao();
-              }}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              Sim, Excluir Permanentemente
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <div className="space-y-1.5">
+                <Label htmlFor={`prazo-fatal-${p.id}`}>Novo prazo fatal {!ehAdmin ? "*" : ""}</Label>
+                <Input id={`prazo-fatal-${p.id}`} type="date" value={novoPrazoFatal} onChange={(e) => setNovoPrazoFatal(e.target.value)} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setModalReativar(false)} disabled={reativando}>Cancelar</Button>
+              <Button type="button" onClick={reativarProcesso} disabled={reativando || !onReativarProcesso}>
+                {reativando ? "Reabrindo..." : "Confirmar Reabertura"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+      
+      {alertExcluir && (
+        <AlertDialog open={alertExcluir} onOpenChange={setAlertExcluir}>
+          <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-red-600"><Trash2 className="w-5 h-5" /> Excluir Processo?</AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p className="font-semibold text-slate-900">Você está prestes a excluir permanentemente:</p>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm">
+                  <p><strong>Número:</strong> {p.numero}</p>
+                  <p><strong>Tipo:</strong> {p.tipoAcao}</p>
+                  <p><strong>Parte:</strong> {p.cliente}</p>
+                  <p><strong>Responsável:</strong> {p.responsavel}</p>
+                </div>
+                <p className="text-red-600 font-semibold">⚠️ Esta ação não pode ser desfeita!</p>
+                <p className="text-sm text-slate-600">O processo será removido permanentemente do banco de dados.</p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={(e) => { e.stopPropagation(); confirmarExclusao(); }} className="bg-red-600 hover:bg-red-700 text-white">Sim, Excluir</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </>
   );
 };
+
+// O Segredo da Performance: Memoização com Comparação Profunda
+export const ProcessoCard = memo(ProcessoCardComponent, (prevProps, nextProps) => {
+  // Sempre atualiza o card invisível da sombra do Drag and Drop
+  if (prevProps.isDragging !== nextProps.isDragging) return false;
+  
+  // Sempre atualiza se o status visual de "Lido" mudou (texto em negrito)
+  if (prevProps.naoLido !== nextProps.naoLido) return false;
+
+  const pPrev = prevProps.processo || prevProps.p;
+  const pNext = nextProps.processo || nextProps.p;
+
+  // Comparações rasas para evitar overhead, garantindo que o card só atualize se os dados mudaram.
+  // O JSON.stringify garante que até mudanças sutis nos arrays/objetos internos reflitam na UI.
+  return JSON.stringify(pPrev) === JSON.stringify(pNext);
+});
