@@ -52,6 +52,22 @@ const GRID_COLOR = "oklch(0.92 0.005 240)";
 const ACCENT = "oklch(0.6 0.16 230)";
 const ACCENT_LIME = "oklch(0.78 0.18 145)";
 
+function assuntoIndicePrincipal(value?: string) {
+  const texto = String(value || "Outros").trim();
+  if (!texto) return "Outros";
+
+  const [principal] = texto.split(/\s[-–—]\s/);
+  return (principal || texto).trim() || "Outros";
+}
+
+function normalizarChaveAssunto(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 export function Estatisticas({ processos }: Props) {
   const handleExportEstatisticas = () => {
     exportIndicadoresGeraisPdf(processos);
@@ -120,13 +136,19 @@ export function Estatisticas({ processos }: Props) {
   }, [processos]);
 
   const dadosTipoAcao = useMemo(() => {
-    const map = new Map<string, number>();
+    const map = new Map<string, { nome: string; valor: number }>();
     processos.forEach((p) => {
-      const t = p.tipoAcao || "Outros";
-      map.set(t, (map.get(t) ?? 0) + 1);
+      const principal = assuntoIndicePrincipal(p.tipoAcao);
+      const chave = normalizarChaveAssunto(principal);
+      const atual = map.get(chave);
+      if (!atual) {
+        map.set(chave, { nome: principal, valor: 1 });
+        return;
+      }
+      map.set(chave, { ...atual, valor: atual.valor + 1 });
     });
-    return Array.from(map.entries())
-      .map(([name, value]) => ({ name, value }))
+    return Array.from(map.values())
+      .map((item) => ({ name: item.nome, value: item.valor }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
   }, [processos]);
@@ -166,6 +188,33 @@ export function Estatisticas({ processos }: Props) {
   const vencidos = processos.filter(
     (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
   ).length;
+  const hoje = processos.filter(
+    (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "today",
+  ).length;
+  const proximos7 = processos.filter((p) => {
+    if (p.status === "concluido") return false;
+    const s = statusPrazo(p.prazo);
+    return s === "today" || s === "soon";
+  }).length;
+
+  const dadosIndicesDashboard = useMemo(
+    () => [
+      { name: "Entradas", valor: ativos },
+      { name: "Concluídos", valor: concluidos },
+      { name: "Acervo", valor: ativos },
+    ],
+    [ativos, concluidos],
+  );
+
+  const dadosPrazosDashboard = useMemo(
+    () => [
+      { name: "Vencidos", valor: vencidos, fill: "var(--deadline-overdue)" },
+      { name: "Hoje", valor: hoje, fill: "var(--deadline-today)" },
+      { name: "7 dias", valor: proximos7, fill: "oklch(0.6 0.16 230)" },
+    ],
+    [vencidos, hoje, proximos7],
+  );
+
   const taxaSucesso = total ? Math.round((concluidos / total) * 100) : 0;
   const topResp = dadosResponsavel[0];
 
@@ -231,6 +280,73 @@ export function Estatisticas({ processos }: Props) {
           tone="info"
           isText
         />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4 sm:gap-5">
+        <ChartCard
+          title="Índices do Dashboard"
+          subtitle="Entradas, concluídos e acervo"
+          icon={TrendingUp}
+        >
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart
+              data={dadosIndicesDashboard}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
+              <Bar dataKey="valor" fill={ACCENT} radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+          <p className="text-xs text-muted-foreground mt-2">
+            Índice de resolutividade atual: <span className="font-semibold">{taxaSucesso}%</span>
+          </p>
+        </ChartCard>
+
+        <ChartCard
+          title="Prazos do Dashboard"
+          subtitle="Vencidos, hoje e próximos 7 dias"
+          icon={AlertTriangle}
+        >
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart
+              data={dadosPrazosDashboard}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
+              <Bar dataKey="valor" radius={[8, 8, 0, 0]}>
+                {dadosPrazosDashboard.map((d, i) => (
+                  <Cell key={i} fill={d.fill} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </ChartCard>
       </div>
 
       {/* Gráficos linha 1 */}

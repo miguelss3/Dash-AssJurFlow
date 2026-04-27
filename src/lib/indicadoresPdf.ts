@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Processo } from "@/types/processo";
-import { statusPrazo } from "@/lib/prazo";
+import { statusPrazo, diasRestantes } from "@/lib/prazo";
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
@@ -33,6 +33,12 @@ function prazoReferencia(p: Processo) {
 
 function isAtrasado(p: Processo) {
   return p.status !== "concluido" && statusPrazo(prazoReferencia(p)) === "overdue";
+}
+
+function diasParaOrdenacao(p: Processo) {
+  const prazo = prazoReferencia(p);
+  if (!prazo) return Number.POSITIVE_INFINITY;
+  return diasRestantes(prazo);
 }
 
 function buildBasePdf(title: string, subtitle: string) {
@@ -114,8 +120,12 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
   const matcher = tipo === "sindicancia" ? isSindicancia : isIPM;
 
   const base = processos.filter((p) => p.tipo === "PA" && matcher(p));
-  const emCurso = base.filter((p) => p.status !== "concluido" && !isAtrasado(p));
-  const atrasadas = base.filter((p) => p.status !== "concluido" && isAtrasado(p));
+  const emCurso = base
+    .filter((p) => p.status !== "concluido" && !isAtrasado(p))
+    .sort((a, b) => diasParaOrdenacao(a) - diasParaOrdenacao(b));
+  const atrasadas = base
+    .filter((p) => p.status !== "concluido" && isAtrasado(p))
+    .sort((a, b) => diasParaOrdenacao(a) - diasParaOrdenacao(b));
   const totalAtivas = emCurso.length + atrasadas.length;
 
   const doc = buildBasePdf(titulo, subtitulo);
