@@ -269,7 +269,11 @@ const ProcessoCardComponent = ({ processo, p: pAntigo, ehAdmin = false, onEdit, 
               {p.prioridade === "normal" && (
                 <Badge variant="outline" className="text-[10px] h-5">Normal</Badge>
               )}
-              {(p.processoReaberto && p.status !== "concluido") ? (
+              {p.status === "concluido" ? (
+                <Badge variant="outline" className="text-[10px] h-5 border-green-400 text-green-800 bg-green-50">
+                  Finalizado
+                </Badge>
+              ) : (p.processoReaberto) ? (
                 <Badge variant="outline" className="text-[10px] h-5 border-blue-300 text-blue-700 bg-blue-50">
                   Processo reaberto
                 </Badge>

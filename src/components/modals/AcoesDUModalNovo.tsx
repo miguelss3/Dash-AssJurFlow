@@ -393,8 +393,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl disabled:bg-emerald-300"
       >
         Registrar Saída e Iniciar Prazo
-      </button>
-    </div>
+      </button>      <button
+        onClick={finalizarProcesso}
+        className="w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-xl transition-colors"
+      >
+        Finalizar Processo
+      </button>    </div>
   );
 
   const renderVisaoAssessor = () => {
@@ -476,6 +480,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
             >
               Enviar para a Chefia
             </button>
+            <button
+              onClick={finalizarProcesso}
+              className="w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-xl transition-colors"
+            >
+              Finalizar Processo
+            </button>
           </div>
         );
 
@@ -491,6 +501,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               <p className="text-xs text-amber-700 mb-4">A aguardar resposta da secao/OM.</p>
               <button onClick={() => avancarFluxo("CRIANDO_REITERACAO")} className="w-full bg-white border border-orange-300 text-orange-700 hover:bg-orange-50 text-xs font-bold py-2 rounded-lg flex items-center justify-center gap-1">
                 <Repeat className="w-3 h-3" /> Gerar Cobranca Oficial
+              </button>
+              <button
+                onClick={finalizarProcesso}
+                className="w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-xl transition-colors mt-1"
+              >
+                Finalizar Processo
               </button>
             </div>
           </div>
@@ -522,6 +538,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                 Enviar a Chefia
               </button>
             </div>
+            <button
+              onClick={finalizarProcesso}
+              className="w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-xl transition-colors"
+            >
+              Finalizar Processo
+            </button>
           </div>
         );
 
@@ -652,6 +674,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
             >
               {tipoDiligencia === "INTERNO" ? "Assinar DIEx e Iniciar Prazo" : "Aprovar e Encaminhar"}
             </button>
+            <button
+              onClick={finalizarProcesso}
+              className="w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-xl transition-colors"
+            >
+              Finalizar Processo
+            </button>
           </div>
         );
 
@@ -675,6 +703,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
             >
               <ArrowRightCircle className="w-4 h-4" /> Devolver ao Assessor
             </button>
+            <button
+              onClick={finalizarProcesso}
+              className="w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-xl transition-colors"
+            >
+              Finalizar Processo
+            </button>
           </div>
         );
 
@@ -687,8 +721,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
             </div>
             <button onClick={() => avancarFluxo("AGUARDANDO_CHEM_DEFESA")} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl">
               Aprovar e Encaminhar
-            </button>
-          </div>
+            </button>            <button
+              onClick={finalizarProcesso}
+              className="w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-xl transition-colors"
+            >
+              Finalizar Processo
+            </button>          </div>
         );
 
       default:
