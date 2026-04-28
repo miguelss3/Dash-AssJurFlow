@@ -27,6 +27,36 @@ const STORAGE_KEY = "assjur:auth";
 // Emails de admin universal (exatamente como no sistema antigo)
 const EMAILS_ADMIN_UNIVERSAL = new Set(["miguelss3@yahoo.com.br"]);
 
+function toUpperTrim(value: unknown): string {
+  return String(value ?? "").trim().toUpperCase();
+}
+
+function parseBooleanLike(value: unknown): boolean {
+  if (value === true) return true;
+  const normalized = toUpperTrim(value);
+  return normalized === "SIM" || normalized === "TRUE" || normalized === "1";
+}
+
+function perfilIndicaChefia(data: {
+  isChefe?: unknown;
+  role?: unknown;
+  cargo?: unknown;
+  setor?: unknown;
+}): boolean {
+  if (parseBooleanLike(data.isChefe)) return true;
+
+  const role = toUpperTrim(data.role);
+  const cargo = toUpperTrim(data.cargo);
+  const setor = toUpperTrim(data.setor);
+
+  return (
+    role.includes("CHEFE")
+    || cargo.includes("CHEFE")
+    || cargo === "ADMIN UNIVERSAL"
+    || setor === "CHEFE ASSEAPASSJUR"
+  );
+}
+
 function mapAuthUserFromFirestore(data: Record<string, any>, fbUser: FirebaseUser): AuthUser {
   const nomeExtraido = fbUser.email ? fbUser.email.split("@")[0] : "Usuário";
   return {
@@ -39,7 +69,7 @@ function mapAuthUserFromFirestore(data: Record<string, any>, fbUser: FirebaseUse
     nomeGuerra: data.nomeGuerra,
     setor: data.setor,
     cargo: data.cargo,
-    isChefe: data.isChefe === true || data.isChefe === "sim",
+    isChefe: perfilIndicaChefia(data),
     telefone: data.telefone,
   };
 }
@@ -87,13 +117,14 @@ export function isAdmin(user: AuthUser | null): boolean {
   }
   
   // Verifica se é Chefe Geral (como no sistema antigo)
-  const setorNorm = user.setor?.trim().toUpperCase();
-  if (setorNorm === "CHEFE ASSEAPASSJUR" || user.cargo === "Admin Universal") {
+  const setorNorm = toUpperTrim(user.setor);
+  const cargoNorm = toUpperTrim(user.cargo);
+  if (setorNorm === "CHEFE ASSEAPASSJUR" || cargoNorm === "ADMIN UNIVERSAL") {
     return true;
   }
   
-  // Verifica se é chefe
-  if (user.isChefe === true) {
+  // Qualquer perfil marcado/identificado como chefe recebe visão ampla.
+  if (perfilIndicaChefia(user)) {
     return true;
   }
   

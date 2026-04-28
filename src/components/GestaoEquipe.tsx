@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, deleteField } from "firebase/firestore";
-import { createUserWithEmailAndPassword, Auth } from "firebase/auth";
+import { collection, getDocs, updateDoc, doc, deleteField, setDoc } from "firebase/firestore";
+import { createUserWithEmailAndPassword, getAuth, updateEmail, type Auth } from "firebase/auth";
+import { deleteApp, initializeApp } from "firebase/app";
 import { db, auth } from "@/lib/firebase";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
 import { Pencil, Trash2, UserPlus } from "lucide-react";
-import type { AuthUser } from "@/hooks/useAuth";
+import { useAuth, type AuthUser } from "@/hooks/useAuth";
 import { nomeMilitarUsuario } from "@/lib/userProfiles";
 
 interface Usuario extends AuthUser {
@@ -15,6 +16,7 @@ interface Usuario extends AuthUser {
 }
 
 export function GestaoEquipe() {
+  const { user: usuarioLogado } = useAuth();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -86,7 +88,7 @@ export function GestaoEquipe() {
         nome: formData.nome,
         nomeGuerra: formData.nomeGuerra,
         telefone: formData.telefone,
-        email: formData.email,
+        email: formData.email.trim().toLowerCase(),
         isChefe: formData.isChefe === "Sim",
         role: formData.isChefe === "Sim" ? `Chefe ${formData.setor}` : "ASSESSOR",
         cargo: formData.isChefe === "Sim" ? `Chefe ${formData.setor}` : deleteField() as unknown as string,
@@ -95,6 +97,53 @@ export function GestaoEquipe() {
       };
 
       if (editando?.id) {
+        const emailAnterior = String(editando.email || "").trim().toLowerCase();
+        const emailNovo = formData.email.trim().toLowerCase();
+        const mudouEmail = !!emailNovo && emailNovo !== emailAnterior;
+
+        if (mudouEmail) {
+          const uidEditado = editando.uid;
+          const uidLogado = auth.currentUser?.uid || usuarioLogado?.uid;
+          const emailLogado = String(auth.currentUser?.email || usuarioLogado?.email || "").trim().toLowerCase();
+          const ehProprioPerfil = (
+            !!uidEditado
+            && !!uidLogado
+            && uidEditado === uidLogado
+          ) || (
+            !!emailAnterior
+            && !!emailLogado
+            && emailAnterior === emailLogado
+          );
+
+          if (!ehProprioPerfil) {
+            alert("Alteração de e-mail de outro usuário não é permitida por aqui. Para terceiros, altere no Firebase Authentication primeiro e depois sincronize o cadastro.");
+            setSalvando(false);
+            return;
+          }
+
+          if (auth.currentUser) {
+            try {
+              await updateEmail(auth.currentUser, emailNovo);
+            } catch (authError: unknown) {
+              const err = authError as { code?: string };
+              if (err.code === "auth/requires-recent-login") {
+                alert("Para alterar seu e-mail de acesso, faça login novamente e tente de novo.");
+              } else if (err.code === "auth/email-already-in-use") {
+                alert("Este e-mail já está em uso no Firebase Auth.");
+              } else {
+                console.error("Erro ao atualizar e-mail no Auth:", authError);
+                alert("Não foi possível atualizar o e-mail de acesso.");
+              }
+              setSalvando(false);
+              return;
+            }
+          } else {
+            alert("Sessão inválida para atualizar e-mail de acesso. Faça login novamente e tente de novo.");
+            setSalvando(false);
+            return;
+          }
+        }
+
         // Atualizar usuário existente
         await updateDoc(doc(db, "usuarios", editando.id), dadosUsuario);
         // console.log("✅ Usuário atualizado:", formData.email);
@@ -106,18 +155,25 @@ export function GestaoEquipe() {
           return;
         }
 
-        // Criar conta no Firebase Auth
+        // Criar conta sem trocar a sessão atual do chefe/admin.
+        // O SDK principal faz auto-login do usuário recém-criado, então usamos um app/auth secundário.
+        let appTemporario: ReturnType<typeof initializeApp> | null = null;
         try {
-          const userCredential = await createUserWithEmailAndPassword(
-            auth as Auth,
-            formData.email,
-            formData.senha
+          appTemporario = initializeApp(
+            auth.app.options,
+            `cadastro-usuario-${Date.now()}`,
           );
-          
+          const authTemporario = getAuth(appTemporario);
+          const userCredential = await createUserWithEmailAndPassword(
+            authTemporario as Auth,
+            formData.email,
+            formData.senha,
+          );
+
           dadosUsuario.uid = userCredential.user.uid;
-          
-          // Salvar no Firestore
-          await addDoc(collection(db, "usuarios"), dadosUsuario);
+
+          // Salvar no doc com ID = UID para ficar compatível com as regras atuais.
+          await setDoc(doc(db, "usuarios", userCredential.user.uid), dadosUsuario, { merge: true });
           // console.log("✅ Novo usuário criado:", formData.email);
         } catch (authError: unknown) {
           const err = authError as { code?: string };
@@ -129,6 +185,15 @@ export function GestaoEquipe() {
           }
           setSalvando(false);
           return;
+        } finally {
+          if (appTemporario) {
+            try {
+              await getAuth(appTemporario).signOut();
+            } catch {
+              // Sem problema caso já tenha sido desconectado.
+            }
+            await deleteApp(appTemporario);
+          }
         }
       }
 
@@ -260,7 +325,6 @@ export function GestaoEquipe() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="usuario@dominio.mil.br"
-              disabled={!!editando}
             />
           </div>
 
