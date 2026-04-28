@@ -770,8 +770,8 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         const processoRef = doc(db, "processos", processo.id);
         const msgAtualizacao = "Dados do processo atualizados.";
         
-        // Remove criadoEm do update para não sobrescrever
-        const { criadoEm: _, ...dadosUpdate } = dados;
+        // Remove campos imutáveis do update (Firestore rules bloqueiam alteração desses campos)
+        const { criadoEm: _, userId: _uid, userEmail: _email, criadoPorUid: _cpUid, criadoPorEmail: _cpEmail, ...dadosUpdate } = dados;
         
         await updateDoc(processoRef, { 
           ...dadosUpdate, 
