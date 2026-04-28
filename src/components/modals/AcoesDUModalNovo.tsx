@@ -133,7 +133,9 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       }
 
       setDataPrazo((pedido?.dataPrazo || pedido?.prazoResposta || "").toString());
-      setNumeroSaida((pedido?.numeroSaida || pedido?.numeroDiex || resposta?.numeroDiex || "").toString());
+      const numeroSaidaCarregado = (pedido?.numeroSaida || pedido?.numeroDiex || resposta?.numeroDiex || "").toString();
+      setNumeroSaida(numeroSaidaCarregado);
+      setNumeroSaidaSalvo(!!numeroSaidaCarregado.trim());
       setNumeroRecebido((pedido?.numeroRecebido || resposta?.numeroRecebido || "").toString());
       setNumeroDocFinal((pedido?.numeroDocFinal || resposta?.numeroOficio || "").toString());
       setReiteracoes(Number(pedido?.reiteracoes || 0));
@@ -379,7 +381,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
   const salvarNumeroDaAssinatura = async () => {
     const numero = numeroSaida.trim();
     if (!numero || !processoId) {
-      toast.error("Informe o número do documento.");
+      toast.error("Informe o número do documento assinado.");
       return;
     }
     try {
@@ -398,10 +400,10 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     }
   };
 
-  const iniciarPrazoAposRegistro = () => {
+  const iniciarPrazoAposRegistro = (tipo: TipoDiligencia) => {
     const numero = numeroSaida.trim();
     if (!numero) {
-      toast.error("Informe o número assinado pelo CHEM.");
+      toast.error("Informe o número do documento assinado.");
       return;
     }
     if (!dataPrazo.trim()) {
@@ -412,7 +414,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       numeroSaida: numero,
       dataPrazo: dataPrazo.trim(),
       acaoPrincipal: "DILIGENCIA",
-      tipoDiligencia: "EXTERNO",
+      tipoDiligencia: tipo,
     });
   };
 
@@ -477,7 +479,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       {/* Passo 2: Iniciar o prazo — só ativo após registrar */}
       <button
         disabled={!numeroSaidaSalvo || !dataPrazo.trim()}
-        onClick={iniciarPrazoAposRegistro}
+        onClick={() => iniciarPrazoAposRegistro("EXTERNO")}
         className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl disabled:bg-emerald-300"
       >
         Iniciar Prazo
@@ -746,10 +748,23 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               </div>
 
               {tipoDiligencia === "INTERNO" ? (
-                <div className="space-y-2 mt-4">
+                <div className="space-y-3 mt-4">
                   <p className="text-[11px] text-indigo-800 mb-1">Você assina o DIEx Simplificado. Informe o número gerado:</p>
                   <label className="text-[11px] font-bold text-indigo-900 uppercase">N° do DIEx Assinado:</label>
-                  <input type="text" aria-label="Número do DIEx assinado" value={numeroSaida} onChange={(e) => setNumeroSaida(e.target.value)} placeholder="Ex: DIEx 123/2026" className="w-full p-2.5 border rounded-lg outline-none text-sm" />
+                  <input type="text" aria-label="Número do DIEx assinado" value={numeroSaida} onChange={(e) => { setNumeroSaida(e.target.value); setNumeroSaidaSalvo(false); }} placeholder="Ex: DIEx 123/2026" className="w-full p-2.5 border rounded-lg outline-none text-sm" />
+                  <div>
+                    <label className="block text-[11px] font-bold text-indigo-900 uppercase mb-1">Prazo para Resposta:</label>
+                    <input
+                      type="date"
+                      aria-label="Prazo para resposta da diligência interna"
+                      value={dataPrazo}
+                      onChange={(e) => setDataPrazo(e.target.value)}
+                      className="w-full p-2.5 border rounded-lg outline-none text-sm"
+                    />
+                    {!dataPrazo.trim() && (
+                      <p className="mt-1 text-[11px] text-amber-700">Nenhum prazo definido ainda. Defina antes de iniciar.</p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <p className="text-[11px] text-indigo-800 bg-white/50 p-2 rounded mt-2">Encaminhe este pedido para o CHEM assinar.</p>
@@ -779,17 +794,35 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               </div>
             )}
 
-            <button
-              disabled={tipoDiligencia === "INTERNO" && !numeroSaida}
-              onClick={() =>
-                avancarFluxo(tipoDiligencia === "INTERNO" ? "AGUARDANDO_RESPOSTA" : "AGUARDANDO_CHEM_DILIGENCIA", {
-                  numeroSaida,
-                })
-              }
-              className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-3 rounded-xl text-sm"
-            >
-              {tipoDiligencia === "INTERNO" ? "Assinar DIEx e Iniciar Prazo" : "Aprovar e Encaminhar"}
-            </button>
+            {tipoDiligencia === "INTERNO" ? (
+              <div className="space-y-2">
+                <button
+                  disabled={!numeroSaida.trim() || numeroSaidaSalvo}
+                  onClick={() => { void salvarNumeroDaAssinatura(); }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold py-3 rounded-xl text-sm"
+                >
+                  {numeroSaidaSalvo ? "✓ Número Registrado" : "Registrar Número do DIEx"}
+                </button>
+                <button
+                  disabled={!numeroSaidaSalvo || !dataPrazo.trim()}
+                  onClick={() => iniciarPrazoAposRegistro("INTERNO")}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-3 rounded-xl text-sm"
+                >
+                  Iniciar Prazo
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() =>
+                  avancarFluxo("AGUARDANDO_CHEM_DILIGENCIA", {
+                    numeroSaida,
+                  })
+                }
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-bold py-3 rounded-xl text-sm"
+              >
+                Aprovar e Encaminhar
+              </button>
+            )}
             <button
               onClick={finalizarProcesso}
               className="w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-xl transition-colors"
