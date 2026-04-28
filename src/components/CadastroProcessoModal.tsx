@@ -92,6 +92,20 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
     return "";
   };
 
+  const inferirSetorPorCampos = (...valores: Array<unknown>): "DU" | "PA" | "" => {
+    const candidatos = valores
+      .filter(Boolean)
+      .map((valor) => valor!.toString().toUpperCase());
+
+    if (candidatos.some((valor) => valor.includes("DU") || valor.includes("DEFESA DE USU"))) {
+      return "DU";
+    }
+    if (candidatos.some((valor) => valor.includes("PA") || valor.includes("PROCESSOS ADMIN"))) {
+      return "PA";
+    }
+    return "";
+  };
+
   const setorUsuarioNormalizado = inferirSetorUsuario();
   const podeCadastrarDU = ehAdminOuChefe || setorUsuarioNormalizado === "DU";
   const podeCadastrarPA = ehAdminOuChefe || setorUsuarioNormalizado === "PA";
@@ -553,6 +567,34 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
       return;
     }
 
+    if (!processo?.id) {
+      if (!user?.uid || !user?.email) {
+        toast.error("Sessão inválida. Faça login novamente antes de cadastrar o processo.");
+        return;
+      }
+
+      const perfilCanonicoRef = doc(db, "usuarios", user.uid);
+      const perfilCanonicoSnap = await getDoc(perfilCanonicoRef);
+
+      if (!perfilCanonicoSnap.exists()) {
+        toast.error("Seu perfil no Firestore não está sincronizado com o UID de acesso. Abra Gestão de Equipe e salve o cadastro deste usuário novamente.");
+        return;
+      }
+
+      const perfilCanonico = perfilCanonicoSnap.data();
+      const setorPerfilCanonico = inferirSetorPorCampos(
+        perfilCanonico.setor,
+        perfilCanonico.role,
+        perfilCanonico.secao,
+        perfilCanonico.cargo,
+      );
+
+      if (!ehAdminOuChefe && setorPerfilCanonico && setorPerfilCanonico !== setor) {
+        toast.error(`Seu perfil no Firestore está vinculado ao setor ${setorPerfilCanonico}. Cadastro liberado apenas para este setor.`);
+        return;
+      }
+    }
+
     // console.log("🚀 Iniciando cadastro no Firebase...");
     setLoading(true);
 
@@ -870,7 +912,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         console.error("🔒 ERRO DE PERMISSÃO FIRESTORE!");
         console.error("🔒 User UID:", user?.uid);
         console.error("🔒 User Email:", user?.email);
-        toast.error("Sem permissão para criar processo. Verifique se está logado corretamente.");
+        toast.error("Sem permissão para criar processo. Verifique se o perfil deste usuário está salvo em /usuarios/{uid} com o setor correto.");
       } else {
         toast.error(`Erro ao salvar: ${err?.message || "Erro desconhecido"}`);
       }

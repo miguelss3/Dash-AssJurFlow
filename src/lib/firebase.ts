@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getFunctions } from "firebase/functions";
 
 // Configuração extraída do seu arquivo original
 const firebaseConfig = {
@@ -20,5 +21,6 @@ const app = initializeApp(firebaseConfig);
 // Inicializa e exporta os serviços para uso em todo o sistema
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const functions = getFunctions(app, "us-central1");
 
 export default app;

@@ -3,6 +3,7 @@ import { collection, getDocs, updateDoc, doc, deleteField, setDoc } from "fireba
 import { createUserWithEmailAndPassword, getAuth, updateEmail, type Auth } from "firebase/auth";
 import { deleteApp, initializeApp } from "firebase/app";
 import { db, auth } from "@/lib/firebase";
+import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
@@ -13,6 +14,8 @@ import { nomeMilitarUsuario } from "@/lib/userProfiles";
 interface Usuario extends AuthUser {
   id?: string;
   ativo?: boolean;
+  dataCadastro?: string;
+  atualizadoEm?: string;
 }
 
 export function GestaoEquipe() {
@@ -82,6 +85,7 @@ export function GestaoEquipe() {
     setSalvando(true);
 
     try {
+      const agoraISO = new Date().toISOString();
       const dadosUsuario: Partial<Usuario> = {
         posto: formData.posto,
         setor: formData.setor,
@@ -94,6 +98,7 @@ export function GestaoEquipe() {
         cargo: formData.isChefe === "Sim" ? `Chefe ${formData.setor}` : deleteField() as unknown as string,
         secao: formData.setor,
         ativo: true,
+        atualizadoEm: agoraISO,
       };
 
       if (editando?.id) {
@@ -144,8 +149,29 @@ export function GestaoEquipe() {
           }
         }
 
-        // Atualizar usuário existente
-        await updateDoc(doc(db, "usuarios", editando.id), dadosUsuario);
+        const uidCanonico = String(editando.uid || editando.id || "").trim();
+        if (!uidCanonico) {
+          alert("Usuário sem UID válido. Abra o cadastro novamente e tente salvar.");
+          setSalvando(false);
+          return;
+        }
+
+        const dadosCanonicos: Partial<Usuario> = {
+          ...dadosUsuario,
+          uid: uidCanonico,
+          dataCadastro: editando.dataCadastro || agoraISO,
+        };
+
+        // Sempre mantém o perfil canônico no Firestore em /usuarios/{uid}, compatível com as regras.
+        await setDoc(doc(db, "usuarios", uidCanonico), dadosCanonicos, { merge: true });
+
+        if (editando.id !== uidCanonico) {
+          await updateDoc(doc(db, "usuarios", editando.id), {
+            ativo: false,
+            atualizadoEm: agoraISO,
+            migradoParaUid: uidCanonico,
+          });
+        }
         // console.log("✅ Usuário atualizado:", formData.email);
       } else {
         // Criar novo usuário
@@ -171,6 +197,7 @@ export function GestaoEquipe() {
           );
 
           dadosUsuario.uid = userCredential.user.uid;
+          dadosUsuario.dataCadastro = agoraISO;
 
           // Salvar no doc com ID = UID para ficar compatível com as regras atuais.
           await setDoc(doc(db, "usuarios", userCredential.user.uid), dadosUsuario, { merge: true });
@@ -209,21 +236,46 @@ export function GestaoEquipe() {
 
   async function removerUsuario(usuario: Usuario) {
     if (!usuario.id) return;
-    
-    const confirmacao = confirm(
-      `Deseja realmente remover ${usuario.nome}?\n\nO usuário será marcado como inativo.`
+
+    const uidUsuario = String(usuario.uid || usuario.id || "").trim();
+    const uidLogado = String(auth.currentUser?.uid || usuarioLogado?.uid || "").trim();
+
+    if (uidUsuario && uidLogado && uidUsuario === uidLogado) {
+      toast.error("Autoexclusão não é permitida por esta tela.");
+      return;
+    }
+
+    const confirmado = window.confirm(
+      `Confirmar remoção de ${usuario.nome} (${usuario.email})?`
     );
-    
-    if (!confirmacao) return;
+    if (!confirmado) return;
 
     try {
-      // Marcar como inativo ao invés de deletar
-      await updateDoc(doc(db, "usuarios", usuario.id), { ativo: false });
+      await updateDoc(doc(db, "usuarios", usuario.id), {
+        ativo: false,
+        excluidoEm: new Date().toISOString(),
+        excluidoPorUid: uidLogado || null,
+        excluidoPorEmail: auth.currentUser?.email || usuarioLogado?.email || null,
+      });
       await carregarUsuarios();
-      // console.log("✅ Usuário removido:", usuario.email);
-    } catch (error) {
-      console.error("Erro ao remover usuário:", error);
-      alert("Erro ao remover usuário.");
+      toast.success(
+        `${usuario.nome} foi removido do sistema.`,
+        {
+          description:
+            "Para revogar o acesso de login definitivamente, exclua também o usuário na aba Authentication do Firebase Console.",
+          duration: 8000,
+        }
+      );
+    } catch (error: unknown) {
+      const err = error as { code?: string };
+      const codigo = String(err?.code || "");
+
+      if (codigo.includes("permission-denied") || codigo.includes("unauthenticated")) {
+        toast.error("Sem permissão para excluir este usuário.");
+        return;
+      }
+
+      toast.error("Erro ao remover usuário. Tente novamente.");
     }
   }
 

@@ -1,0 +1,15 @@
+{
+  "name": "dash-assjurflow-functions",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "node -e \"process.exit(0)\""
+  },
+  "dependencies": {
+    "firebase-admin": "^13.5.0",
+    "firebase-functions": "^6.4.0"
+  }
+}
