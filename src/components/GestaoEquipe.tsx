@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { collection, getDocs, updateDoc, doc, deleteField, setDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword, getAuth, updateEmail, type Auth } from "firebase/auth";
 import { deleteApp, initializeApp } from "firebase/app";
-import { httpsCallable } from "firebase/functions";
-import { db, auth, functions } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -252,24 +251,39 @@ export function GestaoEquipe() {
     if (!confirmado) return;
 
     try {
-      const excluirUsuario = httpsCallable<
-        { uid?: string; email?: string; nome?: string },
-        { ok: boolean; uid: string }
-      >(functions, "deleteUserAccount");
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error("unauthenticated");
 
-      await excluirUsuario({
-        uid: uidUsuario || undefined,
-        email: usuario.email || undefined,
-        nome: usuario.nome || undefined,
+      const response = await fetch("/api/deleteUserAccount", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          uid: uidUsuario || undefined,
+          email: usuario.email || undefined,
+          nome: usuario.nome || undefined,
+        }),
       });
+
+      if (!response.ok) {
+        const errorData: { error?: string; message?: string } = await response.json().catch(() => ({}));
+        const errorCode = errorData.error || "";
+        if (errorCode === "permission-denied" || errorCode === "unauthenticated") {
+          toast.error("Sem permissão para excluir este usuário.");
+          return;
+        }
+        throw new Error(errorCode || "Erro ao excluir usuário");
+      }
 
       await carregarUsuarios();
       toast.success(`${usuario.nome} foi removido do sistema e do acesso de login.`);
     } catch (error: unknown) {
-      const err = error as { code?: string };
-      const codigo = String(err?.code || "");
+      const err = error as { message?: string };
+      const msg = String(err?.message || "");
 
-      if (codigo.includes("permission-denied") || codigo.includes("unauthenticated")) {
+      if (msg.includes("permission-denied") || msg.includes("unauthenticated")) {
         toast.error("Sem permissão para excluir este usuário.");
         return;
       }

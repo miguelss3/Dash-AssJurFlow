@@ -5,6 +5,15 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
+	server: {
+		proxy: {
+			"/api/deleteUserAccount": {
+				target: "https://us-central1-assjur-flow-12rm.cloudfunctions.net",
+				changeOrigin: true,
+				rewrite: () => "/deleteUserAccount",
+			},
+		},
+	},
 	plugins: [
 		TanStackRouterVite({
 			autoCodeSplitting: true,

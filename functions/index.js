@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const functions = require("firebase-functions");
 
 admin.initializeApp();
 
@@ -59,8 +59,8 @@ async function loadCallerProfile(uid, email) {
 }
 
 async function resolveTargetUser(data) {
-  const uid = String(data?.uid || "").trim();
-  const email = String(data?.email || "").trim().toLowerCase();
+  const uid = String(data && data.uid ? data.uid : "").trim();
+  const email = String(data && data.email ? data.email : "").trim().toLowerCase();
 
   if (uid) {
     return { uid, userRecord: await auth.getUser(uid) };
@@ -71,59 +71,104 @@ async function resolveTargetUser(data) {
     return { uid: userRecord.uid, userRecord };
   }
 
-  throw new HttpsError("invalid-argument", "UID ou email do usuário são obrigatórios.");
+  throw new Error("invalid-argument: UID ou email do usuário são obrigatórios.");
 }
 
-exports.deleteUserAccount = onCall({ region: "us-central1" }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+exports.deleteUserAccount = functions.region("us-central1").https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
   }
 
-  const callerUid = request.auth.uid;
-  const callerEmail = String(request.auth.token.email || "").trim().toLowerCase();
-  const callerProfile = await loadCallerProfile(callerUid, callerEmail);
-
-  if (!profileIndicatesAdmin(callerProfile, callerEmail)) {
-    throw new HttpsError("permission-denied", "Somente perfis administrativos podem excluir usuários.");
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "method-not-allowed" });
+    return;
   }
 
-  const { uid, userRecord } = await resolveTargetUser(request.data);
+  try {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) {
+      res.status(401).json({ error: "unauthenticated", message: "Usuário não autenticado." });
+      return;
+    }
 
-  if (uid === callerUid) {
-    throw new HttpsError("failed-precondition", "Autoexclusão não é permitida.");
-  }
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(token);
+    } catch (e) {
+      console.error("verifyIdToken failed:", e.message);
+      res.status(401).json({ error: "unauthenticated", message: "Token inválido." });
+      return;
+    }
 
-  await auth.deleteUser(uid);
+    const callerUid = decodedToken.uid;
+    const callerEmail = String(decodedToken.email || "").trim().toLowerCase();
 
-  const agoraISO = new Date().toISOString();
-  const batch = db.batch();
+    let callerProfile = null;
+    try {
+      callerProfile = await loadCallerProfile(callerUid, callerEmail);
+    } catch (e) {
+      console.error("loadCallerProfile failed:", e.message);
+    }
 
-  const perfilCanonicoRef = db.collection("usuarios").doc(uid);
-  batch.set(perfilCanonicoRef, {
-    ativo: false,
-    authRemovido: true,
-    authRemovidoEm: agoraISO,
-    authRemovidoPorUid: callerUid,
-    authRemovidoPorEmail: callerEmail,
-    uid,
-    email: String(userRecord.email || request.data?.email || "").trim().toLowerCase() || null,
-  }, { merge: true });
+    if (!profileIndicatesAdmin(callerProfile, callerEmail)) {
+      console.log("permission-denied for:", callerEmail, "profile:", JSON.stringify(callerProfile));
+      res.status(403).json({ error: "permission-denied", message: "Somente perfis administrativos podem excluir usuários." });
+      return;
+    }
 
-  const docsPorUid = await db.collection("usuarios").where("uid", "==", uid).get();
-  docsPorUid.docs.forEach((docSnap) => {
-    batch.set(docSnap.ref, {
+    // Suporte a body como Buffer (caso Content-Type não seja detectado)
+    let data = req.body || {};
+    if (Buffer.isBuffer(data)) {
+      try { data = JSON.parse(data.toString()); } catch { data = {}; }
+    }
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch { data = {}; }
+    }
+
+    let uid, userRecord;
+    try {
+      ({ uid, userRecord } = await resolveTargetUser(data));
+    } catch (e) {
+      console.error("resolveTargetUser failed:", e.message, "data:", JSON.stringify(data));
+      res.status(400).json({ error: "invalid-argument", message: e.message || "UID ou email inválidos." });
+      return;
+    }
+
+    if (uid === callerUid) {
+      res.status(400).json({ error: "failed-precondition", message: "Autoexclusão não é permitida." });
+      return;
+    }
+
+    try {
+      await auth.deleteUser(uid);
+    } catch (e) {
+      console.error("auth.deleteUser failed:", e.message);
+      res.status(500).json({ error: "internal", message: "Erro ao deletar usuário do Authentication: " + e.message });
+      return;
+    }
+
+    const agoraISO = new Date().toISOString();
+    const batch = db.batch();
+
+    const perfilCanonicoRef = db.collection("usuarios").doc(uid);
+    batch.set(perfilCanonicoRef, {
       ativo: false,
       authRemovido: true,
       authRemovidoEm: agoraISO,
       authRemovidoPorUid: callerUid,
       authRemovidoPorEmail: callerEmail,
+      uid,
+      email: String(userRecord.email || (data && data.email) || "").trim().toLowerCase() || null,
     }, { merge: true });
-  });
 
-  const emailAlvo = String(userRecord.email || request.data?.email || "").trim().toLowerCase();
-  if (emailAlvo) {
-    const docsPorEmail = await db.collection("usuarios").where("email", "==", emailAlvo).get();
-    docsPorEmail.docs.forEach((docSnap) => {
+    const docsPorUid = await db.collection("usuarios").where("uid", "==", uid).get();
+    docsPorUid.docs.forEach((docSnap) => {
       batch.set(docSnap.ref, {
         ativo: false,
         authRemovido: true,
@@ -132,9 +177,33 @@ exports.deleteUserAccount = onCall({ region: "us-central1" }, async (request) =>
         authRemovidoPorEmail: callerEmail,
       }, { merge: true });
     });
+
+    const emailAlvo = String(userRecord.email || (data && data.email) || "").trim().toLowerCase();
+    if (emailAlvo) {
+      const docsPorEmail = await db.collection("usuarios").where("email", "==", emailAlvo).get();
+      docsPorEmail.docs.forEach((docSnap) => {
+        batch.set(docSnap.ref, {
+          ativo: false,
+          authRemovido: true,
+          authRemovidoEm: agoraISO,
+          authRemovidoPorUid: callerUid,
+          authRemovidoPorEmail: callerEmail,
+        }, { merge: true });
+      });
+    }
+
+    try {
+      await batch.commit();
+    } catch (e) {
+      console.error("Firestore batch error (auth já removido):", e.message);
+    }
+
+    res.json({ ok: true, uid });
+
+  } catch (e) {
+    console.error("deleteUserAccount unhandled error:", e.message, e.stack);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "internal", message: e.message || "Erro interno." });
+    }
   }
-
-  await batch.commit();
-
-  return { ok: true, uid };
 });
