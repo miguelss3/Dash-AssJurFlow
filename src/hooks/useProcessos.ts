@@ -9,6 +9,7 @@ import {
   deleteDoc, 
   doc,
   getDocs,
+  writeBatch,
   type Query,
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
@@ -427,23 +428,19 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
   // Função para remover processo e todos os dados relacionados
   const remover = async (id: string) => {
     try {
-      // console.log(`🗑️ Iniciando exclusão do processo ${id}...`);
+      // Exclusão atômica: se qualquer delete falhar (permissão/rede), nada é removido.
+      const batch = writeBatch(db);
 
-      // 1. Remove distribuições relacionadas ao processo enquanto o processo pai ainda é acessível pelas rules
-      try {
-        const distribuicoesRef = collection(db, "distribuicoes");
-        const qDistrib = query(distribuicoesRef, where("processoId", "==", id));
-        const distribSnapshot = await getDocs(qDistrib);
-        const deleteDistribPromises = distribSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
-        await Promise.all(deleteDistribPromises);
-        // console.log(`✅ ${distribSnapshot.size} distribuições removidas`);
-      } catch {
-        // sem permissao para limpar distribuicoes em alguns perfis; a exclusao do processo segue normalmente
-      }
+      const distribuicoesRef = collection(db, "distribuicoes");
+      const qDistrib = query(distribuicoesRef, where("processoId", "==", id));
+      const distribSnapshot = await getDocs(qDistrib);
+      distribSnapshot.docs.forEach((docSnap) => {
+        batch.delete(docSnap.ref);
+      });
 
-      // 2. Remove o documento principal do processo (resposta rápida na UI)
       const processoRef = doc(db, "processos", id);
-      await deleteDoc(processoRef);
+      batch.delete(processoRef);
+      await batch.commit();
       
       // console.log(`✅ Processo ${id} e todos os dados relacionados foram excluídos permanentemente`);
     } catch (err: unknown) {
