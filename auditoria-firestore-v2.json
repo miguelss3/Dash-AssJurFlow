@@ -1,0 +1,2922 @@
+{
+  "timestamp": "2026-04-28T14:17:01.211Z",
+  "metadados": {
+    "acessosNegados": [
+      "distribuicoes",
+      "processos"
+    ],
+    "observacoes": [
+      "Validações de orfandade dependentes de processos foram ignoradas: acesso negado à coleção processos."
+    ]
+  },
+  "resumo": {
+    "totalColecoes": 6,
+    "totalDocumentos": 63,
+    "totalProblemas": 1,
+    "problemasPorCategoria": {
+      "sincronizacaoAuth": 0,
+      "uidsMissing": 0,
+      "emailsInvalidos": 0,
+      "emailsDuplicados": 0,
+      "setoresInvalidos": 0,
+      "rolesInvalidas": 0,
+      "referenciasBroken": 0,
+      "camposObrigatorios": 1,
+      "documentosOrfaos": 0,
+      "inconsistenciasSetor": 0,
+      "usuariosInativosComDados": 0,
+      "processosComResponsavelInvalido": 0,
+      "distribuicoesOrfas": 0,
+      "mensagensOrfas": 0
+    }
+  },
+  "detalhes": {
+    "usuarios": [
+      {
+        "id": "1xJoGC3siaaN9S9EdugI5FMHw1o2",
+        "secao": "PA",
+        "telefone": "",
+        "cargo": "Chefe PA",
+        "uid": "1xJoGC3siaaN9S9EdugI5FMHw1o2",
+        "nomeGuerra": "Marlon",
+        "email": "marlon.rodrigues@eb.mil.br",
+        "setor": "PA",
+        "ativo": true,
+        "role": "Chefe PA",
+        "posto": "Cap",
+        "nome": "Marlon Rodrigues Brandão",
+        "isChefe": true,
+        "atualizadoEm": "2026-04-28T14:05:22.330Z"
+      },
+      {
+        "id": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+        "setor": "Chefe AsseApAssJur",
+        "email": "miguelss3@yahoo.com.br",
+        "nomeGuerra": "Miguel",
+        "uid": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+        "posto": "Maj",
+        "cargo": "Admin Universal",
+        "telefone": "21998554181",
+        "isChefe": "Sim",
+        "nome": "LUIZ GUSTAVO MIGUEL DE ANDRADE"
+      },
+      {
+        "id": "5UVLndnoghamhct6gQto7nZpdYM2",
+        "dataCadastro": "2026-04-15T13:13:12.849Z",
+        "telefone": "92996220277",
+        "uid": "5UVLndnoghamhct6gQto7nZpdYM2",
+        "secao": "DU",
+        "isChefe": false,
+        "nome": "Caroline Portela de Lima",
+        "ativo": true,
+        "role": "ASSESSOR",
+        "posto": "Ten",
+        "email": "caroline_portela@hotmail.com",
+        "nomeGuerra": "Portela",
+        "setor": "DU"
+      },
+      {
+        "id": "8FxpqRb9mFeVXoLle2f1V3ke5o53",
+        "secao": "PA",
+        "telefone": "",
+        "uid": "8FxpqRb9mFeVXoLle2f1V3ke5o53",
+        "dataCadastro": "2026-04-18T22:52:58.610Z",
+        "nomeGuerra": "Perninha",
+        "email": "alvaro@perna.com.br",
+        "setor": "PA",
+        "ativo": true,
+        "role": "ASSESSOR",
+        "posto": "TC",
+        "nome": "Alvaro",
+        "isChefe": false
+      },
+      {
+        "id": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+        "ativo": true,
+        "role": "ASSESSOR",
+        "posto": "Ten",
+        "email": "adj03.ajur@12rm.eb.mil.br",
+        "nomeGuerra": "Fabra",
+        "setor": "PA",
+        "isChefe": false,
+        "nome": "Gianluca Fabra",
+        "telefone": "48999166650",
+        "uid": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+        "secao": "PA",
+        "dataCadastro": "2026-04-16T14:21:18.783Z"
+      },
+      {
+        "id": "bawYZ4KZebaK1KIAGjYPort4apE3",
+        "posto": "Ten",
+        "uid": "bawYZ4KZebaK1KIAGjYPort4apE3",
+        "ativo": true,
+        "role": "ASSESSOR",
+        "telefone": "",
+        "setor": "DU",
+        "nomeGuerra": "Becker",
+        "secao": "DU",
+        "email": "melynda.adv@gmail.com",
+        "nome": "Melynda Maria Vieiralves Becker Nogueira",
+        "isChefe": false
+      },
+      {
+        "id": "c5cOgQYSbEThZ0w8fr5F905dRZ22",
+        "setor": "PA",
+        "email": "glauciaroses@gmail.com",
+        "nomeGuerra": "Glaucia",
+        "posto": "Ten",
+        "ativo": true,
+        "role": "ASSESSOR",
+        "isChefe": false,
+        "nome": "Gláucia da Silva Oliveira",
+        "secao": "PA",
+        "uid": "c5cOgQYSbEThZ0w8fr5F905dRZ22",
+        "telefone": "92992819059",
+        "dataCadastro": "2026-04-15T14:07:08.309Z"
+      },
+      {
+        "id": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+        "nomeGuerra": "Tamires",
+        "email": "tamiresamaral06@gmail.com",
+        "setor": "DU",
+        "ativo": true,
+        "role": "ASSESSOR",
+        "posto": "Ten",
+        "nome": "Tamires Cruz do Amaral",
+        "isChefe": false,
+        "secao": "DU",
+        "telefone": "92982108079",
+        "uid": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+        "dataCadastro": "2026-04-16T14:25:16.534Z"
+      }
+    ],
+    "processos": [],
+    "distribuicoes": [],
+    "mensagens": [
+      {
+        "id": "28480a1e-269f-4306-84ed-5193fcfb118e",
+        "historico": [
+          {
+            "id": "95106f68-8c50-49b1-aa53-d11f99b7bcfd",
+            "autorId": "sistema",
+            "texto": "Processo cadastrado e instaurado no sistema.",
+            "autor": "Sistema",
+            "timestamp": "2026-04-15T13:51:38.540Z"
+          },
+          {
+            "timestamp": "2026-04-15T13:52:18.979Z",
+            "texto": "Fase do Encarregado concluída. Processo remetido para distribuição à Assessoria PA.",
+            "autorId": "sistema",
+            "id": "afedefe4-878d-47c7-9ad2-f02700380c14",
+            "autor": "Sistema"
+          },
+          {
+            "autor": "Sistema",
+            "autorId": "sistema",
+            "id": "1bc24bc6-5386-4136-842f-29f98bac87a9",
+            "texto": "Distribuído rapidamente para Ten Fabra1.",
+            "timestamp": "2026-04-15T13:52:36.813Z"
+          },
+          {
+            "timestamp": "2026-04-15T13:52:46.751Z",
+            "autor": "Sistema",
+            "autorId": "sistema",
+            "id": "a0b18651-9918-436d-80ef-bd79cf39867a",
+            "texto": "Processo avançou para a fase: 3. Assinatura (Cmt 12 RM)."
+          },
+          {
+            "autor": "Sistema",
+            "texto": "Processo avançou para a fase: 4. Remessa e-Proc STM.",
+            "autorId": "sistema",
+            "id": "db2df1fa-2546-480a-bac0-478b6ace82ce",
+            "timestamp": "2026-04-15T13:53:00.897Z"
+          },
+          {
+            "autor": "Sistema",
+            "autorId": "sistema",
+            "id": "87d82b97-542c-412b-a47a-b8aa998ca3d6",
+            "texto": "Processo carregado no e-Proc e encerrado.",
+            "timestamp": "2026-04-15T13:53:16.850Z"
+          },
+          {
+            "autor": "Sistema",
+            "autorId": "sistema",
+            "id": "b5fff986-9eea-4d7a-856d-17412ad454de",
+            "texto": "Processo reaberto.",
+            "timestamp": "2026-04-15T13:59:42.170Z"
+          }
+        ]
+      },
+      {
+        "id": "2qBWKvKiCHAlCQhGaSUW",
+        "historico": [
+          {
+            "autor": "Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "00f0a30f-ab49-4bf9-903c-9366b4ff8a6c",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "timestamp": "2026-04-23T17:46:52.187Z"
+          },
+          {
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "id": "bd13fb9b-2222-4d08-a3a1-8dd2555cb8a5",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-23T17:50:03.560Z"
+          },
+          {
+            "timestamp": "2026-04-23T20:29:34.989Z",
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "4a546142-5293-4e74-809c-3b72b5a580f9",
+            "autor": "Maj Miguel"
+          },
+          {
+            "autor": "Ten Fabra",
+            "texto": "Prazo do PA iniciado em 23/03/2026.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "34fa30b5-9af2-405f-9da0-92c180e99601",
+            "timestamp": "2026-04-24T12:45:39.646Z"
+          }
+        ]
+      },
+      {
+        "id": "30f3bfae-6d9f-4eff-9740-67b65dcd0ddc",
+        "historico": [
+          {
+            "timestamp": "2026-04-18T23:05:18.089Z",
+            "autorId": "sistema",
+            "id": "422f89ce-3cac-49ca-a350-675f0f9d1f65",
+            "texto": "Processo cadastrado e atribuído a TC Perninha.",
+            "autor": "Sistema"
+          },
+          {
+            "timestamp": "2026-04-18T23:13:58.830Z",
+            "autor": "Sistema",
+            "texto": "Dados do processo atualizados.",
+            "id": "f13cc1d4-2c44-4305-9797-44dabb2ec8da",
+            "autorId": "sistema"
+          },
+          {
+            "autorId": "sistema",
+            "id": "6fc00bf7-a66a-43c7-a189-1de682737539",
+            "texto": "📋 TC Perninha encaminhou para assinatura do Cmt.",
+            "autor": "Sistema",
+            "timestamp": "2026-04-19T02:09:56.998Z"
+          },
+          {
+            "timestamp": "2026-04-19T02:19:11.794Z",
+            "texto": "✅ Portaria assinada pelo Cmt. Registrado por Maj Miguel.",
+            "id": "ff914dc6-cf05-4004-a53e-a3b32ac6e45f",
+            "autorId": "sistema",
+            "autor": "Sistema"
+          },
+          {
+            "timestamp": "2026-04-19T02:19:51.042Z",
+            "autor": "Sistema",
+            "texto": "⏱️ Prazo iniciado em 18/04/2026 por TC Perninha.",
+            "autorId": "sistema",
+            "id": "f2a4fc32-1159-4b37-85e6-a12f048984da"
+          },
+          {
+            "timestamp": "2026-04-19T02:50:18.878Z",
+            "autor": "Sistema",
+            "texto": "🔄 Encarregado substituído: Maj Felipe Albuquerque → Maj Silva. Publicação: BI Nr 34/2026. Motivo: Férias. Portaria alterada para Portaria Nr 19/2026.",
+            "autorId": "sistema",
+            "id": "12cc109b-d091-47af-958e-44a1d28a3498"
+          },
+          {
+            "timestamp": "2026-04-19T02:57:43.872Z",
+            "autorId": "sistema",
+            "id": "c72b1bfb-79aa-45eb-9e4a-4459a50c580a",
+            "texto": "Data inicial de prazo definida para 16/03/2026.",
+            "autor": "Sistema"
+          },
+          {
+            "autor": "Sistema",
+            "id": "20f769d8-82bd-4cd6-9185-b434960a57c9",
+            "autorId": "sistema",
+            "texto": "Data inicial de prazo definida para 11/03/2026.",
+            "timestamp": "2026-04-19T02:57:49.921Z"
+          },
+          {
+            "texto": "Informação de substituição removida.",
+            "autorId": "sistema",
+            "id": "10aa3dcb-e557-4158-a2b9-6696b2586ad1",
+            "autor": "Sistema",
+            "timestamp": "2026-04-19T02:57:52.953Z"
+          },
+          {
+            "timestamp": "2026-04-19T03:02:31.872Z",
+            "autor": "Sistema",
+            "texto": "Data inicial de prazo definida para 09/03/2026.",
+            "id": "c5bafe0a-01c6-4cd3-bb38-98ba853e744a",
+            "autorId": "sistema"
+          },
+          {
+            "autor": "Sistema",
+            "texto": "Informação de substituição removida.",
+            "autorId": "sistema",
+            "id": "42762ab7-37e4-4470-bd4d-e605a108cb64",
+            "timestamp": "2026-04-19T03:02:37.507Z"
+          },
+          {
+            "autorId": "sistema",
+            "id": "5ab58233-9326-4bfb-96f7-f0ee68d3009f",
+            "texto": "🔄 Encarregado substituído: Maj Felipe Albuquerque → Maj Silva. Publicação: 123. Motivo: Férias. Portaria alterada para 32/2026.",
+            "autor": "Sistema",
+            "timestamp": "2026-04-19T03:33:05.687Z"
+          },
+          {
+            "timestamp": "2026-04-19T03:47:56.157Z",
+            "autor": "Sistema",
+            "texto": "1ª prorrogação registada no sistema.",
+            "id": "2e681588-7995-4542-87b3-561654e0fb5a",
+            "autorId": "sistema"
+          },
+          {
+            "timestamp": "2026-04-19T04:08:49.178Z",
+            "autor": "TC Perninha",
+            "texto": "🔄 Encarregado substituído por TC Perninha: Maj Silva → Cap Lucena. Publicação: Bol Res Nr 234. Motivo: Transferência do Encarregado. Portaria alterada para 32/2026.",
+            "id": "cf5e4642-d365-460d-a35a-3ac52a83cfe8",
+            "autorId": "sistema"
+          },
+          {
+            "timestamp": "2026-04-19T05:40:06.672Z",
+            "id": "ee3e9ce0-ff62-437e-a17d-e0cff3b28272",
+            "autorId": "sistema",
+            "texto": "Assessor responsável alterado para TC Perninha.",
+            "autor": "TC Perninha"
+          },
+          {
+            "autor": "TC Perninha",
+            "texto": "Dados do processo atualizados.",
+            "autorId": "sistema",
+            "id": "3be51aad-ace4-49af-bd05-d14dc89d9920",
+            "timestamp": "2026-04-19T05:40:06.673Z"
+          },
+          {
+            "texto": "✅ TC Perninha informou que a solução está pronta para despacho com o Cmt.",
+            "id": "c571de38-37e1-4aed-92d4-acd02bdfdc05",
+            "autorId": "sistema",
+            "autor": "TC Perninha",
+            "timestamp": "2026-04-19T06:01:38.970Z"
+          },
+          {
+            "autorId": "sistema",
+            "id": "381abeba-c942-40c0-a883-1641a2c8fec6",
+            "texto": "📋 TC Perninha encaminhou a solução para despacho com o Cmt.",
+            "autor": "TC Perninha",
+            "timestamp": "2026-04-19T06:05:07.489Z"
+          },
+          {
+            "timestamp": "2026-04-19T06:08:01.085Z",
+            "autor": "Maj Miguel",
+            "id": "8232ebda-d9eb-4e9f-82d7-3dc53467dc7b",
+            "autorId": "sistema",
+            "texto": "✅ Solução assinada pelo Cmt. Registrado por Maj Miguel. Processo devolvido ao assessor para finalização definitiva."
+          },
+          {
+            "autorId": "sistema",
+            "id": "a2f69605-4bb1-4379-a89f-1c2c0c1d3ad7",
+            "texto": "✅ Processo finalizado por TC Perninha. Publicação: 19/04/2026. Determinações: para providencias finais",
+            "autor": "TC Perninha",
+            "timestamp": "2026-04-19T06:21:20.770Z"
+          }
+        ]
+      },
+      {
+        "id": "33bgEO0zzF7rDnfYwzuR",
+        "historico": [
+          {
+            "texto": "Processo Cadastrado por Ten Becker.",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "id": "dda84958-1c9f-427d-afc9-1f088a32a074",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-21T23:46:24.418Z"
+          },
+          {
+            "texto": "Processo distribuído para Ten Tamires",
+            "id": "733c933b-7abb-43d5-8f94-33899ccb0c72",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-21T23:51:28.745Z"
+          }
+        ]
+      },
+      {
+        "id": "46b2f6c6-aade-46dd-8bbe-c66a3c86daa2",
+        "historico": [
+          {
+            "autor": "Maj Miguel",
+            "autorId": "sistema",
+            "id": "8949eefb-2b7e-424f-9928-711284fc4922",
+            "texto": "Processo cadastrado no sistema por Maj Miguel.",
+            "timestamp": "2026-04-21T18:15:40.632Z"
+          }
+        ]
+      },
+      {
+        "id": "4d28e2ca-346a-4ffa-a03d-70df05d3214e",
+        "historico": [
+          {
+            "autor": "Sistema",
+            "texto": "📋 Portaria cadastrada. Aguardando Assinatura do Cmt.",
+            "id": "a9c60508-0716-4733-916c-96309910c645",
+            "autorId": "sistema",
+            "timestamp": "2026-04-19T02:11:08.000Z"
+          },
+          {
+            "texto": "📋 TC Perninha encaminhou para assinatura do Cmt.",
+            "id": "77ceedc1-8cea-4b97-961b-ab25941e4539",
+            "autorId": "sistema",
+            "autor": "Sistema",
+            "timestamp": "2026-04-19T02:21:30.942Z"
+          },
+          {
+            "timestamp": "2026-04-19T02:31:37.872Z",
+            "autorId": "sistema",
+            "id": "7a54f161-d1ca-488a-99fd-1deced14cfa6",
+            "texto": "✅ Portaria assinada pelo Cmt. Registrado por Maj Miguel. Prazo liberado para início.",
+            "autor": "Sistema"
+          },
+          {
+            "timestamp": "2026-04-19T02:32:03.467Z",
+            "autorId": "sistema",
+            "id": "1c5a5ee5-997d-42b0-be7a-0ce4a9a44ad3",
+            "texto": "⏱️ Prazo iniciado em 18/04/2026 por TC Perninha.",
+            "autor": "Sistema"
+          },
+          {
+            "timestamp": "2026-04-19T04:14:56.167Z",
+            "texto": "Data inicial de prazo definida para 02/03/2026.",
+            "autorId": "sistema",
+            "id": "63969200-6cfd-4749-a557-816591fe0a17",
+            "autor": "TC Perninha"
+          },
+          {
+            "autor": "TC Perninha",
+            "autorId": "sistema",
+            "id": "5237320f-42ca-431e-a575-08452ab943cf",
+            "texto": "📝 Prazo para solução iniciado em 19/04/2026 por TC Perninha. Término previsto em 29/04/2026.",
+            "timestamp": "2026-04-19T04:23:56.391Z"
+          },
+          {
+            "timestamp": "2026-04-19T04:58:08.345Z",
+            "autorId": "sistema",
+            "id": "fbe8c0ab-674a-4d90-b300-18035cf0fd7e",
+            "texto": "✅ TC Perninha informou que a solução está pronta para despacho com o Cmt.",
+            "autor": "TC Perninha"
+          },
+          {
+            "timestamp": "2026-04-19T05:15:40.596Z",
+            "autor": "Maj Miguel",
+            "autorId": "sistema",
+            "id": "cdaf2460-8d71-4bcb-9027-f5bca74e89ac",
+            "texto": "✅ Solução assinada pelo Cmt. Registrado por Maj Miguel. Processo devolvido ao assessor para finalização definitiva."
+          },
+          {
+            "autor": "TC Perninha",
+            "id": "daf8c576-1a8c-4a18-90c5-a2a21febcfd0",
+            "autorId": "sistema",
+            "texto": "✅ Processo finalizado por TC Perninha. Publicação: 19/04/2026. Determinações: Informar ao acusado a solução",
+            "timestamp": "2026-04-19T05:19:52.935Z"
+          },
+          {
+            "timestamp": "2026-04-19T05:58:31.704Z",
+            "autor": "TC Perninha",
+            "autorId": "sistema",
+            "id": "1a0f5518-4a94-4007-a50d-1c6537912a73",
+            "texto": "🔎 Processo reaberto para diligência por TC Perninha sem mudança de encarregado."
+          },
+          {
+            "timestamp": "2026-04-19T06:00:08.729Z",
+            "id": "64634d3b-a7e6-4d6f-b625-00aa5bf5d2f5",
+            "autorId": "sistema",
+            "texto": "🔎 Prazo de diligência iniciado em 19/04/2026 por TC Perninha.",
+            "autor": "TC Perninha"
+          },
+          {
+            "id": "176c39f5-8f47-4275-b06b-85e338f8d33e",
+            "autorId": "sistema",
+            "texto": "↩️ TC Perninha desfez a última ação do processo.",
+            "autor": "TC Perninha",
+            "timestamp": "2026-04-19T07:02:55.518Z"
+          }
+        ]
+      },
+      {
+        "id": "5d4ab004-5d84-4126-b658-45f0e2f2f3b7",
+        "historico": [
+          {
+            "timestamp": "2026-04-21T18:06:16.131Z",
+            "texto": "Processo cadastrado no sistema por Maj Miguel.",
+            "autorId": "sistema",
+            "id": "118dfbdf-644d-4b8d-82fd-9e1b7b63ca62",
+            "autor": "Maj Miguel"
+          }
+        ]
+      },
+      {
+        "id": "6CfBREvgCA3EPJMAxeT1",
+        "historico": [
+          {
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "fe1a8667-3433-42ad-a082-d4e59699232f",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-24T13:37:28.518Z"
+          },
+          {
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "id": "dc1fa770-d79e-4dad-9684-1b27f26a37b8",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-24T13:37:41.315Z"
+          },
+          {
+            "timestamp": "2026-04-27T13:09:06.667Z",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "c7b6660c-cc58-4a94-b682-a5d4c9a52eab",
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "autor": "Maj Miguel"
+          },
+          {
+            "timestamp": "2026-04-27T12:30:29.959Z",
+            "autor": "Ten Fabra",
+            "texto": "Prazo do PA iniciado em 18/02/2025.",
+            "id": "9f06501a-f247-47d3-8704-de0f645829ae",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3"
+          },
+          {
+            "timestamp": "2026-04-27T12:31:06.699Z",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "40142d2e-2b4e-4d47-869b-b5bcc55969bd",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 60632, de 11 de fevereiro de 2026).",
+            "autor": "Ten Fabra"
+          },
+          {
+            "texto": "Dados do processo atualizados.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "32027464-cbeb-40bf-9287-01832b7ece8a",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-27T12:58:11.667Z"
+          },
+          {
+            "autor": "Ten Fabra",
+            "texto": "Dados do processo atualizados.",
+            "id": "37c2260a-20ec-48ad-a141-2e681f5bc7fc",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "timestamp": "2026-04-27T12:59:40.258Z"
+          },
+          {
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "6417d2e7-3e49-4fe3-a506-1d52762407e2",
+            "texto": "Dados do processo atualizados.",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-27T13:00:05.602Z"
+          }
+        ]
+      },
+      {
+        "id": "76ilWDCKPRA7C5yLLpbZ",
+        "historico": [
+          {
+            "timestamp": "2026-04-23T16:36:53.065Z",
+            "autor": "Ten Fabra",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "id": "37849ade-4fd9-4665-9311-54923c97427f",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3"
+          },
+          {
+            "timestamp": "2026-04-23T16:37:09.403Z",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "5597f571-f5fe-4113-a80e-2822d1c1536d",
+            "autor": "Ten Fabra"
+          },
+          {
+            "timestamp": "2026-04-27T19:37:31.476Z",
+            "autor": "Maj Miguel",
+            "id": "45b753bf-5be1-4c9c-ad66-9c4f0fad1726",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "Assinatura confirmada."
+          }
+        ]
+      },
+      {
+        "id": "8475d79c-8a7b-4263-984a-d1fc14ef92f7",
+        "historico": [
+          {
+            "timestamp": "2026-04-16T19:48:16.096Z",
+            "id": "8ec9df70-5028-41a6-8129-b88d6dec6f7f",
+            "autorId": "sistema",
+            "texto": "Processo cadastrado e instaurado no sistema.",
+            "autor": "Sistema"
+          },
+          {
+            "texto": "Dados do processo atualizados.",
+            "autorId": "sistema",
+            "id": "52386c96-41a6-49a7-9c7d-e23c18c7b56a",
+            "autor": "Sistema",
+            "timestamp": "2026-04-16T19:50:00.329Z"
+          },
+          {
+            "autor": "Sistema",
+            "autorId": "sistema",
+            "id": "d7be5c54-ac1f-4a7e-95ac-901370e16df3",
+            "texto": "Dados do processo atualizados.",
+            "timestamp": "2026-04-19T01:21:12.432Z"
+          },
+          {
+            "timestamp": "2026-04-19T01:21:33.013Z",
+            "id": "b972c653-e6f0-4c02-bb7e-bafee2225f07",
+            "autorId": "sistema",
+            "texto": "Dados do processo atualizados.",
+            "autor": "Sistema"
+          },
+          {
+            "autor": "Sistema",
+            "id": "89bd3371-725c-4f81-b4ea-e695680d6710",
+            "autorId": "sistema",
+            "texto": "Dados do processo atualizados.",
+            "timestamp": "2026-04-19T01:25:18.116Z"
+          },
+          {
+            "id": "adc9f8ea-4ff0-4618-9070-f0fa1ec70df3",
+            "autorId": "sistema",
+            "texto": "📋 TC Perninha encaminhou para assinatura do Cmt.",
+            "autor": "Sistema",
+            "timestamp": "2026-04-19T02:34:21.158Z"
+          },
+          {
+            "texto": "✅ Portaria assinada pelo Cmt. Registrado por Maj Miguel. Prazo liberado para início.",
+            "id": "da420420-6659-4671-adee-62ee5be8ad1e",
+            "autorId": "sistema",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-19T06:08:26.939Z"
+          }
+        ]
+      },
+      {
+        "id": "8996e002-09a5-471b-8b4f-bd596448d16a",
+        "historico": [
+          {
+            "autorId": "sistema",
+            "id": "a5afa6d1-1c09-4bf2-bc62-09bc5c152069",
+            "texto": "Processo cadastrado e instaurado no sistema.",
+            "autor": "Sistema",
+            "timestamp": "2026-04-16T13:52:34.285Z"
+          },
+          {
+            "timestamp": "2026-04-16T14:59:07.515Z",
+            "texto": "Distribuído rapidamente para Ten Tamires.",
+            "id": "c68d9088-0817-4da5-9168-76f158f6e6e1",
+            "autorId": "sistema",
+            "autor": "Sistema"
+          },
+          {
+            "texto": "Demanda está com o Ten Fabra. Conselho de Disciplina.",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "id": "17fbed23-1d94-4412-8b00-3803cd3cf340",
+            "autor": "Ten Tamires",
+            "timestamp": "2026-04-16T15:05:57.405Z"
+          },
+          {
+            "autor": "Sistema",
+            "texto": "Dados do processo atualizados.",
+            "autorId": "sistema",
+            "id": "41a041f5-b767-48ef-a644-b75ac0d4b6cf",
+            "timestamp": "2026-04-16T15:57:57.788Z"
+          },
+          {
+            "timestamp": "2026-04-16T15:59:09.530Z",
+            "texto": "Processo distribuído para Ten Fabra.",
+            "autorId": "sistema",
+            "id": "43f14b54-61b9-4cbc-b9c0-f7e154e4eae3",
+            "autor": "Sistema"
+          },
+          {
+            "timestamp": "2026-04-16T16:58:25.533Z",
+            "autor": "Ten Fabra",
+            "id": "e5f5c031-9924-48e7-8397-3d4b0a1d9f8b",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Ofício nº 517-Asse Ap As Jurd Cmdo/Cmdo 12ª RM assinado."
+          },
+          {
+            "timestamp": "2026-04-19T04:30:47.519Z",
+            "autor": "TC Perninha",
+            "texto": "📋 TC Perninha encaminhou para assinatura do Cmt.",
+            "id": "83db7571-f1eb-42d9-9e18-1aae694b69e6",
+            "autorId": "sistema"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "✅ Portaria assinada pelo Cmt. Registrado por Maj Miguel. Prazo liberado para início.",
+            "id": "04dc3f1c-9c02-4459-a995-b9dad91d9747",
+            "autorId": "sistema",
+            "timestamp": "2026-04-19T04:39:44.942Z"
+          },
+          {
+            "timestamp": "2026-04-19T05:20:39.423Z",
+            "autor": "TC Perninha",
+            "id": "f1446459-8253-40f0-a9bc-735326ec9fcb",
+            "autorId": "sistema",
+            "texto": "Assessor responsável alterado para Ten Fabra."
+          },
+          {
+            "timestamp": "2026-04-19T05:20:39.424Z",
+            "autor": "TC Perninha",
+            "texto": "Dados do processo atualizados.",
+            "id": "d02836a8-292f-4e82-bf1b-dc85a4639897",
+            "autorId": "sistema"
+          },
+          {
+            "texto": "⏱️ Prazo iniciado em 19/04/2026 por TC Perninha.",
+            "autorId": "sistema",
+            "id": "c008a8d7-c709-4ac7-acf4-2f9604799376",
+            "autor": "TC Perninha",
+            "timestamp": "2026-04-19T05:34:02.157Z"
+          },
+          {
+            "autorId": "sistema",
+            "id": "bb200285-9660-4662-a081-91534b28f7bb",
+            "texto": "↩️ TC Perninha desfez a última ação do processo.",
+            "autor": "TC Perninha",
+            "timestamp": "2026-04-19T05:34:07.036Z"
+          }
+        ]
+      },
+      {
+        "id": "Cd3QDp4tHfAF26JPLe6B",
+        "historico": [
+          {
+            "autor": "Ten Fabra",
+            "id": "b16e48da-e16f-4b16-b796-ae29907ad7be",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "timestamp": "2026-04-23T16:09:44.336Z"
+          },
+          {
+            "timestamp": "2026-04-23T16:09:58.834Z",
+            "autor": "Ten Fabra",
+            "id": "19d460bf-97c9-4049-afc9-dd541518960a",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria."
+          },
+          {
+            "timestamp": "2026-04-27T19:37:22.158Z",
+            "autor": "Maj Miguel",
+            "texto": "Assinatura confirmada.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "4456dcc4-9b88-469c-b48d-006cbca4582c"
+          }
+        ]
+      },
+      {
+        "id": "E2YgSZ4EBHGgwpuyjNq8",
+        "historico": [
+          {
+            "timestamp": "2026-04-23T14:24:04.300Z",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "8c70d03c-26d4-49d2-819b-815d22c20e5d",
+            "autor": "Ten Fabra"
+          },
+          {
+            "timestamp": "2026-04-23T14:24:26.218Z",
+            "autor": "Ten Fabra",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "id": "0bd03976-d066-4985-aada-ee9d728a7d41",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3"
+          },
+          {
+            "id": "6cd917e3-e0be-46ef-b332-aa3bcc6713eb",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Processo redistribuído para Ten Glaucia",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-23T14:29:16.710Z"
+          },
+          {
+            "timestamp": "2026-04-23T15:24:31.064Z",
+            "autorId": "c5cOgQYSbEThZ0w8fr5F905dRZ22",
+            "id": "244bd1b2-268f-46ce-a75b-bb77e7a2dbfb",
+            "texto": "Processo redistribuído para Ten Fabra",
+            "autor": "Ten Glaucia"
+          },
+          {
+            "timestamp": "2026-04-23T15:24:32.279Z",
+            "id": "7cb853a9-c038-41af-a345-ee0e70b81566",
+            "autorId": "c5cOgQYSbEThZ0w8fr5F905dRZ22",
+            "texto": "Processo redistribuído para Ten Glaucia",
+            "autor": "Ten Glaucia"
+          },
+          {
+            "autor": "Ten Fabra",
+            "texto": "Processo redistribuído para Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "24a9d888-5401-42d4-88d6-e5e863db78cd",
+            "timestamp": "2026-04-23T16:17:42.434Z"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Assinatura confirmada.",
+            "id": "dc8fbf9f-9085-4ccd-8329-f444dbac05f5",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "timestamp": "2026-04-27T19:36:38.526Z"
+          }
+        ]
+      },
+      {
+        "id": "EftkIBfObCPkBwGbmAUn",
+        "historico": [
+          {
+            "timestamp": "2026-04-24T11:43:53.966Z",
+            "texto": "Processo Cadastrado por Maj Miguel.",
+            "id": "5ee9e2c1-4681-4ea9-ba87-ff54c4624a11",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "autor": "Maj Miguel"
+          },
+          {
+            "texto": "Processo distribuído para Ten Tamires",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "09b9973f-3d4a-43a1-8090-4b5a56ea418a",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-24T11:44:04.228Z"
+          },
+          {
+            "timestamp": "2026-04-24T14:05:14.777Z",
+            "texto": "minuta diex e ofício. remessa ao escalão enquadrante. demanda do 1º bis.",
+            "id": "da012084-ea15-4b40-94d3-7209a46d05de",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "autor": "Ten Tamires"
+          },
+          {
+            "timestamp": "2026-04-24T14:05:35.285Z",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "id": "1289cdeb-39a8-48d1-a63f-647fba27fdd3",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "autor": "Ten Tamires"
+          },
+          {
+            "timestamp": "2026-04-27T14:21:35.752Z",
+            "autor": "Maj Miguel",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "27e73d1d-d4d7-45f0-beb5-7b468e969c20",
+            "texto": "Chefia aprovou e encaminhou para assinatura do CHEM."
+          },
+          {
+            "timestamp": "2026-04-27T17:16:09.397Z",
+            "id": "d6a4dddf-76ee-4d60-bd86-8a88f1d03598",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "Dados do processo atualizados.",
+            "autor": "Maj Miguel"
+          },
+          {
+            "timestamp": "2026-04-28T13:58:22.070Z",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "id": "44112688-8cdf-44fc-b800-86d79a0f5fb2",
+            "texto": "Chem assinou. DIEx nº 4434-Asse Ap As Jurd Cmdo/Cmdo 12ª RM. Ofício nº 548-Asse Ap As Jurd Cmdo/Cmdo 12ª RM (enviado em 28/04/26).",
+            "autor": "Ten Tamires"
+          },
+          {
+            "timestamp": "2026-04-28T14:03:37.200Z",
+            "autor": "Ten Tamires",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "id": "3c9f20fd-3baa-47e8-a6a0-50cee4bec786",
+            "texto": "Processo finalizado no fluxo DU."
+          }
+        ]
+      },
+      {
+        "id": "JeOzIBqjbPLhtCpEllJM",
+        "historico": [
+          {
+            "timestamp": "2026-04-24T12:55:28.220Z",
+            "autor": "Ten Fabra",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "96bae115-c59a-4895-b2c6-c7c85ec7ab69"
+          },
+          {
+            "autor": "Ten Fabra",
+            "id": "e4ced8f3-38b9-4ff2-866b-0120716c2493",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "timestamp": "2026-04-24T12:55:44.816Z"
+          },
+          {
+            "timestamp": "2026-04-27T13:10:39.797Z",
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "id": "ee2e0b6c-e5f5-49f2-85b7-8d6bf0ec885c",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "autor": "Maj Miguel"
+          },
+          {
+            "timestamp": "2026-04-27T12:16:16.714Z",
+            "texto": "Prazo do PA iniciado em 19/03/2026.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "e5ad15fd-6967-4fbd-bc69-c700cae6d9d2",
+            "autor": "Ten Fabra"
+          },
+          {
+            "autor": "Ten Fabra",
+            "id": "aecb8c71-fd31-4be6-bac4-87da0bd8bc9a",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 61952, de 23 de abril de 2026).",
+            "timestamp": "2026-04-27T12:17:36.379Z"
+          }
+        ]
+      },
+      {
+        "id": "KymCoKaM5XJ3UVPllgSb",
+        "historico": [
+          {
+            "timestamp": "2026-04-23T15:15:06.965Z",
+            "autor": "Ten Tamires",
+            "id": "c184892c-765b-41f8-a5df-40aaa0e7d2af",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "texto": "Processo Cadastrado por Ten Tamires."
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Processo distribuído para Ten Tamires",
+            "id": "5c76942a-d687-4888-b656-06dbef527f8b",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "timestamp": "2026-04-23T15:17:18.928Z"
+          },
+          {
+            "timestamp": "2026-04-23T17:36:07.877Z",
+            "id": "8449aa9d-5593-459a-bad7-283bcf832f33",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "texto": "minuta diex. svp.",
+            "autor": "Ten Tamires"
+          },
+          {
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "id": "ed52d3d9-2e8e-4a22-9b28-5bfadc256ea3",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "autor": "Ten Tamires",
+            "timestamp": "2026-04-23T17:39:53.473Z"
+          },
+          {
+            "timestamp": "2026-04-23T17:41:43.685Z",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "id": "3dbf6a1c-4714-44db-9bd3-c14eadba67d3",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "autor": "Maj Miguel"
+          }
+        ]
+      },
+      {
+        "id": "MrP9hwDzw6EPFnjP2atR",
+        "historico": [
+          {
+            "timestamp": "2026-04-23T15:50:12.578Z",
+            "autor": "Ten Tamires",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "id": "2f8fa91a-9f0a-42bd-9412-840f21f9532f",
+            "texto": "Processo Cadastrado por Ten Tamires."
+          },
+          {
+            "texto": "Processo distribuído para Ten Tamires",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "ccb03f2a-a74b-47e3-a2e6-5367b277a11f",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-23T15:57:40.135Z"
+          },
+          {
+            "timestamp": "2026-04-23T18:13:57.833Z",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "id": "1d2799fc-eae0-4e81-b0d0-d9b1864ddeff",
+            "texto": "diex elaborado. militar da reserva. svp.",
+            "autor": "Ten Tamires"
+          },
+          {
+            "timestamp": "2026-04-23T18:14:28.689Z",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "id": "3db9d880-c888-4442-afdb-4475dcfe3eb0",
+            "autor": "Ten Tamires"
+          },
+          {
+            "autor": "Maj Miguel",
+            "id": "90dd540a-295f-4457-9bf4-caeee68f166d",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "timestamp": "2026-04-23T18:21:42.714Z"
+          }
+        ]
+      },
+      {
+        "id": "NnUJs5d1CPMsaGPm5IBC",
+        "historico": [
+          {
+            "texto": "Processo Cadastrado por Ten Becker.",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "id": "1698e96f-9af0-4699-912c-9c8ed49caca8",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-22T17:19:13.701Z"
+          },
+          {
+            "timestamp": "2026-04-22T17:27:34.482Z",
+            "autor": "Maj Miguel",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "f1a55756-324b-49eb-9c69-aedba7f95380",
+            "texto": "Processo distribuído para Ten Becker"
+          }
+        ]
+      },
+      {
+        "id": "O3dySAXylGGkE2xkyhjF",
+        "historico": [
+          {
+            "timestamp": "2026-04-24T13:34:44.246Z",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "32477cf6-fea7-4387-b6b2-92a657b3753d",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autor": "Ten Fabra"
+          },
+          {
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "id": "25bfd4de-d2c2-4556-8328-c477d2d5a599",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-24T13:34:50.184Z"
+          },
+          {
+            "timestamp": "2026-04-27T13:08:49.045Z",
+            "autor": "Maj Miguel",
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "id": "09397925-a49d-4fde-b3c9-40ebc4b0111f",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2"
+          },
+          {
+            "texto": "Prazo do PA iniciado em 03/02/2026.",
+            "id": "4beddecb-07cf-4c18-be0e-31c6e502f39d",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-27T12:26:29.330Z"
+          },
+          {
+            "autor": "Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "4ad1d856-85f1-4fb5-808c-c07c7ab93f66",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 61338, de 23 de março de 2026).",
+            "timestamp": "2026-04-27T12:28:00.228Z"
+          },
+          {
+            "autor": "Ten Fabra",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 61707, de 9 de abril de 2026).",
+            "id": "55442683-f999-49d7-971a-8522b764945e",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "timestamp": "2026-04-27T12:28:12.129Z"
+          },
+          {
+            "timestamp": "2026-04-27T16:48:24.992Z",
+            "autor": "Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "a6b640fa-c147-4e23-9dd2-b182d1a4d722",
+            "texto": "Dados do processo atualizados."
+          }
+        ]
+      },
+      {
+        "id": "Od2jER8tYALo1T8MRla4",
+        "historico": [
+          {
+            "timestamp": "2026-04-23T15:22:53.729Z",
+            "autor": "Ten Tamires",
+            "id": "7c3ef50a-e63c-49dd-818d-36b8bae94840",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "texto": "Processo Cadastrado por Ten Tamires."
+          },
+          {
+            "timestamp": "2026-04-23T15:26:30.488Z",
+            "texto": "Processo distribuído para Ten Portela",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "21e1194f-8aac-4178-be98-75e5b3be0a4f",
+            "autor": "Maj Miguel"
+          },
+          {
+            "id": "5f49c46f-a41a-4d6e-bf10-7673738d5a73",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "autor": "Ten Portela",
+            "timestamp": "2026-04-23T18:30:12.641Z"
+          },
+          {
+            "timestamp": "2026-04-23T18:25:04.104Z",
+            "autor": "Maj Miguel",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "130d9d7d-52ec-4f26-b787-2e1de4178df8"
+          },
+          {
+            "timestamp": "2026-04-27T17:01:42.641Z",
+            "autor": "Maj Miguel",
+            "texto": "Processo devolvido à mesa do assessor.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "4d913979-fa64-42f4-8eed-099a80ddb03a"
+          },
+          {
+            "timestamp": "2026-04-27T18:28:41.000Z",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "c600fc9c-2d1a-45de-8221-1d629e347b2f",
+            "texto": "Processo chegou do HMAM com prazo exaurido. Chegou ao conhecimento desta Região Militar em 27/04/2026, com prazo de 27/04/2026.",
+            "autor": "Ten Portela"
+          },
+          {
+            "timestamp": "2026-04-27T18:35:11.975Z",
+            "autor": "Ten Portela",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "ed3a6de8-371e-4ee8-8b87-d1398b27c57c",
+            "texto": "Demanda já havia chegado neste Grande Comando por meio do Ofício OFÍCIO Nº 40383/2026/PRU1R/PGU/AGU, com prazo até 30/04/2026. Responderemos com base neste último ofício endereçado à 12RM."
+          }
+        ]
+      },
+      {
+        "id": "OhuqdP2d00Gl7CgRVw2S",
+        "historico": [
+          {
+            "timestamp": "2026-04-22T20:52:19.377Z",
+            "texto": "Processo Cadastrado por TC Perninha.",
+            "autorId": "8FxpqRb9mFeVXoLle2f1V3ke5o53",
+            "id": "d383abdf-221e-4049-8639-a110ac47921e",
+            "autor": "TC Perninha"
+          }
+        ]
+      },
+      {
+        "id": "Q6tNB8NyvuLQeNwUKWWd",
+        "historico": [
+          {
+            "autor": "Ten Fabra",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "6c46b4d7-55ec-4eb2-a56d-b7733f193349",
+            "timestamp": "2026-04-23T15:36:41.735Z"
+          },
+          {
+            "texto": "Dados do processo atualizados.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "244b9df9-876c-4830-9db5-4393446d0751",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-23T15:37:01.213Z"
+          },
+          {
+            "timestamp": "2026-04-23T15:37:05.249Z",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "a0af61f3-106a-4fe3-a233-4ee9f932d7ac",
+            "autor": "Ten Fabra"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "id": "6737bad0-ccce-4416-9a93-2c8ea11c5ac5",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "timestamp": "2026-04-23T16:32:42.375Z"
+          },
+          {
+            "autor": "Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "af5fda11-15c5-4d08-bc72-e0c349632286",
+            "texto": "Prazo do PA iniciado em 08/04/2026.",
+            "timestamp": "2026-04-23T15:37:52.827Z"
+          }
+        ]
+      },
+      {
+        "id": "SlJg0DCuoFLQLoVgS68q",
+        "historico": [
+          {
+            "timestamp": "2026-04-24T11:41:03.729Z",
+            "autor": "Maj Miguel",
+            "texto": "Processo Cadastrado por Maj Miguel.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "720abfbc-2863-43d1-abf1-3c8d096e82f9"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Processo distribuído para Ten Portela",
+            "id": "c2a00c04-3afc-40b9-b9b8-1175b83a6bfb",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "timestamp": "2026-04-24T11:41:27.800Z"
+          },
+          {
+            "timestamp": "2026-04-24T14:16:56.245Z",
+            "autor": "Ten Portela",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "id": "7c83193a-abd8-452e-affb-9192eba98a3b",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2"
+          },
+          {
+            "id": "f5aed80e-85b7-4db9-b6cb-45092f2ac9d6",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "texto": "Militar vinculado ao  5º Batalhão de Engenharia deConstrução  (5º  BEC),  subordinado  à  17ª  Brigada  de  Infantaria  de  Selva,  que  por  sua  vezresponde ao Comando Militar da Amazônia. Remessa ao escalão enquadrante.",
+            "autor": "Ten Portela",
+            "timestamp": "2026-04-24T14:17:36.596Z"
+          },
+          {
+            "id": "25046879-6577-4695-ade5-162168d25ef5",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "vc colocou como diex interno no sistema...devemos aguardar a assinatura do CHEM",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T13:56:14.707Z"
+          },
+          {
+            "id": "51106c8c-f0a5-4233-a066-181d16bdf10f",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "Chefia aprovou e encaminhou para assinatura do CHEM.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T14:06:16.665Z"
+          },
+          {
+            "timestamp": "2026-04-27T15:31:45.733Z",
+            "texto": "Ofício nº 546-Asse Ap As Jurd Cmdo/Cmdo 12ª RM, enviado por email em 27/04/2026.\nDiex 4375-Asse Ap As Jurd Cmdo/Cmdo 12ª RM, enviado ao Grupamento de Engenharia. ChEm alterou o destino do diex, enviado também no dia 27/04/2026.",
+            "id": "9c1a277d-4ece-42b3-ba07-482674bbd4a9",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "autor": "Ten Portela"
+          },
+          {
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "id": "58d59272-6652-4eaa-b0c4-9dad46812399",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "autor": "Ten Portela",
+            "timestamp": "2026-04-27T15:36:54.630Z"
+          },
+          {
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "e942db75-c907-4914-ac37-202b9e0cda24",
+            "texto": "Processo finalizado no fluxo DU.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T16:41:01.916Z"
+          }
+        ]
+      },
+      {
+        "id": "UkZCmR4RrQYwtrcRsKeB",
+        "historico": [
+          {
+            "autor": "Ten Tamires",
+            "id": "cb612e94-c4e4-48e0-a941-7451b2dbf908",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "texto": "Processo Cadastrado por Ten Tamires.",
+            "timestamp": "2026-04-27T19:10:16.272Z"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Processo distribuído para Ten Becker",
+            "id": "efbda17c-cd1c-401f-9c45-9494738c4b97",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "timestamp": "2026-04-27T19:31:25.145Z"
+          },
+          {
+            "timestamp": "2026-04-28T13:42:44.758Z",
+            "id": "66040b14-0513-4e52-a6b4-efff96c19d74",
+            "autorId": "bawYZ4KZebaK1KIAGjYPort4apE3",
+            "texto": "Processo retornado para Aguardando Distribuição",
+            "autor": "Ten Becker"
+          },
+          {
+            "timestamp": "2026-04-28T13:43:01.125Z",
+            "autor": "Ten Becker",
+            "texto": "Processo distribuído para Ten Becker",
+            "id": "a40b9237-55fc-4ad5-b289-3ec997945f0f",
+            "autorId": "bawYZ4KZebaK1KIAGjYPort4apE3"
+          }
+        ]
+      },
+      {
+        "id": "b42c44b8-0316-4001-bb0a-5c1fd8a12d1a",
+        "historico": [
+          {
+            "timestamp": "2026-04-19T12:55:34.343Z",
+            "autorId": "sistema",
+            "id": "e5e65952-8f82-413e-b04b-cb5c848de5b1",
+            "texto": "Processo cadastrado no sistema por Ten Becker.",
+            "autor": "Ten Becker"
+          },
+          {
+            "autor": "Maj Miguel",
+            "id": "256102cd-4a77-495c-8ed7-a76a2ee2dd6a",
+            "autorId": "sistema",
+            "texto": "Processo distribuído para Ten Becker.",
+            "timestamp": "2026-04-19T13:04:49.820Z"
+          },
+          {
+            "autor": "Ten Becker",
+            "texto": "Pedido de Subsídios externo encaminhado ao CHEM para OM 12o Pq Mnt, com acompanhamento do assessor. Prazo de resposta: 22/04/2026.",
+            "id": "9a3ae0c5-d90b-47ac-928c-61207510da90",
+            "autorId": "sistema",
+            "timestamp": "2026-04-19T13:49:30.515Z"
+          },
+          {
+            "texto": "↩️ Ten Becker desfez a última ação do processo.",
+            "id": "0fb17de6-e92b-449f-859b-9993daac6092",
+            "autorId": "sistema",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-19T13:52:19.042Z"
+          },
+          {
+            "autor": "Ten Becker",
+            "id": "ef88d69f-8f7f-4655-b0e2-44e2be476516",
+            "autorId": "sistema",
+            "texto": "Pedido de Subsídios enviado ao admin para conferência e encaminhamento para OM 12o Pq Mnt. Prazo de resposta: 22/04/2026.",
+            "timestamp": "2026-04-19T13:56:53.301Z"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "↩️ Maj Miguel desfez a última ação do processo.",
+            "id": "4d776b99-3066-4982-ad3e-bbe8c39a0afb",
+            "autorId": "sistema",
+            "timestamp": "2026-04-19T14:02:26.361Z"
+          },
+          {
+            "timestamp": "2026-04-19T14:13:35.943Z",
+            "id": "0d70d2f5-5842-4695-a3f0-b0e58e2b1477",
+            "autorId": "sistema",
+            "texto": "Pedido de Subsídios enviado ao chefe da seção para conferência e encaminhamento para OM 12o Pq Mnt. Prazo de resposta: 22/04/2026.",
+            "autor": "Ten Becker"
+          },
+          {
+            "timestamp": "2026-04-19T14:17:45.190Z",
+            "texto": "Admin conferiu e devolveu ao assessor o pedido externo para registrar o DIEx depois da assinatura. Prazo de resposta: 22/04/2026.",
+            "id": "cc400781-688a-4a65-8f11-1a909015334d",
+            "autorId": "sistema",
+            "autor": "Maj Miguel"
+          },
+          {
+            "autorId": "sistema",
+            "id": "10ea9b6b-7a6a-499f-8361-4188a0099e57",
+            "texto": "Admin conferiu e devolveu ao assessor o pedido externo para registrar o DIEx depois da assinatura. Prazo de resposta: 22/04/2026.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-19T14:19:13.160Z"
+          }
+        ]
+      },
+      {
+        "id": "c393e67c-dce4-49d3-821d-3ed2a05480e8",
+        "historico": [
+          {
+            "texto": "📋 Portaria cadastrada. Aguardando Assinatura do Cmt.",
+            "autorId": "sistema",
+            "id": "a419156c-7912-43ba-8392-6cc58a1ee437",
+            "autor": "Sistema",
+            "timestamp": "2026-04-19T02:39:06.996Z"
+          },
+          {
+            "timestamp": "2026-04-19T02:42:10.488Z",
+            "autor": "Sistema",
+            "texto": "📋 TC Perninha encaminhou para assinatura do Cmt.",
+            "id": "47e3c5af-c00b-4652-bfd8-d81f68db1f0b",
+            "autorId": "sistema"
+          },
+          {
+            "timestamp": "2026-04-19T04:28:37.839Z",
+            "autor": "Maj Miguel",
+            "texto": "✅ Portaria assinada pelo Cmt. Registrado por Maj Miguel. Prazo liberado para início.",
+            "autorId": "sistema",
+            "id": "9e687cd8-386a-4367-989b-fb296c77677b"
+          },
+          {
+            "timestamp": "2026-04-19T04:29:43.266Z",
+            "autorId": "sistema",
+            "id": "5699652d-4875-4f18-883a-921e3741c7ae",
+            "texto": "⏱️ Prazo iniciado em 19/04/2026 por TC Perninha.",
+            "autor": "TC Perninha"
+          }
+        ]
+      },
+      {
+        "id": "c85bzgcMVjnPKE9oyq5u",
+        "historico": [
+          {
+            "timestamp": "2026-04-21T23:45:03.717Z",
+            "texto": "Processo Cadastrado por Ten Becker.",
+            "id": "e959d0bc-9205-4df2-90ce-dfe0701bffa5",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "autor": "Ten Becker"
+          },
+          {
+            "id": "b9d7e8c8-5513-4da1-8ca5-dc1358bcff7c",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "texto": "Processo distribuído para Ten Portela",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-21T23:51:26.782Z"
+          },
+          {
+            "id": "b722c469-8ffa-4a59-b89f-60dbe482d998",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "texto": "📨 Solicitação de subsídios internos para SVP. Aguardando assinatura da seção e devolução com DIEx.",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-21T23:59:34.034Z"
+          },
+          {
+            "timestamp": "2026-04-22T00:03:39.521Z",
+            "id": "6d0e6121-f56a-4d66-884a-a59b59b6c73c",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "✅ Assinatura do Chefe de Seção concluída. Processo devolvido ao assessor com DIEx 555.",
+            "autor": "Maj Miguel"
+          }
+        ]
+      },
+      {
+        "id": "c912756b-3755-4c37-ba40-28a9e35c3beb",
+        "historico": [
+          {
+            "autor": "TC Perninha",
+            "id": "49a8106d-bb63-4583-be1a-09b1407e78fd",
+            "autorId": "sistema",
+            "texto": "Processo cadastrado e atribuído a TC Perninha.",
+            "timestamp": "2026-04-19T07:07:25.690Z"
+          },
+          {
+            "timestamp": "2026-04-19T07:07:25.691Z",
+            "autor": "TC Perninha",
+            "texto": "🔎 IPM cadastrado em diligência com nova portaria Portaria Nr 031/2026. Aguardando assinatura do Cmt.",
+            "autorId": "sistema",
+            "id": "b09205d9-b596-4008-a899-f75d323a1910"
+          },
+          {
+            "autor": "TC Perninha",
+            "id": "064c7404-51b6-41e4-83cc-0d7deb25d400",
+            "autorId": "sistema",
+            "texto": "📋 TC Perninha encaminhou para assinatura do Cmt.",
+            "timestamp": "2026-04-19T07:08:11.075Z"
+          },
+          {
+            "texto": "✅ Portaria assinada pelo Cmt. Registrado por Maj Miguel. Prazo liberado para início.",
+            "autorId": "sistema",
+            "id": "fd0c12e0-47b8-4893-b1a2-763dd1cf8805",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-19T07:08:30.715Z"
+          },
+          {
+            "timestamp": "2026-04-19T07:09:05.323Z",
+            "autor": "TC Perninha",
+            "texto": "🔎 Prazo de diligência iniciado em 19/04/2026 por TC Perninha.",
+            "id": "9ec1276c-c000-4cb2-93e4-8394e0c9f2fb",
+            "autorId": "sistema"
+          }
+        ]
+      },
+      {
+        "id": "cSelPcBNFGovePQarJuz",
+        "historico": [
+          {
+            "autor": "Ten Tamires",
+            "texto": "Processo Cadastrado por Ten Tamires.",
+            "id": "bfd5d89c-f2d2-4732-aff0-9a43c6b96e6a",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "timestamp": "2026-04-27T19:14:17.761Z"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Processo distribuído para Ten Tamires",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "049e1955-8e8b-416e-916c-5b1aca9e75d1",
+            "timestamp": "2026-04-27T19:31:14.519Z"
+          }
+        ]
+      },
+      {
+        "id": "cpkWG6mT929OO7HDujQx",
+        "historico": [
+          {
+            "autor": "Ten Fabra",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "fc55e06e-eddf-4105-8a7a-94a0ce04180f",
+            "timestamp": "2026-04-23T17:53:35.523Z"
+          },
+          {
+            "timestamp": "2026-04-24T12:56:30.676Z",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "id": "32986d10-483d-4a9a-bf51-28e88893e6a9",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "autor": "Ten Fabra"
+          },
+          {
+            "timestamp": "2026-04-27T13:14:42.166Z",
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "id": "68825fce-a071-41d1-9d5d-7b7f8c7e5a6b",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "autor": "Maj Miguel"
+          },
+          {
+            "timestamp": "2026-04-27T12:19:38.800Z",
+            "texto": "Prazo do PA iniciado em 14/04/2026.",
+            "id": "a627386c-5030-49e9-a118-5c347316416f",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "autor": "Ten Fabra"
+          }
+        ]
+      },
+      {
+        "id": "d68efc20-4826-477c-bf98-15b21a603b42",
+        "historico": [
+          {
+            "texto": "Processo cadastrado no sistema por Maj Miguel.",
+            "autorId": "sistema",
+            "id": "17009473-53d1-46ba-94d3-b494cff1c5e3",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-21T18:10:49.099Z"
+          }
+        ]
+      },
+      {
+        "id": "dKU9zWo1Xv3D6OwDS3Vv",
+        "historico": [
+          {
+            "autor": "Maj Miguel",
+            "texto": "Processo Cadastrado por Maj Miguel.",
+            "id": "bd224ff6-5cae-4733-bdab-c1867ebd9de3",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "timestamp": "2026-04-27T14:24:37.639Z"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Processo distribuído para Ten Tamires",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "30a832af-5e66-41f0-812c-7cd113a05096",
+            "timestamp": "2026-04-27T14:24:56.201Z"
+          },
+          {
+            "texto": "Dados do processo atualizados.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "a017cb7a-fe9a-4e73-a8d6-1d624cb7155e",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T14:25:11.638Z"
+          },
+          {
+            "timestamp": "2026-04-27T15:26:18.667Z",
+            "texto": "minuta diex. SVP.",
+            "id": "d93bec5b-ffc9-486d-9ef8-c0193acce164",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "autor": "Ten Tamires"
+          },
+          {
+            "timestamp": "2026-04-27T15:26:52.748Z",
+            "id": "5a1ccc34-c703-4bd9-a15e-2d24834da4ee",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "autor": "Ten Tamires"
+          },
+          {
+            "timestamp": "2026-04-27T16:46:17.596Z",
+            "autor": "Maj Miguel",
+            "texto": "Dados do processo atualizados.",
+            "id": "cf504cea-c945-4349-9706-c938419750a8",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2"
+          },
+          {
+            "timestamp": "2026-04-27T17:19:32.378Z",
+            "autor": "Maj Miguel",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "id": "4d89bb9a-389a-4bf3-aa03-5d3f9e117d2b",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2"
+          }
+        ]
+      },
+      {
+        "id": "dcf409c5-55ef-4dde-a368-16d8c0975704",
+        "historico": [
+          {
+            "timestamp": "2026-04-19T06:32:09.509Z",
+            "id": "250cd48b-8b59-4f3c-9630-7114e6805517",
+            "autorId": "sistema",
+            "texto": "Processo cadastrado e atribuído a TC Perninha.",
+            "autor": "TC Perninha"
+          },
+          {
+            "timestamp": "2026-04-19T06:32:09.509Z",
+            "autor": "TC Perninha",
+            "texto": "🔎 IPM cadastrado em diligência com nova portaria Portaria Nr 030/2026.",
+            "id": "791e1868-bfe6-4c31-8fee-1f564e8297ff",
+            "autorId": "sistema"
+          },
+          {
+            "timestamp": "2026-04-19T06:41:53.019Z",
+            "autor": "TC Perninha",
+            "texto": "🔎 Prazo de diligência iniciado em 19/04/2026 por TC Perninha.",
+            "id": "32a7b35c-90db-409c-a061-5e3777a27523",
+            "autorId": "sistema"
+          },
+          {
+            "timestamp": "2026-04-19T06:42:27.258Z",
+            "id": "75878b87-8e43-41a4-a11b-500a99c0f480",
+            "autorId": "sistema",
+            "texto": "✅ TC Perninha informou que a solução está pronta para despacho com o Cmt.",
+            "autor": "TC Perninha"
+          },
+          {
+            "texto": "📋 TC Perninha encaminhou a solução para despacho com o Cmt.",
+            "autorId": "sistema",
+            "id": "39c1f27d-3515-4136-b0cc-51bd5a4e2da9",
+            "autor": "TC Perninha",
+            "timestamp": "2026-04-19T06:42:33.771Z"
+          },
+          {
+            "id": "29905094-804c-48e3-b45e-1eedb376bdd1",
+            "autorId": "sistema",
+            "texto": "✅ Solução assinada pelo Cmt. Registrado por Maj Miguel. Processo devolvido ao assessor para finalização definitiva.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-19T06:43:17.788Z"
+          },
+          {
+            "autor": "TC Perninha",
+            "texto": "✅ Processo finalizado por TC Perninha. Publicação: 19/04/2026. Determinações: teste final",
+            "autorId": "sistema",
+            "id": "fee9065b-e85d-4221-823f-b1f0d4f00604",
+            "timestamp": "2026-04-19T06:43:48.705Z"
+          }
+        ]
+      },
+      {
+        "id": "e70c7771-5726-4373-aea5-5dfee6c072ca",
+        "historico": [
+          {
+            "texto": "Processo cadastrado no sistema por Sistema.",
+            "id": "60afca42-8fe7-405b-b55c-6a6004dff4d7",
+            "autorId": "sistema",
+            "autor": "Sistema",
+            "timestamp": "2026-04-14T15:54:18.800Z"
+          },
+          {
+            "timestamp": "2026-04-14T17:10:37.190Z",
+            "texto": "Processo distribuído para Gianluca Fabra.",
+            "autorId": "sistema",
+            "id": "888f8872-f03e-4acc-846c-2401a5e3ed05",
+            "autor": "Sistema"
+          },
+          {
+            "autor": "Sistema",
+            "id": "fadf7966-e8c6-48ff-a005-8adf7b2ac34e",
+            "autorId": "sistema",
+            "texto": "1ª prorrogação registrada.",
+            "timestamp": "2026-04-14T17:23:47.778Z"
+          },
+          {
+            "autor": "Sistema",
+            "texto": "Processo distribuído para Ten Fabra1.",
+            "autorId": "sistema",
+            "id": "1faef149-ef40-4e01-97c1-d1b1640aed83",
+            "timestamp": "2026-04-15T12:59:57.540Z"
+          },
+          {
+            "timestamp": "2026-04-15T13:11:45.938Z",
+            "autor": "Sistema",
+            "texto": "Distribuído rapidamente para Ten Fabra1.",
+            "autorId": "sistema",
+            "id": "3f629193-06a4-4479-9212-360a91c1a03f"
+          },
+          {
+            "timestamp": "2026-04-15T13:26:58.438Z",
+            "id": "6c54bafd-a201-4a8c-893c-ba96c12ec750",
+            "autorId": "sistema",
+            "texto": "Distribuído rapidamente para Ten Fabra1.",
+            "autor": "Sistema"
+          }
+        ]
+      },
+      {
+        "id": "ee4dbb0b-07ab-4075-8c8e-f1dc19a4e90b",
+        "historico": [
+          {
+            "timestamp": "2026-04-19T13:17:19.352Z",
+            "autor": "Maj Miguel",
+            "id": "dbe49db3-2f2c-44dd-938d-c0f191cc9f3c",
+            "autorId": "sistema",
+            "texto": "🚨 Mandado de Segurança / Urgente cadastrado no sistema."
+          },
+          {
+            "timestamp": "2026-04-19T14:24:46.589Z",
+            "autor": "Maj Miguel",
+            "id": "839e4bc2-ca2e-4b62-9620-8a344964148f",
+            "autorId": "sistema",
+            "texto": "Processo distribuído para Ten Becker."
+          }
+        ]
+      },
+      {
+        "id": "euMSGwUfTrDRuc1WbZVV",
+        "historico": [
+          {
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "91acbccf-f39e-4b72-a536-a5963ddf1209",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-23T17:16:27.641Z"
+          },
+          {
+            "timestamp": "2026-04-23T17:17:59.764Z",
+            "autor": "Ten Fabra",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "a06c35a3-7d8a-47ba-a2a8-64e302842a68"
+          },
+          {
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "e14d7f54-6ead-4d2c-99fa-4958f28ac287",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-23T19:24:07.298Z"
+          },
+          {
+            "timestamp": "2026-04-23T18:29:27.472Z",
+            "id": "2b0f5725-9af3-466b-8dc7-9ad28e6e1b48",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Prazo do PA iniciado em 12/02/2026.",
+            "autor": "Ten Fabra"
+          },
+          {
+            "timestamp": "2026-04-23T18:34:34.906Z",
+            "autor": "Ten Fabra",
+            "id": "089adaee-42a3-4bbe-8b64-0183a8f65426",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 61502, de 31 de março de 2026)."
+          },
+          {
+            "timestamp": "2026-04-23T18:35:22.366Z",
+            "autor": "Ten Fabra",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 61879, de 18 de abril de 2026).",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "44b6199b-1b68-4ed9-a8ec-e4018c93977a"
+          },
+          {
+            "timestamp": "2026-04-24T10:45:43.713Z",
+            "autor": "Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "7c6229be-08e5-4f80-bb6f-a153deffeed8",
+            "texto": "Prorrogação registrada: +20 dias (Gláucia, juntar documento de prorrogação)."
+          },
+          {
+            "id": "bd9b2315-63ee-4a79-9298-8486ea79a454",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Dados do processo atualizados.",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-24T10:46:49.665Z"
+          }
+        ]
+      },
+      {
+        "id": "fHPQ3J89Te23nO6QpOTo",
+        "historico": [
+          {
+            "autor": "Ten Fabra",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "id": "a46345c8-7884-4c50-8e82-db4fab9c5618",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "timestamp": "2026-04-23T14:37:15.044Z"
+          },
+          {
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "ec020106-cb39-461c-a194-6dd736459797",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-23T14:38:04.441Z"
+          },
+          {
+            "timestamp": "2026-04-27T19:36:56.907Z",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "003c1fdc-6c1c-4e49-8188-5d3ada332c69",
+            "texto": "Assinatura confirmada.",
+            "autor": "Maj Miguel"
+          },
+          {
+            "timestamp": "2026-04-28T12:42:43.927Z",
+            "autor": "Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "adc86551-19ea-4ebc-8846-3538e7ce720e",
+            "texto": "Sindicante entrará em instalação. Aguardar o retorno."
+          }
+        ]
+      },
+      {
+        "id": "fuNjJTKEpArFZsRrdOtS",
+        "historico": [
+          {
+            "id": "2a2a291d-5d3c-4caa-98ed-d911a762cc88",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-23T14:34:20.076Z"
+          },
+          {
+            "timestamp": "2026-04-23T14:34:40.258Z",
+            "autor": "Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "feb032e9-720b-4aec-99c2-f9518296a678",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria."
+          },
+          {
+            "timestamp": "2026-04-23T17:22:41.489Z",
+            "autor": "Ten Fabra",
+            "texto": "Processo redistribuído para Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "73abe4c0-42e5-4fdb-acbc-c9e1d372f517"
+          },
+          {
+            "timestamp": "2026-04-27T19:36:25.437Z",
+            "autor": "Maj Miguel",
+            "id": "f4218a9b-fff0-4203-929e-5ab7a3eb14b2",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "Assinatura confirmada."
+          }
+        ]
+      },
+      {
+        "id": "jMfkLXSGJGdtsDqWWrGf",
+        "historico": [
+          {
+            "timestamp": "2026-04-23T14:32:00.532Z",
+            "id": "403f5237-6b51-47ca-a553-ee11c9b6cc02",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autor": "Ten Fabra"
+          },
+          {
+            "timestamp": "2026-04-23T14:32:06.180Z",
+            "autor": "Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "d7a66e19-9060-4df4-948c-1c4e63e6927d",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria."
+          },
+          {
+            "timestamp": "2026-04-27T19:36:13.698Z",
+            "texto": "Assinatura confirmada.",
+            "id": "dd2bd015-73e6-431f-b8d6-0917687d3868",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "autor": "Maj Miguel"
+          }
+        ]
+      },
+      {
+        "id": "jYZEuhGw1TnHacCnQIgg",
+        "historico": [
+          {
+            "timestamp": "2026-04-27T13:56:22.869Z",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "f99f3591-d36e-4fd4-b650-331215e021d3",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autor": "Ten Fabra"
+          },
+          {
+            "autor": "Ten Fabra",
+            "texto": "Memória enviada à chefia.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "f9bdf64d-28ee-4fa5-a560-fbd0ed71fc0d",
+            "timestamp": "2026-04-27T13:56:57.333Z"
+          }
+        ]
+      },
+      {
+        "id": "k8leFyydwY61HSAy2wmz",
+        "historico": [
+          {
+            "texto": "Processo Cadastrado por Ten Portela.",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "543a2ac5-ea36-4184-b208-b5360cfc7296",
+            "autor": "Ten Portela",
+            "timestamp": "2026-04-24T14:59:24.501Z"
+          },
+          {
+            "timestamp": "2026-04-24T15:00:03.917Z",
+            "autor": "Ten Portela",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "a9333254-74b7-44cd-a274-b3ad30a04da3"
+          },
+          {
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "9e8ead12-17c2-4389-ac8f-3bd602f5e23d",
+            "texto": "Chefia aprovou e encaminhou para assinatura do CHEM.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T14:05:43.515Z"
+          },
+          {
+            "texto": "Processo distribuído para Ten Portela",
+            "id": "8c72e3dc-f7ca-4427-8258-f2fb17da59c3",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T16:44:02.529Z"
+          },
+          {
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "b78ca505-6e91-439a-8f5d-bd8b4ac98db2",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T16:59:08.641Z"
+          },
+          {
+            "texto": "Respondido por meio do Ofício-545-Asse Ap As Jurd Cmdo/Cmdo 12ª RM, enviado por email em 27/04/2026. Após recebimento do DIEx 775-AAAJurd/Subdireção/Direção advindo do Hospital de Guarnição de São Gabriel da Cachoeira.",
+            "id": "fcd8fb9d-f0db-4ce6-bb12-792c838c20d2",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "autor": "Ten Portela",
+            "timestamp": "2026-04-27T17:36:35.130Z"
+          },
+          {
+            "timestamp": "2026-04-27T17:36:53.486Z",
+            "texto": "Processo finalizado no fluxo DU.",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "5cddea4f-e8e1-4188-a5e2-3c4f43bc3ad9",
+            "autor": "Ten Portela"
+          }
+        ]
+      },
+      {
+        "id": "kb5xGmz5Y5dKUWJV0uRU",
+        "historico": [
+          {
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "ade0e0b8-d27f-418f-a9b2-98b252a830b6",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-23T16:13:47.215Z"
+          },
+          {
+            "timestamp": "2026-04-23T16:14:05.999Z",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "235efae8-1638-4277-aee3-af0c5ab523fe",
+            "autor": "Ten Fabra"
+          },
+          {
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "92424dc7-a3cd-47ee-aa9f-718745431502",
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-23T17:09:54.302Z"
+          },
+          {
+            "timestamp": "2026-04-23T16:15:23.793Z",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "74c2a3fe-8b12-4c2e-ab23-021b6f907814",
+            "texto": "Prazo do PA iniciado em 08/04/2026.",
+            "autor": "Ten Fabra"
+          }
+        ]
+      },
+      {
+        "id": "lTIku6Rp9RPeEY5KAZEx",
+        "historico": [
+          {
+            "autor": "Maj Miguel",
+            "texto": "Processo Cadastrado por Maj Miguel.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "a019fbab-46a7-40dd-a6f7-eafb2c3bb814",
+            "timestamp": "2026-04-27T17:05:43.189Z"
+          },
+          {
+            "timestamp": "2026-04-27T17:05:50.352Z",
+            "autor": "Maj Miguel",
+            "texto": "Processo distribuído para Ten Tamires",
+            "id": "74ae3ad6-b1c9-4f97-b7e7-95487e738037",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2"
+          },
+          {
+            "timestamp": "2026-04-27T19:00:03.511Z",
+            "autor": "Ten Tamires",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "id": "1af403fb-ddc3-475e-adc8-c50de44f5041",
+            "texto": "Minuta diex. SVP."
+          },
+          {
+            "id": "b36161f3-c448-462f-87bd-a7bd7db11287",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "autor": "Ten Tamires",
+            "timestamp": "2026-04-27T19:00:37.720Z"
+          },
+          {
+            "timestamp": "2026-04-27T19:20:28.041Z",
+            "autor": "Maj Miguel",
+            "texto": "Dados do processo atualizados.",
+            "id": "b8f5707d-6e8f-4afd-81b8-eed9aef0822c",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2"
+          },
+          {
+            "timestamp": "2026-04-27T19:28:43.407Z",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "7f20489d-2233-4dc3-b867-031a4eb159c0",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "autor": "Maj Miguel"
+          }
+        ]
+      },
+      {
+        "id": "proc-teste-001",
+        "historico": [
+          {
+            "timestamp": "2026-04-14T15:25:39.526Z",
+            "texto": "Banco de dados inicializado. Sistema pronto para uso.",
+            "autorId": "sistema",
+            "id": "09a54095-6ffe-41f9-b40d-26f7e491d1c4",
+            "autor": "Sistema"
+          },
+          {
+            "autor": "Sistema",
+            "texto": "Processo finalizado.",
+            "autorId": "sistema",
+            "id": "722ce3c0-c706-4897-8a50-8e130a36595f",
+            "timestamp": "2026-04-14T17:19:57.492Z"
+          },
+          {
+            "timestamp": "2026-04-14T17:20:00.352Z",
+            "autor": "Sistema",
+            "id": "7433af7e-f9d8-4df9-b6fa-dae49cdf5279",
+            "autorId": "sistema",
+            "texto": "Processo reaberto."
+          },
+          {
+            "autorId": "sistema",
+            "id": "403b3599-9f6d-4d67-95e4-68c84031dc02",
+            "texto": "Processo finalizado.",
+            "autor": "Sistema",
+            "timestamp": "2026-04-15T13:00:23.243Z"
+          }
+        ]
+      },
+      {
+        "id": "t37s9xiMoER7jyJLhOoq",
+        "historico": [
+          {
+            "autor": "Ten Fabra",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "ccd3644e-0888-403d-af3e-74ddc4979843",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "timestamp": "2026-04-24T13:40:34.469Z"
+          },
+          {
+            "timestamp": "2026-04-24T13:40:46.113Z",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "5af6fe63-f233-472a-b5d6-482bb66dfad8",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "autor": "Ten Fabra"
+          },
+          {
+            "autor": "Maj Miguel",
+            "id": "4addab6f-840a-4da6-9fdc-9e9f0f75d437",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "timestamp": "2026-04-27T13:09:30.355Z"
+          },
+          {
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "80d720ca-824d-46a3-b6da-929efcccb106",
+            "texto": "Prazo do PA iniciado em 06/01/2026.",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-27T12:33:11.616Z"
+          },
+          {
+            "timestamp": "2026-04-27T12:34:59.209Z",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "3cc7a2ca-ffba-4f82-8bf2-1de68e91a451",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 60516, de 5 de fevereiro de 2026).",
+            "autor": "Ten Fabra"
+          }
+        ]
+      },
+      {
+        "id": "uLb26AfcKHtLkeRL81JQ",
+        "historico": [
+          {
+            "texto": "Processo Cadastrado por Ten Tamires.",
+            "id": "8495a587-9220-4709-9d3e-625e0fd8d61e",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "autor": "Ten Tamires",
+            "timestamp": "2026-04-27T19:06:58.030Z"
+          },
+          {
+            "timestamp": "2026-04-27T19:31:06.937Z",
+            "id": "a5c34d11-4fde-4862-aaa0-34b48b1b2e12",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "Processo distribuído para Ten Becker",
+            "autor": "Maj Miguel"
+          },
+          {
+            "autorId": "bawYZ4KZebaK1KIAGjYPort4apE3",
+            "id": "335f7b3b-3d65-4608-b99e-687bcd271828",
+            "texto": "Processo retornado para Aguardando Distribuição",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-28T13:42:47.443Z"
+          },
+          {
+            "timestamp": "2026-04-28T13:42:57.499Z",
+            "autor": "Ten Becker",
+            "texto": "Processo distribuído para Ten Becker",
+            "autorId": "bawYZ4KZebaK1KIAGjYPort4apE3",
+            "id": "dcd79084-de76-4d22-a9b5-b6d37322b28e"
+          }
+        ]
+      },
+      {
+        "id": "uZZyJ0BRe2Fez6RWnSxF",
+        "historico": [
+          {
+            "timestamp": "2026-04-24T13:25:55.773Z",
+            "autor": "Ten Fabra",
+            "id": "b6bf9098-5984-422a-a782-07ad8b323b4c",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Processo Cadastrado por Ten Fabra."
+          },
+          {
+            "timestamp": "2026-04-24T13:26:40.125Z",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "9d951bd5-857c-4b16-b0ab-0d13fe27fab8",
+            "autor": "Ten Fabra"
+          },
+          {
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "b751d144-9556-403c-80c5-c495615b25cd",
+            "texto": "Assinatura da portaria confirmada pela chefia.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T13:08:27.140Z"
+          },
+          {
+            "timestamp": "2026-04-27T12:20:02.863Z",
+            "id": "207e84ff-e74e-4c2d-899e-812b2430fbae",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Prazo do PA iniciado em 01/09/2025.",
+            "autor": "Ten Fabra"
+          },
+          {
+            "autor": "Ten Fabra",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 58068, de 3 de outubro de 2025).",
+            "id": "37bfa2b1-c0fb-42b7-a2a4-e3101bd693d4",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "timestamp": "2026-04-27T12:23:10.782Z"
+          },
+          {
+            "autor": "Ten Fabra",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 59063, de 24 de novembro de 2025).",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "37b69ce7-b3ec-4a8e-a416-45dd3453a163",
+            "timestamp": "2026-04-27T12:23:25.598Z"
+          },
+          {
+            "timestamp": "2026-04-27T12:23:41.009Z",
+            "texto": "Prorrogação registrada: +20 dias (Nota nº 59795, de 29 de dezembro de 2025).",
+            "id": "bd8b1af8-bc0d-4fa2-b91d-3db475eb43a1",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "autor": "Ten Fabra"
+          },
+          {
+            "timestamp": "2026-04-27T13:02:24.673Z",
+            "texto": "Dados do processo atualizados.",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "ac30e07e-3da8-4781-a269-8369a3da2187",
+            "autor": "Ten Fabra"
+          }
+        ]
+      },
+      {
+        "id": "vAPfhjlPLwktfxsbDifv",
+        "historico": [
+          {
+            "id": "4c51b3cf-d0f1-4306-92a9-0c969b157465",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "texto": "Processo Cadastrado por Ten Fabra.",
+            "autor": "Ten Fabra",
+            "timestamp": "2026-04-23T14:40:54.309Z"
+          },
+          {
+            "timestamp": "2026-04-23T14:41:16.223Z",
+            "autorId": "bClxuXwjElXNfdYg8gx4tqydJ9F3",
+            "id": "9764d313-1a50-4424-ada3-62e6d147bf70",
+            "texto": "Processo PA enviado à chefia para assinatura da portaria.",
+            "autor": "Ten Fabra"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Assinatura confirmada.",
+            "id": "bcfd21ac-dabe-4271-8b3b-6384f7c0ff06",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "timestamp": "2026-04-27T19:37:09.615Z"
+          }
+        ]
+      },
+      {
+        "id": "wHBmKx0y0NX9jfvMzfWJ",
+        "historico": [
+          {
+            "texto": "Processo Cadastrado por Ten Portela.",
+            "id": "a327078d-176f-4ab4-9317-8121bf6874ce",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "autor": "Ten Portela",
+            "timestamp": "2026-04-23T14:28:19.860Z"
+          },
+          {
+            "autor": "Ten Portela",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "323f7ce4-35d5-43f1-9d8d-297050534912",
+            "texto": "Processo distribuído para Ten Portela",
+            "timestamp": "2026-04-23T14:28:55.947Z"
+          },
+          {
+            "timestamp": "2026-04-23T19:01:06.490Z",
+            "texto": "Processo já havia chegado por outros meios. DIEx-3034-Asse Ap As Jurd Cmdo/Cmdo 12ª RM, enviado em 24 MAR 26. Consta Diex Simplificado\t1319-SVP 12/Esc Serv Mil/Cmdo 12ª RM, porém ainda não retornou para esta Assessoria.",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "b3ae4312-3b27-43c8-ac09-224793cbef8d",
+            "autor": "Ten Portela"
+          },
+          {
+            "autor": "Ten Portela",
+            "id": "fe99ae5a-fe6c-4709-9a37-cf88f7380721",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "timestamp": "2026-04-23T19:05:12.668Z"
+          },
+          {
+            "autor": "Maj Miguel",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "bb846eaa-d3ea-477a-9c9f-9b4039df5131",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "timestamp": "2026-04-23T20:00:13.436Z"
+          }
+        ]
+      },
+      {
+        "id": "yk1Nx73IMqbaeid0hHZy",
+        "historico": [
+          {
+            "timestamp": "2026-04-27T16:55:04.831Z",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "8b191b19-2a18-4de7-8de5-608a6be4f6f8",
+            "texto": "Processo Cadastrado por Maj Miguel.",
+            "autor": "Maj Miguel"
+          },
+          {
+            "texto": "Processo distribuído para Ten Portela",
+            "id": "3d9d076c-f6fa-4a3b-9c42-912f319c3a87",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T16:55:13.136Z"
+          },
+          {
+            "timestamp": "2026-04-27T20:29:27.353Z",
+            "autor": "Ten Portela",
+            "texto": "Demanda anteriormente respondida, reiterada por meio do Ofício nº 101-Asse Ap As Jurd Cmdo/Cmdo 12ª RM com as atas de inspeção de saúde.",
+            "id": "9a5cfbcd-9067-4346-a4ac-9ceb6a3354ce",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2"
+          }
+        ]
+      },
+      {
+        "id": "zSMIYPz48Breg95MGtcS",
+        "historico": [
+          {
+            "timestamp": "2026-04-22T00:20:11.367Z",
+            "texto": "Processo Cadastrado por Ten Becker.",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "id": "6b69a262-cb80-4188-af5b-303ff4e0810c",
+            "autor": "Ten Becker"
+          },
+          {
+            "timestamp": "2026-04-22T00:20:23.133Z",
+            "texto": "Processo distribuído para Ten Becker",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "id": "07b129a4-b530-4e4c-9f7b-f1a0dae681a3",
+            "autor": "Ten Becker"
+          },
+          {
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "id": "3f1a6cdb-fd34-42e8-937a-feace68d0d44",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-22T13:47:50.410Z"
+          },
+          {
+            "autor": "Ten Becker",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "id": "b55fbff2-8def-40e0-bdff-dcf6bb716fe9",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "timestamp": "2026-04-22T13:47:51.130Z"
+          },
+          {
+            "timestamp": "2026-04-22T15:11:03.961Z",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "5b155145-2b6b-4791-80e4-ff8c20e8fc98",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "autor": "Maj Miguel"
+          },
+          {
+            "timestamp": "2026-04-22T15:11:04.808Z",
+            "autor": "Maj Miguel",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "d2086b5f-5651-4ec1-a5ab-e40c2e963086",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM."
+          },
+          {
+            "texto": "Reiteração em elaboração pelo assessor.",
+            "id": "493efe19-0b16-4c06-b614-121263b6699b",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-22T16:34:14.771Z"
+          },
+          {
+            "autor": "Ten Becker",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "id": "e39390a7-6fad-4647-81ff-722619ff0d3d",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "timestamp": "2026-04-22T16:34:26.644Z"
+          },
+          {
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "ba6e09ca-e9ed-466d-a970-f93d0a3d49e3",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-22T16:36:14.021Z"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Processo devolvido à mesa do assessor.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "048f7e9a-9d99-4955-ac7a-b7917ebaecb0",
+            "timestamp": "2026-04-22T16:36:19.849Z"
+          },
+          {
+            "autor": "Ten Becker",
+            "id": "5a3fe87e-c405-4f15-a5db-72ed196a6f37",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "texto": "Minuta de defesa encaminhada para decisão da chefia.",
+            "timestamp": "2026-04-22T16:40:55.921Z"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Defesa aprovada pela chefia e aguardando assinatura do CHEM.",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "b8b09c4c-025b-41f8-a2ca-2d2134ed16ab",
+            "timestamp": "2026-04-22T16:52:06.764Z"
+          },
+          {
+            "timestamp": "2026-04-22T17:04:34.552Z",
+            "texto": "Documento final registrado. Processo apto para finalização.",
+            "id": "1f85b5a4-7afb-4fd9-b1a1-516298115695",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "autor": "Ten Becker"
+          },
+          {
+            "texto": "Processo finalizado no fluxo DU.",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "id": "7f322478-9f9b-4c18-9f9b-274ec4fc4b96",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-22T17:04:37.777Z"
+          },
+          {
+            "texto": "Processo reativado para Em Andamento.",
+            "id": "dc76e410-67d8-451a-9d9d-4b2c5df9891a",
+            "autorId": "K5YJgdA8zwZ4mQx2AUUWbJPBKHk2",
+            "autor": "Ten Becker",
+            "timestamp": "2026-04-22T17:10:07.407Z"
+          }
+        ]
+      },
+      {
+        "id": "zgzzMdJvVk0xZpoGurez",
+        "historico": [
+          {
+            "texto": "Processo Cadastrado por Ten Portela.",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "04ffca77-faed-4d4d-85e9-47d24446233d",
+            "autor": "Ten Portela",
+            "timestamp": "2026-04-23T14:35:30.564Z"
+          },
+          {
+            "timestamp": "2026-04-23T15:26:32.776Z",
+            "texto": "Processo distribuído para Ten Tamires",
+            "id": "539757da-e741-44f5-a962-f684f6d51f30",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "autor": "Maj Miguel"
+          },
+          {
+            "autor": "Ten Tamires",
+            "id": "3bd7ce6f-8f95-4f07-afc5-274081d42a27",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "texto": "Militar Cia Cmdo CMA. DIEx para Base. Chem assina.",
+            "timestamp": "2026-04-23T17:22:14.367Z"
+          },
+          {
+            "id": "94d31d1c-840c-4ae2-a49f-8fa69e04f526",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "autor": "Ten Tamires",
+            "timestamp": "2026-04-23T17:23:01.827Z"
+          },
+          {
+            "timestamp": "2026-04-27T17:20:07.834Z",
+            "autor": "Maj Miguel",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "cc1fdf36-dc81-4a92-ab58-cb63ac94a331",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM."
+          }
+        ]
+      },
+      {
+        "id": "zlMuIUJcM0SKd2wEdKKA",
+        "historico": [
+          {
+            "id": "4a05cbf3-fe51-4416-b239-4a10ce34feaf",
+            "autorId": "iYNhCMp5mRR4cesFptg3ugTY0dI3",
+            "texto": "Processo Cadastrado por Ten Tamires.",
+            "autor": "Ten Tamires",
+            "timestamp": "2026-04-23T15:27:51.808Z"
+          },
+          {
+            "timestamp": "2026-04-23T15:57:44.452Z",
+            "id": "0366d775-8537-43a9-b024-ab1a189c92da",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "texto": "Processo distribuído para Ten Portela",
+            "autor": "Maj Miguel"
+          },
+          {
+            "timestamp": "2026-04-23T20:06:11.519Z",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "c06b4620-cd00-462c-879c-f618cd22f443",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "autor": "Ten Portela"
+          },
+          {
+            "timestamp": "2026-04-23T20:07:35.125Z",
+            "autor": "Ten Portela",
+            "texto": "Demanda já havia sido solicitada pela Ten Becker, por meio do DIEx nº 1491-Asse Ap As Jurd Cmdo/Cmdo 12ª RM, enviado em 19/02/2026. Contudo, até o presente momento não obtivemos reposta. Reiterei a solicitação.",
+            "id": "602619a6-716b-4777-8cb9-a5e8dc3f0fb8",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2"
+          },
+          {
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "34e418ac-4901-4189-9f74-2fd1e8e67182",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-23T20:04:26.225Z"
+          },
+          {
+            "timestamp": "2026-04-24T11:46:15.492Z",
+            "autor": "Maj Miguel",
+            "texto": "Processo devolvido à mesa do assessor.",
+            "id": "4a672446-5359-43f4-b96f-5b4a96ee8db6",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2"
+          },
+          {
+            "id": "fd51ceb2-3f1d-4dfd-895d-d813a7ff6c70",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "texto": "DIEx-4321-Asse Ap As Jurd Cmdo/Cmdo 12ª RM, enviado em 24/04/2026.",
+            "autor": "Ten Portela",
+            "timestamp": "2026-04-27T14:18:06.337Z"
+          },
+          {
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "id": "a5d48802-4f3c-4586-87ae-faa5ab5001fb",
+            "texto": "DIEx nº 2754-AAAJur/EM Esp CMA/EM CMA, solicitando cópia da resposta.",
+            "autor": "Ten Portela",
+            "timestamp": "2026-04-27T14:22:49.249Z"
+          },
+          {
+            "autor": "Ten Portela",
+            "id": "172f2e52-5b9d-427a-b2ea-01f7c520f4b8",
+            "autorId": "5UVLndnoghamhct6gQto7nZpdYM2",
+            "texto": "Assessor enviou diligência para decisão da chefia.",
+            "timestamp": "2026-04-27T19:00:25.322Z"
+          },
+          {
+            "autor": "Maj Miguel",
+            "texto": "Chefia aprovou e encaminhou para assinatura do CHEM.",
+            "id": "80f3bdf2-e1cd-4baa-8540-880778ad9cea",
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "timestamp": "2026-04-27T18:56:48.410Z"
+          },
+          {
+            "autorId": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+            "id": "6b208f14-dc12-4ff1-bcc4-20dfae7b0b3e",
+            "texto": "Diligência emitida. Aguardando resposta da seção/OM.",
+            "autor": "Maj Miguel",
+            "timestamp": "2026-04-27T18:57:24.714Z"
+          }
+        ]
+      }
+    ],
+    "eventosCalendario": [
+      {
+        "id": "MUHNeT98DBpggD0FuWRB",
+        "descricao": "https://videoconferencia.7cta.eb.mil.br/capacitacaoassessoria2\n281530 ABR 26",
+        "criadoEm": {
+          "type": "firestore/timestamp/1.0",
+          "seconds": 1777311690,
+          "nanoseconds": 414000000
+        },
+        "titulo": "2ª Videoconferência de 2026 com os Chefes das Assessorias de Apoio para AssuntosJurídicos",
+        "tipo": "reuniao",
+        "data": "2026-04-28",
+        "criadoPor": "Maj LUIZ GUSTAVO MIGUEL DE ANDRADE",
+        "setor": "DU"
+      }
+    ],
+    "configuracoesSistema": [
+      {
+        "id": "layoutPrincipal",
+        "duBoardColumns": [
+          {
+            "enabled": true,
+            "order": 10,
+            "id": "aguardando_resposta",
+            "label": "📩 Aguardando Resposta"
+          },
+          {
+            "label": "📥 Aguardando Distribuicao",
+            "id": "aguardando_distribuicao",
+            "order": 20,
+            "enabled": true
+          }
+        ],
+        "prazoConselhoInicialDias": 30,
+        "newProcessLabel": "Novo Processo",
+        "paEmAndamentoColumns": [
+          {
+            "enabled": true,
+            "order": 10,
+            "id": "sindicancia",
+            "label": "📗 Sindicancias"
+          },
+          {
+            "enabled": true,
+            "order": 20,
+            "id": "ipm",
+            "label": "📘 IPM"
+          },
+          {
+            "id": "conselho",
+            "label": "⚖ Conselhos",
+            "enabled": true,
+            "order": 30
+          }
+        ],
+        "prazoIPMInicialDias": 40,
+        "sidebarSubtitle": "12ª Região Militar",
+        "dashboardTitle": "Painel de Controle",
+        "duFlowActions": [
+          {
+            "label": "Enviar Diligência para a Chefia",
+            "toState": "CHEFIA_DILIGENCIA",
+            "id": "DU_ENVIAR_CHEFIA_DILIGENCIA",
+            "role": "assessor_du",
+            "order": 10,
+            "tipo": "ambos",
+            "enabled": true,
+            "fromState": "MESA_ASSESSOR"
+          },
+          {
+            "role": "chefe_assjur",
+            "label": "Assinar DIEx e Iniciar Prazo",
+            "toState": "AGUARDANDO_RESPOSTA",
+            "id": "DU_CHEFIA_ASSINAR_DIEX",
+            "order": 20,
+            "tipo": "INTERNO",
+            "enabled": true,
+            "fromState": "CHEFIA_DILIGENCIA"
+          },
+          {
+            "role": "chefe_assjur",
+            "label": "Aprovar e Encaminhar para CHEM",
+            "toState": "AGUARDANDO_CHEM_DILIGENCIA",
+            "id": "DU_CHEFIA_APROVAR_DILIGENCIA_EXTERNO",
+            "order": 30,
+            "tipo": "EXTERNO",
+            "enabled": true,
+            "fromState": "CHEFIA_DILIGENCIA"
+          },
+          {
+            "toState": "MESA_ASSESSOR",
+            "id": "DU_CHEFIA_DEVOLVER",
+            "label": "Devolver ao Assessor",
+            "role": "chefe_assjur",
+            "fromState": "CHEFIA_DILIGENCIA",
+            "enabled": true,
+            "tipo": "ambos",
+            "order": 40
+          },
+          {
+            "id": "DU_REGISTRAR_SAIDA",
+            "toState": "AGUARDANDO_RESPOSTA",
+            "label": "Registrar Saída e Iniciar Prazo",
+            "role": "assessor_du",
+            "fromState": "AGUARDANDO_CHEM_DILIGENCIA",
+            "enabled": true,
+            "tipo": "EXTERNO",
+            "order": 50
+          },
+          {
+            "fromState": "AGUARDANDO_RESPOSTA",
+            "enabled": true,
+            "order": 60,
+            "tipo": "ambos",
+            "role": "assessor_du",
+            "toState": "CRIANDO_REITERACAO",
+            "id": "DU_GERAR_COBRANCA",
+            "label": "Gerar Cobrança Oficial"
+          },
+          {
+            "enabled": true,
+            "fromState": "CRIANDO_REITERACAO",
+            "tipo": "ambos",
+            "order": 70,
+            "role": "assessor_du",
+            "toState": "CHEFIA_DILIGENCIA",
+            "id": "DU_ENVIAR_COBRANCA_CHEFIA",
+            "label": "Enviar Cobrança para a Chefia"
+          },
+          {
+            "fromState": "AGUARDANDO_RESPOSTA",
+            "enabled": true,
+            "order": 80,
+            "tipo": "ambos",
+            "role": "chefe_assjur",
+            "id": "DU_REGISTRAR_RESPOSTA",
+            "toState": "MESA_ASSESSOR",
+            "label": "Registrar Resposta Recebida"
+          },
+          {
+            "id": "DU_ENVIAR_CHEFIA_DEFESA",
+            "toState": "CHEFIA_DEFESA",
+            "label": "Enviar Defesa para a Chefia",
+            "role": "assessor_du",
+            "fromState": "MESA_ASSESSOR",
+            "enabled": true,
+            "order": 90,
+            "tipo": "ambos"
+          },
+          {
+            "enabled": true,
+            "fromState": "CHEFIA_DEFESA",
+            "order": 100,
+            "tipo": "ambos",
+            "toState": "AGUARDANDO_CHEM_DEFESA",
+            "id": "DU_CHEFIA_APROVAR_DEFESA",
+            "label": "Aprovar Defesa e Encaminhar CHEM",
+            "role": "chefe_assjur"
+          },
+          {
+            "toState": "APTO_FINALIZAR",
+            "id": "DU_REGISTRAR_DOC_FINAL",
+            "label": "Registrar Documento Final",
+            "role": "assessor_du",
+            "enabled": true,
+            "fromState": "AGUARDANDO_CHEM_DEFESA",
+            "tipo": "ambos",
+            "order": 110
+          },
+          {
+            "label": "Finalizar Processo DU",
+            "id": "DU_FINALIZAR",
+            "toState": "APTO_FINALIZAR",
+            "role": "ambos",
+            "order": 120,
+            "tipo": "ambos",
+            "fromState": "APTO_FINALIZAR",
+            "enabled": true
+          }
+        ],
+        "prazoConselhoProrrogacaoDias": 20,
+        "updatedByName": "Maj Miguel",
+        "dashboardDescription": "Mesa de trabalho e acompanhamento dos processos em andamento",
+        "paFlowActions": [
+          {
+            "track": "padrao",
+            "enabled": true,
+            "fromState": "MESA_ASSESSOR_NOVO",
+            "order": 10,
+            "id": "PA_ENVIAR_CHEFIA",
+            "toState": "AGUARDANDO_CHEFIA",
+            "label": "Enviar para a Chefia da AssJur",
+            "role": "assessor_pa"
+          },
+          {
+            "order": 10,
+            "enabled": true,
+            "fromState": "C_MEMORIA",
+            "track": "conselho",
+            "role": "assessor_pa",
+            "label": "Elaborar Memoria e Enviar a Chefia",
+            "toState": "C_PORTARIA",
+            "id": "C_ENVIAR_MEMORIA"
+          },
+          {
+            "role": "chefe_assjur",
+            "label": "Confirmar Assinatura e Devolver",
+            "toState": "AGUARDANDO_PRAZO",
+            "id": "PA_CHEFIA_CONFIRMA_ASSINATURA",
+            "order": 20,
+            "fromState": "AGUARDANDO_CHEFIA",
+            "enabled": true,
+            "track": "padrao"
+          },
+          {
+            "role": "chefe_assjur",
+            "id": "C_CHEFIA_ASSINA_PORTARIA",
+            "toState": "C_EM_CURSO",
+            "label": "Confirmar Assinatura e Instalar",
+            "track": "conselho",
+            "fromState": "C_PORTARIA",
+            "enabled": true,
+            "order": 20
+          },
+          {
+            "role": "assessor_pa",
+            "label": "Confirmar Data e Iniciar Prazo",
+            "toState": "EM_CURSO",
+            "id": "PA_INICIAR_PRAZO",
+            "order": 30,
+            "track": "padrao",
+            "fromState": "AGUARDANDO_PRAZO",
+            "enabled": true
+          },
+          {
+            "id": "C_ENVIAR_DECISAO_AUT",
+            "toState": "C_DECISAO_AUT_NOMEANTE",
+            "label": "Enviar para Decisao da Autoridade",
+            "role": "assessor_pa",
+            "fromState": "C_EM_CURSO",
+            "track": "conselho",
+            "enabled": true,
+            "order": 30
+          },
+          {
+            "fromState": "EM_CURSO",
+            "track": "padrao",
+            "enabled": true,
+            "order": 40,
+            "id": "PA_ENVIAR_SOLUCAO",
+            "toState": "AGUARDANDO_CHEFIA_SOLUCAO",
+            "label": "Elaborar Solucao e Enviar a Chefia",
+            "role": "assessor_pa"
+          },
+          {
+            "label": "Exarar Decisao e Devolver ao Assessor",
+            "toState": "C_INTIMACAO_ACUSADO",
+            "id": "C_AUT_NOMEANTE_DECIDE",
+            "role": "chefe_assjur",
+            "order": 40,
+            "fromState": "C_DECISAO_AUT_NOMEANTE",
+            "track": "conselho",
+            "enabled": true
+          },
+          {
+            "track": "padrao",
+            "fromState": "AGUARDANDO_CHEFIA_SOLUCAO",
+            "enabled": true,
+            "order": 50,
+            "id": "PA_CHEFIA_CONFIRMA_DESPACHO",
+            "toState": "APTO_FINALIZAR",
+            "label": "Confirmar Despacho e Devolver",
+            "role": "chefe_assjur"
+          },
+          {
+            "enabled": true,
+            "track": "conselho",
+            "fromState": "C_INTIMACAO_ACUSADO",
+            "order": 50,
+            "id": "C_RECURSO_SIM",
+            "toState": "C_ENCAMINHAMENTO_CMTEX",
+            "label": "Acusado apresentou recurso",
+            "role": "assessor_pa"
+          },
+          {
+            "label": "Registrar Despachos e Finalizar",
+            "id": "PA_FINALIZAR_PADRAO",
+            "toState": "CONCLUIDO",
+            "role": "assessor_pa",
+            "order": 60,
+            "track": "padrao",
+            "fromState": "APTO_FINALIZAR",
+            "enabled": true
+          },
+          {
+            "order": 60,
+            "enabled": true,
+            "track": "conselho",
+            "fromState": "C_ENCAMINHAMENTO_CMTEX",
+            "role": "assessor_pa",
+            "label": "Acusado nao apresentou recurso",
+            "toState": "C_DECISAO_CMTEX",
+            "id": "C_RECURSO_NAO"
+          },
+          {
+            "role": "assessor_pa",
+            "label": "Confirmar Remessa ao Cmt Ex",
+            "id": "C_CONFIRMAR_REMESSA",
+            "toState": "CONCLUIDO",
+            "order": 70,
+            "enabled": true,
+            "fromState": "C_DECISAO_CMTEX",
+            "track": "conselho"
+          },
+          {
+            "fromState": "CONCLUIDO",
+            "track": "conselho",
+            "enabled": true,
+            "order": 80,
+            "role": "chefe_assjur",
+            "toState": "CONCLUIDO",
+            "id": "C_REGISTRAR_DECISAO_FINAL",
+            "label": "Registrar Decisao Final e Encerrar"
+          }
+        ],
+        "columnTabs": [
+          {
+            "scope": "PA",
+            "order": 10,
+            "enabled": true,
+            "label": "Em Andamento",
+            "id": "andamento"
+          },
+          {
+            "label": "Em Andamento",
+            "id": "andamento",
+            "scope": "DU",
+            "order": 10,
+            "enabled": true
+          },
+          {
+            "id": "atraso",
+            "label": "Em Atraso",
+            "enabled": true,
+            "order": 20,
+            "scope": "PA"
+          },
+          {
+            "id": "concluidos",
+            "label": "Concluidos",
+            "enabled": true,
+            "scope": "DU",
+            "order": 20
+          },
+          {
+            "order": 30,
+            "scope": "PA",
+            "enabled": true,
+            "label": "Concluidos",
+            "id": "concluidos"
+          }
+        ],
+        "origensDUDocumentos": [
+          "SAPIENS",
+          "CONJUR-EB",
+          "Email",
+          "MPF",
+          "Justiça Federal",
+          "Justiça Estadual",
+          "Outros"
+        ],
+        "prazoSindicanciaProrrogacaoDias": 20,
+        "footerText": "Maj Cav Miguel — AssJur Flow · 12ª Região Militar · Todos os direitos reservados.",
+        "assuntosDUPrincipais": [
+          "Carreira e Remuneração",
+          "Disciplina e Justiça",
+          "Licitações e Contratos",
+          "Movimentação e Transferência",
+          "Requerimento EXTRAJUDICIAL",
+          "Saúde e FUSEx",
+          "SFPC / CAC"
+        ],
+        "updatedAt": "2026-04-27T17:06:38.455Z",
+        "sidebarTitle": "AssJur Flow",
+        "updatedByEmail": "miguelss3@yahoo.com.br",
+        "assuntosPASindicancia": [
+          "Apuração de Fato",
+          "Dano ao Erário",
+          "Despesa de Exercícios Anteriores",
+          "Exame de Pagamento",
+          "FUSEx",
+          "Transgressão Disciplinar",
+          "OUTROS"
+        ],
+        "prazoIPMProrrogacaoDias": 20,
+        "prazoSindicanciaInicialDias": 30
+      }
+    ]
+  },
+  "problemas": {
+    "sincronizacaoAuth": [],
+    "uidsMissing": [],
+    "emailsInvalidos": [],
+    "emailsDuplicados": [],
+    "setoresInvalidos": [],
+    "rolesInvalidas": [],
+    "referenciasBroken": [],
+    "camposObrigatorios": [
+      {
+        "colecao": "usuarios",
+        "documento": "4QNOJq8qcETuQ3wH4afYOfuE9NN2",
+        "campo": "role"
+      }
+    ],
+    "documentosOrfaos": [],
+    "inconsistenciasSetor": [],
+    "usuariosInativosComDados": [],
+    "processosComResponsavelInvalido": [],
+    "distribuicoesOrfas": [],
+    "mensagensOrfas": []
+  }
+}
