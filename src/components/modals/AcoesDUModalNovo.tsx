@@ -404,8 +404,13 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       toast.error("Informe o número assinado pelo CHEM.");
       return;
     }
+    if (!dataPrazo.trim()) {
+      toast.error("Defina o prazo para resposta antes de iniciar.");
+      return;
+    }
     void avancarFluxo("AGUARDANDO_RESPOSTA", {
       numeroSaida: numero,
+      dataPrazo: dataPrazo.trim(),
       acaoPrincipal: "DILIGENCIA",
       tipoDiligencia: "EXTERNO",
     });
@@ -430,18 +435,36 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
 
   const renderRegistroNumeroAssinadoChem = () => (
     <div className="space-y-4 animate-in fade-in">
-      <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 text-center">
-        <FileSignature className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-        <h4 className="font-bold text-emerald-900 text-sm">Documento Assinado pelo CHEM</h4>
-        <p className="text-xs text-emerald-700 mb-3">Insira o número de saída (DIEx Externo / Ofício):</p>
-        <input
-          type="text"
-          aria-label="Número assinado pelo CHEM"
-          value={numeroSaida}
-          onChange={(e) => { setNumeroSaida(e.target.value); setNumeroSaidaSalvo(false); }}
-          placeholder="Ex: Ofício nº 45/2026"
-          className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none"
-        />
+      <div className="bg-emerald-50 p-5 rounded-xl border border-emerald-200 space-y-4">
+        <div className="text-center">
+          <FileSignature className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+          <h4 className="font-bold text-emerald-900 text-sm">Documento Assinado pelo CHEM</h4>
+          <p className="text-xs text-emerald-700 mb-3">Insira o número de saída (DIEx Externo / Ofício):</p>
+          <input
+            type="text"
+            aria-label="Número assinado pelo CHEM"
+            value={numeroSaida}
+            onChange={(e) => { setNumeroSaida(e.target.value); setNumeroSaidaSalvo(false); }}
+            placeholder="Ex: Ofício nº 45/2026"
+            className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-emerald-800 mb-1 flex items-center gap-1">
+            <CalendarIcon className="w-3.5 h-3.5" />
+            Prazo para Resposta
+          </label>
+          <input
+            type="date"
+            aria-label="Prazo para resposta"
+            value={dataPrazo}
+            onChange={(e) => setDataPrazo(e.target.value)}
+            className="w-full p-2.5 border rounded-lg text-sm text-emerald-900 outline-none"
+          />
+          {!dataPrazo && (
+            <p className="text-[11px] text-amber-600 mt-1">Nenhum prazo definido ainda. Defina antes de iniciar.</p>
+          )}
+        </div>
       </div>
       {/* Passo 1: Registrar o número */}
       <button
@@ -453,7 +476,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       </button>
       {/* Passo 2: Iniciar o prazo — só ativo após registrar */}
       <button
-        disabled={!numeroSaidaSalvo}
+        disabled={!numeroSaidaSalvo || !dataPrazo.trim()}
         onClick={iniciarPrazoAposRegistro}
         className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl disabled:bg-emerald-300"
       >
