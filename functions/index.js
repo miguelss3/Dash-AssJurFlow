@@ -63,12 +63,46 @@ async function resolveTargetUser(data) {
   const email = String(data && data.email ? data.email : "").trim().toLowerCase();
 
   if (uid) {
-    return { uid, userRecord: await auth.getUser(uid) };
+    try {
+      return { uid, userRecord: await auth.getUser(uid) };
+    } catch (e) {
+      const code = String(e && e.code ? e.code : "");
+      const uidInvalidoOuAusente = code === "auth/user-not-found" || code === "auth/invalid-uid";
+
+      // Compatibilidade com cadastros legados: alguns documentos usam ID diferente do UID do Auth.
+      // Se o UID informado não existir no Authentication, tenta localizar pelo e-mail.
+      if (uidInvalidoOuAusente && email) {
+        try {
+          const userRecord = await auth.getUserByEmail(email);
+          return { uid: userRecord.uid, userRecord };
+        } catch (emailErr) {
+          const emailCode = String(emailErr && emailErr.code ? emailErr.code : "");
+          if (emailCode === "auth/user-not-found") {
+            throw new Error("user-not-found");
+          }
+          throw emailErr;
+        }
+      }
+
+      if (uidInvalidoOuAusente) {
+        throw new Error("user-not-found");
+      }
+
+      throw e;
+    }
   }
 
   if (email) {
-    const userRecord = await auth.getUserByEmail(email);
-    return { uid: userRecord.uid, userRecord };
+    try {
+      const userRecord = await auth.getUserByEmail(email);
+      return { uid: userRecord.uid, userRecord };
+    } catch (e) {
+      const code = String(e && e.code ? e.code : "");
+      if (code === "auth/user-not-found") {
+        throw new Error("user-not-found");
+      }
+      throw e;
+    }
   }
 
   throw new Error("invalid-argument: UID ou email do usuário são obrigatórios.");
@@ -136,6 +170,10 @@ exports.deleteUserAccount = functions.region("us-central1").https.onRequest(asyn
       ({ uid, userRecord } = await resolveTargetUser(data));
     } catch (e) {
       console.error("resolveTargetUser failed:", e.message, "data:", JSON.stringify(data));
+      if (String(e.message || "") === "user-not-found") {
+        res.status(404).json({ error: "user-not-found", message: "Usuário não encontrado no Firebase Authentication." });
+        return;
+      }
       res.status(400).json({ error: "invalid-argument", message: e.message || "UID ou email inválidos." });
       return;
     }
