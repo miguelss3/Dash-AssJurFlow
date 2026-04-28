@@ -102,6 +102,7 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
   const [tipoDiligencia, setTipoDiligencia] = useState<TipoDiligencia>("INTERNO");
   const [dataPrazo, setDataPrazo] = useState("");
   const [numeroSaida, setNumeroSaida] = useState("");
+  const [numeroSaidaSalvo, setNumeroSaidaSalvo] = useState(false);
   const [numeroRecebido, setNumeroRecebido] = useState("");
   const [numeroDocFinal, setNumeroDocFinal] = useState("");
   const [reiteracoes, setReiteracoes] = useState(0);
@@ -208,6 +209,9 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
       reiteracoes?: number;
       acaoPrincipal?: AcaoPrincipal;
       tipoDiligencia?: TipoDiligencia;
+      statusOverride?: string;
+      descricaoOverride?: string;
+      responsavelOverride?: string;
     },
   ) => {
     if (!processoId || !user) return;
@@ -282,16 +286,23 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
         registradoPorNome: autorMilitar,
       };
 
-      const descricao = descricaoPorSituacao[proximaSituacao];
+      const descricao = extras?.descricaoOverride || descricaoPorSituacao[proximaSituacao];
+      const status = extras?.statusOverride || statusPorSituacao[proximaSituacao];
 
-      await atualizarComSnapshotDU({
+      const patchProcesso: Record<string, unknown> = {
         pedidoSubsidios: pedidoSubsidiosPatch,
         respostaDU: respostaPatch,
-        status: statusPorSituacao[proximaSituacao],
+        status,
         descricao,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
-      }, dataAtual as Record<string, unknown>);
+      };
+
+      if (extras?.responsavelOverride !== undefined) {
+        patchProcesso.responsavel = extras.responsavelOverride;
+      }
+
+      await atualizarComSnapshotDU(patchProcesso, dataAtual as Record<string, unknown>);
 
       await registrarHistorico(descricao);
 
@@ -358,17 +369,62 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
     && tipoDiligencia === "EXTERNO"
     && !numeroSaida.trim();
 
-  const registrarNumeroAssinadoChem = () => {
+  const fluxoExternoPendenteRegistroRecebido =
+    acaoPrincipal === "DILIGENCIA"
+    && tipoDiligencia === "EXTERNO"
+    && !!numeroSaida.trim()
+    && !numeroRecebido.trim()
+    && situacaoFluxo === "MESA_ASSESSOR";
+
+  const salvarNumeroDaAssinatura = async () => {
+    const numero = numeroSaida.trim();
+    if (!numero || !processoId) {
+      toast.error("Informe o número do documento.");
+      return;
+    }
+    try {
+      const processoRef = doc(db, "processos", processoId);
+      const snap = await getDoc(processoRef);
+      const pedidoAtual = snap.exists() ? (snap.data()?.pedidoSubsidios || {}) : {};
+      await updateDoc(processoRef, {
+        "pedidoSubsidios": { ...pedidoAtual, numeroSaida: numero, numeroDiex: numero },
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+      });
+      setNumeroSaidaSalvo(true);
+      toast.success("Número registrado. Agora inicie o prazo quando estiver pronto.");
+    } catch {
+      toast.error("Falha ao salvar o número.");
+    }
+  };
+
+  const iniciarPrazoAposRegistro = () => {
     const numero = numeroSaida.trim();
     if (!numero) {
       toast.error("Informe o número assinado pelo CHEM.");
       return;
     }
-
     void avancarFluxo("AGUARDANDO_RESPOSTA", {
       numeroSaida: numero,
       acaoPrincipal: "DILIGENCIA",
       tipoDiligencia: "EXTERNO",
+    });
+  };
+
+  const registrarDocumentoRecebidoEEnviarDistribuicao = () => {
+    const numero = numeroRecebido.trim();
+    if (!numero) {
+      toast.error("Informe o número do documento recebido.");
+      return;
+    }
+
+    void avancarFluxo("MESA_ASSESSOR", {
+      numeroRecebido: numero,
+      acaoPrincipal: "DILIGENCIA",
+      tipoDiligencia: "EXTERNO",
+      statusOverride: "Aguardando Distribuição",
+      responsavelOverride: "Sem responsável",
+      descricaoOverride: "Documento externo registrado pelo assessor. Processo aguardando distribuição.",
     });
   };
 
@@ -382,23 +438,34 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
           type="text"
           aria-label="Número assinado pelo CHEM"
           value={numeroSaida}
-          onChange={(e) => setNumeroSaida(e.target.value)}
+          onChange={(e) => { setNumeroSaida(e.target.value); setNumeroSaidaSalvo(false); }}
           placeholder="Ex: Ofício nº 45/2026"
           className="w-full p-3 border rounded-lg text-center font-bold text-emerald-900 outline-none"
         />
       </div>
+      {/* Passo 1: Registrar o número */}
       <button
-        disabled={!numeroSaida.trim()}
-        onClick={registrarNumeroAssinadoChem}
+        disabled={!numeroSaida.trim() || numeroSaidaSalvo}
+        onClick={() => { void salvarNumeroDaAssinatura(); }}
+        className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl disabled:bg-blue-300"
+      >
+        {numeroSaidaSalvo ? "✓ Número Registrado" : "Registrar Número do Documento"}
+      </button>
+      {/* Passo 2: Iniciar o prazo — só ativo após registrar */}
+      <button
+        disabled={!numeroSaidaSalvo}
+        onClick={iniciarPrazoAposRegistro}
         className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl disabled:bg-emerald-300"
       >
-        Registrar Saída e Iniciar Prazo
-      </button>      <button
+        Iniciar Prazo
+      </button>
+      <button
         onClick={finalizarProcesso}
         className="w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-xl transition-colors"
       >
         Finalizar Processo
-      </button>    </div>
+      </button>
+    </div>
   );
 
   const renderVisaoAssessor = () => {
@@ -413,6 +480,32 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
                   Este fluxo externo retornou para a mesa com necessidade de registrar o número assinado pelo CHEM.
                 </p>
                 <div className="mt-3">{renderRegistroNumeroAssinadoChem()}</div>
+              </div>
+            )}
+
+            {fluxoExternoPendenteRegistroRecebido && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <h4 className="text-sm font-bold text-amber-900">Registrar Documento Recebido</h4>
+                <p className="mt-1 text-[11px] text-amber-800">
+                  Informe o número do documento recebido para encaminhar o processo para aguardando distribuição.
+                </p>
+                <div className="mt-3 space-y-2">
+                  <input
+                    type="text"
+                    aria-label="Número do documento recebido"
+                    value={numeroRecebido}
+                    onChange={(e) => setNumeroRecebido(e.target.value)}
+                    placeholder="Ex: Ofício/DIEx recebido"
+                    className="w-full p-2.5 border rounded-lg outline-none text-sm"
+                  />
+                  <button
+                    disabled={!numeroRecebido.trim()}
+                    onClick={registrarDocumentoRecebidoEEnviarDistribuicao}
+                    className="w-full bg-amber-600 disabled:bg-amber-300 text-white font-bold py-2.5 rounded-xl"
+                  >
+                    Registrar e Enviar para Aguardando Distribuição
+                  </button>
+                </div>
               </div>
             )}
 
@@ -693,12 +786,12 @@ export function AcoesDUModalNovo({ open, onOpenChange, processoId, numeroProcess
               <h4 className="font-bold text-amber-900 text-sm mb-3 flex items-center gap-2">
                 <Inbox className="w-4 h-4" /> Entrada de Resposta
               </h4>
-              <label className="text-[11px] font-bold text-amber-900 uppercase">N° do Doc. Recebido:</label>
-              <input type="text" aria-label="Número do documento recebido" value={numeroRecebido} onChange={(e) => setNumeroRecebido(e.target.value)} placeholder="Ex: Oficio/DIEx recebido" className="w-full mt-1 p-2.5 border rounded-lg outline-none text-sm" />
+              <p className="text-[11px] text-amber-800">
+                Devolva ao assessor para que ele registre o número do documento recebido e encaminhe para aguardando distribuição.
+              </p>
             </div>
             <button
-              disabled={!numeroRecebido}
-              onClick={() => avancarFluxo("MESA_ASSESSOR", { numeroRecebido })}
+              onClick={() => avancarFluxo("MESA_ASSESSOR")}
               className="w-full bg-amber-600 disabled:bg-amber-300 text-white font-bold py-3 rounded-xl flex justify-center gap-2 text-sm"
             >
               <ArrowRightCircle className="w-4 h-4" /> Devolver ao Assessor
