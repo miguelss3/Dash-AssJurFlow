@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { collection, getDocs, updateDoc, doc, deleteField, setDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword, getAuth, updateEmail, type Auth } from "firebase/auth";
 import { deleteApp, initializeApp } from "firebase/app";
-import { db, auth } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { db, auth, functions } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -251,21 +252,19 @@ export function GestaoEquipe() {
     if (!confirmado) return;
 
     try {
-      await updateDoc(doc(db, "usuarios", usuario.id), {
-        ativo: false,
-        excluidoEm: new Date().toISOString(),
-        excluidoPorUid: uidLogado || null,
-        excluidoPorEmail: auth.currentUser?.email || usuarioLogado?.email || null,
+      const excluirUsuario = httpsCallable<
+        { uid?: string; email?: string; nome?: string },
+        { ok: boolean; uid: string }
+      >(functions, "deleteUserAccount");
+
+      await excluirUsuario({
+        uid: uidUsuario || undefined,
+        email: usuario.email || undefined,
+        nome: usuario.nome || undefined,
       });
+
       await carregarUsuarios();
-      toast.success(
-        `${usuario.nome} foi removido do sistema.`,
-        {
-          description:
-            "Para revogar o acesso de login definitivamente, exclua também o usuário na aba Authentication do Firebase Console.",
-          duration: 8000,
-        }
-      );
+      toast.success(`${usuario.nome} foi removido do sistema e do acesso de login.`);
     } catch (error: unknown) {
       const err = error as { code?: string };
       const codigo = String(err?.code || "");
@@ -275,7 +274,25 @@ export function GestaoEquipe() {
         return;
       }
 
-      toast.error("Erro ao remover usuário. Tente novamente.");
+      // Fallback: inativa no Firestore mesmo se a Cloud Function falhar
+      try {
+        await updateDoc(doc(db, "usuarios", usuario.id), {
+          ativo: false,
+          excluidoEm: new Date().toISOString(),
+          excluidoPorUid: uidLogado || null,
+          excluidoPorEmail: auth.currentUser?.email || usuarioLogado?.email || null,
+        });
+        await carregarUsuarios();
+        toast.warning(
+          `${usuario.nome} foi desativado do sistema.`,
+          {
+            description: "Não foi possível remover o acesso de login automaticamente. Exclua o usuário manualmente no Firebase Console → Authentication.",
+            duration: 10000,
+          }
+        );
+      } catch {
+        toast.error("Erro ao remover usuário. Tente novamente.");
+      }
     }
   }
 
