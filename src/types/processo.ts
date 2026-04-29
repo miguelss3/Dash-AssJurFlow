@@ -13,6 +13,10 @@ export interface PedidoSubsidios {
   tipoDestino?: "interno" | "externo";
   tipoDiligencia?: "INTERNO" | "EXTERNO";
   acaoPrincipal?: "DILIGENCIA" | "DEFESA";
+  // Novo fluxo "Tramitação Livre Vigiada" (DU)
+  assinaturaDestino?: "chefe" | "chem" | "cmt";
+  numeroDocumentoDU?: string;
+  possuiPrazoDU?: boolean;
   secaoInterna?: string;
   omExterna?: string;
   numeroDiex?: string;
@@ -118,6 +122,10 @@ export interface Processo {
   pedidoSubsidios?: PedidoSubsidios;
   respostaDU?: RespostaDU;
   ultimaAcaoFluxo?: UltimaAcaoFluxo;
+  // Campos top-level do novo fluxo DU "Tramitação Livre Vigiada"
+  assinaturaDestino?: "chefe" | "chem" | "cmt";
+  numeroDocumentoDU?: string;
+  possuiPrazoDU?: boolean;
 }
 
 export interface Coluna {

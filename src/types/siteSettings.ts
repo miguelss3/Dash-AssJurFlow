@@ -16,7 +16,7 @@ export interface PAInProgressColumnSetting {
   order: number;
 }
 
-export type DUBoardColumnId = "aguardando_resposta" | "aguardando_distribuicao";
+export type DUBoardColumnId = "aguardando_resposta" | "aguardando_distribuicao" | "aguardando_assinatura";
 
 export interface DUBoardColumnSetting {
   id: DUBoardColumnId;
@@ -70,6 +70,7 @@ export type DUFlowState =
   | "MESA_ASSESSOR"
   | "CHEFIA_DILIGENCIA"
   | "AGUARDANDO_CHEM_DILIGENCIA"
+  | "AGUARDANDO_ASSINATURA"
   | "AGUARDANDO_RESPOSTA"
   | "CRIANDO_REITERACAO"
   | "CHEFIA_DEFESA"
@@ -176,6 +177,12 @@ export const DEFAULT_DU_BOARD_COLUMNS: DUBoardColumnSetting[] = [
     label: "📩 Aguardando Resposta",
     enabled: true,
     order: 10,
+  },
+  {
+    id: "aguardando_assinatura",
+    label: "✍️ Aguardando Assinatura",
+    enabled: true,
+    order: 15,
   },
   {
     id: "aguardando_distribuicao",
@@ -615,7 +622,7 @@ export function normalizarDUBoardColumns(
   const fallbackPorId = new Map<DUBoardColumnId, DUBoardColumnSetting>(
     fallback.map((item) => [item.id, item]),
   );
-  const idsValidos = new Set<DUBoardColumnId>(["aguardando_resposta", "aguardando_distribuicao"]);
+  const idsValidos = new Set<DUBoardColumnId>(["aguardando_resposta", "aguardando_distribuicao", "aguardando_assinatura"]);
 
   if (!Array.isArray(value)) {
     return [...fallback].sort((a, b) => a.order - b.order);
@@ -650,7 +657,7 @@ export function normalizarDUBoardColumns(
     }
   });
 
-  const idsPadrao: DUBoardColumnId[] = ["aguardando_resposta", "aguardando_distribuicao"];
+  const idsPadrao: DUBoardColumnId[] = ["aguardando_resposta", "aguardando_assinatura", "aguardando_distribuicao"];
   idsPadrao.forEach((id, index) => {
     if (!unicasPorId.has(id)) {
       const base = fallbackPorId.get(id) || fallback[index];
@@ -809,6 +816,7 @@ export function normalizarDUFlowActions(
     "MESA_ASSESSOR",
     "CHEFIA_DILIGENCIA",
     "AGUARDANDO_CHEM_DILIGENCIA",
+    "AGUARDANDO_ASSINATURA",
     "AGUARDANDO_RESPOSTA",
     "CRIANDO_REITERACAO",
     "CHEFIA_DEFESA",
