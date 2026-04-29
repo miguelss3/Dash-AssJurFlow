@@ -353,19 +353,19 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       if (ehAdmin) {
         qProcessos = query(
           processosRef,
-          // TEMP: filtro `where("ativo", "==", true)` removido até conclusão da migração.
+          where("ativo", "==", true),
           where("setor", "in", ["DU", "PA"]),
         );
       } else if (setorUsuario) {
         qProcessos = query(
           processosRef,
-          // TEMP: filtro `where("ativo", "==", true)` removido até conclusão da migração.
+          where("ativo", "==", true),
           where("setor", "==", setorUsuario),
         );
       } else {
         qProcessos = query(
           processosRef,
-          // TEMP: filtro `where("ativo", "==", true)` removido até conclusão da migração.
+          where("ativo", "==", true),
           where("userId", "==", firebaseUser.uid),
         );
       }
@@ -409,7 +409,10 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         criadoEm: new Date().toISOString(),
         userId: currentUser.uid,
         userEmail: currentUser.email || "",
-      };
+        // Flag de infraestrutura: todo novo processo nasce ATIVO
+        // (necessária para aparecer no listener filtrado por where("ativo","==",true)).
+        ativo: true,
+      } as Record<string, unknown>;
 
       const novoProcessoLimpo = limparCamposUndefined(novoProcesso);
       const novoDocRef = await addDoc(processosRef, novoProcessoLimpo);
@@ -426,7 +429,15 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
     try {
       const processoRef = doc(db, "processos", id);
 
-      const dadosLimpos = limparCamposUndefined(dados);
+      // Sincroniza a flag de infraestrutura `ativo` com o status quando ele é alterado.
+      // Se o status mudar para "concluido", o processo é arquivado (ativo:false) e some
+      // do listener principal. Qualquer outro status reativa o processo (ativo:true).
+      const dadosComAtivo = dados as Partial<Processo> & { ativo?: boolean };
+      if (Object.prototype.hasOwnProperty.call(dados, "status")) {
+        dadosComAtivo.ativo = dados.status !== "concluido";
+      }
+
+      const dadosLimpos = limparCamposUndefined(dadosComAtivo as Record<string, unknown>);
       if (Object.keys(dadosLimpos).length === 0) return;
 
       await updateDoc(processoRef, dadosLimpos);

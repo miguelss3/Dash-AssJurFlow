@@ -49,7 +49,6 @@ service cloud.firestore {
 
     function canReadProcessData(data) {
       return isSignedIn() && (
-        isAdminUniversal() ||
         data.userId == request.auth.uid ||
         (data.setor in ['DU', 'PA'] && canManageSetor(data.setor))
       );
@@ -82,24 +81,20 @@ service cloud.firestore {
     }
 
     function canUpdateProcess(oldData, newData) {
-      return isSignedIn() && (
-        isAdminUniversal() ||
-        (
-          canManageSetor(oldData.setor) &&
-          oldData.userId == newData.userId &&
-          oldData.userEmail == newData.userEmail &&
-          oldData.setor == newData.setor &&
-          // Endurece update: bloqueia alteração de campos de identidade/origem.
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'userId',
-            'userEmail',
-            'setor',
-            'criadoEm',
-            'criadoPorUid',
-            'criadoPorEmail'
-          ])
-        )
-      );
+      return isSignedIn() &&
+        canManageSetor(oldData.setor) &&
+        oldData.userId == newData.userId &&
+        oldData.userEmail == newData.userEmail &&
+        oldData.setor == newData.setor &&
+        // Endurece update: bloqueia alteração de campos de identidade/origem.
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'userId',
+          'userEmail',
+          'setor',
+          'criadoEm',
+          'criadoPorUid',
+          'criadoPorEmail'
+        ]);
     }
 
     function canDeleteProcess(oldData) {

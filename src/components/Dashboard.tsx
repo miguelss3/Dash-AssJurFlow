@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -8,6 +9,18 @@ import {
   Inbox,
   BarChart2,
 } from "lucide-react";
+import {
+  collection,
+  getCountFromServer,
+  getDocs,
+  limit,
+  orderBy,
+  query,
+  where,
+  type QueryConstraint,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth, isAdmin } from "@/hooks/useAuth";
 import type { Processo, FiltroPrazo } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
 
@@ -17,9 +30,66 @@ interface Props {
   onFiltroChange: (f: FiltroPrazo) => void;
 }
 
+interface ServerStats {
+  totalConcluidos: number;
+  finalizadosMes: number;
+  carregando: boolean;
+}
+
+const STATS_INICIAIS: ServerStats = {
+  totalConcluidos: 0,
+  finalizadosMes: 0,
+  carregando: true,
+};
+
+/**
+ * Converte com segurança qualquer formato de data vindo do Firestore.
+ * Aceita Timestamp nativo (com .toDate()), objetos { seconds, nanoseconds },
+ * Date instância ou String ISO. Retorna null se não conseguir converter.
+ */
+function toDateSafe(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+
+  // Firestore Timestamp (cliente SDK)
+  if (typeof value === "object" && value !== null) {
+    const maybeTs = value as { toDate?: () => Date; seconds?: number };
+    if (typeof maybeTs.toDate === "function") {
+      try {
+        const d = maybeTs.toDate();
+        return Number.isNaN(d.getTime()) ? null : d;
+      } catch {
+        /* cai pro próximo fallback */
+      }
+    }
+    if (typeof maybeTs.seconds === "number") {
+      return new Date(maybeTs.seconds * 1000);
+    }
+  }
+
+  if (typeof value === "string") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
+}
+
+function ehDoMesAtual(value: unknown, ref: Date): boolean {
+  const d = toDateSafe(value);
+  if (!d) return false;
+  return d.getUTCFullYear() === ref.getUTCFullYear() && d.getUTCMonth() === ref.getUTCMonth();
+}
+
 export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
-  const ativos = processos.filter((p) => p.status !== "concluido");
-  const ativosDUFatal = ativos.filter((p) => {
+  const { user } = useAuth();
+  const ehAdmin = isAdmin(user);
+  const setorUsuario = String(user?.setor || "").trim().toUpperCase();
+  const escopoSetor =
+    !ehAdmin && (setorUsuario === "DU" || setorUsuario === "PA") ? setorUsuario : null;
+
+  // ---------- KPIs de PRAZO (client-side, sobre os ATIVOS recebidos via prop) ----------
+  const ativosDUFatal = processos.filter((p) => {
     const setor = (p.setor || p.tipo || "").toString().toUpperCase();
     return setor === "DU" && Boolean(p.prazoFatal);
   });
@@ -29,32 +99,109 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
     const s = statusPrazo(p.prazoFatal);
     return s === "today" || s === "soon";
   }).length;
-  const concluidos = processos.filter((p) => p.status === "concluido").length;
-  const total = processos.length;
-  const indiceResolutividade =
-    total > 0 ? Math.round((concluidos / total) * 100) : 0;
 
-  const totalDU = processos.filter((p) => p.tipo === "DU").length;
-  const totalPA = processos.filter((p) => p.tipo === "PA").length;
-  const taxaConclusao = total > 0 ? Math.round((concluidos / total) * 100) : 0;
-
-  const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
-  const mesNome = now.toLocaleString("pt-BR", { month: "long", year: "numeric" });
-
-  const isCurrentMonth = (dateStr?: string) => {
-    if (!dateStr) return false;
-    const d = new Date(dateStr);
-    return !Number.isNaN(d.getTime()) && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  };
-
-  const processosMes = processos.filter((p) => isCurrentMonth(p.criadoEm)).length;
-  const finalizadosMes = processos.filter(
-    (p) => p.status === "concluido" && isCurrentMonth(p.atualizadoEm),
+  // ---------- Contagem por setor a partir dos ATIVOS (props) ----------
+  const ativosDU = processos.filter(
+    (p) => (p.setor || p.tipo || "").toString().toUpperCase() === "DU",
   ).length;
+  const ativosPA = processos.filter(
+    (p) => (p.setor || p.tipo || "").toString().toUpperCase() === "PA",
+  ).length;
+  const acervoAtivo = processos.length;
+
+  // ---------- Entradas no mês: deriva da prop, lidando com Timestamp OU String ISO ----------
+  const mesRef = useMemo(() => new Date(), []);
+  const criadosMes = useMemo(
+    () =>
+      processos.filter((p) => {
+        // pode existir tanto `criadoEm` (novo) quanto `dataEntrada` (legado)
+        return (
+          ehDoMesAtual(p.criadoEm, mesRef) ||
+          ehDoMesAtual((p as unknown as { dataEntrada?: unknown }).dataEntrada, mesRef)
+        );
+      }).length,
+    [processos, mesRef],
+  );
+
+  const mesNome = useMemo(
+    () => mesRef.toLocaleString("pt-BR", { month: "long", year: "numeric" }),
+    [mesRef],
+  );
+
+  // ---------- Estatísticas SERVIDOR (concluídos = ativo:false) ----------
+  const [stats, setStats] = useState<ServerStats>(STATS_INICIAIS);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelado = false;
+
+    const carregar = async () => {
+      const processosRef = collection(db, "processos");
+
+      // Escopo por setor (admin → DU+PA; usuário comum → seu setor)
+      const escopoBase: QueryConstraint[] = escopoSetor
+        ? [where("setor", "==", escopoSetor)]
+        : ehAdmin
+          ? [where("setor", "in", ["DU", "PA"])]
+          : [];
+
+      // ---------- Tarefa 1: contagem TOTAL de concluídos (ativo == false) ----------
+      let totalConcluidos = 0;
+      try {
+        const qConcluidos = query(
+          processosRef,
+          ...escopoBase,
+          where("ativo", "==", false),
+        );
+        const snap = await getCountFromServer(qConcluidos);
+        totalConcluidos = snap.data().count;
+      } catch (err) {
+        console.error("Dashboard: falha ao contar concluídos (ativo==false):", err);
+      }
+
+      // ---------- Tarefa 2: conclusões do mês — query híbrida ----------
+      let finalizadosMes = 0;
+      try {
+        const qFinalizadosRecentes = query(
+          processosRef,
+          ...escopoBase,
+          where("ativo", "==", false),
+          orderBy("atualizadoEm", "desc"),
+          limit(200),
+        );
+        const docsSnap = await getDocs(qFinalizadosRecentes);
+        finalizadosMes = docsSnap.docs.reduce((acc, doc) => {
+          const data = doc.data() as { atualizadoEm?: unknown };
+          return acc + (ehDoMesAtual(data.atualizadoEm, mesRef) ? 1 : 0);
+        }, 0);
+      } catch (err) {
+        console.warn(
+          "Dashboard: a query de finalizadosMes falhou — provavelmente exige um " +
+            "ÍNDICE COMPOSTO no Firestore (campos: setor + ativo + atualizadoEm). " +
+            "Abra o link gerado pelo Firebase no console do navegador para criar o índice automaticamente.",
+          err,
+        );
+      }
+
+      if (cancelado) return;
+      setStats({ totalConcluidos, finalizadosMes, carregando: false });
+    };
+
+    carregar();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [user, ehAdmin, escopoSetor, mesRef]);
+
+  // ---------- Derivados ----------
+  const { totalConcluidos, finalizadosMes } = stats;
+
+  // Tarefa 3: total geral = ativos (props) + concluídos (server)
+  const totalGeral = acervoAtivo + totalConcluidos;
+  const taxaConclusao = totalGeral > 0 ? Math.round((totalConcluidos / totalGeral) * 100) : 0;
   const resolutividadeMes =
-    processosMes > 0 ? Math.round((finalizadosMes / processosMes) * 100) : 0;
+    criadosMes > 0 ? Math.round((finalizadosMes / criadosMes) * 100) : 0;
 
   return (
     <div className="space-y-4">
@@ -79,7 +226,7 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground font-medium">Cadastrados</span>
-              <span className="text-sm font-bold tabular-nums text-foreground">{processosMes}</span>
+              <span className="text-sm font-bold tabular-nums text-foreground">{criadosMes}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground font-medium">Finalizados</span>
@@ -111,30 +258,30 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
             </p>
 
             <div className="grid grid-cols-2 gap-6">
-              {/* Cadastrados */}
+              {/* Cadastrados (Histórico Total) */}
               <div>
                 <div className="text-5xl font-bold font-display tabular-nums leading-none">
-                  {total}
+                  {totalGeral}
                 </div>
                 <p className="text-sm text-white/70 mt-2">Processos cadastrados</p>
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
-                    DU: {totalDU}
+                    DU: {ativosDU}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
-                    PA: {totalPA}
+                    PA: {ativosPA}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
-                    Ativos: {ativos.length}
+                    Ativos: {acervoAtivo}
                   </span>
                 </div>
               </div>
 
-              {/* Finalizados */}
+              {/* Finalizados (Histórico Total) */}
               <div>
                 <div className="flex items-end gap-2 leading-none">
                   <div className="text-5xl font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
-                    {concluidos}
+                    {totalConcluidos}
                   </div>
                   <div className="mb-1 text-base font-bold text-[oklch(0.78_0.18_145)] opacity-80">
                     {taxaConclusao}%
@@ -158,7 +305,7 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           label="Entradas no mês"
-          value={total - concluidos}
+          value={criadosMes}
           icon={Inbox}
           tone="blue"
           active={false}
@@ -166,21 +313,21 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
         />
         <KpiCard
           label="Conclusões no mês"
-          value={concluidos}
+          value={finalizadosMes}
           icon={CheckCircle2}
           tone="green"
           active={false}
         />
         <KpiCard
           label="Índice de Resolutividade"
-          value={`${indiceResolutividade}%`}
+          value={`${resolutividadeMes}%`}
           icon={TrendingUp}
           tone="purple"
           active={false}
         />
         <KpiCard
           label="Acervo Total"
-          value={ativos.length}
+          value={totalGeral}
           icon={Trophy}
           tone="amber"
           active={false}
