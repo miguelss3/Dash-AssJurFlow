@@ -55,6 +55,11 @@ export function AcoesDUModalNovo({
   const [numeroRecebido, setNumeroRecebido] = useState("");
   const [possuiPrazoDU, setPossuiPrazoDU] = useState<boolean>(true);
   const [isReiteracao, setIsReiteracao] = useState<boolean>(false);
+  // V2.4 — Composição de documento(s) externos.
+  const [incluiDiexExterno, setIncluiDiexExterno] = useState<boolean>(false);
+  const [incluiOficioExterno, setIncluiOficioExterno] = useState<boolean>(false);
+  const [numeroDiexExterno, setNumeroDiexExterno] = useState<string>("");
+  const [numeroOficioExterno, setNumeroOficioExterno] = useState<string>("");
   const [carregandoFluxo, setCarregandoFluxo] = useState(false);
 
   // ---------------- Carga ----------------
@@ -119,6 +124,31 @@ export function AcoesDUModalNovo({
         possuiPrazoSalvo = dataPrazoCarregada.trim().length > 0;
       }
       setPossuiPrazoDU(possuiPrazoSalvo);
+
+      // ---------------------------------------------------------------
+      // V2.4 — Composição de documentos externos. Lê tanto top-level
+      // quanto pedidoSubsidios para garantir compat. com cards antigos.
+      // ---------------------------------------------------------------
+      const incluiDiex =
+        typeof data?.incluiDiexExterno === "boolean"
+          ? data.incluiDiexExterno
+          : typeof pedido?.incluiDiexExterno === "boolean"
+            ? pedido.incluiDiexExterno
+            : false;
+      const incluiOficio =
+        typeof data?.incluiOficioExterno === "boolean"
+          ? data.incluiOficioExterno
+          : typeof pedido?.incluiOficioExterno === "boolean"
+            ? pedido.incluiOficioExterno
+            : false;
+      setIncluiDiexExterno(incluiDiex);
+      setIncluiOficioExterno(incluiOficio);
+      setNumeroDiexExterno(
+        (data?.numeroDiexExterno || pedido?.numeroDiexExterno || "").toString(),
+      );
+      setNumeroOficioExterno(
+        (data?.numeroOficioExterno || pedido?.numeroOficioExterno || "").toString(),
+      );
     } catch (error) {
       console.error("Erro ao carregar fluxo DU:", error);
       toast.error("Não foi possível carregar o fluxo do processo.");
@@ -164,6 +194,11 @@ export function AcoesDUModalNovo({
       possuiPrazoDU?: boolean;
       descricaoOverride?: string;
       reiteracoesIncrement?: number;
+      // V2.4 — Composição de documentos externos.
+      incluiDiexExterno?: boolean;
+      incluiOficioExterno?: boolean;
+      numeroDiexExterno?: string;
+      numeroOficioExterno?: string;
     },
   ) => {
     if (!processoId || !user) return;
@@ -179,6 +214,11 @@ export function AcoesDUModalNovo({
       const numeroDocEfetivo = (extras?.numeroDocumentoDU ?? numeroDocumentoDU).trim();
       const numeroRecebidoEfetivo = (extras?.numeroRecebido ?? numeroRecebido).trim();
       const possuiPrazoEfetivo = extras?.possuiPrazoDU ?? possuiPrazoDU;
+      // V2.4 — Composição de documento(s) externo(s).
+      const incluiDiexEfetivo = extras?.incluiDiexExterno ?? incluiDiexExterno;
+      const incluiOficioEfetivo = extras?.incluiOficioExterno ?? incluiOficioExterno;
+      const numeroDiexExternoEfetivo = (extras?.numeroDiexExterno ?? numeroDiexExterno).trim();
+      const numeroOficioExternoEfetivo = (extras?.numeroOficioExterno ?? numeroOficioExterno).trim();
       const agoraISO = new Date().toISOString();
 
       const descricao =
@@ -190,9 +230,17 @@ export function AcoesDUModalNovo({
       const historicoExistente = Array.isArray(pedidoAtual?.numeroDiexHistorico)
         ? (pedidoAtual.numeroDiexHistorico as string[])
         : [];
-      const numeroDiexHistorico = numeroDocEfetivo
-        ? Array.from(new Set([...historicoExistente, numeroDocEfetivo]))
-        : historicoExistente;
+      // V2.4 — Acumula no histórico todos os números gerados nesta transição:
+      // o genérico (DIEx Simplificado/legado) + DIEx externo + Ofício externo.
+      const novosNumeros = [
+        numeroDocEfetivo,
+        numeroDiexExternoEfetivo,
+        numeroOficioExternoEfetivo,
+      ].filter((s) => s && s.trim().length > 0);
+      const numeroDiexHistorico =
+        novosNumeros.length > 0
+          ? Array.from(new Set([...historicoExistente, ...novosNumeros]))
+          : historicoExistente;
 
       // V2.3 — Contador de reiterações preservado entre transições.
       const reiteracoesAtual = Number(pedidoAtual?.reiteracoes) || 0;
@@ -210,6 +258,11 @@ export function AcoesDUModalNovo({
         numeroDiexHistorico,
         numeroRecebido: numeroRecebidoEfetivo,
         possuiPrazoDU: possuiPrazoEfetivo,
+        // V2.4 — Composição de documentos externos persistida no pedido.
+        incluiDiexExterno: incluiDiexEfetivo,
+        incluiOficioExterno: incluiOficioEfetivo,
+        numeroDiexExterno: numeroDiexExternoEfetivo,
+        numeroOficioExterno: numeroOficioExternoEfetivo,
         reiteracoes: reiteracoesEfetivo,
         situacaoFluxo: proximaSituacao,
         solicitadoEm:
@@ -230,6 +283,11 @@ export function AcoesDUModalNovo({
         assinaturaDestino: destinoEfetivo,
         numeroDocumentoDU: numeroDocEfetivo,
         possuiPrazoDU: possuiPrazoEfetivo,
+        // V2.4 — Espelho top-level dos campos de composição externa.
+        incluiDiexExterno: incluiDiexEfetivo,
+        incluiOficioExterno: incluiOficioEfetivo,
+        numeroDiexExterno: numeroDiexExternoEfetivo,
+        numeroOficioExterno: numeroOficioExternoEfetivo,
         status: LABEL_SITUACAO[proximaSituacao],
         descricao,
         atualizadoEm: Timestamp.now(),
@@ -250,6 +308,10 @@ export function AcoesDUModalNovo({
       if (extras?.numeroDocumentoDU !== undefined) setNumeroDocumentoDU(extras.numeroDocumentoDU);
       if (extras?.numeroRecebido !== undefined) setNumeroRecebido(extras.numeroRecebido);
       if (extras?.possuiPrazoDU !== undefined) setPossuiPrazoDU(extras.possuiPrazoDU);
+      if (extras?.incluiDiexExterno !== undefined) setIncluiDiexExterno(extras.incluiDiexExterno);
+      if (extras?.incluiOficioExterno !== undefined) setIncluiOficioExterno(extras.incluiOficioExterno);
+      if (extras?.numeroDiexExterno !== undefined) setNumeroDiexExterno(extras.numeroDiexExterno);
+      if (extras?.numeroOficioExterno !== undefined) setNumeroOficioExterno(extras.numeroOficioExterno);
 
       if (onSuccess) onSuccess();
     } catch (error) {
@@ -384,6 +446,56 @@ export function AcoesDUModalNovo({
     }
   };
 
+  // V2.5 — Salva os dados de composição do(s) documento(s) sem alterar a
+  // situacaoFluxo, mantendo o card estacionado em "Aguardando Assinatura".
+  // Usado pelo Estágio 1 da Vigília do SPED.
+  const handleSalvarDadosSPED = async () => {
+    if (!processoId || !user) return;
+    try {
+      const processoRef = doc(db, "processos", processoId);
+      const snap = await getDoc(processoRef);
+      const dataAtual = (snap.exists() ? snap.data() : {}) as Record<string, unknown>;
+      const pedidoAtual = (dataAtual?.pedidoSubsidios as Record<string, unknown>) || {};
+
+      const numeroDocEfetivo = numeroDocumentoDU.trim();
+      const numeroDiexExternoEfetivo = numeroDiexExterno.trim();
+      const numeroOficioExternoEfetivo = numeroOficioExterno.trim();
+      const prazoEfetivo = dataPrazo.trim();
+
+      const pedidoSubsidiosPatch = {
+        ...pedidoAtual,
+        assinaturaDestino,
+        possuiPrazoDU,
+        dataPrazo: prazoEfetivo,
+        prazoResposta: prazoEfetivo,
+        numeroDocumentoDU: numeroDocEfetivo,
+        numeroSaida: numeroDocEfetivo,
+        incluiDiexExterno,
+        incluiOficioExterno,
+        numeroDiexExterno: numeroDiexExternoEfetivo,
+        numeroOficioExterno: numeroOficioExternoEfetivo,
+      };
+
+      await updateDoc(processoRef, {
+        pedidoSubsidios: pedidoSubsidiosPatch,
+        assinaturaDestino,
+        numeroDocumentoDU: numeroDocEfetivo,
+        possuiPrazoDU,
+        incluiDiexExterno,
+        incluiOficioExterno,
+        numeroDiexExterno: numeroDiexExternoEfetivo,
+        numeroOficioExterno: numeroOficioExternoEfetivo,
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+      });
+      toast.success("Dados salvos. Card mantido em Aguardando Assinatura.");
+      if (onSuccess) onSuccess();
+    } catch (error) {
+      console.error("Erro ao salvar dados da Vigília SPED:", error);
+      toast.error("Falha ao salvar os dados.");
+    }
+  };
+
   const handleRegistrarEntrada = () => {
     const numero = numeroRecebido.trim();
     if (!numero) {
@@ -419,6 +531,15 @@ export function AcoesDUModalNovo({
           setPossuiPrazoDU={setPossuiPrazoDU}
           dataPrazo={dataPrazo}
           setDataPrazo={setDataPrazo}
+          incluiDiexExterno={incluiDiexExterno}
+          setIncluiDiexExterno={setIncluiDiexExterno}
+          incluiOficioExterno={incluiOficioExterno}
+          setIncluiOficioExterno={setIncluiOficioExterno}
+          numeroDiexExterno={numeroDiexExterno}
+          setNumeroDiexExterno={setNumeroDiexExterno}
+          numeroOficioExterno={numeroOficioExterno}
+          setNumeroOficioExterno={setNumeroOficioExterno}
+          onSalvarDados={handleSalvarDadosSPED}
           onRegistrar={handleRegistrarSPED}
           onMinutaRejeitada={handleMinutaRejeitada}
           onFinalizar={finalizarProcesso}
@@ -445,6 +566,16 @@ export function AcoesDUModalNovo({
         setDataPrazo={setDataPrazo}
         isReiteracao={isReiteracao}
         setIsReiteracao={setIsReiteracao}
+        numeroDocumentoDU={numeroDocumentoDU}
+        setNumeroDocumentoDU={setNumeroDocumentoDU}
+        incluiDiexExterno={incluiDiexExterno}
+        setIncluiDiexExterno={setIncluiDiexExterno}
+        incluiOficioExterno={incluiOficioExterno}
+        setIncluiOficioExterno={setIncluiOficioExterno}
+        numeroDiexExterno={numeroDiexExterno}
+        setNumeroDiexExterno={setNumeroDiexExterno}
+        numeroOficioExterno={numeroOficioExterno}
+        setNumeroOficioExterno={setNumeroOficioExterno}
         onEnviarChefia={handleEnviarChefia}
         onFinalizar={finalizarProcesso}
       />
@@ -464,6 +595,14 @@ export function AcoesDUModalNovo({
             setPossuiPrazoDU={setPossuiPrazoDU}
             dataPrazo={dataPrazo}
             setDataPrazo={setDataPrazo}
+            incluiDiexExterno={incluiDiexExterno}
+            setIncluiDiexExterno={setIncluiDiexExterno}
+            incluiOficioExterno={incluiOficioExterno}
+            setIncluiOficioExterno={setIncluiOficioExterno}
+            numeroDiexExterno={numeroDiexExterno}
+            setNumeroDiexExterno={setNumeroDiexExterno}
+            numeroOficioExterno={numeroOficioExterno}
+            setNumeroOficioExterno={setNumeroOficioExterno}
             onAssinarEFinalizar={handleAssinarEFinalizar}
             onAprovarSPED={handleAprovarSPED}
             onDevolverAssessor={handleDevolverAssessor}

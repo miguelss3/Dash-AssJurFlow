@@ -172,9 +172,16 @@ export const DEFAULT_PA_EM_ANDAMENTO_COLUMNS: PAInProgressColumnSetting[] = [
 ];
 
 export const DEFAULT_DU_BOARD_COLUMNS: DUBoardColumnSetting[] = [
+  // Ordem do Kanban DU (V2.4): Mesa do Assessor e Mesa do Chefe são
+  // colunas fixas renderizadas pelo board; aqui ficam as colunas configuráveis
+  // que aparecem à direita.
+  // 1ª configurável: Aguardando Distribuição.
+  // 2ª configurável (= 4ª global): Aguardando Assinatura — logo à direita
+  //   da Mesa do Chefe e antes de Aguardando Resposta.
+  // 3ª configurável: Aguardando Resposta.
   {
-    id: "aguardando_resposta",
-    label: "📩 Aguardando Resposta",
+    id: "aguardando_distribuicao",
+    label: "📥 Aguardando Distribuicao",
     enabled: true,
     order: 10,
   },
@@ -182,13 +189,13 @@ export const DEFAULT_DU_BOARD_COLUMNS: DUBoardColumnSetting[] = [
     id: "aguardando_assinatura",
     label: "✍️ Aguardando Assinatura",
     enabled: true,
-    order: 15,
+    order: 20,
   },
   {
-    id: "aguardando_distribuicao",
-    label: "📥 Aguardando Distribuicao",
+    id: "aguardando_resposta",
+    label: "📩 Aguardando Resposta",
     enabled: true,
-    order: 20,
+    order: 30,
   },
 ];
 
@@ -670,6 +677,22 @@ export function normalizarDUBoardColumns(
         });
       }
     }
+  });
+
+  // V2.5 — Override defensivo: garante que "Aguardando Assinatura" exista,
+  // esteja habilitada e fique como 4ª coluna global (logo após a Mesa do
+  // Chefe). Resolve o caso de o Firestore ter sobrescrito o padrão antigo
+  // (sem essa coluna) ou tê-la salvo desabilitada.
+  const fallbackAssinatura = fallbackPorId.get("aguardando_assinatura");
+  const labelAssinatura =
+    unicasPorId.get("aguardando_assinatura")?.label
+    || fallbackAssinatura?.label
+    || "✍️ Aguardando Assinatura";
+  unicasPorId.set("aguardando_assinatura", {
+    id: "aguardando_assinatura",
+    label: labelAssinatura,
+    enabled: true,
+    order: 15,
   });
 
   return Array.from(unicasPorId.values()).sort((a, b) => a.order - b.order);

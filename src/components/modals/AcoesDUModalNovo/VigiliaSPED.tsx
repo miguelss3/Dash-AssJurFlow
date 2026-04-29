@@ -1,13 +1,16 @@
-import { CalendarIcon, FileSignature } from "lucide-react";
+import { CalendarIcon, FileSignature, Save } from "lucide-react";
 import {
   AssinaturaDestino,
   DOC_DANGER_BTN_CLASS,
   DOC_INPUT_CLASS,
   DOC_LABEL_CLASS,
   DOC_PRIMARY_BTN_CLASS,
+  DOC_SECONDARY_BTN_CLASS,
   LABEL_ASSINATURA_DESTINO,
+  docContainerClass,
   docRadioClass,
 } from "./shared";
+import { CamposDocumento } from "./CamposDocumento";
 
 interface VigiliaSPEDProps {
   assinaturaDestino: AssinaturaDestino;
@@ -17,6 +20,18 @@ interface VigiliaSPEDProps {
   setPossuiPrazoDU: (v: boolean) => void;
   dataPrazo: string;
   setDataPrazo: (v: string) => void;
+  // V2.4 — Composição do(s) documento(s).
+  incluiDiexExterno: boolean;
+  setIncluiDiexExterno: (v: boolean) => void;
+  incluiOficioExterno: boolean;
+  setIncluiOficioExterno: (v: boolean) => void;
+  numeroDiexExterno: string;
+  setNumeroDiexExterno: (v: string) => void;
+  numeroOficioExterno: string;
+  setNumeroOficioExterno: (v: string) => void;
+  // V2.5 — Salva os campos no Firestore sem alterar a situacaoFluxo,
+  // mantendo o card estacionado em "Aguardando Assinatura".
+  onSalvarDados: () => void;
   onRegistrar: () => void;
   onMinutaRejeitada: () => void;
   onFinalizar: () => void;
@@ -31,17 +46,32 @@ export function VigiliaSPED({
   setPossuiPrazoDU,
   dataPrazo,
   setDataPrazo,
+  incluiDiexExterno,
+  setIncluiDiexExterno,
+  incluiOficioExterno,
+  setIncluiOficioExterno,
+  numeroDiexExterno,
+  setNumeroDiexExterno,
+  numeroOficioExterno,
+  setNumeroOficioExterno,
   onRegistrar,
   onMinutaRejeitada,
   onFinalizar,
 }: VigiliaSPEDProps) {
   const rotuloAutoridade = LABEL_ASSINATURA_DESTINO[assinaturaDestino];
-  const podeRegistrar =
-    numeroDocumentoDU.trim().length > 0 && (!possuiPrazoDU || dataPrazo.trim().length > 0);
+  // V2.4 — Para externos, exigimos que ao menos um dos checkboxes esteja
+  // marcado e seu respectivo número preenchido. Para chefe, mantém o input
+  // simplificado.
+  const externoOk =
+    assinaturaDestino === "chefe"
+      ? numeroDocumentoDU.trim().length > 0
+      : (incluiDiexExterno && numeroDiexExterno.trim().length > 0)
+        || (incluiOficioExterno && numeroOficioExterno.trim().length > 0);
+  const podeRegistrar = externoOk && (!possuiPrazoDU || dataPrazo.trim().length > 0);
 
   return (
     <div className="space-y-5 animate-in fade-in">
-      <article className="bg-white border border-slate-200 rounded-xl p-5 space-y-5 shadow-sm">
+      <article className={docContainerClass(assinaturaDestino)}>
         <header className="border-b-2 border-slate-300 pb-3">
           <p className={DOC_LABEL_CLASS}>Vigília do SPED</p>
           <p className="text-xs text-slate-700">
@@ -49,17 +79,19 @@ export function VigiliaSPED({
           </p>
         </header>
 
-        <section>
-          <label className={DOC_LABEL_CLASS}>Número do Documento Gerado</label>
-          <input
-            type="text"
-            aria-label="Número do documento gerado no SPED"
-            value={numeroDocumentoDU}
-            onChange={(e) => setNumeroDocumentoDU(e.target.value)}
-            placeholder="Ex: Ofício nº 123/2026"
-            className={DOC_INPUT_CLASS}
-          />
-        </section>
+        <CamposDocumento
+          assinaturaDestino={assinaturaDestino}
+          numeroDocumentoDU={numeroDocumentoDU}
+          setNumeroDocumentoDU={setNumeroDocumentoDU}
+          incluiDiexExterno={incluiDiexExterno}
+          setIncluiDiexExterno={setIncluiDiexExterno}
+          incluiOficioExterno={incluiOficioExterno}
+          setIncluiOficioExterno={setIncluiOficioExterno}
+          numeroDiexExterno={numeroDiexExterno}
+          setNumeroDiexExterno={setNumeroDiexExterno}
+          numeroOficioExterno={numeroOficioExterno}
+          setNumeroOficioExterno={setNumeroOficioExterno}
+        />
 
         <section>
           <p className={DOC_LABEL_CLASS}>Existe Prazo para Resposta?</p>
@@ -96,13 +128,28 @@ export function VigiliaSPED({
         )}
       </article>
 
-      <button
-        disabled={!podeRegistrar}
-        onClick={onRegistrar}
-        className={DOC_PRIMARY_BTN_CLASS}
-      >
-        <FileSignature className="w-4 h-4" /> Registrar Documento
-      </button>
+      {/* V2.5 — Estágio 1 (Aguardando Dados): "Salvar Dados" mantém o card
+          estacionado nesta coluna. Estágio 2 (Dados Preenchidos): libera
+          "Iniciar Prazo" + "Finalizar Processo". */}
+      {!temNumerosRegistrados ? (
+        <button onClick={onSalvarDados} className={DOC_SECONDARY_BTN_CLASS}>
+          <Save className="w-4 h-4" /> Salvar Dados
+        </button>
+      ) : (
+        <>
+          <button
+            disabled={!podeIniciarPrazo}
+            onClick={onRegistrar}
+            className={DOC_PRIMARY_BTN_CLASS}
+          >
+            <FileSignature className="w-4 h-4" /> Iniciar Prazo
+          </button>
+
+          <button onClick={onFinalizar} className={DOC_DANGER_BTN_CLASS}>
+            Finalizar Processo
+          </button>
+        </>
+      )}
 
       {/* Marcha à Ré — minuta rejeitada na assinatura externa. */}
       <button
@@ -110,10 +157,6 @@ export function VigiliaSPED({
         className="w-full rounded-md border border-red-300 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50"
       >
         Minuta Rejeitada no SPED
-      </button>
-
-      <button onClick={onFinalizar} className={DOC_DANGER_BTN_CLASS}>
-        Finalizar Processo
       </button>
     </div>
   );

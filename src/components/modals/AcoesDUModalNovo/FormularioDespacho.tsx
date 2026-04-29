@@ -8,8 +8,10 @@ import {
   DOC_PRIMARY_BTN_CLASS,
   LABEL_ACAO,
   LABEL_ASSINATURA_DESTINO,
+  docContainerClass,
   docRadioClass,
 } from "./shared";
+import { CamposDocumento } from "./CamposDocumento";
 
 interface FormularioDespachoProps {
   acaoPrincipal: AcaoPrincipal;
@@ -20,11 +22,22 @@ interface FormularioDespachoProps {
   setDataPrazo: (v: string) => void;
   isReiteracao: boolean;
   setIsReiteracao: (v: boolean) => void;
+  // V2.4 — Composição do(s) documento(s).
+  numeroDocumentoDU: string;
+  setNumeroDocumentoDU: (v: string) => void;
+  incluiDiexExterno: boolean;
+  setIncluiDiexExterno: (v: boolean) => void;
+  incluiOficioExterno: boolean;
+  setIncluiOficioExterno: (v: boolean) => void;
+  numeroDiexExterno: string;
+  setNumeroDiexExterno: (v: string) => void;
+  numeroOficioExterno: string;
+  setNumeroOficioExterno: (v: string) => void;
   onEnviarChefia: () => void;
   onFinalizar: () => void;
 }
 
-// Formulário universal "Despacho" — Signatário → Objeto → Prazo → Botão.
+// Formulário universal "Despacho" — Signatário → Objeto → Documento → Prazo → Botão.
 export function FormularioDespacho({
   acaoPrincipal,
   setAcaoPrincipal,
@@ -34,12 +47,22 @@ export function FormularioDespacho({
   setDataPrazo,
   isReiteracao,
   setIsReiteracao,
+  numeroDocumentoDU,
+  setNumeroDocumentoDU,
+  incluiDiexExterno,
+  setIncluiDiexExterno,
+  incluiOficioExterno,
+  setIncluiOficioExterno,
+  numeroDiexExterno,
+  setNumeroDiexExterno,
+  numeroOficioExterno,
+  setNumeroOficioExterno,
   onEnviarChefia,
   onFinalizar,
 }: FormularioDespachoProps) {
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2">
-      <article className="bg-white border border-slate-200 rounded-xl p-5 space-y-5 shadow-sm">
+      <article className={docContainerClass(assinaturaDestino)}>
         {/* Signatário */}
         <header className="border-b-2 border-slate-300 pb-3">
           <p className={DOC_LABEL_CLASS}>Signatário (Autoridade)</p>
@@ -96,6 +119,22 @@ export function FormularioDespacho({
             </label>
           )}
         </section>
+
+        {/* V2.4 — Montagem de Documento(s). Opcional na visaão do Assessor. */}
+        <CamposDocumento
+          assinaturaDestino={assinaturaDestino}
+          numeroDocumentoDU={numeroDocumentoDU}
+          setNumeroDocumentoDU={setNumeroDocumentoDU}
+          incluiDiexExterno={incluiDiexExterno}
+          setIncluiDiexExterno={setIncluiDiexExterno}
+          incluiOficioExterno={incluiOficioExterno}
+          setIncluiOficioExterno={setIncluiOficioExterno}
+          numeroDiexExterno={numeroDiexExterno}
+          setNumeroDiexExterno={setNumeroDiexExterno}
+          numeroOficioExterno={numeroOficioExterno}
+          setNumeroOficioExterno={setNumeroOficioExterno}
+          opcional
+        />
 
         {/* Prazo (apenas em DILIGENCIA) */}
         {acaoPrincipal === "DILIGENCIA" && (

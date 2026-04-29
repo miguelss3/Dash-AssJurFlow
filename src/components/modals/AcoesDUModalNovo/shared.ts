@@ -50,6 +50,21 @@ export const DOC_SECONDARY_BTN_CLASS =
 export const DOC_DANGER_BTN_CLASS =
   "w-full border border-red-200 text-red-700 hover:bg-red-50 text-xs font-semibold py-2 rounded-md transition-colors";
 
+// V2.4 — Wrapper colorido do "Bloco de Documento" segundo o signatário.
+// Azul claro = interno (Chefe / DIEx Simplificado). Verde = externo (CHEM/Cmt).
+export const docContainerClass = (destino: AssinaturaDestino) =>
+  destino === "chefe"
+    ? "bg-blue-50 border border-blue-200 rounded-xl p-5 space-y-5 shadow-sm"
+    : "bg-emerald-50 border border-emerald-200 rounded-xl p-5 space-y-5 shadow-sm";
+
+// V2.4 — Estilo do checkbox "pill" para tipos de documento externo (DIEx / Ofício).
+export const docCheckboxPillClass = (selected: boolean) =>
+  `flex items-center justify-center gap-2 p-2.5 border rounded-md text-xs font-bold cursor-pointer transition-colors ${
+    selected
+      ? "bg-emerald-700 text-white border-emerald-700"
+      : "bg-white text-emerald-800 border-emerald-300 hover:bg-emerald-100"
+  }`;
+
 // Estilo dos radios em formato "pill de documento".
 export const docRadioClass = (selected: boolean) =>
   `flex items-center justify-center gap-2 p-2.5 border rounded-md text-xs font-bold cursor-pointer transition-colors ${

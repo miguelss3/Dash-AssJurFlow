@@ -27,6 +27,11 @@ export interface PedidoSubsidios {
   numeroDiexHistorico?: string[];
   prazoResposta?: string;
   observacoes?: string;
+  // V2.4 — Composição de documentos externos (CHEM/Cmt).
+  incluiDiexExterno?: boolean;
+  incluiOficioExterno?: boolean;
+  numeroDiexExterno?: string;
+  numeroOficioExterno?: string;
   situacaoFluxo?: string;
   solicitadoEm?: string;
   solicitadoPorNome?: string;
@@ -126,6 +131,11 @@ export interface Processo {
   assinaturaDestino?: "chefe" | "chem" | "cmt";
   numeroDocumentoDU?: string;
   possuiPrazoDU?: boolean;
+  // V2.4 — Composição de documentos externos espelhada na raiz.
+  incluiDiexExterno?: boolean;
+  incluiOficioExterno?: boolean;
+  numeroDiexExterno?: string;
+  numeroOficioExterno?: string;
 }
 
 export interface Coluna {

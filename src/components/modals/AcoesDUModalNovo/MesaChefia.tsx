@@ -9,8 +9,10 @@ import {
   DOC_SECONDARY_BTN_CLASS,
   LABEL_ACAO,
   LABEL_ASSINATURA_DESTINO,
+  docContainerClass,
   docRadioClass,
 } from "./shared";
+import { CamposDocumento } from "./CamposDocumento";
 
 interface MesaChefiaProps {
   assinaturaDestino: AssinaturaDestino;
@@ -21,6 +23,15 @@ interface MesaChefiaProps {
   setPossuiPrazoDU: (v: boolean) => void;
   dataPrazo: string;
   setDataPrazo: (v: string) => void;
+  // V2.4 — Composição do(s) documento(s).
+  incluiDiexExterno: boolean;
+  setIncluiDiexExterno: (v: boolean) => void;
+  incluiOficioExterno: boolean;
+  setIncluiOficioExterno: (v: boolean) => void;
+  numeroDiexExterno: string;
+  setNumeroDiexExterno: (v: string) => void;
+  numeroOficioExterno: string;
+  setNumeroOficioExterno: (v: string) => void;
   onAssinarEFinalizar: () => void;
   onAprovarSPED: () => void;
   onDevolverAssessor: () => void;
@@ -37,6 +48,14 @@ export function MesaChefia({
   setPossuiPrazoDU,
   dataPrazo,
   setDataPrazo,
+  incluiDiexExterno,
+  setIncluiDiexExterno,
+  incluiOficioExterno,
+  setIncluiOficioExterno,
+  numeroDiexExterno,
+  setNumeroDiexExterno,
+  numeroOficioExterno,
+  setNumeroOficioExterno,
   onAssinarEFinalizar,
   onAprovarSPED,
   onDevolverAssessor,
@@ -47,7 +66,7 @@ export function MesaChefia({
 
   return (
     <div className="space-y-5 animate-in fade-in">
-      <article className="bg-white border border-slate-200 rounded-xl p-5 space-y-5 shadow-sm">
+      <article className={docContainerClass(assinaturaDestino)}>
         <header className="border-b-2 border-slate-300 pb-3">
           <p className={DOC_LABEL_CLASS}>Signatário (Autoridade)</p>
           <p className="text-base font-bold text-slate-900">{rotuloAutoridade}</p>
@@ -58,17 +77,19 @@ export function MesaChefia({
 
         {ehAssinaturaChefe ? (
           <>
-            <section>
-              <label className={DOC_LABEL_CLASS}>Nr DIEx Simplificado</label>
-              <input
-                type="text"
-                aria-label="Número do DIEx Simplificado"
-                value={numeroDocumentoDU}
-                onChange={(e) => setNumeroDocumentoDU(e.target.value)}
-                placeholder="Ex: DIEx 045/2026"
-                className={DOC_INPUT_CLASS}
-              />
-            </section>
+            <CamposDocumento
+              assinaturaDestino={assinaturaDestino}
+              numeroDocumentoDU={numeroDocumentoDU}
+              setNumeroDocumentoDU={setNumeroDocumentoDU}
+              incluiDiexExterno={incluiDiexExterno}
+              setIncluiDiexExterno={setIncluiDiexExterno}
+              incluiOficioExterno={incluiOficioExterno}
+              setIncluiOficioExterno={setIncluiOficioExterno}
+              numeroDiexExterno={numeroDiexExterno}
+              setNumeroDiexExterno={setNumeroDiexExterno}
+              numeroOficioExterno={numeroOficioExterno}
+              setNumeroOficioExterno={setNumeroOficioExterno}
+            />
 
             <section>
               <p className={DOC_LABEL_CLASS}>Existe Prazo para Resposta?</p>
@@ -105,21 +126,39 @@ export function MesaChefia({
             )}
           </>
         ) : (
-          <p className="text-[12px] text-slate-700 bg-slate-50 border border-slate-200 p-3 rounded-md">
-            Encaminhe via SPED para assinatura do <strong>{rotuloAutoridade}</strong>. O número do
-            documento será informado posteriormente, na vigília do SPED.
-          </p>
+          <>
+            <CamposDocumento
+              assinaturaDestino={assinaturaDestino}
+              numeroDocumentoDU={numeroDocumentoDU}
+              setNumeroDocumentoDU={setNumeroDocumentoDU}
+              incluiDiexExterno={incluiDiexExterno}
+              setIncluiDiexExterno={setIncluiDiexExterno}
+              incluiOficioExterno={incluiOficioExterno}
+              setIncluiOficioExterno={setIncluiOficioExterno}
+              numeroDiexExterno={numeroDiexExterno}
+              setNumeroDiexExterno={setNumeroDiexExterno}
+              numeroOficioExterno={numeroOficioExterno}
+              setNumeroOficioExterno={setNumeroOficioExterno}
+              opcional
+            />
+            <p className="text-[12px] text-slate-700 bg-white/60 border border-emerald-200 p-3 rounded-md">
+              Encaminhe via SPED para assinatura do <strong>{rotuloAutoridade}</strong>. Os números
+              definitivos podem ser confirmados na vigília do SPED.
+            </p>
+          </>
         )}
       </article>
 
       {ehAssinaturaChefe ? (
         <button onClick={onAssinarEFinalizar} className={DOC_PRIMARY_BTN_CLASS}>
           <FileSignature className="w-4 h-4" />
-          Assinar e {possuiPrazoDU ? "Iniciar Prazo" : "Finalizar"}
+          {/* V2.6 — Documento interno: estritamente "Assinar". */}
+          Assinar
         </button>
       ) : (
         <button onClick={onAprovarSPED} className={DOC_PRIMARY_BTN_CLASS}>
-          <Send className="w-4 h-4" /> Aprovar via SPED
+          {/* V2.6 — Documento externo: estritamente "Aprovado" (manda para Vigília SPED). */}
+          <Send className="w-4 h-4" /> Aprovado
         </button>
       )}
 

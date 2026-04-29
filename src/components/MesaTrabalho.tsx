@@ -93,6 +93,12 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     [duBoardColumns],
   );
 
+  // V2.6 — Coluna "Aguardando Assinatura" (estacionamento da Vigília SPED).
+  const duColunaAguardandoAssinatura = useMemo(
+    () => duBoardColumns.find((c) => c.id === "aguardando_assinatura")?.label || "✍️ Aguardando Assinatura",
+    [duBoardColumns],
+  );
+
   const duColunaAguardandoDistribuicao = useMemo(
     () => duBoardColumns.find((c) => c.id === "aguardando_distribuicao")?.label || "📥 Aguardando Distribuicao",
     [duBoardColumns],
@@ -201,6 +207,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     if (
       novoResponsavel === "MESA DO CHEFE"
       || novoResponsavel === duColunaAguardandoResposta
+      || novoResponsavel === duColunaAguardandoAssinatura
       || paColunaLabelSet.has(novoResponsavel)
     ) {
       setActiveId(null);
@@ -268,6 +275,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     const tipoPorId = new Map<string, TipoProcesso | string>();
     const tipoPANormPorId = new Map<string, string>();
     const isPendenciaChefiaPorId = new Map<string, boolean>();
+    // V2.6 — Roteia cards do estágio AGUARDANDO_ASSINATURA para a coluna própria.
+    const isAguardandoAssinaturaPorId = new Map<string, boolean>();
     const isAguardandoRespostaPorId = new Map<string, boolean>();
     const isAguardandoRespostaVencidoPorId = new Map<string, boolean>();
     const isPAAtrasadoPorId = new Map<string, boolean>();
@@ -308,9 +317,15 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       const situacaoFluxoPedido = p.pedidoSubsidios?.situacaoFluxo || "";
       const statusNorm = (p.status || "").toString().toLowerCase();
 
+      // V2.6 — Identifica cards estacionados em "Aguardando Assinatura".
+      const aguardandoAssinatura =
+        situacaoFluxoPedido === "AGUARDANDO_ASSINATURA" || statusNorm === "aguardando assinatura";
+      isAguardandoAssinaturaPorId.set(p.id, aguardandoAssinatura);
+
+      // V2.6 — Removido statusNorm.includes("aguardando assinatura") para não
+      // engolir os cards do novo estágio (que agora têm coluna própria).
       const pendenciaChefia =
         SITUACOES_PENDENCIA_CHEFIA.has(situacaoFluxoPedido)
-        || statusNorm.includes("aguardando assinatura")
         || statusNorm.includes("aguardando chem");
       isPendenciaChefiaPorId.set(p.id, pendenciaChefia);
 
@@ -355,6 +370,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       // Particiona doTipo em uma única passagem
       const aguardandoRespostaDUAtivos: Processo[] = [];
       const aguardandoRespostaDUVencidos: Processo[] = [];
+      // V2.6 — Cards parados em "Aguardando Assinatura" (Vigília SPED).
+      const aguardandoAssinaturaDU: Processo[] = [];
       const pendenciasChefia: Processo[] = [];
       const doTipoSemPendenciasChefia: Processo[] = [];
 
@@ -367,6 +384,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           } else {
             aguardandoRespostaDUAtivos.push(p);
           }
+          continue;
+        }
+
+        // V2.6 — Cards do estágio AGUARDANDO_ASSINATURA vão para a coluna nova
+        // (estacionamento da Vigília SPED), não para a Mesa do Chefe.
+        if (tipo === "DU" && isAguardandoAssinaturaPorId.get(p.id)) {
+          aguardandoAssinaturaDU.push(p);
           continue;
         }
 
@@ -403,6 +427,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
         garantirChave(duColunaAguardandoResposta);
         mapAtivos.set(duColunaAguardandoResposta, aguardandoRespostaDUAtivos);
         mapAtrasados.set(duColunaAguardandoResposta, aguardandoRespostaDUVencidos);
+      }
+
+      // V2.6 — Sempre garante a coluna "Aguardando Assinatura" no fluxo DU
+      // e popula com os cards estacionados na Vigília SPED.
+      if (tipo === "DU") {
+        garantirChave(duColunaAguardandoAssinatura);
+        mapAtivos.set(duColunaAguardandoAssinatura, aguardandoAssinaturaDU);
       }
 
       if (tipo === "DU") {
@@ -463,10 +494,10 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           itensConcluidos: mapConcluidos.get(nome) || [],
         }))
         .filter(({ nome, itensAtivos, itensPortariaAssinada, itensAtrasados, itensConcluidos }) => {
-          if (tipo === "DU" && (nome === "MESA DO CHEFE" || nome === duColunaAguardandoResposta || nome === duColunaAguardandoDistribuicao)) {
+          if (tipo === "DU" && (nome === "MESA DO CHEFE" || nome === duColunaAguardandoAssinatura || nome === duColunaAguardandoResposta || nome === duColunaAguardandoDistribuicao)) {
             return true;
           }
-          if (nome.includes("📥 Aguardando") || nome.includes("📩 Aguardando")) {
+          if (nome.includes("📥 Aguardando") || nome.includes("📩 Aguardando") || nome.includes("✍️ Aguardando")) {
             return itensAtivos.length > 0 || itensPortariaAssinada.length > 0 || itensAtrasados.length > 0 || itensConcluidos.length > 0;
           }
           return true;
@@ -481,6 +512,9 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           if (aEhColunaPA && bEhColunaPA) {
             return paColunaLabels.indexOf(a.nome) - paColunaLabels.indexOf(b.nome);
           }
+          // V2.6 — Ordem estrita das colunas fixas DU.
+          if (a.nome === duColunaAguardandoAssinatura) return -1;
+          if (b.nome === duColunaAguardandoAssinatura) return 1;
           if (a.nome === duColunaAguardandoResposta) return -1;
           if (b.nome === duColunaAguardandoResposta) return 1;
           if (a.nome === duColunaAguardandoDistribuicao) return -1;
@@ -494,7 +528,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     }
 
     return result;
-  }, [processosEfetivos, filtroTipo, assessoresDoSetor, paColunaLabelPorId, paColunaLabelSet, paColunaLabels, ehAdmin, duColunaAguardandoResposta, duColunaAguardandoDistribuicao]);
+  }, [processosEfetivos, filtroTipo, assessoresDoSetor, paColunaLabelPorId, paColunaLabelSet, paColunaLabels, ehAdmin, duColunaAguardandoResposta, duColunaAguardandoAssinatura, duColunaAguardandoDistribuicao]);
 
   if (grupos.length === 0) {
     return (
@@ -531,12 +565,16 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
             ? grupo.assessores
                 .filter((a) => (
                   a.nome === "MESA DO CHEFE"
+                  || a.nome === duColunaAguardandoAssinatura
                   || a.nome === duColunaAguardandoResposta
                   || a.nome === duColunaAguardandoDistribuicao
                 ))
+                // V2.6 — Ordem estrita: Chefe → Assinatura → Resposta → Distribuição.
                 .sort((a, b) => {
                   if (a.nome === "MESA DO CHEFE") return -1;
                   if (b.nome === "MESA DO CHEFE") return 1;
+                  if (a.nome === duColunaAguardandoAssinatura) return -1;
+                  if (b.nome === duColunaAguardandoAssinatura) return 1;
                   if (a.nome === duColunaAguardandoResposta) return -1;
                   if (b.nome === duColunaAguardandoResposta) return 1;
                   if (a.nome === duColunaAguardandoDistribuicao) return -1;
@@ -548,6 +586,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
             ? grupo.assessores.filter(
                 (a) =>
                   a.nome !== "MESA DO CHEFE"
+                  && a.nome !== duColunaAguardandoAssinatura
                   && a.nome !== duColunaAguardandoResposta
                   && a.nome !== duColunaAguardandoDistribuicao,
               )
