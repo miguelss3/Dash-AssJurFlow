@@ -63,15 +63,15 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
     [processos],
   );
 
-  // ---------- KPIs de PRAZO (client-side, somente sobre ATIVOS) ----------
+  // ---------- KPIs de PRAZO (client-side, UNIFICADO DU + PA) ----------
   // statusPrazo agora aceita Timestamp do Firestore OU String ISO (ver lib/prazo).
-  const ativosDUFatal = processosAtivos.filter((p) => {
-    const setor = (p.setor || p.tipo || "").toString().toUpperCase();
-    return setor === "DU" && Boolean(p.prazoFatal);
-  });
-  const vencidos = ativosDUFatal.filter((p) => statusPrazo(p.prazoFatal) === "overdue").length;
-  const hoje = ativosDUFatal.filter((p) => statusPrazo(p.prazoFatal) === "today").length;
-  const semana = ativosDUFatal.filter((p) => {
+  // Antes filtr\u00e1vamos s\u00f3 setor === "DU", o que escondia totalmente os prazos PA
+  // para o Admin. Agora consideramos QUALQUER processo ativo (n\u00e3o conclu\u00eddo) que
+  // tenha `prazoFatal` preenchido, independentemente do setor.
+  const processosComPrazo = processosAtivos.filter((p) => Boolean(p.prazoFatal));
+  const vencidos = processosComPrazo.filter((p) => statusPrazo(p.prazoFatal) === "overdue").length;
+  const hoje = processosComPrazo.filter((p) => statusPrazo(p.prazoFatal) === "today").length;
+  const semana = processosComPrazo.filter((p) => {
     const s = statusPrazo(p.prazoFatal);
     return s === "today" || s === "soon";
   }).length;
