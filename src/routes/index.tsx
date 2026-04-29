@@ -183,7 +183,7 @@ function Index() {
     loading: siteSettingsLoading,
     saveSettings: persistSiteSettings,
   } = useSiteSettings(ready && !!user);
-  const { processos, criar, atualizar, remover } = useProcessos(siteSettings, user);
+  const { processos, carregando: loadingProcessos, criar, atualizar, remover } = useProcessos(siteSettings, user);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Processo | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<StatusProcesso>("novo");
@@ -216,8 +216,13 @@ function Index() {
   // Usuário logado (sem fallback fixo para evitar flicker visual no reload)
   const usuario = user ?? { posto: "", nome: "", role: "", setor: "" };
   const ehAdmin = isAdmin(user);
+  // Cast para Record permite ler campos legados (`secao`, `cargo`) sem quebrar o tipo AuthUser.
+  const usuarioLegado = usuario as Record<string, unknown>;
   const setorUsuario = normalizarSetor(
-    usuario.setor || usuario.role || usuario.secao || usuario.cargo,
+    (usuario.setor as string)
+      || (usuario.role as string)
+      || (usuarioLegado.secao as string | undefined)
+      || (usuarioLegado.cargo as string | undefined),
   );
 
   const isPendenteChefia = (p: Processo) => {
@@ -1338,6 +1343,7 @@ function Index() {
                 processos={processosParaDashboard}
                 filtro={filtro}
                 onFiltroChange={(f) => startTransition(() => setFiltro(f))}
+                loadingProcessos={loadingProcessos}
               />
 
               {filtro !== "todos" && (

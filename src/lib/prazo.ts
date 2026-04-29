@@ -88,6 +88,13 @@ export function obterRegraPrazoPA(tipoPA: string | undefined | null): {
 }
 export function obterRegraPrazoPA(
   tipoPA: string | undefined | null,
+  configuracao: Partial<ProcessualDeadlineSettings> | null | undefined,
+): {
+  diasIniciais: number;
+  diasProrrogacao: number;
+}
+export function obterRegraPrazoPA(
+  tipoPA: string | undefined | null,
   configuracao?: Partial<ProcessualDeadlineSettings> | null,
 ): {
   diasIniciais: number;

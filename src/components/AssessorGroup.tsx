@@ -20,9 +20,11 @@ interface Props {
   siteSettings?: SiteSettings;
   unreadProcessIds?: Set<string>;
   onReadProcess?: (processoId: string) => void;
+  /** Quando `true`, a coluna usa largura ampliada (450px) em telas ≥sm. */
+  isWide?: boolean;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false }: Props) {
   const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">("andamento");
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
@@ -147,7 +149,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
   return (
     <div 
       ref={setNodeRef}
-      className={`shrink-0 w-[88vw] sm:w-[340px] snap-start flex flex-col rounded-3xl bg-card border shadow-card overflow-hidden transition-all ${
+      className={`shrink-0 w-[88vw] ${isWide ? "sm:w-[450px]" : "sm:w-[340px]"} snap-start flex flex-col rounded-3xl bg-card border shadow-card overflow-hidden transition-all ${
         isOver ? "border-blue-500 border-2 ring-2 ring-blue-200 scale-[1.02]" : "border-border"
       }`}
     >

@@ -85,6 +85,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
   useEffect(() => {
     let unsubProcessos: (() => void) | null = null;
     let unsubConcluidos: (() => void) | null = null;
+    let timeoutCarregamento: ReturnType<typeof setTimeout> | null = null;
 
     // Aguarda o Firebase Auth resolver o estado de autenticação antes de inscrever os listeners
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -94,6 +95,10 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       if (mergeTimerRef.current) {
         clearTimeout(mergeTimerRef.current);
         mergeTimerRef.current = null;
+      }
+      if (timeoutCarregamento) {
+        clearTimeout(timeoutCarregamento);
+        timeoutCarregamento = null;
       }
 
       if (!firebaseUser) {
@@ -174,6 +179,44 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       let processosCacheAtivos: any[] = [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let processosCacheConcluidos: any[] = [];
+
+      // ---------- SINCRONIZAÇÃO ESTRITA AO SERVIDOR ----------
+      // O Firestore SDK dispara onSnapshot duas vezes ao iniciar:
+      //   1) com `metadata.fromCache === true` → dados antigos do IndexedDB ("ghost")
+      //   2) com `metadata.fromCache === false` → dados frescos confirmados pelo servidor
+      // Mantemos `carregando=true` até ambos os listeners terem confirmado servidor
+      // (ou terem falhado, para não travar a UI eternamente).
+      let ativosSyncedServidor = false;
+      let concluidosSyncedServidor = false;
+      const tentarLiberarCarregamento = () => {
+        if (ativosSyncedServidor && concluidosSyncedServidor) {
+          if (timeoutCarregamento) {
+            clearTimeout(timeoutCarregamento);
+            timeoutCarregamento = null;
+          }
+          setCarregando(false);
+        }
+      };
+
+      // ---------- TIMEOUT DE DESISTÊNCIA (3s) ----------
+      // Se o servidor não responder em 3s (rede lenta, captive portal, índice ausente,
+      // backend indisponível...), liberamos a UI compulsoriamente. Os dados do CACHE já
+      // foram entregues pelo onSnapshot quase instantaneamente — melhor mostrar dados
+      // potencialmente stale do que deixar o usuário preso em "…" indefinidamente.
+      timeoutCarregamento = setTimeout(() => {
+        if (!ativosSyncedServidor || !concluidosSyncedServidor) {
+          console.warn(
+            "⏱️ useProcessos: timeout de 3s atingido sem confirmação do servidor." +
+              " Liberando UI com dados do cache local. Verifique conectividade ou" +
+              " índices do Firestore se isso acontecer com frequência.",
+            { ativosSyncedServidor, concluidosSyncedServidor },
+          );
+          ativosSyncedServidor = true;
+          concluidosSyncedServidor = true;
+          setCarregando(false);
+        }
+        timeoutCarregamento = null;
+      }, 3000);
 
       // ARQUITETURA HÍBRIDA: o snapshot principal traz só ATIVOS (performance);
       // um segundo listener traz os ÚLTIMOS 50 concluídos para popular a aba
@@ -428,7 +471,6 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       // }
       
             setProcessos(listaProcessos);
-            setCarregando(false);
             setErro(null);
           })();
         }, 40);
@@ -462,11 +504,25 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         (snapshot) => {
           processosCacheAtivos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           mesclarProcessosAutorizados();
+          // Só marcamos "sincronizado" quando os dados vierem do SERVIDOR.
+          // Snapshots com fromCache=true são entregas rápidas do IndexedDB local
+          // (potencialmente stale) — ignoramos para o gate de carregamento.
+          if (!snapshot.metadata.fromCache && !ativosSyncedServidor) {
+            ativosSyncedServidor = true;
+            tentarLiberarCarregamento();
+          }
         },
         (err) => {
-          console.error("❌ Erro ao buscar processos ativos:", err);
+          console.error(
+            "❌ Erro no listener de processos ATIVOS:" +
+              " Verifique se o índice composto do Firestore foi criado" +
+              " (setor + ativo). Abra o link sugerido no console do Firebase.",
+            err,
+          );
           setErro("Erro ao carregar processos");
-          setCarregando(false);
+          // Mesmo em erro, liberamos o gate para evitar UI travada em "…".
+          ativosSyncedServidor = true;
+          tentarLiberarCarregamento();
         }
       );
 
@@ -506,17 +562,26 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         (snapshot) => {
           processosCacheConcluidos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           mesclarProcessosAutorizados();
+          if (!snapshot.metadata.fromCache && !concluidosSyncedServidor) {
+            concluidosSyncedServidor = true;
+            tentarLiberarCarregamento();
+          }
         },
         (err) => {
-          console.warn(
-            "⚠️ Listener de concluídos recentes falhou — a aba 'Concluídos' do Kanban" +
-              " pode ficar vazia. Provavelmente é necessário criar um ÍNDICE COMPOSTO no" +
-              " Firestore (setor + ativo + atualizadoEm). Abra o link gerado no console.",
+          console.error(
+            "❌ Erro no listener de processos CONCLUÍDOS:" +
+              " Verifique se o índice composto do Firestore foi criado" +
+              " (setor + ativo + atualizadoEm desc). Abra o link sugerido no console do Firebase." +
+              " A aba 'Concluídos' do Kanban pode ficar vazia até o índice ser provisionado.",
             err,
           );
           // Não seta erro global: a UI dos ativos continua funcionando.
           processosCacheConcluidos = [];
           mesclarProcessosAutorizados();
+          // Libera o gate — sem este listener, concluídos históricos virão pelo
+          // getCountFromServer do Dashboard de qualquer forma.
+          concluidosSyncedServidor = true;
+          tentarLiberarCarregamento();
         }
       );
     }); // fecha onAuthStateChanged
@@ -526,6 +591,10 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       if (mergeTimerRef.current) {
         clearTimeout(mergeTimerRef.current);
         mergeTimerRef.current = null;
+      }
+      if (timeoutCarregamento) {
+        clearTimeout(timeoutCarregamento);
+        timeoutCarregamento = null;
       }
       unsubAuth();
       if (unsubProcessos) unsubProcessos();

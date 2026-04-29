@@ -588,6 +588,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         siteSettings={siteSettings}
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
+                        isWide={a.nome === paColunaLabelPorId.get("sindicancia")}
                       />
                     ))}
                   </div>

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { calcularFaixasProrrogacaoPA, calcularPrazoFinalPA, formatarData, obterRegraPrazoPA } from "@/lib/prazo";
+import { addDays, format } from "date-fns";
 import { toast } from "sonner";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
@@ -167,6 +168,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
 
   const tipoProcesso = processo?.tipoPA || "";
   const isConselho = tipoProcesso === "Conselho de Disciplina" || tipoProcesso === "Conselho de Justificação";
+  const isSindicancia = tipoProcesso === "Sindicância" || tipoProcesso === "Sindicancia";
   const { diasIniciais, diasProrrogacao } = obterRegraPrazoPA(tipoProcesso);
   const fluxoAtual = isConselho ? "conselho" : "padrao";
 
@@ -728,6 +730,12 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               </div>
             )}
 
+            {isSindicancia && (
+              <Button onClick={entregarSindicancia} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <CheckCircle2 className="w-4 h-4 mr-1" /> Sindicância Entregue
+              </Button>
+            )}
+
             <Button onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_ENVIAR_SOLUCAO", "AGUARDANDO_CHEFIA_SOLUCAO"), "Solução enviada.")} className="w-full bg-slate-900 hover:bg-black">
               <PenTool className="w-4 h-4 mr-1" /> Elaborar Solução e Enviar à Chefia
             </Button>
@@ -751,8 +759,83 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
             <Button disabled={!dataAssinatura} onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_CHEFIA_CONFIRMA_ASSINATURA", "AGUARDANDO_PRAZO"), "Assinatura confirmada.")} className="w-full bg-indigo-600">Confirmar e Devolver</Button>
           </div>
         );
+
+      // Tarefa 2 — Chefia também precisa enxergar o botão "Sindicância Entregue"
+      // quando uma Sindicância está em curso (admin pode operar pelo encarregado).
+      case "EM_CURSO":
+        if (!isSindicancia) {
+          return <div className="text-center text-sm text-slate-500 py-4">Aguardando ação do Assessor.</div>;
+        }
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl text-sm text-emerald-900">
+              <h4 className="font-bold flex items-center gap-2 mb-1">
+                <Clock className="w-4 h-4" /> Sindicância em curso
+              </h4>
+              Ao registrar a entrega, será aberto um novo prazo de <strong>10 dias</strong> para confecção da solução.
+            </div>
+            <Button onClick={entregarSindicancia} className="w-full bg-emerald-600 hover:bg-emerald-700">
+              <CheckCircle2 className="w-4 h-4 mr-1" /> Sindicância Entregue
+            </Button>
+          </div>
+        );
+
       default:
         return <div className="text-center text-sm text-slate-500 py-4">Aguardando ação do Assessor.</div>;
+    }
+  };
+
+  /**
+   * Tarefa 1 — Sindicância entregue pelo encarregado.
+   * Quando uma Sindicância em curso é entregue, abrimos um novo prazo de 10 dias
+   * (a partir de hoje) para a confecção da solução pela AssJur.
+   * - Mantém a situação em EM_CURSO (assessor segue trabalhando na solução).
+   * - Reseta dataInicioPrazo para hoje e prazoFatal/finalPrazo para hoje + 10 dias.
+   * - Usa atualizarComSnapshotPA para preservar o snapshot de auditoria (Tarefa 3).
+   */
+  const entregarSindicancia = async () => {
+    if (!processoId || !user) return;
+    if (!isSindicancia) {
+      toast.error("Ação disponível apenas para Sindicâncias.");
+      return;
+    }
+    try {
+      const hoje = new Date();
+      const hojeISO = format(hoje, "yyyy-MM-dd");
+      const novoPrazoISO = format(addDays(hoje, 10), "yyyy-MM-dd");
+      const descricao = "Sindicância entregue pelo encarregado. Iniciado prazo de 10 dias para confecção da solução.";
+
+      await atualizarComSnapshotPA({
+        situacaoFluxo: "EM_CURSO",
+        status: "andamento",
+        finalizado: false,
+        dataInicioPrazo: hojeISO,
+        prazoFatal: novoPrazoISO,
+        finalPrazo: novoPrazoISO,
+        descricao,
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+      });
+      await registrarHistorico(
+        `${descricao} Novo prazo fatal: ${formatarData(novoPrazoISO)}.`,
+      );
+
+      setDataInicioPrazo(hojeISO);
+      setSituacaoFluxo("EM_CURSO");
+      if (processo) {
+        setProcesso({
+          ...processo,
+          situacaoFluxo: "EM_CURSO",
+          dataInicioPrazo: hojeISO,
+          prazoFatal: novoPrazoISO,
+          finalPrazo: novoPrazoISO,
+        });
+      }
+      if (onSuccess) onSuccess();
+      toast.success(`Sindicância entregue. Novo prazo: ${formatarData(novoPrazoISO)}.`);
+    } catch (error) {
+      console.error("Erro ao registrar entrega da sindicância:", error);
+      toast.error("Falha ao registrar a entrega da sindicância.");
     }
   };
 

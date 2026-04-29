@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Inbox,
   BarChart2,
+  Loader2,
 } from "lucide-react";
 import {
   collection,
@@ -25,6 +26,11 @@ interface Props {
   processos: Processo[];
   filtro: FiltroPrazo;
   onFiltroChange: (f: FiltroPrazo) => void;
+  /**
+   * Estado de sincronização do `useProcessos` com o servidor.
+   * Enquanto `true`, o array `processos` pode ser apenas o cache local (stale).
+   */
+  loadingProcessos?: boolean;
 }
 
 interface ServerStats {
@@ -49,7 +55,7 @@ function ehDoMesAtual(value: unknown, ref: Date): boolean {
   return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
 }
 
-export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
+export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos = false }: Props) {
   const { user } = useAuth();
   const ehAdmin = isAdmin(user);
   const setorUsuario = String(user?.setor || "").trim().toUpperCase();
@@ -109,6 +115,19 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
   // poderíamos contar localmente — mas o limite de 50 é propositadamente baixo,
   // então continuamos batendo no servidor para o total HISTÓRICO real.
   const [stats, setStats] = useState<ServerStats>(STATS_INICIAIS);
+  // Tarefa 3: Fallback de resiliência. Se o servidor demorar mais de 3s para responder
+  // às contagens, liberamos a UI mesmo assim — melhor mostrar dados parciais (ainda sem
+  // o totalConcluidos histórico) do que travar o usuário em "…" indefinidamente.
+  const [statsTimeout, setStatsTimeout] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    setStatsTimeout(false);
+    const id = setTimeout(() => {
+      setStatsTimeout(true);
+    }, 3000);
+    return () => clearTimeout(id);
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -160,11 +179,33 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
   // ---------- Derivados ----------
   const { totalConcluidos, finalizadosMes } = stats;
 
-  // Tarefa 3: total geral = ativos (props) + concluídos (server)
+  // Tarefa 1+2+4: "dadosProntos" agora exige confirmação do servidor em DOIS pontos:
+  //   - `loadingProcessos === false`: o useProcessos já recebeu snapshot com
+  //     `metadata.fromCache === false` (servidor confirmou). Coleções vazias
+  //     (zero processos reais) também disparam fromCache=false, então não travam aqui.
+  //   - `stats.carregando === false`: o getCountFromServer já retornou
+  //     (mesmo que com count=0).
+  // Tarefa 3 (resiliência): se a contagem do servidor demorar >3s,
+  // `statsTimeout` libera a UI assim mesmo — a interface não fica refem do servidor.
+  const dadosProntos = !loadingProcessos && (!stats.carregando || statsTimeout);
+
+  // Tarefa 3: total geral = ativos (props) + concluídos (server).
+  // Enquanto !dadosProntos, mantemos os derivados em 0 mas NÃO os exibimos
+  // (a proteção ocorre no JSX), evitando que o "0%" pisque na tela.
   const totalGeral = acervoAtivo + totalConcluidos;
-  const taxaConclusao = totalGeral > 0 ? Math.round((totalConcluidos / totalGeral) * 100) : 0;
+  const taxaConclusao =
+    dadosProntos && totalGeral > 0
+      ? Math.round((totalConcluidos / totalGeral) * 100)
+      : 0;
   const resolutividadeMes =
-    criadosMes > 0 ? Math.round((finalizadosMes / criadosMes) * 100) : 0;
+    dadosProntos && criadosMes > 0
+      ? Math.round((finalizadosMes / criadosMes) * 100)
+      : 0;
+
+  /** Placeholder visual enquanto cache e servidor sincronizam. */
+  const placeholder = (
+    <Loader2 className="inline-block h-[0.7em] w-[0.7em] animate-spin opacity-60 align-middle" />
+  );
 
   return (
     <div className="space-y-4">
@@ -189,23 +230,29 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground font-medium">Cadastrados</span>
-              <span className="text-sm font-bold tabular-nums text-foreground">{criadosMes}</span>
+              <span className="text-sm font-bold tabular-nums text-foreground">
+                {dadosProntos ? criadosMes : placeholder}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground font-medium">Finalizados</span>
-              <span className="text-sm font-bold tabular-nums text-[var(--deadline-safe)]">{finalizadosMes}</span>
+              <span className="text-sm font-bold tabular-nums text-[var(--deadline-safe)]">
+                {dadosProntos ? finalizadosMes : placeholder}
+              </span>
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs text-muted-foreground font-medium">Resolutividade</span>
-              <span className="text-xs font-bold tabular-nums text-foreground">{resolutividadeMes}%</span>
+              <span className="text-xs font-bold tabular-nums text-foreground">
+                {dadosProntos ? `${resolutividadeMes}%` : placeholder}
+              </span>
             </div>
             <div className="h-2 rounded-full bg-muted overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-[oklch(0.6_0.16_230)] to-[oklch(0.78_0.18_145)] transition-all"
-                style={{ width: `${resolutividadeMes}%` }}
+                style={{ width: dadosProntos ? `${resolutividadeMes}%` : "0%" }}
               />
             </div>
           </div>
@@ -224,18 +271,18 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
               {/* Cadastrados (Histórico Total) */}
               <div>
                 <div className="text-5xl font-bold font-display tabular-nums leading-none">
-                  {totalGeral}
+                  {dadosProntos ? totalGeral : placeholder}
                 </div>
                 <p className="text-sm text-white/70 mt-2">Processos cadastrados</p>
                 <div className="flex flex-wrap gap-1.5 mt-3">
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
-                    DU: {ativosDU}
+                    DU: {dadosProntos ? ativosDU : "…"}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
-                    PA: {ativosPA}
+                    PA: {dadosProntos ? ativosPA : "…"}
                   </span>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
-                    Ativos: {acervoAtivo}
+                    Ativos: {dadosProntos ? acervoAtivo : "…"}
                   </span>
                 </div>
               </div>
@@ -244,18 +291,20 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
               <div>
                 <div className="flex items-end gap-2 leading-none">
                   <div className="text-5xl font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
-                    {totalConcluidos}
+                    {dadosProntos ? totalConcluidos : placeholder}
                   </div>
                   <div className="mb-1 text-base font-bold text-[oklch(0.78_0.18_145)] opacity-80">
-                    {taxaConclusao}%
+                    {dadosProntos ? `${taxaConclusao}%` : "…"}
                   </div>
                 </div>
                 <p className="text-sm text-white/70 mt-2">Finalizados</p>
-                <p className="text-xs text-white/50 mt-0.5">{taxaConclusao}% do total cadastrado</p>
+                <p className="text-xs text-white/50 mt-0.5">
+                  {dadosProntos ? `${taxaConclusao}% do total cadastrado` : "sincronizando com servidor…"}
+                </p>
                 <div className="mt-3 h-1.5 rounded-full bg-white/15 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-[oklch(0.78_0.18_145)] transition-all"
-                    style={{ width: `${taxaConclusao}%` }}
+                    style={{ width: dadosProntos ? `${taxaConclusao}%` : "0%" }}
                   />
                 </div>
               </div>
@@ -268,7 +317,7 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           label="Entradas no mês"
-          value={criadosMes}
+          value={dadosProntos ? criadosMes : placeholder}
           icon={Inbox}
           tone="blue"
           active={false}
@@ -276,21 +325,21 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
         />
         <KpiCard
           label="Conclusões no mês"
-          value={finalizadosMes}
+          value={dadosProntos ? finalizadosMes : placeholder}
           icon={CheckCircle2}
           tone="green"
           active={false}
         />
         <KpiCard
           label="Índice de Resolutividade"
-          value={`${resolutividadeMes}%`}
+          value={dadosProntos ? `${resolutividadeMes}%` : placeholder}
           icon={TrendingUp}
           tone="purple"
           active={false}
         />
         <KpiCard
           label="Acervo Total"
-          value={totalGeral}
+          value={dadosProntos ? totalGeral : placeholder}
           icon={Trophy}
           tone="amber"
           active={false}
@@ -301,8 +350,8 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <KpiCard
           label="Vencidos"
-          value={vencidos}
-          sub={vencidos > 0 ? "ação imediata" : "tudo em dia"}
+          value={dadosProntos ? vencidos : placeholder}
+          sub={dadosProntos ? (vencidos > 0 ? "ação imediata" : "tudo em dia") : "sincronizando…"}
           icon={AlertTriangle}
           tone="red"
           active={filtro === "vencidos"}
@@ -310,8 +359,8 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
         />
         <KpiCard
           label="Vencem Hoje"
-          value={hoje}
-          sub={hoje > 0 ? "priorizar" : "sem prazos"}
+          value={dadosProntos ? hoje : placeholder}
+          sub={dadosProntos ? (hoje > 0 ? "priorizar" : "sem prazos") : "sincronizando…"}
           icon={Clock}
           tone="amber"
           active={filtro === "hoje"}
@@ -319,8 +368,8 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
         />
         <KpiCard
           label="Próximos 7 dias"
-          value={semana}
-          sub="planejar semana"
+          value={dadosProntos ? semana : placeholder}
+          sub={dadosProntos ? "planejar semana" : "sincronizando…"}
           icon={CalendarRange}
           tone="blue"
           active={filtro === "semana"}
@@ -341,7 +390,7 @@ function KpiCard({
   onClick,
 }: {
   label: string;
-  value: string | number;
+  value: ReactNode;
   sub?: string;
   icon: typeof AlertTriangle;
   tone: "blue" | "green" | "purple" | "amber" | "red";
