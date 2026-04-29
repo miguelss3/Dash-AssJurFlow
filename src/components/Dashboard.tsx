@@ -12,9 +12,6 @@ import {
 import {
   collection,
   getCountFromServer,
-  getDocs,
-  limit,
-  orderBy,
   query,
   where,
   type QueryConstraint,
@@ -22,7 +19,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
 import type { Processo, FiltroPrazo } from "@/types/processo";
-import { statusPrazo } from "@/lib/prazo";
+import { statusPrazo, toDateLocal } from "@/lib/prazo";
 
 interface Props {
   processos: Processo[];
@@ -43,42 +40,13 @@ const STATS_INICIAIS: ServerStats = {
 };
 
 /**
- * Converte com segurança qualquer formato de data vindo do Firestore.
- * Aceita Timestamp nativo (com .toDate()), objetos { seconds, nanoseconds },
- * Date instância ou String ISO. Retorna null se não conseguir converter.
+ * Verifica se uma data (Timestamp do Firestore OU String ISO) pertence ao mesmo
+ * mês/ano de uma data de referência. Usa fuso LOCAL (correto para Manaus/Brasil).
  */
-function toDateSafe(value: unknown): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-
-  // Firestore Timestamp (cliente SDK)
-  if (typeof value === "object" && value !== null) {
-    const maybeTs = value as { toDate?: () => Date; seconds?: number };
-    if (typeof maybeTs.toDate === "function") {
-      try {
-        const d = maybeTs.toDate();
-        return Number.isNaN(d.getTime()) ? null : d;
-      } catch {
-        /* cai pro próximo fallback */
-      }
-    }
-    if (typeof maybeTs.seconds === "number") {
-      return new Date(maybeTs.seconds * 1000);
-    }
-  }
-
-  if (typeof value === "string") {
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-
-  return null;
-}
-
 function ehDoMesAtual(value: unknown, ref: Date): boolean {
-  const d = toDateSafe(value);
+  const d = toDateLocal(value);
   if (!d) return false;
-  return d.getUTCFullYear() === ref.getUTCFullYear() && d.getUTCMonth() === ref.getUTCMonth();
+  return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
 }
 
 export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
@@ -88,8 +56,16 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
   const escopoSetor =
     !ehAdmin && (setorUsuario === "DU" || setorUsuario === "PA") ? setorUsuario : null;
 
-  // ---------- KPIs de PRAZO (client-side, sobre os ATIVOS recebidos via prop) ----------
-  const ativosDUFatal = processos.filter((p) => {
+  // O array `processos` agora vem HÍBRIDO do useProcessos: ATIVOS + Últimos 50
+  // CONCLUÍDOS (para a aba "Concluídos" do Kanban). Separamos aqui.
+  const processosAtivos = useMemo(
+    () => processos.filter((p) => p.status !== "concluido"),
+    [processos],
+  );
+
+  // ---------- KPIs de PRAZO (client-side, somente sobre ATIVOS) ----------
+  // statusPrazo agora aceita Timestamp do Firestore OU String ISO (ver lib/prazo).
+  const ativosDUFatal = processosAtivos.filter((p) => {
     const setor = (p.setor || p.tipo || "").toString().toUpperCase();
     return setor === "DU" && Boolean(p.prazoFatal);
   });
@@ -100,16 +76,16 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
     return s === "today" || s === "soon";
   }).length;
 
-  // ---------- Contagem por setor a partir dos ATIVOS (props) ----------
-  const ativosDU = processos.filter(
+  // ---------- Contagem por setor a partir dos ATIVOS ----------
+  const ativosDU = processosAtivos.filter(
     (p) => (p.setor || p.tipo || "").toString().toUpperCase() === "DU",
   ).length;
-  const ativosPA = processos.filter(
+  const ativosPA = processosAtivos.filter(
     (p) => (p.setor || p.tipo || "").toString().toUpperCase() === "PA",
   ).length;
-  const acervoAtivo = processos.length;
+  const acervoAtivo = processosAtivos.length;
 
-  // ---------- Entradas no mês: deriva da prop, lidando com Timestamp OU String ISO ----------
+  // ---------- Entradas no mês: deriva da prop unificada (Timestamp OU String ISO) ----------
   const mesRef = useMemo(() => new Date(), []);
   const criadosMes = useMemo(
     () =>
@@ -129,6 +105,9 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
   );
 
   // ---------- Estatísticas SERVIDOR (concluídos = ativo:false) ----------
+  // Como o useProcessos agora também carrega os ÚLTIMOS 50 concluídos no cliente,
+  // poderíamos contar localmente — mas o limite de 50 é propositadamente baixo,
+  // então continuamos batendo no servidor para o total HISTÓRICO real.
   const [stats, setStats] = useState<ServerStats>(STATS_INICIAIS);
 
   useEffect(() => {
@@ -145,7 +124,7 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
           ? [where("setor", "in", ["DU", "PA"])]
           : [];
 
-      // ---------- Tarefa 1: contagem TOTAL de concluídos (ativo == false) ----------
+      // ---------- Contagem TOTAL de concluídos (ativo == false) ----------
       let totalConcluidos = 0;
       try {
         const qConcluidos = query(
@@ -159,29 +138,13 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
         console.error("Dashboard: falha ao contar concluídos (ativo==false):", err);
       }
 
-      // ---------- Tarefa 2: conclusões do mês — query híbrida ----------
-      let finalizadosMes = 0;
-      try {
-        const qFinalizadosRecentes = query(
-          processosRef,
-          ...escopoBase,
-          where("ativo", "==", false),
-          orderBy("atualizadoEm", "desc"),
-          limit(200),
-        );
-        const docsSnap = await getDocs(qFinalizadosRecentes);
-        finalizadosMes = docsSnap.docs.reduce((acc, doc) => {
-          const data = doc.data() as { atualizadoEm?: unknown };
-          return acc + (ehDoMesAtual(data.atualizadoEm, mesRef) ? 1 : 0);
-        }, 0);
-      } catch (err) {
-        console.warn(
-          "Dashboard: a query de finalizadosMes falhou — provavelmente exige um " +
-            "ÍNDICE COMPOSTO no Firestore (campos: setor + ativo + atualizadoEm). " +
-            "Abra o link gerado pelo Firebase no console do navegador para criar o índice automaticamente.",
-          err,
-        );
-      }
+      // ---------- Conclusões do mês (derivada do cache local de concluídos) ----------
+      // O useProcessos já baixou os últimos 50 concluídos ordenados por
+      // `atualizadoEm desc`, que cobre confortavelmente o mês corrente.
+      const finalizadosMes = processos.reduce((acc, p) => {
+        if (p.status !== "concluido") return acc;
+        return acc + (ehDoMesAtual(p.atualizadoEm, mesRef) ? 1 : 0);
+      }, 0);
 
       if (cancelado) return;
       setStats({ totalConcluidos, finalizadosMes, carregando: false });
@@ -192,7 +155,7 @@ export function Dashboard({ processos, filtro, onFiltroChange }: Props) {
     return () => {
       cancelado = true;
     };
-  }, [user, ehAdmin, escopoSetor, mesRef]);
+  }, [user, ehAdmin, escopoSetor, mesRef, processos]);
 
   // ---------- Derivados ----------
   const { totalConcluidos, finalizadosMes } = stats;

@@ -10,6 +10,8 @@ import {
   doc,
   getDocs,
   writeBatch,
+  orderBy,
+  limit,
   type Query,
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
@@ -77,11 +79,13 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
 
   useEffect(() => {
     let unsubProcessos: (() => void) | null = null;
+    let unsubConcluidos: (() => void) | null = null;
 
     // Aguarda o Firebase Auth resolver o estado de autenticação antes de inscrever os listeners
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
       // Cancela listeners anteriores se existirem
       if (unsubProcessos) { unsubProcessos(); unsubProcessos = null; }
+      if (unsubConcluidos) { unsubConcluidos(); unsubConcluidos = null; }
       if (mergeTimerRef.current) {
         clearTimeout(mergeTimerRef.current);
         mergeTimerRef.current = null;
@@ -113,7 +117,35 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       );
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let processosCache: any[] = [];
+      let processosCacheAtivos: any[] = [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let processosCacheConcluidos: any[] = [];
+
+      // ARQUITETURA HÍBRIDA: o snapshot principal traz só ATIVOS (performance);
+      // um segundo listener traz os ÚLTIMOS 50 concluídos para popular a aba
+      // "Concluídos" do Kanban sem inflar memória.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const combinarCaches = (): any[] => {
+        if (processosCacheAtivos.length === 0) return processosCacheConcluidos;
+        if (processosCacheConcluidos.length === 0) return processosCacheAtivos;
+        // Dedup por id (defensivo: um doc não deve estar nos dois caches).
+        const vistos = new Set<string>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const combinado: any[] = [];
+        for (const item of processosCacheAtivos) {
+          if (item?.id && !vistos.has(item.id)) {
+            vistos.add(item.id);
+            combinado.push(item);
+          }
+        }
+        for (const item of processosCacheConcluidos) {
+          if (item?.id && !vistos.has(item.id)) {
+            vistos.add(item.id);
+            combinado.push(item);
+          }
+        }
+        return combinado;
+      };
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const carregarResponsaveisLegado = async (processosAtuais: any[]) => {
@@ -165,6 +197,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
           mergeTimerRef.current = null;
 
           void (async () => {
+            const processosCache = combinarCaches();
             const responsaveisLegado = await carregarResponsaveisLegado(processosCache);
             const listaProcessos: Processo[] = [];
       
@@ -373,13 +406,63 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       unsubProcessos = onSnapshot(
         qProcessos,
         (snapshot) => {
-          processosCache = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          processosCacheAtivos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           mesclarProcessosAutorizados();
         },
         (err) => {
-          console.error("❌ Erro ao buscar processos:", err);
+          console.error("❌ Erro ao buscar processos ativos:", err);
           setErro("Erro ao carregar processos");
           setCarregando(false);
+        }
+      );
+
+      // ---------- Listener B: ÚLTIMOS 50 CONCLUÍDOS (para a aba "Concluídos" do Kanban) ----------
+      // Usa o mesmo escopo (admin / setor / userId) porém com `ativo == false` e ordenado
+      // por `atualizadoEm` desc + limit(50). Se o índice composto não existir, o erro é
+      // capturado e o app segue funcionando — basta abrir o link do Firebase no console.
+      let qConcluidos: Query;
+      if (ehAdmin) {
+        qConcluidos = query(
+          processosRef,
+          where("ativo", "==", false),
+          where("setor", "in", ["DU", "PA"]),
+          orderBy("atualizadoEm", "desc"),
+          limit(50),
+        );
+      } else if (setorUsuario) {
+        qConcluidos = query(
+          processosRef,
+          where("ativo", "==", false),
+          where("setor", "==", setorUsuario),
+          orderBy("atualizadoEm", "desc"),
+          limit(50),
+        );
+      } else {
+        qConcluidos = query(
+          processosRef,
+          where("ativo", "==", false),
+          where("userId", "==", firebaseUser.uid),
+          orderBy("atualizadoEm", "desc"),
+          limit(50),
+        );
+      }
+
+      unsubConcluidos = onSnapshot(
+        qConcluidos,
+        (snapshot) => {
+          processosCacheConcluidos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          mesclarProcessosAutorizados();
+        },
+        (err) => {
+          console.warn(
+            "⚠️ Listener de concluídos recentes falhou — a aba 'Concluídos' do Kanban" +
+              " pode ficar vazia. Provavelmente é necessário criar um ÍNDICE COMPOSTO no" +
+              " Firestore (setor + ativo + atualizadoEm). Abra o link gerado no console.",
+            err,
+          );
+          // Não seta erro global: a UI dos ativos continua funcionando.
+          processosCacheConcluidos = [];
+          mesclarProcessosAutorizados();
         }
       );
     }); // fecha onAuthStateChanged
@@ -392,6 +475,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       }
       unsubAuth();
       if (unsubProcessos) unsubProcessos();
+      if (unsubConcluidos) unsubConcluidos();
     };
   }, [authUser, siteSettings]);
 

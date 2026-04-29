@@ -7,6 +7,60 @@ import {
 
 export type StatusPrazo = "overdue" | "today" | "soon" | "safe";
 
+/**
+ * Aceita qualquer formato de data vindo do Firestore ou da aplicação:
+ *  - Date instance
+ *  - Firestore Timestamp (com `.toDate()`)
+ *  - { seconds, nanoseconds } (Timestamp serializado)
+ *  - String ISO completa (`2026-04-29T13:00:00.000Z`)
+ *  - String somente data (`2026-04-29`) — interpretada como meia-noite LOCAL
+ *    para não sofrer deslocamento em fusos negativos (ex.: Manaus UTC-4),
+ *    o que provocaria "hoje" virar "ontem".
+ * Retorna `null` se não conseguir converter.
+ */
+export function toDateLocal(value: unknown): Date | null {
+  if (value === null || value === undefined || value === "") return null;
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value === "object") {
+  const v = value as { toDate?: () => Date; seconds?: number };
+    if (typeof v.toDate === "function") {
+      try {
+        const d = v.toDate();
+        return Number.isNaN(d.getTime()) ? null : d;
+      } catch {
+        /* tenta seconds */
+      }
+    }
+    if (typeof v.seconds === "number") {
+      const d = new Date(v.seconds * 1000);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+  }
+
+  if (typeof value === "string") {
+    const texto = value.trim();
+    if (!texto) return null;
+    const apenasData = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (apenasData) {
+      const d = new Date(
+        Number(apenasData[1]),
+        Number(apenasData[2]) - 1,
+        Number(apenasData[3]),
+        0, 0, 0, 0,
+      );
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    const d = new Date(texto);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
+}
+
 type ProrrogacaoPA = {
   dias?: number | null;
   inicio?: string | null;
@@ -201,65 +255,71 @@ export function normalizarTextoHistoricoPrazoPA(
   return dataFormatada === "—" ? texto : `Prazo do PA iniciado em ${dataFormatada}.`;
 }
 
-export function diasRestantes(prazoISO: string | undefined | null): number {
-  if (!prazoISO) return 999; // Sem prazo = prazo distante
-  try {
-    return differenceInCalendarDays(parseISO(prazoISO), new Date());
-  } catch {
-    return 999; // Erro ao parsear = prazo distante
-  }
+export function diasRestantes(prazo: unknown): number {
+  if (!prazo) return 999; // Sem prazo = prazo distante
+  const d = toDateLocal(prazo);
+  if (!d) return 999;
+  // differenceInCalendarDays usa fuso LOCAL (correto para Manaus/Brasil).
+  return differenceInCalendarDays(d, new Date());
 }
 
-export function statusPrazo(prazoISO: string | undefined | null): StatusPrazo {
-  if (!prazoISO) return "safe"; // Sem prazo = não tem urgência
-  const d = diasRestantes(prazoISO);
+export function statusPrazo(prazo: unknown): StatusPrazo {
+  if (!prazo) return "safe"; // Sem prazo = não tem urgência
+  const d = diasRestantes(prazo);
   if (d < 0) return "overdue";
   if (d === 0) return "today";
   if (d <= 5) return "soon";
   return "safe";
 }
 
-export function rotuloPrazo(prazoISO: string | undefined | null): string {
-  if (!prazoISO) return "—";
-  const d = diasRestantes(prazoISO);
+export function rotuloPrazo(prazo: unknown): string {
+  if (!prazo) return "—";
+  const d = diasRestantes(prazo);
   if (d < 0) return `−${Math.abs(d)}d`;
   if (d === 0) return "Hoje";
   if (d === 1) return "+1d";
   return `+${d}d`;
 }
 
-export function rotuloPrazoLongo(prazoISO: string | undefined | null): string {
-  if (!prazoISO) return "Sem prazo definido";
-  const d = diasRestantes(prazoISO);
+export function rotuloPrazoLongo(prazo: unknown): string {
+  if (!prazo) return "Sem prazo definido";
+  const d = diasRestantes(prazo);
   if (d < 0) return `Vencido há ${Math.abs(d)} ${Math.abs(d) === 1 ? "dia" : "dias"}`;
   if (d === 0) return "Vence hoje";
   if (d === 1) return "Vence amanhã";
   return `Faltam ${d} dias`;
 }
 
-export function formatarData(prazoISO: string | undefined | null): string {
-  if (!prazoISO) return "—";
+export function formatarData(prazo: unknown): string {
+  if (!prazo) return "—";
 
-  const dataCivil = normalizarDataPrazoPA(prazoISO);
-  if (dataCivil) {
-    try {
-      return format(parseISO(`${dataCivil}T00:00:00`), "dd/MM/yyyy", { locale: ptBR });
-    } catch {
-      return "—";
+  // String simples "YYYY-MM-DD" → caminho legado preservado.
+  if (typeof prazo === "string") {
+    const dataCivil = normalizarDataPrazoPA(prazo);
+    if (dataCivil) {
+      try {
+        return format(parseISO(`${dataCivil}T00:00:00`), "dd/MM/yyyy", { locale: ptBR });
+      } catch {
+        /* cai no fallback robusto abaixo */
+      }
     }
   }
 
+  const d = toDateLocal(prazo);
+  if (!d) return "—";
   try {
-    return format(parseISO(prazoISO), "dd/MM/yyyy", { locale: ptBR });
+    return format(d, "dd/MM/yyyy", { locale: ptBR });
   } catch {
     return "—";
   }
 }
 
-export function formatarDataCurta(prazoISO: string | undefined | null): string {
-  if (!prazoISO) return "—";
+export function formatarDataCurta(prazo: unknown): string {
+  if (!prazo) return "—";
+  const d = toDateLocal(prazo);
+  if (!d) return "—";
   try {
-    return format(parseISO(prazoISO), "dd MMM", { locale: ptBR });
+    return format(d, "dd MMM", { locale: ptBR });
   } catch {
     return "—";
   }
