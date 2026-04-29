@@ -18,6 +18,11 @@ import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import type { Processo, StatusProcesso, TipoProcesso, Prioridade } from "@/types/processo";
 import { isAdmin, type AuthUser } from "./useAuth";
+
+// Sentinela de m\u00f3dulo: garante que a recupera\u00e7\u00e3o de "fantasmas" (docs sem o
+// campo `ativo`) rode no m\u00e1ximo UMA vez por sess\u00e3o do navegador, mesmo que o
+// hook seja remontado (StrictMode, troca de rota, etc.).
+let recuperacaoFantasmasExecutada = false;
 import { calcularPrazoFinalPA, normalizarTextoHistoricoPrazoPA } from "@/lib/prazo";
 import type { SiteSettings } from "@/types/siteSettings";
 
@@ -115,6 +120,55 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       const setorUsuario = normalizarSetor(
         usuarioEfetivo.setor || usuarioEfetivo.role || usuarioEfetivo.secao || usuarioEfetivo.cargo,
       );
+
+      // ---------- RECUPERA\u00c7\u00c3O DE EMERG\u00caNCIA: processos "fantasmas" ----------
+      // Os listeners principais usam `where("ativo","==",true|false)`, que NUNCA
+      // retorna documentos sem o campo `ativo`. Processos antigos (ou criados
+      // durante a janela em que o cadastro n\u00e3o injetava a flag) ficam invis\u00edveis.
+      // Aqui, apenas um admin varre a cole\u00e7\u00e3o, identifica os "\u00f3rf\u00e3os" e
+      // injeta `ativo` derivado do status (`concluido` -> false; sen\u00e3o true).
+      // \u00c9 uma rotina ONE-SHOT por sess\u00e3o (sentinela de m\u00f3dulo).
+      if (ehAdmin && !recuperacaoFantasmasExecutada) {
+        recuperacaoFantasmasExecutada = true;
+        void (async () => {
+          try {
+            const snap = await getDocs(
+              query(collection(db, "processos"), where("setor", "in", ["DU", "PA"])),
+            );
+            const fantasmas = snap.docs.filter((d) => {
+              const data = d.data() as { ativo?: unknown };
+              return data.ativo === undefined || data.ativo === null;
+            });
+            if (fantasmas.length === 0) return;
+
+            console.warn(
+              `\u26a0\ufe0f Recupera\u00e7\u00e3o de fantasmas: encontrados ${fantasmas.length} processo(s)` +
+                ` sem o campo 'ativo'. Aplicando corre\u00e7\u00e3o autom\u00e1tica...`,
+            );
+
+            // Firestore limita writeBatch a 500 ops; dividimos por seguran\u00e7a.
+            const lotes = dividirEmLotes(fantasmas, 400);
+            for (const lote of lotes) {
+              const batch = writeBatch(db);
+              for (const docSnap of lote) {
+                const data = docSnap.data() as { status?: string };
+                const statusNorm = (data.status || "").toString().toLowerCase().trim();
+                const novoAtivo = statusNorm !== "concluido" && statusNorm !== "finalizado";
+                batch.update(docSnap.ref, { ativo: novoAtivo });
+              }
+              await batch.commit();
+            }
+
+            console.warn(
+              `\u2705 Recupera\u00e7\u00e3o conclu\u00edda: ${fantasmas.length} processo(s) agora aparecem nos listeners.`,
+            );
+          } catch (err) {
+            console.error("\u274c Falha na recupera\u00e7\u00e3o de fantasmas:", err);
+            // Permite nova tentativa em sess\u00f5es futuras se a primeira falhar.
+            recuperacaoFantasmasExecutada = false;
+          }
+        })();
+      }
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let processosCacheAtivos: any[] = [];
