@@ -16,6 +16,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { toast } from "sonner";
 import type { Processo, StatusProcesso, TipoProcesso, Prioridade } from "@/types/processo";
 import { isAdmin, type AuthUser } from "./useAuth";
 
@@ -198,25 +199,42 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         }
       };
 
-      // ---------- TIMEOUT DE DESISTÊNCIA (3s) ----------
-      // Se o servidor não responder em 3s (rede lenta, captive portal, índice ausente,
-      // backend indisponível...), liberamos a UI compulsoriamente. Os dados do CACHE já
-      // foram entregues pelo onSnapshot quase instantaneamente — melhor mostrar dados
-      // potencialmente stale do que deixar o usuário preso em "…" indefinidamente.
+      // ---------- TIMEOUT DE DESISTÊNCIA (8s) ----------
+      // 8 segundos é o padrão de mercado para conexões com maior latência. Garante que
+      // o usuário veja a contagem real do servidor na maioria das vezes, mas mantém a
+      // resiliência caso o índice realmente falhe ou a rede esteja indisponível.
+      // Os dados do CACHE local já foram entregues pelo onSnapshot quase instantaneamente.
       timeoutCarregamento = setTimeout(() => {
         if (!ativosSyncedServidor || !concluidosSyncedServidor) {
-          console.warn(
-            "⏱️ useProcessos: timeout de 3s atingido sem confirmação do servidor." +
-              " Liberando UI com dados do cache local. Verifique conectividade ou" +
-              " índices do Firestore se isso acontecer com frequência.",
-            { ativosSyncedServidor, concluidosSyncedServidor },
-          );
+          const temDadosEmCache =
+            processosCacheAtivos.length > 0 || processosCacheConcluidos.length > 0;
+          const ehDev =
+            typeof import.meta !== "undefined" && (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+
+          if (temDadosEmCache) {
+            // Caminho normal: o IndexedDB já entregou snapshots; só estamos esperando
+            // a confirmação do servidor. Mensagem informativa, sem alarme.
+            console.info(
+              "ℹ️ useProcessos: Utilizando dados otimizados do cache enquanto aguarda o servidor.",
+              ehDev ? { ativosSyncedServidor, concluidosSyncedServidor } : undefined,
+            );
+          } else {
+            // Caminho excepcional: nem cache nem servidor responderam. Mantém o aviso
+            // mais detalhado para facilitar diagnóstico (índice ausente, sem permissão,
+            // captive portal, etc.).
+            console.warn(
+              "⏱️ useProcessos: timeout de 8s atingido sem dados do servidor nem cache." +
+                " Verifique conectividade, índices do Firestore ou regras de permissão.",
+              ehDev ? { ativosSyncedServidor, concluidosSyncedServidor } : undefined,
+            );
+          }
+
           ativosSyncedServidor = true;
           concluidosSyncedServidor = true;
           setCarregando(false);
         }
         timeoutCarregamento = null;
-      }, 3000);
+      }, 8000);
 
       // ARQUITETURA HÍBRIDA: o snapshot principal traz só ATIVOS (performance);
       // um segundo listener traz os ÚLTIMOS 50 concluídos para popular a aba
@@ -518,8 +536,16 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
               " Verifique se o índice composto do Firestore foi criado" +
               " (setor + ativo). Abra o link sugerido no console do Firebase.",
             err,
-          );
-          setErro("Erro ao carregar processos");
+          );          // Captura agressiva: o Firestore SDK loga o link de criação do índice
+          // como warning silencioso. Surfaceamos via toast persistente para o
+          // admin clicar no console e provisionar o índice imediatamente.
+          const codigo = (err as { code?: string })?.code;
+          if (codigo === "failed-precondition") {
+            toast.error(
+              "Índice do Firestore ausente (processos ativos). Abra o console do navegador (F12) e clique no link gerado pelo Firebase para criar o índice composto.",
+              { duration: Infinity, id: "firestore-index-ativos" },
+            );
+          }          setErro("Erro ao carregar processos");
           // Mesmo em erro, liberamos o gate para evitar UI travada em "…".
           ativosSyncedServidor = true;
           tentarLiberarCarregamento();
@@ -575,6 +601,13 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
               " A aba 'Concluídos' do Kanban pode ficar vazia até o índice ser provisionado.",
             err,
           );
+          const codigo = (err as { code?: string })?.code;
+          if (codigo === "failed-precondition") {
+            toast.error(
+              "Índice do Firestore ausente (processos concluídos). Abra o console do navegador (F12) e clique no link gerado pelo Firebase para criar o índice composto.",
+              { duration: Infinity, id: "firestore-index-concluidos" },
+            );
+          }
           // Não seta erro global: a UI dos ativos continua funcionando.
           processosCacheConcluidos = [];
           mesclarProcessosAutorizados();

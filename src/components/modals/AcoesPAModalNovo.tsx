@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
@@ -227,6 +227,68 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
                 `${acao.label} (fluxo configurável).`,
               );
             }}
+          >
+            {acao.label}
+          </Button>
+        ))}
+      </div>
+    );
+  };
+
+  /**
+   * Tarefa 1 — Motor de Botões Dinâmicos.
+   * Gera os botões de transição de estado a partir de `acoesFluxoPA` (siteSettings.paFlowActions),
+   * filtrando por:
+   *   - fromState === situacaoFluxo
+   *   - role === userRole OU role === "ambos"
+   *   - enabled === true
+   *   - track === fluxoAtual OU track === "todos"
+   * Cada botão, ao ser clicado, dispara `avancarFluxo(toState, label)`.
+   *
+   * Tarefa 3 — Mensagem amigável quando nenhuma ação está disponível para a fase atual.
+   * Use `idsExcluidos` para suprimir ações já renderizadas como botões funcionais com
+   * payload específico (ex.: "Iniciar Prazo" depende do input de data).
+   */
+  const renderBotoesDinamicosFase = (opcoes: {
+    idsExcluidos?: string[];
+    mostrarMensagemVazio?: boolean;
+    mensagemVazio?: ReactNode;
+  } = {}): ReactNode => {
+    const { idsExcluidos = [], mostrarMensagemVazio = true, mensagemVazio } = opcoes;
+    const exclusao = new Set(idsExcluidos);
+
+    const acoes = acoesFluxoPA
+      .filter((acao) => {
+        if (!acao.enabled) return false;
+        if (exclusao.has(acao.id)) return false;
+        if (acao.fromState !== situacaoFluxo) return false;
+        if (acao.role !== "ambos" && acao.role !== role) return false;
+        if (acao.track !== "todos" && acao.track !== fluxoAtual) return false;
+        return true;
+      })
+      .sort((a, b) => a.order - b.order);
+
+    if (acoes.length === 0) {
+      if (!mostrarMensagemVazio) return null;
+      return (
+        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-center text-xs text-slate-600">
+          {mensagemVazio ?? "Nenhuma ação configurada para esta fase nos Ajustes do Site."}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {acoes.map((acao) => (
+          <Button
+            key={acao.id}
+            onClick={() => {
+              void avancarFluxo(
+                acao.toState as SituacaoFluxoPA,
+                `${acao.label}.`,
+              );
+            }}
+            className="w-full bg-sky-600 hover:bg-sky-700"
           >
             {acao.label}
           </Button>
@@ -570,10 +632,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
             {cabecalhoReadOnly}
-            <Button onClick={() => avancarFluxo(proximaSituacaoConfigurada("C_ENVIAR_MEMORIA", "C_PORTARIA"), "Memória enviada à chefia.")} className="w-full bg-rose-600 hover:bg-rose-700">
-              {labelAcaoConfigurada("C_ENVIAR_MEMORIA", "Elaborar Memória e Enviar à Chefia")}
-            </Button>
-            {renderAcoesCustomizadas(["C_ENVIAR_MEMORIA"])}
+            {renderBotoesDinamicosFase()}
           </div>
         );
 
@@ -630,11 +689,24 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
             <Button onClick={() => avancarFluxo(proximaSituacaoConfigurada("C_ENVIAR_DECISAO_AUT", "C_DECISAO_AUT_NOMEANTE"), "Enviado para decisão.")} className="w-full bg-slate-800 hover:bg-black">
               <PenTool className="w-4 h-4 mr-1" /> Enviar p/ Decisão da Autoridade
             </Button>
+
+            {/* Tarefa 1 — ações adicionais configuradas em Ajustes para C_EM_CURSO */}
+            {renderBotoesDinamicosFase({
+              idsExcluidos: ["C_ENVIAR_DECISAO_AUT"],
+              mostrarMensagemVazio: false,
+            })}
           </div>
         );
 
       default:
-        return <div className="text-center text-sm text-slate-500 py-4">Aguardando ação da Chefia.</div>;
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {cabecalhoReadOnly}
+            {renderBotoesDinamicosFase({
+              mensagemVazio: "Nenhuma ação configurada para esta fase nos Ajustes do Site.",
+            })}
+          </div>
+        );
     }
   };
 
@@ -644,9 +716,7 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         return (
           <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
             {cabecalhoReadOnly}
-            <Button onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_ENVIAR_CHEFIA", "AGUARDANDO_CHEFIA"), "Enviado à chefia.")} className="w-full bg-sky-600 hover:bg-sky-700">
-              {labelAcaoConfigurada("PA_ENVIAR_CHEFIA", "Enviar para a Chefia da AssJur")}
-            </Button>
+            {renderBotoesDinamicosFase()}
           </div>
         );
 
@@ -736,14 +806,21 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               </Button>
             )}
 
-            <Button onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_ENVIAR_SOLUCAO", "AGUARDANDO_CHEFIA_SOLUCAO"), "Solução enviada.")} className="w-full bg-slate-900 hover:bg-black">
-              <PenTool className="w-4 h-4 mr-1" /> Elaborar Solução e Enviar à Chefia
-            </Button>
+            {/* Tarefa 1 — motor dinâmico ("Elaborar Solução", ações extras, etc).
+                Tarefa 3 — mensagem amigável quando nada estiver configurado. */}
+            {renderBotoesDinamicosFase()}
           </div>
         );
 
       default:
-        return <div className="text-center text-sm text-slate-500 py-4">Aguardando ação da Chefia.</div>;
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {cabecalhoReadOnly}
+            {renderBotoesDinamicosFase({
+              mensagemVazio: "Nenhuma ação configurada para esta fase nos Ajustes do Site.",
+            })}
+          </div>
+        );
     }
   };
 
@@ -757,6 +834,13 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
               <Input type="date" value={dataAssinatura} onChange={(e) => setDataAssinatura(e.target.value)} />
             </div>
             <Button disabled={!dataAssinatura} onClick={() => avancarFluxo(proximaSituacaoConfigurada("PA_CHEFIA_CONFIRMA_ASSINATURA", "AGUARDANDO_PRAZO"), "Assinatura confirmada.")} className="w-full bg-indigo-600">Confirmar e Devolver</Button>
+
+            {/* Tarefa 1 — ações adicionais configuradas para AGUARDANDO_CHEFIA. A ação
+                principal (PA_CHEFIA_CONFIRMA_ASSINATURA) já é renderizada acima por exigir input. */}
+            {renderBotoesDinamicosFase({
+              idsExcluidos: ["PA_CHEFIA_CONFIRMA_ASSINATURA"],
+              mostrarMensagemVazio: false,
+            })}
           </div>
         );
 
@@ -781,7 +865,13 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
         );
 
       default:
-        return <div className="text-center text-sm text-slate-500 py-4">Aguardando ação do Assessor.</div>;
+        return (
+          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            {renderBotoesDinamicosFase({
+              mensagemVazio: "Nenhuma ação configurada para esta fase nos Ajustes do Site.",
+            })}
+          </div>
+        );
     }
   };
 
@@ -863,7 +953,12 @@ export function AcoesPAModalNovo({ open, onOpenChange, processoId, numeroProcess
   return (
     <Dialog open={open} onOpenChange={(opening) => { if (!opening) resetFormularios(); onOpenChange(opening); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Ações PA - {numeroProcesso}</DialogTitle></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>Ações PA - {numeroProcesso}</DialogTitle>
+          <DialogDescription className="sr-only">
+            Modal de ações do fluxo do Procedimento Administrativo: avance etapas, registre prorrogações e atualize a situação do processo.
+          </DialogDescription>
+        </DialogHeader>
         {carregando ? (
           <div className="py-8 text-center text-sm">Carregando...</div>
         ) : (

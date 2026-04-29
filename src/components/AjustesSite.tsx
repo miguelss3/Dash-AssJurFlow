@@ -682,8 +682,8 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     const novaAcao: PAFlowActionSetting = {
       id: `PA_CUSTOM_${Date.now()}`,
       label: "Nova ação PA",
-      fromState: "EM_CURSO",
-      toState: "AGUARDANDO_CHEFIA_SOLUCAO",
+      fromState: "MESA_ASSESSOR_NOVO",
+      toState: "AGUARDANDO_CHEFIA",
       role: "assessor_pa",
       track,
       enabled: true,
@@ -827,28 +827,14 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     track: PAFlowTrack,
     lista: PAFlowActionSetting[],
   ): PAFlowActionSetting[] => {
-    if (track === "todos") {
-      return lista.map((item, index) => ({
-        ...item,
-        order: (index + 1) * 10,
-      }));
-    }
-
-    const sequencia = PA_FLOW_SEQUENCE_BY_TRACK[track];
-    const ultimoEstado = sequencia[sequencia.length - 1];
-    const penultimoEstado = sequencia[Math.max(sequencia.length - 2, 0)];
-
-    return lista.map((item, index) => {
-      const from = sequencia[index] || penultimoEstado;
-      const to = sequencia[index + 1] || ultimoEstado;
-      return {
-        ...item,
-        track,
-        fromState: from,
-        toState: to,
-        order: (index + 1) * 10,
-      };
-    });
+    // Preserva integralmente os campos fromState e toState definidos pelo usuário.
+    // Esta função apenas garante que a `track` esteja correta e renumera `order`
+    // (10, 20, 30, ...) para manter a organização visual dentro da trilha.
+    return lista.map((item, index) => ({
+      ...item,
+      track,
+      order: (index + 1) * 10,
+    }));
   };
 
   const handlePAFlowDragEnd = (track: PAFlowTrack, event: DragEndEvent) => {
@@ -1416,6 +1402,23 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       toast.error("Mantenha ao menos uma coluna ativa no setor DU.");
       return;
     }
+
+    // 🔍 AUDITORIA: log final do array que será gravado no Firestore.
+    // Use este log para confirmar que `fromState` e `toState` foram preservados
+    // exatamente como o usuário configurou nos selects (sem conversao para CONCLUIDO).
+    console.log(
+      "[AjustesSite] paFlowActions a serem persistidas:",
+      paFlowActions.map((acao) => ({
+        id: acao.id,
+        label: acao.label,
+        fromState: acao.fromState,
+        toState: acao.toState,
+        role: acao.role,
+        track: acao.track,
+        enabled: acao.enabled,
+        order: acao.order,
+      })),
+    );
 
     setSaving(true);
     try {
