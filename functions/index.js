@@ -245,3 +245,108 @@ exports.deleteUserAccount = functions.region("us-central1").https.onRequest(asyn
     }
   }
 });
+
+exports.criarUsuarioAdmin = functions.region("us-central1").https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "method-not-allowed" });
+    return;
+  }
+
+  try {
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) {
+      res.status(401).json({ error: "unauthenticated", message: "Usuário não autenticado." });
+      return;
+    }
+
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(token);
+    } catch (e) {
+      console.error("verifyIdToken failed:", e.message);
+      res.status(401).json({ error: "unauthenticated", message: "Token inválido." });
+      return;
+    }
+
+    const callerUid = decodedToken.uid;
+    const callerEmail = String(decodedToken.email || "").trim().toLowerCase();
+
+    let callerProfile = null;
+    try {
+      callerProfile = await loadCallerProfile(callerUid, callerEmail);
+    } catch (e) {
+      console.error("loadCallerProfile failed:", e.message);
+    }
+
+    if (!profileIndicatesAdmin(callerProfile, callerEmail)) {
+      console.log("permission-denied for:", callerEmail, "profile:", JSON.stringify(callerProfile));
+      res.status(403).json({ error: "permission-denied", message: "Somente perfis administrativos podem criar usuários." });
+      return;
+    }
+
+    let data = req.body || {};
+    if (Buffer.isBuffer(data)) {
+      try { data = JSON.parse(data.toString()); } catch { data = {}; }
+    }
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch { data = {}; }
+    }
+
+    const email = String(data && data.email ? data.email : "").trim().toLowerCase();
+    const senha = String(data && data.senha ? data.senha : "");
+    const nomeExibicao = String(data && data.nomeExibicao ? data.nomeExibicao : "").trim();
+
+    if (!email || !senha) {
+      res.status(400).json({ error: "invalid-argument", message: "email e senha são obrigatórios." });
+      return;
+    }
+
+    if (senha.length < 6) {
+      res.status(400).json({ error: "invalid-argument", message: "A senha deve ter no mínimo 6 caracteres." });
+      return;
+    }
+
+    let userRecord;
+    try {
+      userRecord = await auth.createUser({
+        email,
+        password: senha,
+        displayName: nomeExibicao || undefined,
+      });
+    } catch (e) {
+      const code = String(e && e.code ? e.code : "");
+      console.error("auth.createUser failed:", code, e.message);
+      if (code === "auth/email-already-exists") {
+        res.status(409).json({ error: "email-already-exists", message: "Este email já está em uso." });
+        return;
+      }
+      if (code === "auth/invalid-email") {
+        res.status(400).json({ error: "invalid-email", message: "Email inválido." });
+        return;
+      }
+      if (code === "auth/invalid-password") {
+        res.status(400).json({ error: "invalid-password", message: "Senha inválida (mínimo 6 caracteres)." });
+        return;
+      }
+      res.status(500).json({ error: "internal", message: "Erro ao criar usuário no Authentication: " + e.message });
+      return;
+    }
+
+    res.status(200).json({ ok: true, uid: userRecord.uid });
+  } catch (e) {
+    console.error("criarUsuarioAdmin unhandled error:", e.message, e.stack);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "internal", message: e.message || "Erro interno." });
+    }
+  }
+});

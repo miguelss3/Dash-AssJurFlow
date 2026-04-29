@@ -12,6 +12,11 @@ export default defineConfig({
 				changeOrigin: true,
 				rewrite: () => "/deleteUserAccount",
 			},
+			"/api/criarUsuarioAdmin": {
+				target: "https://us-central1-assjur-flow-12rm.cloudfunctions.net",
+				changeOrigin: true,
+				rewrite: () => "/criarUsuarioAdmin",
+			},
 		},
 	},
 	plugins: [

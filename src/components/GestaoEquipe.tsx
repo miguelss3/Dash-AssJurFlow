@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { collection, getDocs, updateDoc, doc, deleteField, setDoc } from "firebase/firestore";
-import { createUserWithEmailAndPassword, getAuth, updateEmail, type Auth } from "firebase/auth";
-import { deleteApp, initializeApp } from "firebase/app";
+import { updateEmail } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
@@ -181,46 +180,67 @@ export function GestaoEquipe() {
           return;
         }
 
-        // Criar conta sem trocar a sessão atual do chefe/admin.
-        // O SDK principal faz auto-login do usuário recém-criado, então usamos um app/auth secundário.
-        let appTemporario: ReturnType<typeof initializeApp> | null = null;
+        // Criação delegada à Cloud Function `criarUsuarioAdmin`.
+        // Isso preserva a sessão do administrador (sem auto-login do novo usuário).
         try {
-          appTemporario = initializeApp(
-            auth.app.options,
-            `cadastro-usuario-${Date.now()}`,
-          );
-          const authTemporario = getAuth(appTemporario);
-          const userCredential = await createUserWithEmailAndPassword(
-            authTemporario as Auth,
-            formData.email,
-            formData.senha,
-          );
+          const tokenAdmin = await auth.currentUser?.getIdToken();
+          if (!tokenAdmin) {
+            alert("Sessão expirada. Faça login novamente.");
+            setSalvando(false);
+            return;
+          }
 
-          dadosUsuario.uid = userCredential.user.uid;
+          const nomeExibicao =
+            String(dadosUsuario.nome || "").trim() ||
+            String(formData.nome || "").trim() ||
+            formData.email;
+
+          const response = await fetch("/api/criarUsuarioAdmin", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${tokenAdmin}`,
+            },
+            body: JSON.stringify({
+              email: formData.email,
+              senha: formData.senha,
+              nomeExibicao,
+            }),
+          });
+
+          const payload: { ok?: boolean; uid?: string; error?: string; message?: string } =
+            await response.json().catch(() => ({}));
+
+          if (!response.ok || !payload.ok || !payload.uid) {
+            const code = payload.error || "";
+            if (code === "email-already-exists") {
+              alert("Este email já está em uso!");
+            } else if (code === "invalid-email") {
+              alert("Email inválido.");
+            } else if (code === "invalid-password" || code === "invalid-argument") {
+              alert(payload.message || "Dados inválidos.");
+            } else if (code === "permission-denied") {
+              alert("Sem permissão para criar usuários.");
+            } else if (code === "unauthenticated") {
+              alert("Sessão expirada. Faça login novamente.");
+            } else {
+              console.error("criarUsuarioAdmin falhou:", payload);
+              alert("Erro ao criar conta de usuário. Verifique os dados.");
+            }
+            setSalvando(false);
+            return;
+          }
+
+          dadosUsuario.uid = payload.uid;
           dadosUsuario.dataCadastro = agoraISO;
 
-          // Salvar no doc com ID = UID para ficar compatível com as regras atuais.
-          await setDoc(doc(db, "usuarios", userCredential.user.uid), dadosUsuario, { merge: true });
-          // console.log("✅ Novo usuário criado:", formData.email);
+          // Salvar doc com ID = UID retornado pelo backend.
+          await setDoc(doc(db, "usuarios", payload.uid), dadosUsuario, { merge: true });
         } catch (authError: unknown) {
-          const err = authError as { code?: string };
-          if (err.code === "auth/email-already-in-use") {
-            alert("Este email já está em uso!");
-          } else {
-            console.error("Erro ao criar usuário:", authError);
-            alert("Erro ao criar conta de usuário. Verifique os dados.");
-          }
+          console.error("Erro ao criar usuário (Cloud Function):", authError);
+          alert("Erro ao criar conta de usuário. Verifique sua conexão e tente novamente.");
           setSalvando(false);
           return;
-        } finally {
-          if (appTemporario) {
-            try {
-              await getAuth(appTemporario).signOut();
-            } catch {
-              // Sem problema caso já tenha sido desconectado.
-            }
-            await deleteApp(appTemporario);
-          }
         }
       }
 

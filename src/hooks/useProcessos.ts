@@ -351,11 +351,23 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       let qProcessos: Query;
 
       if (ehAdmin) {
-        qProcessos = query(processosRef, where("setor", "in", ["DU", "PA"]));
+        qProcessos = query(
+          processosRef,
+          // TEMP: filtro `where("ativo", "==", true)` removido até conclusão da migração.
+          where("setor", "in", ["DU", "PA"]),
+        );
       } else if (setorUsuario) {
-        qProcessos = query(processosRef, where("setor", "==", setorUsuario));
+        qProcessos = query(
+          processosRef,
+          // TEMP: filtro `where("ativo", "==", true)` removido até conclusão da migração.
+          where("setor", "==", setorUsuario),
+        );
       } else {
-        qProcessos = query(processosRef, where("userId", "==", firebaseUser.uid));
+        qProcessos = query(
+          processosRef,
+          // TEMP: filtro `where("ativo", "==", true)` removido até conclusão da migração.
+          where("userId", "==", firebaseUser.uid),
+        );
       }
 
       unsubProcessos = onSnapshot(
