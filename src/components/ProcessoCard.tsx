@@ -491,18 +491,39 @@ const ProcessoCardComponent = ({ processo, p: pAntigo, ehAdmin = false, onEdit, 
   );
 };
 
-// O Segredo da Performance: Memoização com Comparação Profunda
+// Memoização com comparação rasa de propriedades vitais.
+// Evita serialização do objeto inteiro (gargalo de CPU em listas grandes).
 export const ProcessoCard = memo(ProcessoCardComponent, (prevProps, nextProps) => {
   // Sempre atualiza o card invisível da sombra do Drag and Drop
   if (prevProps.isDragging !== nextProps.isDragging) return false;
-  
+
   // Sempre atualiza se o status visual de "Lido" mudou (texto em negrito)
   if (prevProps.naoLido !== nextProps.naoLido) return false;
 
   const pPrev = prevProps.processo || prevProps.p;
   const pNext = nextProps.processo || nextProps.p;
 
-  // Comparações rasas para evitar overhead, garantindo que o card só atualize se os dados mudaram.
-  // O JSON.stringify garante que até mudanças sutis nos arrays/objetos internos reflitam na UI.
-  return JSON.stringify(pPrev) === JSON.stringify(pNext);
+  // Identidade referencial: caminho mais rápido (mesmo objeto -> sem mudanças).
+  if (pPrev === pNext) return true;
+  if (!pPrev || !pNext) return pPrev === pNext;
+
+  // Compara apenas as propriedades mutáveis que afetam a renderização do card.
+  // Inclui campos visíveis cuja mudança não é coberta por `atualizadoEm`
+  // (que nem todas as escritas no Firestore atualizam).
+  const psPrev = pPrev.pedidoSubsidios;
+  const psNext = nextProps.processo?.pedidoSubsidios ?? nextProps.p?.pedidoSubsidios;
+  return (
+    pPrev.id === pNext.id
+    && pPrev.status === pNext.status
+    && pPrev.responsavel === pNext.responsavel
+    && pPrev.descricao === pNext.descricao
+    && pPrev.prazoFatal === pNext.prazoFatal
+    && pPrev.finalPrazo === pNext.finalPrazo
+    && pPrev.prazo === pNext.prazo
+    && pPrev.processoReaberto === pNext.processoReaberto
+    && pPrev.isMS === pNext.isMS
+    && pPrev.atualizadoEm === pNext.atualizadoEm
+    && (psPrev?.situacaoFluxo ?? null) === (psNext?.situacaoFluxo ?? null)
+    && (psPrev?.reiteracoes ?? null) === (psNext?.reiteracoes ?? null)
+  );
 });

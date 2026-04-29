@@ -55,7 +55,7 @@ import { toast } from "sonner";
 
 interface Props {
   processos: Processo[];
-  usuario: { posto: string; nome: string; role?: string; setor?: string };
+  usuario: { posto?: string; nome?: string; role?: string; setor?: string } | null | undefined;
   ehAdmin?: boolean;
   onNovoLancamento?: (payload: { id: string; titulo: string; descricao?: string; criadoEm: string }) => void;
 }
@@ -104,7 +104,10 @@ function labelTipo(t: TipoEvento | "prazo-fatal"): string {
 }
 
 export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLancamento }: Props) {
-  const setorUsuario = ((usuario?.setor || "").toString().toUpperCase() === "PA" ? "PA" : "DU") as "DU" | "PA";
+  // Defensivo: usuario pode chegar nulo em transições de auth/lazy load.
+  const setorUsuario = (((usuario?.setor ?? "").toString().toUpperCase() === "PA") ? "PA" : "DU") as "DU" | "PA";
+  const postoUsuario = usuario?.posto ?? "";
+  const nomeUsuario = usuario?.nome ?? "";
   const { eventos, criar, remover } = useEventosCalendario(setorUsuario, ehAdmin);
   const [mesRef, setMesRef] = useState(new Date());
   const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null);
@@ -187,7 +190,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
         titulo: novoTitulo.trim(),
         descricao: novaDescricao.trim() || undefined,
         tipo: novoTipo,
-        criadoPor: `${usuario.posto} ${usuario.nome}`,
+        criadoPor: `${postoUsuario} ${nomeUsuario}`.trim() || "Sistema",
         setor: setorUsuario,
       });
       onNovoLancamento?.({
@@ -660,7 +663,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
             <div className="text-[11px] text-muted-foreground bg-muted/40 rounded-lg p-2.5 border border-border">
               Lançamento será registrado em nome de{" "}
               <span className="font-bold text-foreground">
-                {usuario.posto} {usuario.nome}
+                {postoUsuario} {nomeUsuario}
               </span>
               .
             </div>

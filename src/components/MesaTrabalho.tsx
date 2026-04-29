@@ -238,12 +238,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   };
 
   const grupos = useMemo(() => {
-    // console.log("📊 MesaTrabalho - Total de processos recebidos:", processos.length);
-    // console.log("📊 Assessores do setor carregados:", assessoresDoSetor.length);
-    
     const ativos = processosEfetivos.filter((p) => p.status !== "concluido");
-    // console.log("📊 Processos ativos (não concluídos):", ativos.length);
-    
+
     const tipos: TipoProcesso[] =
       filtroTipo === "todos" ? ["DU", "PA"] : [filtroTipo as TipoProcesso];
 
@@ -258,145 +254,172 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       }[];
     }[] = [];
 
-    for (const tipo of tipos) {
-      // Usa 'setor' se existir (Firebase), senão 'tipo' (dados locais)
-      const doTipo = ativos.filter((p) => (p.setor || p.tipo) === tipo);
-      const concluidosDoTipo = processosEfetivos.filter(
-        (p) => (p.setor || p.tipo) === tipo && p.status === "concluido",
-      );
-      // console.log(`📊 Processos do tipo ${tipo}:`, doTipo.length);
+    // ---- Pré-cálculo O(n): classificações usadas por todos os tipos ----
+    // Em vez de filtrar a lista várias vezes (cada filter percorre N processos),
+    // percorremos a lista uma única vez e guardamos flags por id em Maps.
+    const SITUACOES_PENDENCIA_CHEFIA = new Set([
+      "aguardando_assinatura_secao",
+      "aguardando_aprovacao_externa",
+      "enviado_admin",
+      "CHEFIA_DILIGENCIA",
+      "CHEFIA_DEFESA",
+    ]);
 
-      const isPendenteChefia = (p: Processo) => {
-        const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
-        const statusNorm = (p.status || "").toString().toLowerCase();
-        return [
-          "aguardando_assinatura_secao",
-          "aguardando_aprovacao_externa",
-          "enviado_admin",
-          "CHEFIA_DILIGENCIA",
-          "CHEFIA_DEFESA",
-        ].includes(situacaoFluxo)
-          || statusNorm.includes("aguardando assinatura")
-          || statusNorm.includes("aguardando chem");
-      };
+    const tipoPorId = new Map<string, TipoProcesso | string>();
+    const tipoPANormPorId = new Map<string, string>();
+    const isPendenciaChefiaPorId = new Map<string, boolean>();
+    const isAguardandoRespostaPorId = new Map<string, boolean>();
+    const isAguardandoRespostaVencidoPorId = new Map<string, boolean>();
+    const isPAAtrasadoPorId = new Map<string, boolean>();
+    const colunaPAEmAndamentoPorId = new Map<string, string | null>();
+    const colunaPAPortariaAssinadaPorId = new Map<string, string | null>();
 
-      const isAguardandoResposta = (p: Processo) => {
-        const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
-        const statusNorm = (p.status || "").toString().toLowerCase();
-        return situacaoFluxo === "AGUARDANDO_RESPOSTA" || statusNorm === "aguardando resposta";
-      };
+    const colunaConselho = paColunaLabelPorId.get("conselho") || null;
+    const colunaIPM = paColunaLabelPorId.get("ipm") || null;
+    const colunaSindicancia = paColunaLabelPorId.get("sindicancia") || null;
 
-      const isDUAguardandoRespostaVencido = (p: Processo) => {
-        if (tipo !== "DU") return false;
-        if (!isAguardandoResposta(p)) return false;
+    const classificarPA = (p: Processo, tipoNorm: string): { emAndamento: string | null; portaria: string | null; atrasado: boolean } => {
+      const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
+      const emCurso = situacaoFluxo === "EM_CURSO" || situacaoFluxo === "C_EM_CURSO";
+      let emAndamento: string | null = null;
+      if (emCurso) {
+        if (tipoNorm.includes("conselho")) emAndamento = colunaConselho;
+        else if (tipoNorm.includes("ipm")) emAndamento = colunaIPM;
+        else if (tipoNorm.includes("sindic")) emAndamento = colunaSindicancia;
+      }
+
+      let portaria: string | null = null;
+      if (situacaoFluxo === "AGUARDANDO_PRAZO" && tipoNorm.includes("sindic")) {
+        portaria = colunaSindicancia;
+      }
+
+      let atrasado = false;
+      if (emCurso) {
+        const prazoBase = p.prazoFatal || p.finalPrazo;
+        atrasado = !!prazoBase && diasRestantes(prazoBase) < 0;
+      }
+      return { emAndamento, portaria, atrasado };
+    };
+
+    for (const p of processosEfetivos) {
+      const tipoCanonico = (p.setor || p.tipo) as TipoProcesso | string;
+      tipoPorId.set(p.id, tipoCanonico);
+
+      const situacaoFluxoPedido = p.pedidoSubsidios?.situacaoFluxo || "";
+      const statusNorm = (p.status || "").toString().toLowerCase();
+
+      const pendenciaChefia =
+        SITUACOES_PENDENCIA_CHEFIA.has(situacaoFluxoPedido)
+        || statusNorm.includes("aguardando assinatura")
+        || statusNorm.includes("aguardando chem");
+      isPendenciaChefiaPorId.set(p.id, pendenciaChefia);
+
+      const aguardandoResposta =
+        situacaoFluxoPedido === "AGUARDANDO_RESPOSTA" || statusNorm === "aguardando resposta";
+      isAguardandoRespostaPorId.set(p.id, aguardandoResposta);
+
+      if (aguardandoResposta && tipoCanonico === "DU") {
         const prazoBase = p.pedidoSubsidios?.prazoResposta;
-        return !!prazoBase && diasRestantes(prazoBase) < 0;
-      };
+        isAguardandoRespostaVencidoPorId.set(
+          p.id,
+          !!prazoBase && diasRestantes(prazoBase) < 0,
+        );
+      } else {
+        isAguardandoRespostaVencidoPorId.set(p.id, false);
+      }
 
-      const colunaPAEmAndamento = (p: Processo) => {
-        if (tipo !== "PA") return null;
+      if (tipoCanonico === "PA") {
+        const tipoPANorm = (p.tipoPA || p.subtipo || "")
+          .toString()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+        tipoPANormPorId.set(p.id, tipoPANorm);
 
-        const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
-        if (situacaoFluxo !== "EM_CURSO" && situacaoFluxo !== "C_EM_CURSO") {
-          return null;
+        const { emAndamento, portaria, atrasado } = classificarPA(p, tipoPANorm);
+        colunaPAEmAndamentoPorId.set(p.id, emAndamento);
+        colunaPAPortariaAssinadaPorId.set(p.id, portaria);
+        isPAAtrasadoPorId.set(p.id, atrasado);
+      }
+    }
+
+    // ---- Distribuição por tipo (apenas lookups O(1)) ----
+    for (const tipo of tipos) {
+      const doTipo = ativos.filter((p) => tipoPorId.get(p.id) === tipo);
+      const concluidosDoTipo = processosEfetivos.filter(
+        (p) => tipoPorId.get(p.id) === tipo && p.status === "concluido",
+      );
+
+      const considerarPendenciaChefia = tipo === "DU" || ehAdmin;
+
+      // Particiona doTipo em uma única passagem
+      const aguardandoRespostaDUAtivos: Processo[] = [];
+      const aguardandoRespostaDUVencidos: Processo[] = [];
+      const pendenciasChefia: Processo[] = [];
+      const doTipoSemPendenciasChefia: Processo[] = [];
+
+      for (const p of doTipo) {
+        const aguardando = isAguardandoRespostaPorId.get(p.id) === true;
+
+        if (tipo === "DU" && aguardando) {
+          if (isAguardandoRespostaVencidoPorId.get(p.id)) {
+            aguardandoRespostaDUVencidos.push(p);
+          } else {
+            aguardandoRespostaDUAtivos.push(p);
+          }
+          continue;
         }
 
-        const tipoPANormalizado = (p.tipoPA || p.subtipo || "")
-          .toString()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase();
+        if (considerarPendenciaChefia && isPendenciaChefiaPorId.get(p.id)) {
+          pendenciasChefia.push(p);
+          continue;
+        }
 
-        if (tipoPANormalizado.includes("conselho")) return paColunaLabelPorId.get("conselho") || null;
-        if (tipoPANormalizado.includes("ipm")) return paColunaLabelPorId.get("ipm") || null;
-        if (tipoPANormalizado.includes("sindic")) return paColunaLabelPorId.get("sindicancia") || null;
-        return null;
-      };
+        doTipoSemPendenciasChefia.push(p);
+      }
 
-      const colunaPAPortariaAssinada = (p: Processo) => {
-        if (tipo !== "PA") return null;
-
-        const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
-        if (situacaoFluxo !== "AGUARDANDO_PRAZO") return null;
-
-        const tipoPANormalizado = (p.tipoPA || p.subtipo || "")
-          .toString()
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .toLowerCase();
-
-        if (!tipoPANormalizado.includes("sindic")) return null;
-        return paColunaLabelPorId.get("sindicancia") || null;
-      };
-
-      const isPAAtrasado = (p: Processo) => {
-        if (tipo !== "PA") return false;
-        const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
-        if (situacaoFluxo !== "EM_CURSO" && situacaoFluxo !== "C_EM_CURSO") return false;
-        const prazoBase = p.prazoFatal || p.finalPrazo;
-        return !!prazoBase && diasRestantes(prazoBase) < 0;
-      };
-
-      const aguardandoRespostaDUAtivos = tipo === "DU"
-        ? doTipo.filter((p) => isAguardandoResposta(p) && !isDUAguardandoRespostaVencido(p))
-        : [];
-      const aguardandoRespostaDUVencidos = tipo === "DU"
-        ? doTipo.filter((p) => isAguardandoResposta(p) && isDUAguardandoRespostaVencido(p))
-        : [];
-      const considerarPendenciaChefia = tipo === "DU" || ehAdmin;
-      const pendenciasChefia = considerarPendenciaChefia
-        ? doTipo.filter((p) => isPendenteChefia(p) && (tipo !== "DU" || !isAguardandoResposta(p)))
-        : [];
-      const doTipoSemPendenciasChefia = considerarPendenciaChefia
-        ? doTipo.filter((p) => !isPendenteChefia(p) && (tipo !== "DU" || !isAguardandoResposta(p)))
-        : doTipo;
-      
       const mapAtivos = new Map<string, Processo[]>();
       const mapPortariaAssinada = new Map<string, Processo[]>();
       const mapAtrasados = new Map<string, Processo[]>();
       const mapConcluidos = new Map<string, Processo[]>();
 
+      const garantirChave = (chave: string) => {
+        if (!mapAtivos.has(chave)) mapAtivos.set(chave, []);
+        if (!mapPortariaAssinada.has(chave)) mapPortariaAssinada.set(chave, []);
+        if (!mapAtrasados.has(chave)) mapAtrasados.set(chave, []);
+        if (!mapConcluidos.has(chave)) mapConcluidos.set(chave, []);
+      };
+
       if (tipo === "PA") {
-        paColunaLabels.forEach((coluna) => {
-          mapAtivos.set(coluna, []);
-          mapPortariaAssinada.set(coluna, []);
-          mapAtrasados.set(coluna, []);
-          mapConcluidos.set(coluna, []);
-        });
+        paColunaLabels.forEach(garantirChave);
       }
 
       if (pendenciasChefia.length > 0 || tipo === "DU") {
+        garantirChave("MESA DO CHEFE");
         mapAtivos.set("MESA DO CHEFE", pendenciasChefia);
-        if (!mapPortariaAssinada.has("MESA DO CHEFE")) mapPortariaAssinada.set("MESA DO CHEFE", []);
-        if (!mapAtrasados.has("MESA DO CHEFE")) mapAtrasados.set("MESA DO CHEFE", []);
-        if (!mapConcluidos.has("MESA DO CHEFE")) mapConcluidos.set("MESA DO CHEFE", []);
       }
 
       if (aguardandoRespostaDUAtivos.length > 0 || aguardandoRespostaDUVencidos.length > 0 || tipo === "DU") {
+        garantirChave(duColunaAguardandoResposta);
         mapAtivos.set(duColunaAguardandoResposta, aguardandoRespostaDUAtivos);
         mapAtrasados.set(duColunaAguardandoResposta, aguardandoRespostaDUVencidos);
-        if (!mapPortariaAssinada.has(duColunaAguardandoResposta)) mapPortariaAssinada.set(duColunaAguardandoResposta, []);
-        if (!mapConcluidos.has(duColunaAguardandoResposta)) mapConcluidos.set(duColunaAguardandoResposta, []);
       }
 
       if (tipo === "DU") {
-        if (!mapAtivos.has(duColunaAguardandoDistribuicao)) mapAtivos.set(duColunaAguardandoDistribuicao, []);
-        if (!mapAtrasados.has(duColunaAguardandoDistribuicao)) mapAtrasados.set(duColunaAguardandoDistribuicao, []);
-        if (!mapPortariaAssinada.has(duColunaAguardandoDistribuicao)) mapPortariaAssinada.set(duColunaAguardandoDistribuicao, []);
-        if (!mapConcluidos.has(duColunaAguardandoDistribuicao)) mapConcluidos.set(duColunaAguardandoDistribuicao, []);
+        garantirChave(duColunaAguardandoDistribuicao);
       }
-      
-      // Adiciona os processos aos seus responsáveis
+
+      // Adiciona os processos aos seus responsáveis (lookup O(1) nas Maps)
       doTipoSemPendenciasChefia.forEach((p) => {
-        const colunaPortariaAssinadaPA = colunaPAPortariaAssinada(p);
+        const colunaPortariaAssinadaPA = colunaPAPortariaAssinadaPorId.get(p.id) || null;
         if (colunaPortariaAssinadaPA) {
           mapPortariaAssinada.get(colunaPortariaAssinadaPA)!.push(p);
           return;
         }
 
-        const colunaEspecialPA = colunaPAEmAndamento(p);
+        const colunaEspecialPA = colunaPAEmAndamentoPorId.get(p.id) || null;
         if (colunaEspecialPA) {
-          if (isPAAtrasado(p)) {
+          if (isPAAtrasadoPorId.get(p.id)) {
             mapAtrasados.get(colunaEspecialPA)!.push(p);
           } else {
             mapAtivos.get(colunaEspecialPA)!.push(p);
@@ -404,16 +427,14 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           return;
         }
 
-        // Processos sem responsável ou com "Sem responsável" vão para "Aguardando Distribuição"
+        // Processos sem responsável vão para "Aguardando Distribuição" (DU) ou são ignorados (PA)
         let responsavelKey = p.responsavel || "";
         if (!responsavelKey || responsavelKey === "Sem responsável" || responsavelKey.trim() === "") {
           responsavelKey = tipo === "PA" ? "" : duColunaAguardandoDistribuicao;
         }
         if (!responsavelKey) return;
-        if (!mapAtivos.has(responsavelKey)) mapAtivos.set(responsavelKey, []);
+        garantirChave(responsavelKey);
         mapAtivos.get(responsavelKey)!.push(p);
-        if (!mapPortariaAssinada.has(responsavelKey)) mapPortariaAssinada.set(responsavelKey, []);
-        if (!mapAtrasados.has(responsavelKey)) mapAtrasados.set(responsavelKey, []);
       });
 
       concluidosDoTipo.forEach((p) => {
@@ -422,30 +443,14 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           responsavelKey = tipo === "PA" ? "" : duColunaAguardandoDistribuicao;
         }
         if (!responsavelKey) return;
-        if (!mapConcluidos.has(responsavelKey)) mapConcluidos.set(responsavelKey, []);
+        garantirChave(responsavelKey);
         mapConcluidos.get(responsavelKey)!.push(p);
-        if (!mapPortariaAssinada.has(responsavelKey)) mapPortariaAssinada.set(responsavelKey, []);
       });
-      
+
       // Adiciona todos os assessores do setor (mesmo sem processos)
-      const assessoresDesteTipo = assessoresDoSetor.filter(a => a.setor === tipo);
-      assessoresDesteTipo.forEach(assessor => {
-        if (!mapAtivos.has(assessor.nome)) {
-          mapAtivos.set(assessor.nome, []); // Coluna vazia
-        }
-        if (!mapAtrasados.has(assessor.nome)) {
-          mapAtrasados.set(assessor.nome, []);
-        }
-        if (!mapPortariaAssinada.has(assessor.nome)) {
-          mapPortariaAssinada.set(assessor.nome, []);
-        }
-        if (!mapConcluidos.has(assessor.nome)) {
-          mapConcluidos.set(assessor.nome, []);
-        }
-      });
-      
-      // console.log(`📊 Assessores com colunas para ${tipo}:`, Array.from(map.keys()));
-      
+      const assessoresDesteTipo = assessoresDoSetor.filter((a) => a.setor === tipo);
+      assessoresDesteTipo.forEach((assessor) => garantirChave(assessor.nome));
+
       // Ordena: "Aguardando Distribuição" primeiro (SE houver processos), depois ordem alfabética
       const nomesAssessores = Array.from(new Set([...mapAtivos.keys(), ...mapConcluidos.keys()]));
 
@@ -458,14 +463,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           itensConcluidos: mapConcluidos.get(nome) || [],
         }))
         .filter(({ nome, itensAtivos, itensPortariaAssinada, itensAtrasados, itensConcluidos }) => {
-          // Só mostra "Aguardando Distribuição" e colunas especiais se tiver processos
           if (tipo === "DU" && (nome === "MESA DO CHEFE" || nome === duColunaAguardandoResposta || nome === duColunaAguardandoDistribuicao)) {
             return true;
           }
           if (nome.includes("📥 Aguardando") || nome.includes("📩 Aguardando")) {
             return itensAtivos.length > 0 || itensPortariaAssinada.length > 0 || itensAtrasados.length > 0 || itensConcluidos.length > 0;
           }
-          return true; // Outros assessores sempre aparecem
+          return true;
         })
         .sort((a, b) => {
           if (a.nome.includes("MESA DO CHEFE")) return -1;
@@ -483,12 +487,12 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           if (b.nome === duColunaAguardandoDistribuicao) return 1;
           return a.nome.localeCompare(b.nome);
         });
+
       if (assessores.length > 0) {
         result.push({ tipo, assessores });
       }
     }
-    
-    // console.log("📊 Resultado final:", result);
+
     return result;
   }, [processosEfetivos, filtroTipo, assessoresDoSetor, paColunaLabelPorId, paColunaLabelSet, paColunaLabels, ehAdmin, duColunaAguardandoResposta, duColunaAguardandoDistribuicao]);
 
