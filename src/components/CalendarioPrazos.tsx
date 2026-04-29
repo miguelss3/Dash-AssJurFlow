@@ -684,13 +684,15 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
         </DialogContent>
       </Dialog>
 
-      <DetalhesProcessoModal
-        open={!!processoSelecionado}
-        onOpenChange={(open) => {
-          if (!open) setProcessoSelecionado(null);
-        }}
-        processo={processoSelecionado}
-      />
+      {processoSelecionado && (
+        <DetalhesProcessoModal
+          open={!!processoSelecionado}
+          onOpenChange={(open) => {
+            if (!open) setProcessoSelecionado(null);
+          }}
+          processo={processoSelecionado}
+        />
+      )}
     </div>
   );
 }

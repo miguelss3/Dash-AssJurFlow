@@ -54,7 +54,7 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
     }
   };
 
-  const setor = processo.setor || processo.tipo;
+  const setor = processo?.setor || processo?.tipo;
   const isDU = setor === "DU";
   const isPA = setor === "PA";
 
@@ -66,6 +66,10 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
     setEditandoPrazosDU(false);
   }, [open, processo]);
 
+  // Guarda defensiva: o modal pode ser disparado a partir do calendário com um
+  // evento manual sem processo atrelado. Sem este early return, qualquer leitura
+  // de `processo.id`, `processo.prorrogacoes` etc. abaixo lança TypeError.
+  // Mantido APÓS os hooks para não violar as Regras dos Hooks do React.
   if (!processo) return null;
 
   const handleSalvarPrazosDU = async () => {
