@@ -76,6 +76,7 @@ export interface SiteSettings extends ProcessualDeadlineSettings {
   assuntosPASindicancia: string[];
   assuntosDUPrincipais: string[];
   origensDUDocumentos: string[];
+  secoesDU: string[];
   paEmAndamentoColumns: PAInProgressColumnSetting[];
   duBoardColumns: DUBoardColumnSetting[];
   columnTabs: ColumnTabSetting[];
@@ -112,6 +113,14 @@ export const DEFAULT_ORIGENS_DU_DOCUMENTOS = [
   "Justiça Federal",
   "Justiça Estadual",
   "Outros",
+];
+
+export const DEFAULT_SECOES_DU = [
+  "SVP",
+  "SSIP",
+  "SALC",
+  "Sec Pessoal",
+  "OUTROS",
 ];
 
 export const DEFAULT_ASSUNTOS_PA_SINDICANCIA = [
@@ -406,6 +415,13 @@ export function normalizarOrigensDUDocumentos(
   return normalizarListaTextual(value, fallback);
 }
 
+export function normalizarSecoesDU(
+  value: unknown,
+  fallback: string[] = DEFAULT_SECOES_DU,
+): string[] {
+  return normalizarListaTextual(value, fallback);
+}
+
 export function normalizarAssuntosPA(
   value: unknown,
   fallback: string[] = DEFAULT_ASSUNTOS_PA_SINDICANCIA,
@@ -689,6 +705,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   assuntosPASindicancia: [...DEFAULT_ASSUNTOS_PA_SINDICANCIA],
   assuntosDUPrincipais: [...DEFAULT_ASSUNTOS_DU_PRINCIPAIS],
   origensDUDocumentos: [...DEFAULT_ORIGENS_DU_DOCUMENTOS],
+  secoesDU: [...DEFAULT_SECOES_DU],
   paEmAndamentoColumns: [...DEFAULT_PA_EM_ANDAMENTO_COLUMNS],
   duBoardColumns: [...DEFAULT_DU_BOARD_COLUMNS],
   columnTabs: [...DEFAULT_COLUMN_TABS],

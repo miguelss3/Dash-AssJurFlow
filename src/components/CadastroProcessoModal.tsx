@@ -17,9 +17,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { calcularFaixasProrrogacaoPA, calcularPrazoFinalPA } from "@/lib/prazo";
 import {
   DEFAULT_ORIGENS_DU_DOCUMENTOS,
+  DEFAULT_SECOES_DU,
   DEFAULT_ASSUNTOS_PA_SINDICANCIA,
   DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
   normalizarOrigensDUDocumentos,
+  normalizarSecoesDU,
   normalizarAssuntosPA,
   normalizarAssuntosDU,
   type SiteSettings,
@@ -34,7 +36,6 @@ interface CadastroProcessoModalProps {
 }
 
 const TIPOS_PA = ["IPM", "Sindicância", "Conselho de Disciplina", "Conselho de Justificação", "Investigação Preliminar", "Outros"];
-const SECOES_DU = ["SVP", "SFPC", "DIVADM", "APG", "PMM", "OUTROS"];
 const POSTOS_CONSELHO = ["Cap", "Maj", "TC", "Cel"];
 const POSTOS_ENCARREGADO = ["Sgt", "Ten", "Cap", "Maj", "TC", "Cel"];
 
@@ -76,6 +77,10 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         DEFAULT_ORIGENS_DU_DOCUMENTOS,
       ),
     [siteSettings?.origensDUDocumentos],
+  );
+  const secoesDU = useMemo(
+    () => normalizarSecoesDU(siteSettings?.secoesDU, DEFAULT_SECOES_DU),
+    [siteSettings?.secoesDU],
   );
 
   const inferirSetorUsuario = () => {
@@ -1172,7 +1177,7 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {SECOES_DU.map((sec) => (
+                      {secoesDU.map((sec) => (
                         <SelectItem key={sec} value={sec}>{sec}</SelectItem>
                       ))}
                     </SelectContent>

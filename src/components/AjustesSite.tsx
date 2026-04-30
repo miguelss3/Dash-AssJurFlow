@@ -41,6 +41,7 @@ import {
   DEFAULT_COLUMN_TABS,
   DEFAULT_DU_BOARD_COLUMNS,
   DEFAULT_ORIGENS_DU_DOCUMENTOS,
+  DEFAULT_SECOES_DU,
   DEFAULT_ASSUNTOS_PA_SINDICANCIA,
   DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
   DEFAULT_PA_EM_ANDAMENTO_COLUMNS,
@@ -51,6 +52,7 @@ import {
   normalizarPAEmAndamentoColumns,
   normalizarPAFlowActions,
   normalizarOrigensDUDocumentos,
+  normalizarSecoesDU,
   normalizarAssuntosPA,
   normalizarAssuntosDU,
   type ColumnTabId,
@@ -214,6 +216,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [novoAssuntoPA, setNovoAssuntoPA] = useState("");
   const [novoAssuntoDU, setNovoAssuntoDU] = useState("");
   const [novaOrigemDUDocumento, setNovaOrigemDUDocumento] = useState("");
+  const [novaSecaoDU, setNovaSecaoDU] = useState("");
   const [openGeral, setOpenGeral] = useState(false);
   const [openPA, setOpenPA] = useState(false);
   const [openDU, setOpenDU] = useState(false);
@@ -224,6 +227,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [openDUColunas, setOpenDUColunas] = useState(false);
   const [openDUAssuntos, setOpenDUAssuntos] = useState(false);
   const [openDUOrigens, setOpenDUOrigens] = useState(false);
+  const [openDUSecoes, setOpenDUSecoes] = useState(false);
   const [selectedPAPreviewColumnId, setSelectedPAPreviewColumnId] =
     useState<PAInProgressColumnId>("sindicancia");
   const [selectedPAPreviewTabId, setSelectedPAPreviewTabId] = useState<ColumnTabId>("andamento");
@@ -236,6 +240,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [dragAssuntoPAId, setDragAssuntoPAId] = useState<string | null>(null);
   const [dragAssuntoDUId, setDragAssuntoDUId] = useState<string | null>(null);
   const [dragOrigemDUId, setDragOrigemDUId] = useState<string | null>(null);
+  const [dragSecaoDUId, setDragSecaoDUId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [previewTab, setPreviewTab] = useState<"PA" | "DU">("PA");
   const sensors = useSensors(
@@ -256,6 +261,10 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     () => form.origensDUDocumentos.map((_, index) => `orig-${index}`),
     [form.origensDUDocumentos],
   );
+  const secoesDUIds = useMemo(
+    () => (form.secoesDU ?? []).map((_, index) => `sec-${index}`),
+    [form.secoesDU],
+  );
   const dragAssuntoPALabel = useMemo(() => {
     if (!dragAssuntoPAId) return "";
     const index = Number(dragAssuntoPAId.replace("pa-", ""));
@@ -271,6 +280,11 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     const index = Number(dragOrigemDUId.replace("orig-", ""));
     return Number.isNaN(index) ? "" : form.origensDUDocumentos[index] || "";
   }, [dragOrigemDUId, form.origensDUDocumentos]);
+  const dragSecaoDULabel = useMemo(() => {
+    if (!dragSecaoDUId) return "";
+    const index = Number(dragSecaoDUId.replace("sec-", ""));
+    return Number.isNaN(index) ? "" : (form.secoesDU ?? [])[index] || "";
+  }, [dragSecaoDUId, form.secoesDU]);
 
   useEffect(() => {
     setForm(settings);
@@ -478,6 +492,76 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       origensDUDocumentos: [...prev.origensDUDocumentos, texto],
     }));
     setNovaOrigemDUDocumento("");
+  };
+
+  const updateSecaoDU = (index: number, value: string) => {
+    setForm((prev) => {
+      const lista = [...(prev.secoesDU ?? [])];
+      lista[index] = value;
+      return { ...prev, secoesDU: lista };
+    });
+  };
+
+  const removeSecaoDU = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      secoesDU: (prev.secoesDU ?? []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleDragStartSecaoDU = (event: DragStartEvent) => {
+    setDragSecaoDUId(String(event.active.id));
+  };
+
+  const handleDragCancelSecaoDU = () => {
+    setDragSecaoDUId(null);
+  };
+
+  const handleDragEndSecaoDU = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      setDragSecaoDUId(null);
+      return;
+    }
+    const oldIndex = Number(String(active.id).replace("sec-", ""));
+    const newIndex = Number(String(over.id).replace("sec-", ""));
+    if (Number.isNaN(oldIndex) || Number.isNaN(newIndex)) return;
+    setForm((prev) => ({
+      ...prev,
+      secoesDU: arrayMove(prev.secoesDU ?? [], oldIndex, newIndex),
+    }));
+    setDragSecaoDUId(null);
+  };
+
+  const addSecaoDU = () => {
+    const texto = novaSecaoDU.trim();
+    if (!texto) {
+      toast.error("Informe uma seção válida para adicionar.");
+      return;
+    }
+
+    const chaveNova = texto
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+    const existe = (form.secoesDU ?? []).some((item) => {
+      const chaveAtual = String(item)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+      return chaveAtual === chaveNova;
+    });
+
+    if (existe) {
+      toast.error("Esta seção já existe na lista.");
+      return;
+    }
+
+    setForm((prev) => ({
+      ...prev,
+      secoesDU: [...(prev.secoesDU ?? []), texto],
+    }));
+    setNovaSecaoDU("");
   };
 
   const handleDragStartDU = (event: DragStartEvent) => {
@@ -1167,6 +1251,8 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       DEFAULT_ORIGENS_DU_DOCUMENTOS,
     );
 
+    const secoesDU = normalizarSecoesDU(form.secoesDU, DEFAULT_SECOES_DU);
+
     const paEmAndamentoColumns = normalizarPAEmAndamentoColumns(
       form.paEmAndamentoColumns,
       DEFAULT_PA_EM_ANDAMENTO_COLUMNS,
@@ -1292,6 +1378,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
         assuntosPASindicancia,
         assuntosDUPrincipais,
         origensDUDocumentos,
+        secoesDU,
         paEmAndamentoColumns,
         duBoardColumns,
         columnTabs,
@@ -2336,6 +2423,77 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                           type="button"
                           variant="secondary"
                           onClick={addOrigemDUDocumento}
+                          className="shrink-0"
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Adicionar
+                        </Button>
+                      </div>
+                    </CollapsibleContent>
+                  </section>
+                </Collapsible>
+
+                <Collapsible open={openDUSecoes} onOpenChange={setOpenDUSecoes}>
+                  <section className="space-y-4 border-t border-border pt-5">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
+                      <div>
+                        <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                          <Settings2 className="h-4 w-4 text-[var(--tipo-du)]" />
+                          Seções (Origem/Destino)
+                        </h4>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Edite as seções exibidas no dropdown de origem/destino durante o cadastro
+                          de processos DU.
+                        </p>
+                      </div>
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${openDUSecoes ? "rotate-180" : ""}`}
+                      />
+                    </CollapsibleTrigger>
+
+                    <CollapsibleContent className="pt-2 space-y-3">
+                      <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragStart={handleDragStartSecaoDU}
+                        onDragCancel={handleDragCancelSecaoDU}
+                        onDragEnd={handleDragEndSecaoDU}
+                      >
+                        <SortableContext
+                          items={secoesDUIds}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="space-y-2">
+                            {(form.secoesDU ?? []).map((secao, index) => (
+                              <SortableAssuntoRow
+                                key={secoesDUIds[index]}
+                                id={secoesDUIds[index]}
+                                value={secao}
+                                placeholder="Digite a seção"
+                                onChange={(value) => updateSecaoDU(index, value)}
+                                onDelete={() => removeSecaoDU(index)}
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                        <DragOverlay>
+                          {dragSecaoDULabel ? (
+                            <AssuntoDragPreview label={dragSecaoDULabel} />
+                          ) : null}
+                        </DragOverlay>
+                      </DndContext>
+
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <Input
+                          value={novaSecaoDU}
+                          onChange={(e) => setNovaSecaoDU(e.target.value)}
+                          placeholder="Nova seção (origem/destino)"
+                          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addSecaoDU(); } }}
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={addSecaoDU}
                           className="shrink-0"
                         >
                           <Plus className="mr-2 h-4 w-4" />

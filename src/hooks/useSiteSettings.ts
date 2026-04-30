@@ -9,11 +9,13 @@ import {
   DEFAULT_DU_BOARD_COLUMNS,
   DEFAULT_PA_EM_ANDAMENTO_COLUMNS,
   DEFAULT_ORIGENS_DU_DOCUMENTOS,
+  DEFAULT_SECOES_DU,
   DEFAULT_PA_FLOW_ACTIONS,
   DEFAULT_SITE_SETTINGS,
   normalizarColumnTabs,
   normalizarDUBoardColumns,
   normalizarOrigensDUDocumentos,
+  normalizarSecoesDU,
   normalizarAssuntosPA,
   normalizarAssuntosDU,
   normalizarPAEmAndamentoColumns,
@@ -55,6 +57,10 @@ export function useSiteSettings(enabled: boolean) {
           origensDUDocumentos: normalizarOrigensDUDocumentos(
             data.origensDUDocumentos,
             DEFAULT_ORIGENS_DU_DOCUMENTOS,
+          ),
+          secoesDU: normalizarSecoesDU(
+            data.secoesDU,
+            DEFAULT_SECOES_DU,
           ),
           paEmAndamentoColumns: normalizarPAEmAndamentoColumns(
             data.paEmAndamentoColumns,
@@ -104,6 +110,10 @@ export function useSiteSettings(enabled: boolean) {
         origensDUDocumentos: normalizarOrigensDUDocumentos(
           nextSettings.origensDUDocumentos,
           DEFAULT_ORIGENS_DU_DOCUMENTOS,
+        ),
+        secoesDU: normalizarSecoesDU(
+          nextSettings.secoesDU,
+          DEFAULT_SECOES_DU,
         ),
         paEmAndamentoColumns: normalizarPAEmAndamentoColumns(
           nextSettings.paEmAndamentoColumns,

@@ -187,11 +187,11 @@ service cloud.firestore {
           'assuntosPASindicancia',
           'assuntosDUPrincipais',
           'origensDUDocumentos',
+          'secoesDU', // <--- Inclusão da nova configuração
           'paEmAndamentoColumns',
           'duBoardColumns',
           'columnTabs',
           'paFlowActions',
-          'duFlowActions',
           'updatedAt',
           'updatedByName',
           'updatedByEmail'
@@ -211,11 +211,11 @@ service cloud.firestore {
         request.resource.data.assuntosPASindicancia is list &&
         request.resource.data.assuntosDUPrincipais is list &&
         request.resource.data.origensDUDocumentos is list &&
+        request.resource.data.secoesDU is list && // <--- Tipagem garantida como Array
         request.resource.data.paEmAndamentoColumns is list &&
         request.resource.data.duBoardColumns is list &&
         request.resource.data.columnTabs is list &&
-        request.resource.data.paFlowActions is list &&
-        request.resource.data.duFlowActions is list;
+        request.resource.data.paFlowActions is list; // <--- Remoção total do duFlowActions
       allow delete: if false;
     }
     
