@@ -15,6 +15,8 @@ import {
   Pencil,
   Save,
   X,
+  ArrowUpRight,
+  ArrowDownLeft,
   type LucideIcon,
 } from "lucide-react";
 import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
@@ -207,8 +209,10 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                   Mandado de Segurança
                 </Badge>
               )}
-              {/* V2.10 — Badge de situação DU sincronizado com o Kanban. */}
-              {isDU && (
+              {/* V2.10 — Badge de situação DU sincronizado com o Kanban.
+                   V2.20 — Oculta quando o processo já está concluído para
+                   evitar exibir "Apto finalizar" em processos finalizados. */}
+              {isDU && processo.status !== "concluido" && (
                 <Badge variant="outline" className="bg-sky-50 text-sky-800 border-sky-200">
                   {getBadgeSituacaoDU(pedido?.situacaoFluxo)}
                 </Badge>
@@ -231,50 +235,14 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
             </div>
           </div>
 
-          {/* Fluxo de Subsídios (DU) */}
-          {isDU && processo.pedidoSubsidios && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">
-                  {(processo.pedidoSubsidios.reiteracoes ?? 0) > 0
-                    ? `Pedido de Subsídios (${processo.pedidoSubsidios.reiteracoes}ª Reiteração)`
-                    : "Pedido de Subsídios"}
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-slate-50 border border-slate-200 rounded-lg p-4">
-                  <InfoRow icon={FileText} label="Destino" value={processo.pedidoSubsidios.tipoDestino === "interno" ? "Interno" : "Externo"} />
-                  <InfoRow icon={Building2} label="Seção/OM" value={processo.pedidoSubsidios.tipoDestino === "interno" ? processo.pedidoSubsidios.secaoInterna : processo.pedidoSubsidios.omExterna} />
-                  {/* V2.10 — Mostra o número da cobrança atual (numeroDocumentoDU
-                       atualizado pelo motor V2.9), com fallback para o DIEx. */}
-                  <InfoRow
-                    icon={Mail}
-                    label="DIEx / Documento"
-                    value={processo.pedidoSubsidios.numeroDocumentoDU || processo.pedidoSubsidios.numeroDiex || "Pendente"}
-                  />
-                  <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(dataPedidoDU)} />
-                  {/* V2.10 — Prazo da cobrança atual (dataPrazo), com fallback para
-                       o prazoResposta histórico. */}
-                  <InfoRow
-                    icon={Clock}
-                    label="Prazo de Resposta"
-                    value={
-                      processo.pedidoSubsidios.dataPrazo
-                        ? formatarData(processo.pedidoSubsidios.dataPrazo)
-                        : processo.pedidoSubsidios.prazoResposta
-                          ? formatarData(processo.pedidoSubsidios.prazoResposta)
-                          : "—"
-                    }
-                  />
-                  <InfoRow icon={AlertCircle} label="Situação" value={getBadgeSituacaoDU(processo.pedidoSubsidios.situacaoFluxo)} />
-                </div>
-              </div>
-            </>
-          )}
+          {/* V2.20 — Pedido de Subsídios foi movido para baixo das informações
+               principais, atuando como detalhamento secundário. */}
 
           <Separator />
 
-          {/* Informações Principais */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Informações Principais — V2.20: 3 colunas para DU
+               (Informações Gerais | Documentos | Prazos e Datas). */}
+          <div className={`grid grid-cols-1 ${isDU ? "md:grid-cols-3" : "md:grid-cols-2"} gap-6`}>
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Informações Gerais</h4>
               
@@ -296,6 +264,59 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
               
               <InfoRow icon={User} label="Responsável" value={processo.responsavel} />
             </div>
+
+            {/* V2.20 — Coluna Documentos: enviados (DIEx do pedido) e recebidos
+                 (DIEx da resposta), com setinhas indicando o sentido. */}
+            {isDU && (
+              <div className="space-y-4">
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Documentos</h4>
+
+                {(() => {
+                  const docEnviado =
+                    pedido?.numeroDocumentoDU || pedido?.numeroDiex || "";
+                  const docRecebido =
+                    respostaDU?.numeroDiex ||
+                    respostaDU?.numeroOficio ||
+                    respostaDU?.numeroRecebido ||
+                    "";
+                  return (
+                    <>
+                      <div className="flex items-start gap-3">
+                        <ArrowUpRight className="w-4 h-4 text-sky-500 mt-0.5" />
+                        <div className="flex-1">
+                          <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">
+                            Enviado
+                          </div>
+                          <div
+                            className={`text-sm mt-0.5 ${
+                              docEnviado ? "text-slate-800 font-medium" : "text-slate-400 italic"
+                            }`}
+                          >
+                            {docEnviado || "Pendente"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-3">
+                        <ArrowDownLeft className="w-4 h-4 text-sky-500 mt-0.5" />
+                        <div className="flex-1">
+                          <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">
+                            Recebido
+                          </div>
+                          <div
+                            className={`text-sm mt-0.5 ${
+                              docRecebido ? "text-slate-800 font-medium" : "text-slate-400 italic"
+                            }`}
+                          >
+                            {docRecebido || "Pendente"}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
 
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">
@@ -420,6 +441,51 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
               })}
             </div>
           </div>
+
+          {/* V2.20 — Pedido de Subsídios (DU) movido para baixo das informações
+               principais, atuando como detalhamento secundário. */}
+          {isDU && processo.pedidoSubsidios && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">
+                  {(processo.pedidoSubsidios.reiteracoes ?? 0) > 0
+                    ? `Pedido de Subsídios (${processo.pedidoSubsidios.reiteracoes}ª Reiteração)`
+                    : "Pedido de Subsídios"}
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-slate-50 border border-slate-200 rounded-lg p-4">
+                  <InfoRow icon={FileText} label="Destino" value={processo.pedidoSubsidios.tipoDestino === "interno" ? "Interno" : "Externo"} />
+                  <InfoRow icon={Building2} label="Seção/OM" value={processo.pedidoSubsidios.tipoDestino === "interno" ? processo.pedidoSubsidios.secaoInterna : processo.pedidoSubsidios.omExterna} />
+                  {/* V2.10 — Mostra o número da cobrança atual (numeroDocumentoDU
+                       atualizado pelo motor V2.9), com fallback para o DIEx. */}
+                  <InfoRow
+                    icon={Mail}
+                    label="DIEx / Documento"
+                    value={processo.pedidoSubsidios.numeroDocumentoDU || processo.pedidoSubsidios.numeroDiex || "Pendente"}
+                  />
+                  <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(dataPedidoDU)} />
+                  {/* V2.10 — Prazo da cobrança atual (dataPrazo), com fallback para
+                       o prazoResposta histórico. */}
+                  <InfoRow
+                    icon={Clock}
+                    label="Prazo de Resposta"
+                    value={
+                      processo.pedidoSubsidios.dataPrazo
+                        ? formatarData(processo.pedidoSubsidios.dataPrazo)
+                        : processo.pedidoSubsidios.prazoResposta
+                          ? formatarData(processo.pedidoSubsidios.prazoResposta)
+                          : "—"
+                    }
+                  />
+                  {/* V2.20 — Não exibe situação quando o processo já foi concluído
+                       (evita mostrar "Apto finalizar" em processos finalizados). */}
+                  {processo.status !== "concluido" && (
+                    <InfoRow icon={AlertCircle} label="Situação" value={getBadgeSituacaoDU(processo.pedidoSubsidios.situacaoFluxo)} />
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           {prorrogacoesPA.length > 0 && (
             <>
