@@ -40,7 +40,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   DEFAULT_COLUMN_TABS,
   DEFAULT_DU_BOARD_COLUMNS,
-  DEFAULT_DU_FLOW_ACTIONS,
   DEFAULT_ORIGENS_DU_DOCUMENTOS,
   DEFAULT_ASSUNTOS_PA_SINDICANCIA,
   DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
@@ -58,10 +57,6 @@ import {
   type ColumnTabSetting,
   type DUBoardColumnId,
   type DUBoardColumnSetting,
-  type DUFlowActionSetting,
-  type DUFlowRole,
-  type DUFlowState,
-  type DUFlowTipo,
   type PAInProgressColumnId,
   type PAInProgressColumnSetting,
   type PAFlowActionSetting,
@@ -214,40 +209,6 @@ const PA_FLOW_SEQUENCE_BY_TRACK: Record<"padrao" | "conselho", PAFlowState[]> = 
   ],
 };
 
-const DU_FLOW_STATES: DUFlowState[] = [
-  "MESA_ASSESSOR",
-  "CHEFIA_DILIGENCIA",
-  "AGUARDANDO_CHEM_DILIGENCIA",
-  "AGUARDANDO_RESPOSTA",
-  "CRIANDO_REITERACAO",
-  "CHEFIA_DEFESA",
-  "AGUARDANDO_CHEM_DEFESA",
-  "APTO_FINALIZAR",
-];
-
-const DU_FLOW_STATE_LABELS: Record<DUFlowState, string> = {
-  MESA_ASSESSOR: "Mesa do Assessor",
-  CHEFIA_DILIGENCIA: "Chefia – Diligência",
-  AGUARDANDO_CHEM_DILIGENCIA: "Aguardando CHEM (Diligência)",
-  AGUARDANDO_RESPOSTA: "Aguardando Resposta",
-  CRIANDO_REITERACAO: "Criando Reiteração",
-  CHEFIA_DEFESA: "Chefia – Defesa",
-  AGUARDANDO_CHEM_DEFESA: "Aguardando CHEM (Defesa)",
-  APTO_FINALIZAR: "Apto para Finalização",
-};
-
-const DU_FLOW_ROLE_OPTIONS: Array<{ value: DUFlowRole; label: string }> = [
-  { value: "assessor_du", label: "Assessor DU" },
-  { value: "chefe_assjur", label: "Chefe AssJur" },
-  { value: "ambos", label: "Ambos" },
-];
-
-const DU_FLOW_TIPO_OPTIONS: Array<{ value: DUFlowTipo; label: string; color: string }> = [
-  { value: "INTERNO", label: "Interno (DIEx)", color: "text-violet-700" },
-  { value: "EXTERNO", label: "Externo", color: "text-sky-700" },
-  { value: "ambos", label: "Ambos os Fluxos", color: "text-slate-600" },
-];
-
 export function AjustesSite({ settings, loading = false, onSave }: AjustesSiteProps) {
   const [form, setForm] = useState<SiteSettings>(settings);
   const [novoAssuntoPA, setNovoAssuntoPA] = useState("");
@@ -261,7 +222,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [openPAAbas, setOpenPAAbas] = useState(false);
   const [openPAFluxo, setOpenPAFluxo] = useState(false);
   const [openDUColunas, setOpenDUColunas] = useState(false);
-  const [openDUFluxo, setOpenDUFluxo] = useState(false);
   const [openDUAssuntos, setOpenDUAssuntos] = useState(false);
   const [openDUOrigens, setOpenDUOrigens] = useState(false);
   const [selectedPAPreviewColumnId, setSelectedPAPreviewColumnId] =
@@ -270,10 +230,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [selectedDUPreviewColumnId, setSelectedDUPreviewColumnId] =
     useState<DUBoardColumnId>("aguardando_resposta");
   const [selectedDUPreviewTabId, setSelectedDUPreviewTabId] = useState<ColumnTabId>("andamento");
-  const [selectedDUFlowActionIndex, setSelectedDUFlowActionIndex] = useState<number | null>(null);
-  const selectedDUFlowEditorRef = useRef<HTMLDivElement | null>(null);
   const [modoPAAvancado, setModoPAAvancado] = useState(false);
-  const [modoDUAvancado, setModoDUAvancado] = useState(false);
   const [selectedFlowActionIndex, setSelectedFlowActionIndex] = useState<number | null>(null);
   const selectedFlowEditorRef = useRef<HTMLDivElement | null>(null);
   const [dragAssuntoPAId, setDragAssuntoPAId] = useState<string | null>(null);
@@ -630,42 +587,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     });
   };
 
-  const updateDUFlowAction = (index: number, patch: Partial<DUFlowActionSetting>) => {
-    setForm((prev) => {
-      const lista = [...prev.duFlowActions];
-      lista[index] = { ...lista[index], ...patch };
-      return { ...prev, duFlowActions: lista };
-    });
-  };
-
-  const removeDUFlowAction = (index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      duFlowActions: prev.duFlowActions.filter((_, i) => i !== index),
-    }));
-  };
-
-  const addDUFlowAction = () => {
-    const maiorOrdem = form.duFlowActions.reduce((max, item) => {
-      const atual = Number(item.order || 0);
-      return atual > max ? atual : max;
-    }, 0);
-    const novaAcao: DUFlowActionSetting = {
-      id: `DU_CUSTOM_${Date.now()}`,
-      label: "Nova ação DU",
-      fromState: "MESA_ASSESSOR",
-      toState: "CHEFIA_DILIGENCIA",
-      role: "assessor_du",
-      tipo: "ambos",
-      enabled: true,
-      order: maiorOrdem + 10,
-    };
-    setForm((prev) => ({
-      ...prev,
-      duFlowActions: [...prev.duFlowActions, novaAcao],
-    }));
-  };
-
   const removePAFlowAction = (index: number) => {
     setForm((prev) => ({
       ...prev,
@@ -802,27 +723,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     });
   }, [selectedFlowActionIndex]);
 
-  const duFlowActionsComIndice = useMemo(
-    () => (form.duFlowActions ?? []).map((acao, index) => ({ acao, index })),
-    [form.duFlowActions],
-  );
-
-  const selectedDUFlowAction = useMemo(() => {
-    if (selectedDUFlowActionIndex === null) return null;
-    const lista = form.duFlowActions ?? [];
-    if (selectedDUFlowActionIndex < 0 || selectedDUFlowActionIndex >= lista.length) return null;
-    return { acao: lista[selectedDUFlowActionIndex], index: selectedDUFlowActionIndex };
-  }, [form.duFlowActions, selectedDUFlowActionIndex]);
-
-  useEffect(() => {
-    if (selectedDUFlowActionIndex === null) return;
-    requestAnimationFrame(() => {
-      const el = selectedDUFlowEditorRef.current;
-      if (!el) return;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-  }, [selectedDUFlowActionIndex]);
-
   const aplicarFluxoAutomaticoPorTrilha = (
     track: PAFlowTrack,
     lista: PAFlowActionSetting[],
@@ -869,38 +769,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
         ...prev,
         paFlowActions: lista,
       };
-    });
-  };
-
-  const handleDUFlowDragEnd = (tipo: "INTERNO" | "EXTERNO", event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const activeIndex = Number(String(active.id).split("-").pop());
-    const overIndex = Number(String(over.id).split("-").pop());
-    if (Number.isNaN(activeIndex) || Number.isNaN(overIndex)) return;
-
-    setForm((prev) => {
-      const lista = [...prev.duFlowActions];
-      const indicesGrupo = lista
-        .map((acao, index) => ({ acao, index }))
-        .filter(({ acao }) => acao.tipo === tipo || acao.tipo === "ambos")
-        .sort((a, b) => a.acao.order - b.acao.order)
-        .map(({ index }) => index);
-
-      const origemNoGrupo = indicesGrupo.indexOf(activeIndex);
-      const destinoNoGrupo = indicesGrupo.indexOf(overIndex);
-      if (origemNoGrupo < 0 || destinoNoGrupo < 0) return prev;
-
-      const ordemIndices = arrayMove(indicesGrupo, origemNoGrupo, destinoNoGrupo);
-      ordemIndices.forEach((indexOriginal, posicao) => {
-        lista[indexOriginal] = {
-          ...lista[indexOriginal],
-          order: (posicao + 1) * 10,
-        };
-      });
-
-      return { ...prev, duFlowActions: lista };
     });
   };
 
@@ -1372,15 +1240,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       return;
     }
 
-    const duFlowActions = (form.duFlowActions ?? [])
-      .sort((a, b) => a.order - b.order)
-      .map((acao, index) => ({ ...acao, order: (index + 1) * 10 }));
-
-    if (duFlowActions.length === 0) {
-      toast.error("Mantenha ao menos uma ação no fluxo DU.");
-      return;
-    }
-
     if (paEmAndamentoColumns.every((coluna) => coluna.enabled === false)) {
       toast.error("Mantenha ao menos uma coluna de PA em andamento habilitada.");
       return;
@@ -1437,7 +1296,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
         duBoardColumns,
         columnTabs,
         paFlowActions,
-        duFlowActions,
         prazoIPMInicialDias: Math.trunc(Number(form.prazoIPMInicialDias)),
         prazoIPMProrrogacaoDias: Math.trunc(Number(form.prazoIPMProrrogacaoDias)),
         prazoSindicanciaInicialDias: Math.trunc(Number(form.prazoSindicanciaInicialDias)),
@@ -2348,463 +2206,9 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                   </section>
                 </Collapsible>
 
-                <Collapsible open={openDUFluxo} onOpenChange={setOpenDUFluxo}>
-                  <section className="space-y-4 border-t border-border pt-5">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
-                      <div>
-                        <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
-                          <Workflow className="h-4 w-4 text-[var(--tipo-du)]" />
-                          Ações do Fluxo DU
-                        </h4>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Configure os botões de ação exibidos no modal do fluxo DU.
-                        </p>
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${openDUFluxo ? "rotate-180" : ""}`}
-                      />
-                    </CollapsibleTrigger>
-
-                    <CollapsibleContent className="pt-2 space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <p className="text-xs text-muted-foreground">
-                          {modoDUAvancado
-                            ? "Modo avançado: edição completa dos campos técnicos do fluxo DU."
-                            : "Modo simples: preencha o essencial. Use modo avançado para editar estados e perfis."}
-                        </p>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setModoDUAvancado((prev) => !prev)}
-                        >
-                          {modoDUAvancado ? "Modo simples" : "Modo avançado"}
-                        </Button>
-                      </div>
-
-                      {/* Two-flow visual: Interno + Externo side by side */}
-                      <div className="rounded-2xl border border-border bg-background p-3 space-y-3">
-                        <h5 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-700">
-                          <Workflow className="h-4 w-4 text-[var(--tipo-du)]" />
-                          Fluxograma Visual das Ações
-                        </h5>
-                        <p className="text-[11px] text-muted-foreground">
-                          Clique em uma ação para editá-la. Arraste para{" "}
-                          <span className="font-semibold text-slate-600">reordenar</span>. Ações com{" "}
-                          <span className="font-semibold text-slate-600">Ambos</span> aparecem nos
-                          dois fluxos.
-                        </p>
-
-                        <div className="grid gap-3 md:grid-cols-2">
-                          {/* Fluxo Interno */}
-                          <div className="rounded-xl border border-violet-200 bg-violet-50/30 p-2 space-y-1.5">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-violet-700 flex items-center gap-1">
-                              <span className="inline-block h-2 w-2 rounded-full bg-violet-400" />
-                              Fluxo Interno (DIEx)
-                            </p>
-                            {duFlowActionsComIndice.filter(
-                              ({ acao }) =>
-                                acao.enabled && (acao.tipo === "INTERNO" || acao.tipo === "ambos"),
-                            ).length === 0 ? (
-                              <p className="text-[10px] text-muted-foreground">Nenhuma ação.</p>
-                            ) : (
-                              <DndContext
-                                sensors={sensors}
-                                collisionDetection={closestCenter}
-                                onDragEnd={(event) => handleDUFlowDragEnd("INTERNO", event)}
-                              >
-                                <SortableContext
-                                  items={duFlowActionsComIndice
-                                    .filter(
-                                      ({ acao }) =>
-                                        acao.enabled &&
-                                        (acao.tipo === "INTERNO" || acao.tipo === "ambos"),
-                                    )
-                                    .sort((a, b) => a.acao.order - b.acao.order)
-                                    .map(({ index }) => `du-flow-visual-int-${index}`)}
-                                  strategy={verticalListSortingStrategy}
-                                >
-                                  <div className="space-y-1.5">
-                                    {duFlowActionsComIndice
-                                      .filter(
-                                        ({ acao }) =>
-                                          acao.enabled &&
-                                          (acao.tipo === "INTERNO" || acao.tipo === "ambos"),
-                                      )
-                                      .sort((a, b) => a.acao.order - b.acao.order)
-                                      .map(({ acao, index }) => (
-                                        <SortableFlowActionCard
-                                          key={`du-flow-int-${acao.id}`}
-                                          id={`du-flow-visual-int-${index}`}
-                                          onClick={() => setSelectedDUFlowActionIndex(index)}
-                                          selected={selectedDUFlowActionIndex === index}
-                                        >
-                                          <div
-                                            className={`rounded-lg border px-2 py-1.5 text-xs transition-colors ${
-                                              selectedDUFlowActionIndex === index
-                                                ? "border-violet-400 bg-violet-100/60 ring-1 ring-violet-200"
-                                                : "border-violet-100 bg-white hover:bg-violet-50"
-                                            }`}
-                                          >
-                                            <p className="font-semibold text-slate-800">
-                                              {acao.label}
-                                            </p>
-                                            <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
-                                              <span>{DU_FLOW_STATE_LABELS[acao.fromState]}</span>
-                                              <ArrowRight className="h-2.5 w-2.5" />
-                                              <span>{DU_FLOW_STATE_LABELS[acao.toState]}</span>
-                                              {acao.tipo === "ambos" && (
-                                                <span className="ml-auto text-[9px] text-slate-400 italic">
-                                                  ambos
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </SortableFlowActionCard>
-                                      ))}
-                                  </div>
-                                </SortableContext>
-                              </DndContext>
-                            )}
-                          </div>
-
-                          {/* Fluxo Externo */}
-                          <div className="rounded-xl border border-sky-200 bg-sky-50/30 p-2 space-y-1.5">
-                            <p className="text-[10px] font-bold uppercase tracking-wide text-sky-700 flex items-center gap-1">
-                              <span className="inline-block h-2 w-2 rounded-full bg-sky-400" />
-                              Fluxo Externo
-                            </p>
-                            {duFlowActionsComIndice.filter(
-                              ({ acao }) =>
-                                acao.enabled && (acao.tipo === "EXTERNO" || acao.tipo === "ambos"),
-                            ).length === 0 ? (
-                              <p className="text-[10px] text-muted-foreground">Nenhuma ação.</p>
-                            ) : (
-                              <DndContext
-                                sensors={sensors}
-                                collisionDetection={closestCenter}
-                                onDragEnd={(event) => handleDUFlowDragEnd("EXTERNO", event)}
-                              >
-                                <SortableContext
-                                  items={duFlowActionsComIndice
-                                    .filter(
-                                      ({ acao }) =>
-                                        acao.enabled &&
-                                        (acao.tipo === "EXTERNO" || acao.tipo === "ambos"),
-                                    )
-                                    .sort((a, b) => a.acao.order - b.acao.order)
-                                    .map(({ index }) => `du-flow-visual-ext-${index}`)}
-                                  strategy={verticalListSortingStrategy}
-                                >
-                                  <div className="space-y-1.5">
-                                    {duFlowActionsComIndice
-                                      .filter(
-                                        ({ acao }) =>
-                                          acao.enabled &&
-                                          (acao.tipo === "EXTERNO" || acao.tipo === "ambos"),
-                                      )
-                                      .sort((a, b) => a.acao.order - b.acao.order)
-                                      .map(({ acao, index }) => (
-                                        <SortableFlowActionCard
-                                          key={`du-flow-ext-${acao.id}`}
-                                          id={`du-flow-visual-ext-${index}`}
-                                          onClick={() => setSelectedDUFlowActionIndex(index)}
-                                          selected={selectedDUFlowActionIndex === index}
-                                        >
-                                          <div
-                                            className={`rounded-lg border px-2 py-1.5 text-xs transition-colors ${
-                                              selectedDUFlowActionIndex === index
-                                                ? "border-sky-400 bg-sky-100/60 ring-1 ring-sky-200"
-                                                : "border-sky-100 bg-white hover:bg-sky-50"
-                                            }`}
-                                          >
-                                            <p className="font-semibold text-slate-800">
-                                              {acao.label}
-                                            </p>
-                                            <div className="mt-0.5 flex items-center gap-1 text-[10px] text-slate-500">
-                                              <span>{DU_FLOW_STATE_LABELS[acao.fromState]}</span>
-                                              <ArrowRight className="h-2.5 w-2.5" />
-                                              <span>{DU_FLOW_STATE_LABELS[acao.toState]}</span>
-                                              {acao.tipo === "ambos" && (
-                                                <span className="ml-auto text-[9px] text-slate-400 italic">
-                                                  ambos
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        </SortableFlowActionCard>
-                                      ))}
-                                  </div>
-                                </SortableContext>
-                              </DndContext>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {selectedDUFlowAction && (
-                        <div
-                          ref={selectedDUFlowEditorRef}
-                          className="rounded-2xl border border-sky-200 bg-sky-50/30 p-3 space-y-3"
-                        >
-                          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
-                            Edição da Ação Selecionada
-                          </p>
-                          {(() => {
-                            const { acao, index } = selectedDUFlowAction;
-                            return (
-                              <div className="rounded-xl border border-border bg-background p-3 space-y-3">
-                                {modoDUAvancado ? (
-                                  <>
-                                    <div className="grid gap-3 md:grid-cols-2">
-                                      <div className="space-y-1.5">
-                                        <Label>ID da Ação</Label>
-                                        <Input
-                                          value={acao.id}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, { id: e.target.value })
-                                          }
-                                          placeholder="ID único da ação"
-                                        />
-                                      </div>
-                                      <div className="space-y-1.5">
-                                        <Label>Rótulo da Ação</Label>
-                                        <Input
-                                          value={acao.label}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, { label: e.target.value })
-                                          }
-                                          placeholder="Texto exibido no botão"
-                                        />
-                                      </div>
-                                    </div>
-                                    <div className="grid gap-3 md:grid-cols-2">
-                                      <div className="space-y-1.5">
-                                        <Label>Tipo de Fluxo</Label>
-                                        <select
-                                          value={acao.tipo ?? "ambos"}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, {
-                                              tipo: e.target.value as DUFlowTipo,
-                                            })
-                                          }
-                                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                        >
-                                          {DU_FLOW_TIPO_OPTIONS.map((opt) => (
-                                            <option
-                                              key={`du-tipo-adv-${opt.value}`}
-                                              value={opt.value}
-                                            >
-                                              {opt.label}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-                                      <div className="space-y-1.5">
-                                        <Label>Perfil</Label>
-                                        <select
-                                          value={acao.role}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, {
-                                              role: e.target.value as DUFlowRole,
-                                            })
-                                          }
-                                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                        >
-                                          {DU_FLOW_ROLE_OPTIONS.map((opt) => (
-                                            <option key={`du-role-${opt.value}`} value={opt.value}>
-                                              {opt.label}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-                                    </div>
-                                    <div className="grid gap-3 md:grid-cols-3">
-                                      <div className="space-y-1.5">
-                                        <Label>Estado Atual</Label>
-                                        <select
-                                          value={acao.fromState}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, {
-                                              fromState: e.target.value as DUFlowState,
-                                            })
-                                          }
-                                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                        >
-                                          {DU_FLOW_STATES.map((estado) => (
-                                            <option key={`du-from-${estado}`} value={estado}>
-                                              {DU_FLOW_STATE_LABELS[estado]}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-                                      <div className="space-y-1.5">
-                                        <Label>Próximo Estado</Label>
-                                        <select
-                                          value={acao.toState}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, {
-                                              toState: e.target.value as DUFlowState,
-                                            })
-                                          }
-                                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                        >
-                                          {DU_FLOW_STATES.map((estado) => (
-                                            <option key={`du-to-${estado}`} value={estado}>
-                                              {DU_FLOW_STATE_LABELS[estado]}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-                                      <div className="space-y-1.5">
-                                        <Label>Ordem</Label>
-                                        <Input
-                                          type="number"
-                                          min={0}
-                                          value={acao.order}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, {
-                                              order: Number(e.target.value) || 0,
-                                            })
-                                          }
-                                        />
-                                      </div>
-                                    </div>
-                                    <div className="flex items-end justify-between gap-2">
-                                      <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                                        <input
-                                          type="checkbox"
-                                          className="h-4 w-4"
-                                          checked={acao.enabled}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, { enabled: e.target.checked })
-                                          }
-                                        />
-                                        Ação habilitada
-                                      </label>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => {
-                                          removeDUFlowAction(index);
-                                          setSelectedDUFlowActionIndex(null);
-                                        }}
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Excluir
-                                      </Button>
-                                    </div>
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="space-y-1.5">
-                                      <Label>Nome da Ação</Label>
-                                      <Input
-                                        value={acao.label}
-                                        onChange={(e) =>
-                                          updateDUFlowAction(index, { label: e.target.value })
-                                        }
-                                        placeholder="Texto exibido no botão"
-                                      />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                      <Label>Tipo de Fluxo</Label>
-                                      <select
-                                        value={acao.tipo ?? "ambos"}
-                                        onChange={(e) =>
-                                          updateDUFlowAction(index, {
-                                            tipo: e.target.value as DUFlowTipo,
-                                          })
-                                        }
-                                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                      >
-                                        {DU_FLOW_TIPO_OPTIONS.map((opt) => (
-                                          <option key={`du-tipo-${opt.value}`} value={opt.value}>
-                                            {opt.label}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    <div className="grid gap-3 md:grid-cols-2">
-                                      <div className="space-y-1.5">
-                                        <Label>De (estado atual)</Label>
-                                        <select
-                                          value={acao.fromState}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, {
-                                              fromState: e.target.value as DUFlowState,
-                                            })
-                                          }
-                                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                        >
-                                          {DU_FLOW_STATES.map((estado) => (
-                                            <option key={`du-from-simple-${estado}`} value={estado}>
-                                              {DU_FLOW_STATE_LABELS[estado]}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-                                      <div className="space-y-1.5">
-                                        <Label>Para (próximo estado)</Label>
-                                        <select
-                                          value={acao.toState}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, {
-                                              toState: e.target.value as DUFlowState,
-                                            })
-                                          }
-                                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                                        >
-                                          {DU_FLOW_STATES.map((estado) => (
-                                            <option key={`du-to-simple-${estado}`} value={estado}>
-                                              {DU_FLOW_STATE_LABELS[estado]}
-                                            </option>
-                                          ))}
-                                        </select>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                      <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                                        <input
-                                          type="checkbox"
-                                          className="h-4 w-4"
-                                          checked={acao.enabled}
-                                          onChange={(e) =>
-                                            updateDUFlowAction(index, { enabled: e.target.checked })
-                                          }
-                                        />
-                                        Ação habilitada
-                                      </label>
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => {
-                                          removeDUFlowAction(index);
-                                          setSelectedDUFlowActionIndex(null);
-                                        }}
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Excluir
-                                      </Button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-
-                      <div className="space-y-3">
-                        <Button type="button" variant="secondary" onClick={addDUFlowAction}>
-                          <Plus className="mr-2 h-4 w-4" />
-                          Nova ação DU
-                        </Button>
-                      </div>
-                    </CollapsibleContent>
-                  </section>
-                </Collapsible>
-
+                {/* V2.11 — Bloco "Ações do Fluxo DU" removido. O motor V2.9 do
+                    AcoesDUModalNovo é hardcoded; configurar essas ações
+                    dinamicamente tornou-se obsoleto e perigoso. */}
                 <Collapsible open={openDUAssuntos} onOpenChange={setOpenDUAssuntos}>
                   <section className="space-y-4 border-t border-border pt-5">
                     <CollapsibleTrigger className="flex w-full items-center justify-between text-left">

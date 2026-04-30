@@ -8,13 +8,11 @@ import {
   DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
   DEFAULT_DU_BOARD_COLUMNS,
   DEFAULT_PA_EM_ANDAMENTO_COLUMNS,
-  DEFAULT_DU_FLOW_ACTIONS,
   DEFAULT_ORIGENS_DU_DOCUMENTOS,
   DEFAULT_PA_FLOW_ACTIONS,
   DEFAULT_SITE_SETTINGS,
   normalizarColumnTabs,
   normalizarDUBoardColumns,
-  normalizarDUFlowActions,
   normalizarOrigensDUDocumentos,
   normalizarAssuntosPA,
   normalizarAssuntosDU,
@@ -74,10 +72,6 @@ export function useSiteSettings(enabled: boolean) {
             data.paFlowActions,
             DEFAULT_PA_FLOW_ACTIONS,
           ),
-          duFlowActions: normalizarDUFlowActions(
-            data.duFlowActions,
-            DEFAULT_DU_FLOW_ACTIONS,
-          ),
         });
       } else {
         setSettings(DEFAULT_SITE_SETTINGS);
@@ -126,10 +120,6 @@ export function useSiteSettings(enabled: boolean) {
         paFlowActions: normalizarPAFlowActions(
           nextSettings.paFlowActions,
           DEFAULT_PA_FLOW_ACTIONS,
-        ),
-        duFlowActions: normalizarDUFlowActions(
-          nextSettings.duFlowActions,
-          DEFAULT_DU_FLOW_ACTIONS,
         ),
         updatedAt: new Date().toISOString(),
         updatedByName: meta?.name || undefined,

@@ -66,31 +66,6 @@ export interface PAFlowActionSetting {
   order: number;
 }
 
-export type DUFlowState =
-  | "MESA_ASSESSOR"
-  | "CHEFIA_DILIGENCIA"
-  | "AGUARDANDO_CHEM_DILIGENCIA"
-  | "AGUARDANDO_ASSINATURA"
-  | "AGUARDANDO_RESPOSTA"
-  | "CRIANDO_REITERACAO"
-  | "CHEFIA_DEFESA"
-  | "AGUARDANDO_CHEM_DEFESA"
-  | "APTO_FINALIZAR";
-
-export type DUFlowRole = "assessor_du" | "chefe_assjur" | "ambos";
-export type DUFlowTipo = "INTERNO" | "EXTERNO" | "ambos";
-
-export interface DUFlowActionSetting {
-  id: string;
-  label: string;
-  fromState: DUFlowState;
-  toState: DUFlowState;
-  role: DUFlowRole;
-  tipo: DUFlowTipo;
-  enabled: boolean;
-  order: number;
-}
-
 export interface SiteSettings extends ProcessualDeadlineSettings {
   sidebarTitle: string;
   sidebarSubtitle: string;
@@ -105,7 +80,6 @@ export interface SiteSettings extends ProcessualDeadlineSettings {
   duBoardColumns: DUBoardColumnSetting[];
   columnTabs: ColumnTabSetting[];
   paFlowActions: PAFlowActionSetting[];
-  duFlowActions: DUFlowActionSetting[];
   updatedAt?: string;
   updatedByName?: string;
   updatedByEmail?: string;
@@ -384,129 +358,6 @@ export const DEFAULT_PA_FLOW_ACTIONS: PAFlowActionSetting[] = [
     track: "conselho",
     enabled: true,
     order: 140,
-  },
-];
-
-export const DEFAULT_DU_FLOW_ACTIONS: DUFlowActionSetting[] = [
-  {
-    id: "DU_ENVIAR_CHEFIA_DILIGENCIA",
-    label: "Enviar Diligência para a Chefia",
-    fromState: "MESA_ASSESSOR",
-    toState: "CHEFIA_DILIGENCIA",
-    role: "assessor_du",
-    tipo: "ambos",
-    enabled: true,
-    order: 10,
-  },
-  {
-    id: "DU_CHEFIA_ASSINAR_DIEX",
-    label: "Assinar DIEx e Iniciar Prazo",
-    fromState: "CHEFIA_DILIGENCIA",
-    toState: "AGUARDANDO_RESPOSTA",
-    role: "chefe_assjur",
-    tipo: "INTERNO",
-    enabled: true,
-    order: 20,
-  },
-  {
-    id: "DU_CHEFIA_APROVAR_DILIGENCIA_EXTERNO",
-    label: "Aprovar e Encaminhar para CHEM",
-    fromState: "CHEFIA_DILIGENCIA",
-    toState: "AGUARDANDO_CHEM_DILIGENCIA",
-    role: "chefe_assjur",
-    tipo: "EXTERNO",
-    enabled: true,
-    order: 25,
-  },
-  {
-    id: "DU_CHEFIA_DEVOLVER",
-    label: "Devolver ao Assessor",
-    fromState: "CHEFIA_DILIGENCIA",
-    toState: "MESA_ASSESSOR",
-    role: "chefe_assjur",
-    tipo: "ambos",
-    enabled: true,
-    order: 30,
-  },
-  {
-    id: "DU_REGISTRAR_SAIDA",
-    label: "Registrar Saída e Iniciar Prazo",
-    fromState: "AGUARDANDO_CHEM_DILIGENCIA",
-    toState: "AGUARDANDO_RESPOSTA",
-    role: "assessor_du",
-    tipo: "EXTERNO",
-    enabled: true,
-    order: 40,
-  },
-  {
-    id: "DU_GERAR_COBRANCA",
-    label: "Gerar Cobrança Oficial",
-    fromState: "AGUARDANDO_RESPOSTA",
-    toState: "CRIANDO_REITERACAO",
-    role: "assessor_du",
-    tipo: "ambos",
-    enabled: true,
-    order: 45,
-  },
-  {
-    id: "DU_ENVIAR_COBRANCA_CHEFIA",
-    label: "Enviar Cobrança para a Chefia",
-    fromState: "CRIANDO_REITERACAO",
-    toState: "CHEFIA_DILIGENCIA",
-    role: "assessor_du",
-    tipo: "ambos",
-    enabled: true,
-    order: 47,
-  },
-  {
-    id: "DU_REGISTRAR_RESPOSTA",
-    label: "Registrar Resposta Recebida",
-    fromState: "AGUARDANDO_RESPOSTA",
-    toState: "MESA_ASSESSOR",
-    role: "chefe_assjur",
-    tipo: "ambos",
-    enabled: true,
-    order: 50,
-  },
-  {
-    id: "DU_ENVIAR_CHEFIA_DEFESA",
-    label: "Enviar Defesa para a Chefia",
-    fromState: "MESA_ASSESSOR",
-    toState: "CHEFIA_DEFESA",
-    role: "assessor_du",
-    tipo: "ambos",
-    enabled: true,
-    order: 60,
-  },
-  {
-    id: "DU_CHEFIA_APROVAR_DEFESA",
-    label: "Aprovar Defesa e Encaminhar CHEM",
-    fromState: "CHEFIA_DEFESA",
-    toState: "AGUARDANDO_CHEM_DEFESA",
-    role: "chefe_assjur",
-    tipo: "ambos",
-    enabled: true,
-    order: 70,
-  },
-  {
-    id: "DU_REGISTRAR_DOC_FINAL",
-    label: "Registrar Documento Final",
-    fromState: "AGUARDANDO_CHEM_DEFESA",
-    toState: "APTO_FINALIZAR",
-    role: "assessor_du",
-    tipo: "ambos",
-    enabled: true,
-    order: 80,
-  },
-  {
-    id: "DU_FINALIZAR",
-    label: "Finalizar Processo DU",
-    fromState: "APTO_FINALIZAR",
-    toState: "APTO_FINALIZAR",
-    role: "ambos",
-    tipo: "ambos",
-    enabled: true,
-    order: 90,
   },
 ];
 
@@ -827,69 +678,6 @@ export function normalizarPAFlowActions(
   return unicas.sort((a, b) => a.order - b.order);
 }
 
-export function normalizarDUFlowActions(
-  value: unknown,
-  fallback: DUFlowActionSetting[] = DEFAULT_DU_FLOW_ACTIONS,
-): DUFlowActionSetting[] {
-  if (!Array.isArray(value)) {
-    return [...fallback].sort((a, b) => a.order - b.order);
-  }
-
-  const estadosValidos = new Set<DUFlowState>([
-    "MESA_ASSESSOR",
-    "CHEFIA_DILIGENCIA",
-    "AGUARDANDO_CHEM_DILIGENCIA",
-    "AGUARDANDO_ASSINATURA",
-    "AGUARDANDO_RESPOSTA",
-    "CRIANDO_REITERACAO",
-    "CHEFIA_DEFESA",
-    "AGUARDANDO_CHEM_DEFESA",
-    "APTO_FINALIZAR",
-  ]);
-  const rolesValidos = new Set<DUFlowRole>(["assessor_du", "chefe_assjur", "ambos"]);
-  const tiposValidos = new Set<DUFlowTipo>(["INTERNO", "EXTERNO", "ambos"]);
-
-  const saneadas: DUFlowActionSetting[] = value
-    .map((item, index) => {
-      const base = item as Partial<DUFlowActionSetting>;
-      const id = String(base.id || "").trim() || `acao_du_${index + 1}`;
-      const label = String(base.label || "").trim() || `Acao ${index + 1}`;
-      const fromState = base.fromState;
-      const toState = base.toState;
-      const role = base.role;
-      const tipo: DUFlowTipo = tiposValidos.has(base.tipo as DUFlowTipo) ? (base.tipo as DUFlowTipo) : "ambos";
-
-      if (!estadosValidos.has(fromState as DUFlowState)) return null;
-      if (!estadosValidos.has(toState as DUFlowState)) return null;
-      if (!rolesValidos.has(role as DUFlowRole)) return null;
-
-      return {
-        id,
-        label,
-        fromState: fromState as DUFlowState,
-        toState: toState as DUFlowState,
-        role: role as DUFlowRole,
-        tipo,
-        enabled: base.enabled !== false,
-        order: Number.isFinite(Number(base.order)) ? Number(base.order) : (index + 1) * 10,
-      };
-    })
-    .filter((item): item is DUFlowActionSetting => !!item);
-
-  if (saneadas.length === 0) {
-    return [...fallback].sort((a, b) => a.order - b.order);
-  }
-
-  const ids = new Set<string>();
-  const unicas = saneadas.filter((item) => {
-    if (ids.has(item.id)) return false;
-    ids.add(item.id);
-    return true;
-  });
-
-  return unicas.sort((a, b) => a.order - b.order);
-}
-
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   ...DEFAULT_PROCESSUAL_DEADLINES,
   sidebarTitle: "AssJur Flow",
@@ -905,5 +693,4 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   duBoardColumns: [...DEFAULT_DU_BOARD_COLUMNS],
   columnTabs: [...DEFAULT_COLUMN_TABS],
   paFlowActions: [...DEFAULT_PA_FLOW_ACTIONS],
-  duFlowActions: [...DEFAULT_DU_FLOW_ACTIONS],
 };
