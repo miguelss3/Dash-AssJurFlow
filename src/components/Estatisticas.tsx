@@ -269,9 +269,9 @@ export function Estatisticas({ processos }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         <KpiHero
           icon={CheckCircle2}
-          label="Taxa de conclusão"
+          label="Taxa de conclusão (safra recente)"
           value={`${taxaSucesso}%`}
-          sub={`${concluidos} de ${total} processos`}
+          sub={`${concluidos} de ${total} processos (últimos 50 concluídos + ativos)`}
           tone="success"
         />
         <KpiHero
@@ -380,8 +380,8 @@ export function Estatisticas({ processos }: Props) {
       {/* Gráficos linha 1 */}
       <div className="grid lg:grid-cols-2 gap-4 sm:gap-5">
         <ChartCard
-          title="Distribuição por status"
-          subtitle="Processos em cada fase do fluxo"
+          title="Distribuição por status (safra recente)"
+          subtitle="Reflete o cache local: ativos + últimos 50 concluídos (não o histórico global)"
           icon={TrendingUp}
         >
           <ResponsiveContainer width="100%" height={260}>

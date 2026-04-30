@@ -86,7 +86,6 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
   useEffect(() => {
     let unsubProcessos: (() => void) | null = null;
     let unsubConcluidos: (() => void) | null = null;
-    let timeoutCarregamento: ReturnType<typeof setTimeout> | null = null;
 
     // Aguarda o Firebase Auth resolver o estado de autenticação antes de inscrever os listeners
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
@@ -96,10 +95,6 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       if (mergeTimerRef.current) {
         clearTimeout(mergeTimerRef.current);
         mergeTimerRef.current = null;
-      }
-      if (timeoutCarregamento) {
-        clearTimeout(timeoutCarregamento);
-        timeoutCarregamento = null;
       }
 
       if (!firebaseUser) {
@@ -181,60 +176,10 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let processosCacheConcluidos: any[] = [];
 
-      // ---------- SINCRONIZAÇÃO ESTRITA AO SERVIDOR ----------
-      // O Firestore SDK dispara onSnapshot duas vezes ao iniciar:
-      //   1) com `metadata.fromCache === true` → dados antigos do IndexedDB ("ghost")
-      //   2) com `metadata.fromCache === false` → dados frescos confirmados pelo servidor
-      // Mantemos `carregando=true` até ambos os listeners terem confirmado servidor
-      // (ou terem falhado, para não travar a UI eternamente).
-      let ativosSyncedServidor = false;
-      let concluidosSyncedServidor = false;
-      const tentarLiberarCarregamento = () => {
-        if (ativosSyncedServidor && concluidosSyncedServidor) {
-          if (timeoutCarregamento) {
-            clearTimeout(timeoutCarregamento);
-            timeoutCarregamento = null;
-          }
-          setCarregando(false);
-        }
-      };
-
-      // ---------- TIMEOUT DE DESISTÊNCIA (8s) ----------
-      // 8 segundos é o padrão de mercado para conexões com maior latência. Garante que
-      // o usuário veja a contagem real do servidor na maioria das vezes, mas mantém a
-      // resiliência caso o índice realmente falhe ou a rede esteja indisponível.
-      // Os dados do CACHE local já foram entregues pelo onSnapshot quase instantaneamente.
-      timeoutCarregamento = setTimeout(() => {
-        if (!ativosSyncedServidor || !concluidosSyncedServidor) {
-          const temDadosEmCache =
-            processosCacheAtivos.length > 0 || processosCacheConcluidos.length > 0;
-          const ehDev =
-            typeof import.meta !== "undefined" && (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
-
-          if (temDadosEmCache) {
-            // Caminho normal: o IndexedDB já entregou snapshots; só estamos esperando
-            // a confirmação do servidor. Mensagem informativa, sem alarme.
-            console.info(
-              "ℹ️ useProcessos: Utilizando dados otimizados do cache enquanto aguarda o servidor.",
-              ehDev ? { ativosSyncedServidor, concluidosSyncedServidor } : undefined,
-            );
-          } else {
-            // Caminho excepcional: nem cache nem servidor responderam. Mantém o aviso
-            // mais detalhado para facilitar diagnóstico (índice ausente, sem permissão,
-            // captive portal, etc.).
-            console.warn(
-              "⏱️ useProcessos: timeout de 8s atingido sem dados do servidor nem cache." +
-                " Verifique conectividade, índices do Firestore ou regras de permissão.",
-              ehDev ? { ativosSyncedServidor, concluidosSyncedServidor } : undefined,
-            );
-          }
-
-          ativosSyncedServidor = true;
-          concluidosSyncedServidor = true;
-          setCarregando(false);
-        }
-        timeoutCarregamento = null;
-      }, 8000);
+      // V2.13 — Optimistic UI: liberamos o carregamento assim que QUALQUER
+      // snapshot chegar (cache local OU servidor). O Firestore já emite
+      // snapshots subsequentes automaticamente quando o servidor confirmar,
+      // então não precisamos bloquear a UI esperando `fromCache=false`.
 
       // ARQUITETURA HÍBRIDA: o snapshot principal traz só ATIVOS (performance);
       // um segundo listener traz os ÚLTIMOS 50 concluídos para popular a aba
@@ -522,13 +467,9 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         (snapshot) => {
           processosCacheAtivos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           mesclarProcessosAutorizados();
-          // Só marcamos "sincronizado" quando os dados vierem do SERVIDOR.
-          // Snapshots com fromCache=true são entregas rápidas do IndexedDB local
-          // (potencialmente stale) — ignoramos para o gate de carregamento.
-          if (!snapshot.metadata.fromCache && !ativosSyncedServidor) {
-            ativosSyncedServidor = true;
-            tentarLiberarCarregamento();
-          }
+          // V2.13 — Optimistic UI: libera a tela imediatamente, mesmo com
+          // snapshot do cache local. O servidor confirmará em segundo plano.
+          setCarregando(false);
         },
         (err) => {
           console.error(
@@ -547,8 +488,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
             );
           }          setErro("Erro ao carregar processos");
           // Mesmo em erro, liberamos o gate para evitar UI travada em "…".
-          ativosSyncedServidor = true;
-          tentarLiberarCarregamento();
+          setCarregando(false);
         }
       );
 
@@ -588,10 +528,8 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         (snapshot) => {
           processosCacheConcluidos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           mesclarProcessosAutorizados();
-          if (!snapshot.metadata.fromCache && !concluidosSyncedServidor) {
-            concluidosSyncedServidor = true;
-            tentarLiberarCarregamento();
-          }
+          // V2.13 — Optimistic UI: libera a tela imediatamente.
+          setCarregando(false);
         },
         (err) => {
           console.error(
@@ -613,8 +551,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
           mesclarProcessosAutorizados();
           // Libera o gate — sem este listener, concluídos históricos virão pelo
           // getCountFromServer do Dashboard de qualquer forma.
-          concluidosSyncedServidor = true;
-          tentarLiberarCarregamento();
+          setCarregando(false);
         }
       );
     }); // fecha onAuthStateChanged
@@ -624,10 +561,6 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       if (mergeTimerRef.current) {
         clearTimeout(mergeTimerRef.current);
         mergeTimerRef.current = null;
-      }
-      if (timeoutCarregamento) {
-        clearTimeout(timeoutCarregamento);
-        timeoutCarregamento = null;
       }
       unsubAuth();
       if (unsubProcessos) unsubProcessos();

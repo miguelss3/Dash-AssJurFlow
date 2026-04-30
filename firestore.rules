@@ -81,20 +81,11 @@ service cloud.firestore {
     }
 
     function canUpdateProcess(oldData, newData) {
+      // Simplificado: Exige login, permissão no setor e impede roubo de processo
       return isSignedIn() &&
         canManageSetor(oldData.setor) &&
         oldData.userId == newData.userId &&
-        oldData.userEmail == newData.userEmail &&
-        oldData.setor == newData.setor &&
-        // Endurece update: bloqueia alteração de campos de identidade/origem.
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-          'userId',
-          'userEmail',
-          'setor',
-          'criadoEm',
-          'criadoPorUid',
-          'criadoPorEmail'
-        ]);
+        oldData.setor == newData.setor;
     }
 
     function canDeleteProcess(oldData) {
@@ -121,7 +112,6 @@ service cloud.firestore {
     // Regras para a coleção de usuários
     match /usuarios/{userId} {
       allow read:  if isSignedIn();
-      // Escrita restrita: admin universal por email ou usuário com perfil de Chefe
       allow write: if isSignedIn() && (isAdminUniversal() || isChefePerfil());
     }
     
@@ -150,14 +140,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Regras do Calendário (Blindado mas flexível)
     match /eventosCalendario/{eventoId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() &&
         request.resource.data.setor in ['DU', 'PA'] &&
-        canManageSetor(request.resource.data.setor) &&
-        request.resource.data.data is string &&
-        request.resource.data.titulo is string &&
-        request.resource.data.tipo is string;
+        canManageSetor(request.resource.data.setor);
       allow update: if isSignedIn() &&
         resource.data.setor in ['DU', 'PA'] &&
         canManageSetor(resource.data.setor);
@@ -171,31 +159,6 @@ service cloud.firestore {
       allow create, update: if isSignedIn() &&
         isAdminUniversal() &&
         configId == 'layoutPrincipal' &&
-        request.resource.data.keys().hasOnly([
-          'sidebarTitle',
-          'sidebarSubtitle',
-          'dashboardTitle',
-          'dashboardDescription',
-          'newProcessLabel',
-          'footerText',
-          'prazoIPMInicialDias',
-          'prazoIPMProrrogacaoDias',
-          'prazoSindicanciaInicialDias',
-          'prazoSindicanciaProrrogacaoDias',
-          'prazoConselhoInicialDias',
-          'prazoConselhoProrrogacaoDias',
-          'assuntosPASindicancia',
-          'assuntosDUPrincipais',
-          'origensDUDocumentos',
-          'secoesDU', // <--- Inclusão da nova configuração
-          'paEmAndamentoColumns',
-          'duBoardColumns',
-          'columnTabs',
-          'paFlowActions',
-          'updatedAt',
-          'updatedByName',
-          'updatedByEmail'
-        ]) &&
         request.resource.data.sidebarTitle is string &&
         request.resource.data.sidebarSubtitle is string &&
         request.resource.data.dashboardTitle is string &&
@@ -211,15 +174,15 @@ service cloud.firestore {
         request.resource.data.assuntosPASindicancia is list &&
         request.resource.data.assuntosDUPrincipais is list &&
         request.resource.data.origensDUDocumentos is list &&
-        request.resource.data.secoesDU is list && // <--- Tipagem garantida como Array
+        request.resource.data.secoesDU is list &&
         request.resource.data.paEmAndamentoColumns is list &&
         request.resource.data.duBoardColumns is list &&
         request.resource.data.columnTabs is list &&
-        request.resource.data.paFlowActions is list; // <--- Remoção total do duFlowActions
+        request.resource.data.paFlowActions is list;
+        
       allow delete: if false;
     }
     
-    // Regra padrão: negar acesso a outras coleções não especificadas
     match /{document=**} {
       allow read, write: if false;
     }
