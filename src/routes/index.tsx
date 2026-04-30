@@ -295,9 +295,8 @@ function Index() {
       }
       if (filtro === "todos") return true;
       if (p.status === "concluido") return false;
-      const setor = normalizarSetor(p.setor || p.tipo);
       const prazoFatal = p.prazoFatal;
-      if (setor !== "DU" || !prazoFatal) return false;
+      if (!prazoFatal) return false;
       const s = statusPrazo(prazoFatal);
       if (filtro === "vencidos") return s === "overdue";
       if (filtro === "hoje") return s === "today";
@@ -1367,6 +1366,7 @@ function Index() {
               <MesaTrabalho
                 processos={filtrados}
                 filtroTipo={filtroTipo}
+                filtro={filtro}
                 onEdit={handleEdit}
                 onDelete={handleRemover}
                 onMove={handleMoverStatus}

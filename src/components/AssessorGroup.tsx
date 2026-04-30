@@ -1,9 +1,9 @@
 import { ProcessoCard } from "./ProcessoCard";
-import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
+import type { Processo, StatusProcesso, TipoProcesso, FiltroPrazo } from "@/types/processo";
 import { DEFAULT_COLUMN_TABS, DEFAULT_PA_EM_ANDAMENTO_COLUMNS, normalizarPAEmAndamentoColumns } from "@/types/siteSettings";
 import type { SiteSettings } from "@/types/siteSettings";
 import { useDroppable } from "@dnd-kit/core";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 interface Props {
   responsavel: string;
@@ -22,10 +22,19 @@ interface Props {
   onReadProcess?: (processoId: string) => void;
   /** Quando `true`, a coluna usa largura ampliada (450px) em telas ≥sm. */
   isWide?: boolean;
+  filtro?: FiltroPrazo;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro }: Props) {
   const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">("andamento");
+
+  useEffect(() => {
+    if (filtro === "vencidos") {
+      setAba("atraso");
+    } else if (filtro === "hoje" || filtro === "semana" || filtro === "todos") {
+      setAba("andamento");
+    }
+  }, [filtro]);
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
   });

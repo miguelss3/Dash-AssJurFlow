@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from "react";
-import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
+import type { Processo, StatusProcesso, TipoProcesso, FiltroPrazo } from "@/types/processo";
 import { AssessorGroup } from "./AssessorGroup";
 import {
   DndContext,
@@ -33,9 +33,10 @@ interface Props {
   unreadProcessIds?: Set<string>;
   onReadProcess?: (processoId: string) => void;
   siteSettings?: SiteSettings;
+  filtro?: FiltroPrazo;
 }
 
-export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess, siteSettings }: Props) {
+export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess, siteSettings, filtro }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
@@ -627,6 +628,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         siteSettings={siteSettings}
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
+                        filtro={filtro}
                         isWide={a.nome === paColunaLabelPorId.get("sindicancia")}
                       />
                     ))}
@@ -649,6 +651,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         siteSettings={siteSettings}
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
+                        filtro={filtro}
                       />
                     ))}
                   </div>
@@ -673,6 +676,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         siteSettings={siteSettings}
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
+                        filtro={filtro}
                       />
                     ))}
                   </div>
@@ -694,6 +698,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         siteSettings={siteSettings}
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
+                        filtro={filtro}
                       />
                     ))}
                   </div>
@@ -717,6 +722,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                       siteSettings={siteSettings}
                       unreadProcessIds={unreadProcessIds}
                       onReadProcess={onReadProcess}
+                      filtro={filtro}
                     />
                   ))}
                 </div>
