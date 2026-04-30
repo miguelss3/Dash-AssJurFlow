@@ -1,17 +1,16 @@
-import { CalendarIcon, Send } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import {
   AcaoPrincipal,
   AssinaturaDestino,
-  DOC_DANGER_BTN_CLASS,
   DOC_INPUT_CLASS,
   DOC_LABEL_CLASS,
-  DOC_PRIMARY_BTN_CLASS,
   LABEL_ACAO,
   LABEL_ASSINATURA_DESTINO,
   docContainerClass,
   docRadioClass,
 } from "./shared";
 import { CamposDocumento } from "./CamposDocumento";
+import { formatarData } from "@/lib/prazo";
 
 interface FormularioDespachoProps {
   acaoPrincipal: AcaoPrincipal;
@@ -22,7 +21,6 @@ interface FormularioDespachoProps {
   setDataPrazo: (v: string) => void;
   isReiteracao: boolean;
   setIsReiteracao: (v: boolean) => void;
-  // V2.4 — Composição do(s) documento(s).
   numeroDocumentoDU: string;
   setNumeroDocumentoDU: (v: string) => void;
   incluiDiexExterno: boolean;
@@ -33,11 +31,13 @@ interface FormularioDespachoProps {
   setNumeroDiexExterno: (v: string) => void;
   numeroOficioExterno: string;
   setNumeroOficioExterno: (v: string) => void;
-  onEnviarChefia: () => void;
-  onFinalizar: () => void;
+  // V2.8 — Memória do despacho anterior para o banner de Reiteração.
+  numeroAnterior?: string;
+  prazoAnterior?: string;
 }
 
-// Formulário universal "Despacho" — Signatário → Objeto → Documento → Prazo → Botão.
+// V2.7 — Apenas campos de formulário. Ações primárias (Despachar) e secundárias
+// (Finalizar) vivem no rodapé universal do orquestrador AcoesDUModalNovo.
 export function FormularioDespacho({
   acaoPrincipal,
   setAcaoPrincipal,
@@ -57,13 +57,19 @@ export function FormularioDespacho({
   setNumeroDiexExterno,
   numeroOficioExterno,
   setNumeroOficioExterno,
-  onEnviarChefia,
-  onFinalizar,
+  numeroAnterior,
+  prazoAnterior,
 }: FormularioDespachoProps) {
+  // V2.8 — Banner só aparece quando o assessor confirmar a reiteração e
+  // existir, no documento, registro do despacho anterior.
+  const exibirBannerReiteracao =
+    isReiteracao
+    && acaoPrincipal === "DILIGENCIA"
+    && Boolean(numeroAnterior && numeroAnterior.trim());
+
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2">
       <article className={docContainerClass(assinaturaDestino)}>
-        {/* Signatário */}
         <header className="border-b-2 border-slate-300 pb-3">
           <p className={DOC_LABEL_CLASS}>Signatário (Autoridade)</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -83,7 +89,6 @@ export function FormularioDespacho({
           </div>
         </header>
 
-        {/* Objeto */}
         <section>
           <p className={DOC_LABEL_CLASS}>Objeto do Despacho</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -105,7 +110,6 @@ export function FormularioDespacho({
             ))}
           </div>
 
-          {/* Reiteração — exibido apenas para DILIGENCIA. */}
           {acaoPrincipal === "DILIGENCIA" && (
             <label className="mt-3 flex items-center gap-2 text-[12px] text-slate-700 cursor-pointer select-none">
               <input
@@ -118,9 +122,26 @@ export function FormularioDespacho({
               Este despacho é uma <strong>Reiteração</strong>.
             </label>
           )}
+
+          {/* V2.8 — Banner inteligente de memória da cobrança anterior. */}
+          {exibirBannerReiteracao && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-[12px] text-red-800">
+              <p className="font-bold flex items-center gap-1 mb-1">
+                ⚠️ Histórico da Cobrança:
+              </p>
+              <p>
+                Estamos reiterando o documento <strong>{numeroAnterior}</strong>.
+              </p>
+              {prazoAnterior && prazoAnterior.trim() && (
+                <p>
+                  O prazo original havia sido fixado para{" "}
+                  <strong>{formatarData(prazoAnterior)}</strong> e não foi cumprido.
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
-        {/* V2.4 — Montagem de Documento(s). Opcional na visaão do Assessor. */}
         <CamposDocumento
           assinaturaDestino={assinaturaDestino}
           numeroDocumentoDU={numeroDocumentoDU}
@@ -136,7 +157,6 @@ export function FormularioDespacho({
           opcional
         />
 
-        {/* Prazo (apenas em DILIGENCIA) */}
         {acaoPrincipal === "DILIGENCIA" && (
           <section>
             <label className={`${DOC_LABEL_CLASS} flex items-center gap-1`}>
@@ -152,14 +172,6 @@ export function FormularioDespacho({
           </section>
         )}
       </article>
-
-      <button onClick={onEnviarChefia} className={DOC_PRIMARY_BTN_CLASS}>
-        <Send className="w-4 h-4" /> Enviar para Chefia
-      </button>
-
-      <button onClick={onFinalizar} className={DOC_DANGER_BTN_CLASS}>
-        Finalizar Processo
-      </button>
     </div>
   );
 }

@@ -1,12 +1,9 @@
-import { CalendarIcon, FileSignature, Send } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import {
   AcaoPrincipal,
   AssinaturaDestino,
-  DOC_DANGER_BTN_CLASS,
   DOC_INPUT_CLASS,
   DOC_LABEL_CLASS,
-  DOC_PRIMARY_BTN_CLASS,
-  DOC_SECONDARY_BTN_CLASS,
   LABEL_ACAO,
   LABEL_ASSINATURA_DESTINO,
   docContainerClass,
@@ -23,7 +20,6 @@ interface MesaChefiaProps {
   setPossuiPrazoDU: (v: boolean) => void;
   dataPrazo: string;
   setDataPrazo: (v: string) => void;
-  // V2.4 — Composição do(s) documento(s).
   incluiDiexExterno: boolean;
   setIncluiDiexExterno: (v: boolean) => void;
   incluiOficioExterno: boolean;
@@ -32,13 +28,11 @@ interface MesaChefiaProps {
   setNumeroDiexExterno: (v: string) => void;
   numeroOficioExterno: string;
   setNumeroOficioExterno: (v: string) => void;
-  onAssinarEFinalizar: () => void;
-  onAprovarSPED: () => void;
-  onDevolverAssessor: () => void;
-  onFinalizar: () => void;
 }
 
-// Mesa da Chefia — bifurca pela autoridade (Chefe assina; CHEM/Cmt vão p/ SPED).
+// V2.7 — Mesa da Chefia: apenas formulário. O botão universal "Despachar /
+// Encaminhar" no rodapé do orquestrador roteia entre Assinar (chefe) e
+// Aprovar/SPED (chem/cmt) com base no signatário selecionado.
 export function MesaChefia({
   assinaturaDestino,
   acaoPrincipal,
@@ -56,10 +50,6 @@ export function MesaChefia({
   setNumeroDiexExterno,
   numeroOficioExterno,
   setNumeroOficioExterno,
-  onAssinarEFinalizar,
-  onAprovarSPED,
-  onDevolverAssessor,
-  onFinalizar,
 }: MesaChefiaProps) {
   const ehAssinaturaChefe = assinaturaDestino === "chefe";
   const rotuloAutoridade = LABEL_ASSINATURA_DESTINO[assinaturaDestino];
@@ -143,32 +133,11 @@ export function MesaChefia({
             />
             <p className="text-[12px] text-slate-700 bg-white/60 border border-emerald-200 p-3 rounded-md">
               Encaminhe via SPED para assinatura do <strong>{rotuloAutoridade}</strong>. Os números
-              definitivos podem ser confirmados na vigília do SPED.
+              definitivos podem ser confirmados no SPED.
             </p>
           </>
         )}
       </article>
-
-      {ehAssinaturaChefe ? (
-        <button onClick={onAssinarEFinalizar} className={DOC_PRIMARY_BTN_CLASS}>
-          <FileSignature className="w-4 h-4" />
-          {/* V2.6 — Documento interno: estritamente "Assinar". */}
-          Assinar
-        </button>
-      ) : (
-        <button onClick={onAprovarSPED} className={DOC_PRIMARY_BTN_CLASS}>
-          {/* V2.6 — Documento externo: estritamente "Aprovado" (manda para Vigília SPED). */}
-          <Send className="w-4 h-4" /> Aprovado
-        </button>
-      )}
-
-      <button onClick={onDevolverAssessor} className={DOC_SECONDARY_BTN_CLASS}>
-        Devolver ao Assessor
-      </button>
-
-      <button onClick={onFinalizar} className={DOC_DANGER_BTN_CLASS}>
-        Finalizar Processo
-      </button>
     </div>
   );
 }

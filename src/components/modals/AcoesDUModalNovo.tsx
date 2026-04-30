@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
-import { Lock } from "lucide-react";
+import { Lock, Send } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
@@ -61,6 +61,10 @@ export function AcoesDUModalNovo({
   const [numeroDiexExterno, setNumeroDiexExterno] = useState<string>("");
   const [numeroOficioExterno, setNumeroOficioExterno] = useState<string>("");
   const [carregandoFluxo, setCarregandoFluxo] = useState(false);
+  // V2.8 — Memória do despacho anterior, alimentada na carga inicial.
+  // Usada pelo banner de Reiteração no FormularioDespacho.
+  const [numeroAnterior, setNumeroAnterior] = useState<string>("");
+  const [prazoAnterior, setPrazoAnterior] = useState<string>("");
 
   // ---------------- Carga ----------------
   const carregarFluxo = async () => {
@@ -148,6 +152,22 @@ export function AcoesDUModalNovo({
       );
       setNumeroOficioExterno(
         (data?.numeroOficioExterno || pedido?.numeroOficioExterno || "").toString(),
+      );
+
+      // V2.8 — Snapshot do despacho anterior para o banner de Reiteração.
+      // Captura o número/prazo "como estavam" ao abrir o modal — o que o
+      // assessor digitar agora não polui a memória histórica.
+      setNumeroAnterior(
+        (
+          pedido?.numeroDocumentoDU
+          || pedido?.numeroDiex
+          || pedido?.numeroSaida
+          || data?.numeroDocumentoDU
+          || ""
+        ).toString(),
+      );
+      setPrazoAnterior(
+        (pedido?.dataPrazo || pedido?.prazoResposta || "").toString(),
       );
     } catch (error) {
       console.error("Erro ao carregar fluxo DU:", error);
@@ -355,23 +375,115 @@ export function AcoesDUModalNovo({
 
   const cabecalhoSituacao = useMemo(() => LABEL_SITUACAO[situacaoFluxo], [situacaoFluxo]);
 
-  // ---------------- Handlers de ação (alimentam os sub-componentes) ----------------
-  const handleEnviarChefia = () => {
-    const ehReiteracao = acaoPrincipal === "DILIGENCIA" && isReiteracao;
-    void avancarFluxo("CHEFIA_DILIGENCIA", {
-      assinaturaDestino,
-      acaoPrincipal,
-      ...(acaoPrincipal === "DILIGENCIA" && dataPrazo.trim() ? { dataPrazo: dataPrazo.trim() } : {}),
-      ...(ehReiteracao ? { reiteracoesIncrement: 1 } : {}),
-      descricaoOverride: ehReiteracao
-        ? "Reiteração de Pedido de Subsídios despachada para a Chefia."
-        : `Despachado para a Chefia. Ação: ${LABEL_ACAO[acaoPrincipal]}. `
-          + `Assinatura: ${LABEL_ASSINATURA_DESTINO[assinaturaDestino]}.`,
-    });
-    setIsReiteracao(false);
+  // ---------------- V2.7 — Handler Universal "Despachar / Encaminhar" ----------------
+  // Roteia a transição com base em (situacaoFluxo, papel, signatário). Mantém
+  // a máquina de estados estabelecida nos handlers anteriores, agora unificada
+  // sob um único botão no rodapé.
+  const handleDespachoUniversal = () => {
+    switch (situacaoFluxo) {
+      case "MESA_ASSESSOR": {
+        const ehReiteracao = acaoPrincipal === "DILIGENCIA" && isReiteracao;
+        void avancarFluxo("CHEFIA_DILIGENCIA", {
+          assinaturaDestino,
+          acaoPrincipal,
+          ...(acaoPrincipal === "DILIGENCIA" && dataPrazo.trim()
+            ? { dataPrazo: dataPrazo.trim() }
+            : {}),
+          ...(ehReiteracao ? { reiteracoesIncrement: 1 } : {}),
+          descricaoOverride: ehReiteracao
+            ? "Reiteração de Pedido de Subsídios despachada para a Chefia."
+            : `Despachado para a Chefia. Ação: ${LABEL_ACAO[acaoPrincipal]}. `
+              + `Assinatura: ${LABEL_ASSINATURA_DESTINO[assinaturaDestino]}.`,
+        });
+        setIsReiteracao(false);
+        return;
+      }
+
+      case "CHEFIA_DILIGENCIA": {
+        if (!ehChefia) return;
+        if (assinaturaDestino === "chefe") {
+          // Chefe assina diretamente: prazo → AGUARDANDO_RESPOSTA, sem prazo → encerra.
+          const numero = numeroDocumentoDU.trim();
+          if (!numero) {
+            toast.error("Informe o número do DIEx Simplificado.");
+            return;
+          }
+          if (possuiPrazoDU) {
+            if (!dataPrazo.trim()) {
+              toast.error("Defina o prazo para resposta antes de assinar.");
+              return;
+            }
+            void avancarFluxo("AGUARDANDO_RESPOSTA", {
+              numeroDocumentoDU: numero,
+              possuiPrazoDU: true,
+              dataPrazo: dataPrazo.trim(),
+              assinaturaDestino: "chefe",
+              acaoPrincipal: "DILIGENCIA",
+              descricaoOverride: `DIEx ${numero} assinado pelo Chefe da AssJur. Prazo iniciado.`,
+            });
+          } else {
+            void finalizarProcesso();
+          }
+        } else {
+          // CHEM/Cmt: aprovação manda à Vigília SPED.
+          void avancarFluxo("AGUARDANDO_ASSINATURA", {
+            assinaturaDestino,
+            descricaoOverride:
+              `Chefia aprovou via SPED. Aguardando assinatura do `
+              + `${LABEL_ASSINATURA_DESTINO[assinaturaDestino]}.`,
+          });
+        }
+        return;
+      }
+
+      case "AGUARDANDO_ASSINATURA": {
+        // V2.7 — Eliminado o conceito de 2 estágios. Com os números obrigatórios
+        // preenchidos, o clique único registra e roteia conforme o prazo.
+        const numero = numeroDocumentoDU.trim();
+        if (assinaturaDestino === "chefe" && !numero) {
+          toast.error("Informe o número do documento gerado.");
+          return;
+        }
+        const rotuloAutoridade = LABEL_ASSINATURA_DESTINO[assinaturaDestino];
+        if (possuiPrazoDU) {
+          if (!dataPrazo.trim()) {
+            toast.error("Defina o prazo para resposta.");
+            return;
+          }
+          void avancarFluxo("AGUARDANDO_RESPOSTA", {
+            numeroDocumentoDU: numero,
+            possuiPrazoDU: true,
+            dataPrazo: dataPrazo.trim(),
+            assinaturaDestino,
+            descricaoOverride: `Documento ${numero} assinado por ${rotuloAutoridade}. Prazo iniciado.`,
+          });
+        } else {
+          void avancarFluxo("MESA_ASSESSOR", {
+            numeroDocumentoDU: numero,
+            possuiPrazoDU: false,
+            assinaturaDestino,
+            descricaoOverride: `Documento ${numero} assinado por ${rotuloAutoridade}. Sem prazo.`,
+          });
+        }
+        return;
+      }
+
+      case "AGUARDANDO_RESPOSTA": {
+        const numero = numeroRecebido.trim();
+        if (!numero) {
+          toast.error("Informe o número do documento recebido.");
+          return;
+        }
+        void avancarFluxo("MESA_ASSESSOR", {
+          numeroRecebido: numero,
+          descricaoOverride: "Resposta recebida. Em análise pelo assessor.",
+        });
+        return;
+      }
+    }
   };
 
-  // V2.3 — Marcha à Ré: minuta rejeitada na assinatura externa.
+  // V2.7 — Marcha à Ré: minuta rejeitada na assinatura externa (Vigília SPED).
   const handleMinutaRejeitada = () => {
     void avancarFluxo("MESA_ASSESSOR", {
       possuiPrazoDU: false,
@@ -379,134 +491,58 @@ export function AcoesDUModalNovo({
     });
   };
 
-  const handleAssinarEFinalizar = () => {
-    const numero = numeroDocumentoDU.trim();
-    if (!numero) {
-      toast.error("Informe o número do DIEx Simplificado.");
-      return;
-    }
-    if (possuiPrazoDU) {
-      if (!dataPrazo.trim()) {
-        toast.error("Defina o prazo para resposta antes de assinar.");
-        return;
-      }
-      void avancarFluxo("AGUARDANDO_RESPOSTA", {
-        numeroDocumentoDU: numero,
-        possuiPrazoDU: true,
-        dataPrazo: dataPrazo.trim(),
-        assinaturaDestino: "chefe",
-        acaoPrincipal: "DILIGENCIA",
-        descricaoOverride: `DIEx ${numero} assinado pelo Chefe da AssJur. Prazo iniciado.`,
-      });
-    } else {
-      void finalizarProcesso();
-    }
-  };
-
-  const handleAprovarSPED = () => {
-    void avancarFluxo("AGUARDANDO_ASSINATURA", {
-      assinaturaDestino,
-      descricaoOverride:
-        `Chefia aprovou via SPED. Aguardando assinatura do ${LABEL_ASSINATURA_DESTINO[assinaturaDestino]}.`,
-    });
-  };
-
+  // V2.7 — Devolver ao Assessor (Chefia desiste sem ação).
   const handleDevolverAssessor = () => {
     void avancarFluxo("MESA_ASSESSOR", {
       descricaoOverride: "Chefia devolveu o processo ao assessor sem ação.",
     });
   };
 
-  const handleRegistrarSPED = () => {
-    const numero = numeroDocumentoDU.trim();
-    if (!numero) {
-      toast.error("Informe o número do documento gerado.");
-      return;
-    }
-    const rotuloAutoridade = LABEL_ASSINATURA_DESTINO[assinaturaDestino];
-    if (possuiPrazoDU) {
-      if (!dataPrazo.trim()) {
-        toast.error("Defina o prazo para resposta.");
-        return;
+  // V2.7 — Validação de bloqueio do botão universal por fase.
+  const despachoBloqueado = useMemo(() => {
+    switch (situacaoFluxo) {
+      case "MESA_ASSESSOR":
+        // Para DILIGENCIA exigimos prazo; DEFESA é livre.
+        return acaoPrincipal === "DILIGENCIA" && !dataPrazo.trim();
+      case "CHEFIA_DILIGENCIA":
+        if (!ehChefia) return true;
+        if (assinaturaDestino === "chefe") {
+          if (!numeroDocumentoDU.trim()) return true;
+          if (possuiPrazoDU && !dataPrazo.trim()) return true;
+          return false;
+        }
+        // chem/cmt → aprovação para SPED não exige campos.
+        return false;
+      case "AGUARDANDO_ASSINATURA": {
+        // Campos obrigatórios das colunas fixas (input de número da Vigília).
+        const externoOk =
+          assinaturaDestino === "chefe"
+            ? numeroDocumentoDU.trim().length > 0
+            : (incluiDiexExterno && numeroDiexExterno.trim().length > 0)
+              || (incluiOficioExterno && numeroOficioExterno.trim().length > 0);
+        if (!externoOk) return true;
+        if (possuiPrazoDU && !dataPrazo.trim()) return true;
+        return false;
       }
-      void avancarFluxo("AGUARDANDO_RESPOSTA", {
-        numeroDocumentoDU: numero,
-        possuiPrazoDU: true,
-        dataPrazo: dataPrazo.trim(),
-        assinaturaDestino,
-        descricaoOverride: `Documento ${numero} assinado por ${rotuloAutoridade}. Prazo iniciado.`,
-      });
-    } else {
-      void avancarFluxo("MESA_ASSESSOR", {
-        numeroDocumentoDU: numero,
-        possuiPrazoDU: false,
-        assinaturaDestino,
-        descricaoOverride: `Documento ${numero} assinado por ${rotuloAutoridade}. Sem prazo.`,
-      });
+      case "AGUARDANDO_RESPOSTA":
+        return numeroRecebido.trim().length === 0;
+      default:
+        return true;
     }
-  };
-
-  // V2.5 — Salva os dados de composição do(s) documento(s) sem alterar a
-  // situacaoFluxo, mantendo o card estacionado em "Aguardando Assinatura".
-  // Usado pelo Estágio 1 da Vigília do SPED.
-  const handleSalvarDadosSPED = async () => {
-    if (!processoId || !user) return;
-    try {
-      const processoRef = doc(db, "processos", processoId);
-      const snap = await getDoc(processoRef);
-      const dataAtual = (snap.exists() ? snap.data() : {}) as Record<string, unknown>;
-      const pedidoAtual = (dataAtual?.pedidoSubsidios as Record<string, unknown>) || {};
-
-      const numeroDocEfetivo = numeroDocumentoDU.trim();
-      const numeroDiexExternoEfetivo = numeroDiexExterno.trim();
-      const numeroOficioExternoEfetivo = numeroOficioExterno.trim();
-      const prazoEfetivo = dataPrazo.trim();
-
-      const pedidoSubsidiosPatch = {
-        ...pedidoAtual,
-        assinaturaDestino,
-        possuiPrazoDU,
-        dataPrazo: prazoEfetivo,
-        prazoResposta: prazoEfetivo,
-        numeroDocumentoDU: numeroDocEfetivo,
-        numeroSaida: numeroDocEfetivo,
-        incluiDiexExterno,
-        incluiOficioExterno,
-        numeroDiexExterno: numeroDiexExternoEfetivo,
-        numeroOficioExterno: numeroOficioExternoEfetivo,
-      };
-
-      await updateDoc(processoRef, {
-        pedidoSubsidios: pedidoSubsidiosPatch,
-        assinaturaDestino,
-        numeroDocumentoDU: numeroDocEfetivo,
-        possuiPrazoDU,
-        incluiDiexExterno,
-        incluiOficioExterno,
-        numeroDiexExterno: numeroDiexExternoEfetivo,
-        numeroOficioExterno: numeroOficioExternoEfetivo,
-        atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: autorMilitar,
-      });
-      toast.success("Dados salvos. Card mantido em Aguardando Assinatura.");
-      if (onSuccess) onSuccess();
-    } catch (error) {
-      console.error("Erro ao salvar dados da Vigília SPED:", error);
-      toast.error("Falha ao salvar os dados.");
-    }
-  };
-
-  const handleRegistrarEntrada = () => {
-    const numero = numeroRecebido.trim();
-    if (!numero) {
-      toast.error("Informe o número do documento recebido.");
-      return;
-    }
-    void avancarFluxo("MESA_ASSESSOR", {
-      numeroRecebido: numero,
-      descricaoOverride: "Resposta recebida. Em análise pelo assessor.",
-    });
-  };
+  }, [
+    situacaoFluxo,
+    acaoPrincipal,
+    assinaturaDestino,
+    dataPrazo,
+    possuiPrazoDU,
+    numeroDocumentoDU,
+    numeroRecebido,
+    incluiDiexExterno,
+    incluiOficioExterno,
+    numeroDiexExterno,
+    numeroOficioExterno,
+    ehChefia,
+  ]);
 
   // ---------------- Roteamento de visões ----------------
   const renderVisaoAssessor = () => {
@@ -539,10 +575,6 @@ export function AcoesDUModalNovo({
           setNumeroDiexExterno={setNumeroDiexExterno}
           numeroOficioExterno={numeroOficioExterno}
           setNumeroOficioExterno={setNumeroOficioExterno}
-          onSalvarDados={handleSalvarDadosSPED}
-          onRegistrar={handleRegistrarSPED}
-          onMinutaRejeitada={handleMinutaRejeitada}
-          onFinalizar={finalizarProcesso}
         />
       );
     }
@@ -551,8 +583,6 @@ export function AcoesDUModalNovo({
         <EntradaResposta
           numeroRecebido={numeroRecebido}
           setNumeroRecebido={setNumeroRecebido}
-          onRegistrarEntrada={handleRegistrarEntrada}
-          onFinalizar={finalizarProcesso}
         />
       );
     }
@@ -576,8 +606,8 @@ export function AcoesDUModalNovo({
         setNumeroDiexExterno={setNumeroDiexExterno}
         numeroOficioExterno={numeroOficioExterno}
         setNumeroOficioExterno={setNumeroOficioExterno}
-        onEnviarChefia={handleEnviarChefia}
-        onFinalizar={finalizarProcesso}
+        numeroAnterior={numeroAnterior}
+        prazoAnterior={prazoAnterior}
       />
     );
   };
@@ -603,10 +633,6 @@ export function AcoesDUModalNovo({
             setNumeroDiexExterno={setNumeroDiexExterno}
             numeroOficioExterno={numeroOficioExterno}
             setNumeroOficioExterno={setNumeroOficioExterno}
-            onAssinarEFinalizar={handleAssinarEFinalizar}
-            onAprovarSPED={handleAprovarSPED}
-            onDevolverAssessor={handleDevolverAssessor}
-            onFinalizar={finalizarProcesso}
           />
         );
       case "AGUARDANDO_ASSINATURA":
@@ -638,6 +664,50 @@ export function AcoesDUModalNovo({
           renderVisaoChefe()
         ) : (
           renderVisaoAssessor()
+        )}
+
+        {/* V2.7 — Rodapé universal "Despachar / Encaminhar". Espelha o SPED:
+            uma única ação primária por fase, com secundários condicionais. */}
+        {!carregandoFluxo && (
+          <div className="mt-5 pt-4 border-t border-slate-200 flex flex-col gap-2">
+            {/* 1. Ação principal — único botão primário por fase. */}
+            <button
+              onClick={handleDespachoUniversal}
+              disabled={despachoBloqueado}
+              className="w-full py-3 rounded-xl text-sm font-bold border border-transparent bg-[#0F172A] hover:bg-slate-800 text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="w-4 h-4" />
+              Despachar / Encaminhar
+            </button>
+
+            {/* 2. Retorno / Devolução — contorno âmbar. Padronizado para
+                 "Devolver ao Assessor" tanto na Chefia quanto no SPED. */}
+            {ehChefia && situacaoFluxo === "CHEFIA_DILIGENCIA" && (
+              <button
+                onClick={handleDevolverAssessor}
+                className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-amber-400 text-amber-700 hover:bg-amber-50"
+              >
+                Devolver ao Assessor
+              </button>
+            )}
+
+            {situacaoFluxo === "AGUARDANDO_ASSINATURA" && (
+              <button
+                onClick={handleMinutaRejeitada}
+                className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-amber-400 text-amber-700 hover:bg-amber-50"
+              >
+                Devolver ao Assessor
+              </button>
+            )}
+
+            {/* 3. Encerramento — contorno vermelho, sempre disponível. */}
+            <button
+              onClick={() => void finalizarProcesso()}
+              className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-red-300 text-red-700 hover:bg-red-50"
+            >
+              Finalizar Processo
+            </button>
+          </div>
         )}
       </DialogContent>
     </Dialog>

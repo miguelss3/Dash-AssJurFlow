@@ -104,7 +104,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
   const abasConfiguradas = useMemo(() => {
     if (isAguardandoRespostaDU) {
       return [
-        { id: "andamento", scope: "DU", label: "Em Andamento", order: 1, enabled: true },
+        { id: "andamento", scope: "DU", label: "No Prazo", order: 1, enabled: true },
         { id: "atraso", scope: "DU", label: "Vencidos", order: 2, enabled: true },
         { id: "concluidos", scope: "DU", label: "Concluídos", order: 3, enabled: true },
       ];
@@ -195,7 +195,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
         {processosDaAbaAtiva.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-border py-10 text-center text-xs text-muted-foreground/60 font-semibold">
             {abaAtiva === "andamento"
-              ? "Sem processos em andamento"
+              ? "Sem processos no prazo"
               : abaAtiva === "portaria_assinada"
                 ? "Sem portarias assinadas"
               : abaAtiva === "atraso"

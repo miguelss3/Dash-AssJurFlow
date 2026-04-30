@@ -209,7 +209,7 @@ export const DEFAULT_COLUMN_TABS: ColumnTabSetting[] = [
   },
   {
     id: "andamento",
-    label: "Em Andamento",
+    label: "No Prazo",
     enabled: true,
     order: 10,
     scope: "PA",
@@ -230,7 +230,7 @@ export const DEFAULT_COLUMN_TABS: ColumnTabSetting[] = [
   },
   {
     id: "andamento",
-    label: "Em Andamento",
+    label: "No Prazo",
     enabled: true,
     order: 10,
     scope: "DU",

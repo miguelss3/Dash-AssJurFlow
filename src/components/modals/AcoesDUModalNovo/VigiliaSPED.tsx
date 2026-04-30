@@ -1,11 +1,8 @@
-import { CalendarIcon, FileSignature, Save } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import {
   AssinaturaDestino,
-  DOC_DANGER_BTN_CLASS,
   DOC_INPUT_CLASS,
   DOC_LABEL_CLASS,
-  DOC_PRIMARY_BTN_CLASS,
-  DOC_SECONDARY_BTN_CLASS,
   LABEL_ASSINATURA_DESTINO,
   docContainerClass,
   docRadioClass,
@@ -20,7 +17,6 @@ interface VigiliaSPEDProps {
   setPossuiPrazoDU: (v: boolean) => void;
   dataPrazo: string;
   setDataPrazo: (v: string) => void;
-  // V2.4 — Composição do(s) documento(s).
   incluiDiexExterno: boolean;
   setIncluiDiexExterno: (v: boolean) => void;
   incluiOficioExterno: boolean;
@@ -29,15 +25,11 @@ interface VigiliaSPEDProps {
   setNumeroDiexExterno: (v: string) => void;
   numeroOficioExterno: string;
   setNumeroOficioExterno: (v: string) => void;
-  // V2.5 — Salva os campos no Firestore sem alterar a situacaoFluxo,
-  // mantendo o card estacionado em "Aguardando Assinatura".
-  onSalvarDados: () => void;
-  onRegistrar: () => void;
-  onMinutaRejeitada: () => void;
-  onFinalizar: () => void;
 }
 
-// Vigília do SPED — registra o nº do documento após assinatura externa.
+// V2.7 — Vigília do SPED: apenas formulário. O botão universal "Despachar /
+// Encaminhar" no rodapé executa diretamente o registro (com prazo → AGUARDANDO
+// _RESPOSTA, sem prazo → MESA_ASSESSOR), eliminando os 2 estágios anteriores.
 export function VigiliaSPED({
   assinaturaDestino,
   numeroDocumentoDU,
@@ -54,20 +46,8 @@ export function VigiliaSPED({
   setNumeroDiexExterno,
   numeroOficioExterno,
   setNumeroOficioExterno,
-  onRegistrar,
-  onMinutaRejeitada,
-  onFinalizar,
 }: VigiliaSPEDProps) {
   const rotuloAutoridade = LABEL_ASSINATURA_DESTINO[assinaturaDestino];
-  // V2.4 — Para externos, exigimos que ao menos um dos checkboxes esteja
-  // marcado e seu respectivo número preenchido. Para chefe, mantém o input
-  // simplificado.
-  const externoOk =
-    assinaturaDestino === "chefe"
-      ? numeroDocumentoDU.trim().length > 0
-      : (incluiDiexExterno && numeroDiexExterno.trim().length > 0)
-        || (incluiOficioExterno && numeroOficioExterno.trim().length > 0);
-  const podeRegistrar = externoOk && (!possuiPrazoDU || dataPrazo.trim().length > 0);
 
   return (
     <div className="space-y-5 animate-in fade-in">
@@ -127,37 +107,6 @@ export function VigiliaSPED({
           </section>
         )}
       </article>
-
-      {/* V2.5 — Estágio 1 (Aguardando Dados): "Salvar Dados" mantém o card
-          estacionado nesta coluna. Estágio 2 (Dados Preenchidos): libera
-          "Iniciar Prazo" + "Finalizar Processo". */}
-      {!temNumerosRegistrados ? (
-        <button onClick={onSalvarDados} className={DOC_SECONDARY_BTN_CLASS}>
-          <Save className="w-4 h-4" /> Salvar Dados
-        </button>
-      ) : (
-        <>
-          <button
-            disabled={!podeIniciarPrazo}
-            onClick={onRegistrar}
-            className={DOC_PRIMARY_BTN_CLASS}
-          >
-            <FileSignature className="w-4 h-4" /> Iniciar Prazo
-          </button>
-
-          <button onClick={onFinalizar} className={DOC_DANGER_BTN_CLASS}>
-            Finalizar Processo
-          </button>
-        </>
-      )}
-
-      {/* Marcha à Ré — minuta rejeitada na assinatura externa. */}
-      <button
-        onClick={onMinutaRejeitada}
-        className="w-full rounded-md border border-red-300 bg-white px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-50"
-      >
-        Minuta Rejeitada no SPED
-      </button>
     </div>
   );
 }
