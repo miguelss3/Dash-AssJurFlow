@@ -27,16 +27,21 @@ interface Props {
   onDelete: (id: string) => void;
   onMove: (id: string, status: StatusProcesso) => void;
   onReativarProcesso?: (processoId: string, payload?: { motivo: string; novoPrazoFatal: string }) => void | Promise<void>;
-  onRedistribuir?: (processoId: string, novoResponsavel: string) => void | Promise<void>;
+  onRedistribuir?: (
+    processoId: string,
+    novoResponsavel: string,
+    opcoes?: { situacaoFluxo?: string; mensagemHistorico?: string },
+  ) => void | Promise<void>;
   usuario?: AuthUser;
   ehAdmin?: boolean;
   unreadProcessIds?: Set<string>;
   onReadProcess?: (processoId: string) => void;
   siteSettings?: SiteSettings;
   filtro?: FiltroPrazo;
+  busca?: string;
 }
 
-export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess, siteSettings, filtro }: Props) {
+export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess, siteSettings, filtro, busca }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
@@ -205,12 +210,39 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
 
     // O ID do 'over' é o responsável (nome do assessor ou "Aguardando Distribuição")
     const novoResponsavel = over.id as string;
-    if (
-      novoResponsavel === "MESA DO CHEFE"
-      || novoResponsavel === duColunaAguardandoResposta
-      || novoResponsavel === duColunaAguardandoAssinatura
-      || paColunaLabelSet.has(novoResponsavel)
-    ) {
+
+    // V2.17 — Drop nas colunas de fluxo retroage situacaoFluxo e libera o responsável.
+    const RETROCESSO_FLUXO: Record<string, string> = {
+      "MESA DO CHEFE": "enviado_admin",
+      [duColunaAguardandoAssinatura]: "AGUARDANDO_ASSINATURA",
+      [duColunaAguardandoResposta]: "AGUARDANDO_RESPOSTA",
+    };
+
+    if (novoResponsavel in RETROCESSO_FLUXO) {
+      const processoId = active.id as string;
+      const processoAtual = processosEfetivos.find((p) => p.id === processoId);
+      const responsavelAnterior = processoAtual?.responsavel || "";
+      const situacaoFluxo = RETROCESSO_FLUXO[novoResponsavel];
+      const mensagemHistorico = `Fluxo retroagido manualmente para ${novoResponsavel}`;
+
+      if (onRedistribuir) {
+        // V2.19 — Preserva o assessor responsável. A própria classificação do board
+        // (pendenciasChefia / aguardandoAssinatura / aguardandoResposta) já remove o
+        // card da coluna do assessor enquanto a situacaoFluxo estiver ativa. Quando
+        // o fluxo avançar, o card volta automaticamente para a coluna de quem é dono.
+        Promise.resolve(
+          onRedistribuir(processoId, responsavelAnterior, { situacaoFluxo, mensagemHistorico }),
+        ).catch(() => {
+          // Sem otimismo a reverter: o snapshot do Firestore reabsorve o estado real.
+        });
+      }
+
+      setActiveId(null);
+      setActiveProcesso(null);
+      return;
+    }
+
+    if (paColunaLabelSet.has(novoResponsavel)) {
       setActiveId(null);
       setActiveProcesso(null);
       return;
@@ -248,8 +280,13 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   const grupos = useMemo(() => {
     const ativos = processosEfetivos.filter((p) => p.status !== "concluido");
 
-    const tipos: TipoProcesso[] =
-      filtroTipo === "todos" ? ["DU", "PA"] : [filtroTipo as TipoProcesso];
+    const buscaAtiva = !!busca?.trim();
+
+    // V2.18 — Busca Soberana: ignora filtroTipo e exibe DU + PA simultaneamente,
+    // garantindo que o card encontrado nunca "suma" por causa do filtro de setor.
+    const tipos: TipoProcesso[] = buscaAtiva
+      ? ["DU", "PA"]
+      : filtroTipo === "todos" ? ["DU", "PA"] : [filtroTipo as TipoProcesso];
 
     const result: {
       tipo: TipoProcesso;
@@ -529,7 +566,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
     }
 
     return result;
-  }, [processosEfetivos, filtroTipo, assessoresDoSetor, paColunaLabelPorId, paColunaLabelSet, paColunaLabels, ehAdmin, duColunaAguardandoResposta, duColunaAguardandoAssinatura, duColunaAguardandoDistribuicao]);
+  }, [processosEfetivos, filtroTipo, assessoresDoSetor, paColunaLabelPorId, paColunaLabelSet, paColunaLabels, ehAdmin, duColunaAguardandoResposta, duColunaAguardandoAssinatura, duColunaAguardandoDistribuicao, busca]);
 
   if (grupos.length === 0) {
     return (
@@ -629,6 +666,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
                         filtro={filtro}
+                        busca={busca}
                         isWide={a.nome === paColunaLabelPorId.get("sindicancia")}
                       />
                     ))}
@@ -652,6 +690,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
                         filtro={filtro}
+                      busca={busca}
                       />
                     ))}
                   </div>
@@ -677,6 +716,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
                         filtro={filtro}
+                      busca={busca}
                       />
                     ))}
                   </div>
@@ -699,6 +739,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
                         filtro={filtro}
+                      busca={busca}
                       />
                     ))}
                   </div>
@@ -723,6 +764,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                       unreadProcessIds={unreadProcessIds}
                       onReadProcess={onReadProcess}
                       filtro={filtro}
+                    busca={busca}
                     />
                   ))}
                 </div>

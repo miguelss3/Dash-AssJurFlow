@@ -23,9 +23,10 @@ interface Props {
   /** Quando `true`, a coluna usa largura ampliada (450px) em telas ≥sm. */
   isWide?: boolean;
   filtro?: FiltroPrazo;
+  busca?: string;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca }: Props) {
   const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">("andamento");
 
   useEffect(() => {
@@ -35,6 +36,21 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       setAba("andamento");
     }
   }, [filtro]);
+
+  // V2.18 — Quando há busca ativa, salta automaticamente para a primeira aba
+  // que possui resultados, evitando que o card encontrado fique escondido.
+  useEffect(() => {
+    if (!busca?.trim()) return;
+    if (processos.length > 0) {
+      setAba("andamento");
+    } else if (processosAtrasados.length > 0) {
+      setAba("atraso");
+    } else if (processosPortariaAssinada.length > 0) {
+      setAba("portaria_assinada");
+    } else if (processosConcluidos.length > 0) {
+      setAba("concluidos");
+    }
+  }, [busca, processos.length, processosAtrasados.length, processosPortariaAssinada.length, processosConcluidos.length]);
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
   });

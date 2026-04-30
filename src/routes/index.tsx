@@ -264,21 +264,23 @@ function Index() {
   }, [processos, ehAdmin, setorUsuario]);
 
   const filtrados = useMemo(() => {
+    const buscaAtiva = busca.trim().length > 0;
+    const q = buscaAtiva ? normalizarTexto(busca) : "";
+
     return processos.filter((p) => {
       const setorProcesso = normalizarSetor(p.setor || p.tipo);
 
-      if (filtroTipo !== "todos" && setorProcesso !== filtroTipo) return false;
-
-      // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
-      // FILTRO "VISÃO DO SETOR": para assessores não-admin, mostra apenas processos do seu setor (DU ou PA)
-      // Processos com setor vazio/corrompido nunca vazam para assessores
+      // Trava de segurança: assessor não-admin nunca enxerga processos fora do seu setor,
+      // mesmo durante uma busca.
       if (!ehAdmin && setorUsuario) {
         if (setorProcesso === "" || setorProcesso !== setorUsuario) {
           return false;
         }
       }
-      if (busca.trim()) {
-        const q = normalizarTexto(busca);
+
+      // V2.18 — Busca Soberana: quando o usuário digita algo, ignoramos
+      // filtroTipo (DU/PA) e filtro de prazos. Retorna qualquer match no banco.
+      if (buscaAtiva) {
         const camposBusca = [
           p.numero,
           p.cliente,
@@ -290,9 +292,11 @@ function Index() {
           p.pedidoSubsidios?.observacoes,
           p.respostaDU?.observacoes,
         ];
-        const hit = camposBusca.some((campo) => normalizarTexto(campo).includes(q));
-        if (!hit) return false;
+        return camposBusca.some((campo) => normalizarTexto(campo).includes(q));
       }
+
+      if (filtroTipo !== "todos" && setorProcesso !== filtroTipo) return false;
+
       if (filtro === "todos") return true;
       if (p.status === "concluido") return false;
       const prazoFatal = p.prazoFatal;
@@ -802,9 +806,18 @@ function Index() {
     });
   };
 
-  const handleRedistribuir = async (processoId: string, novoResponsavel: string) => {
+  const handleRedistribuir = async (
+    processoId: string,
+    novoResponsavel: string,
+    opcoes?: { situacaoFluxo?: string; mensagemHistorico?: string },
+  ) => {
+    const retrocessoFluxo = opcoes?.situacaoFluxo;
     const toastId = toast.loading(
-      novoResponsavel?.trim() ? "Redistribuindo processo..." : "Removendo distribuição...",
+      retrocessoFluxo
+        ? "Retrocedendo fluxo do processo..."
+        : novoResponsavel?.trim()
+          ? "Redistribuindo processo..."
+          : "Removendo distribuição...",
     );
     try {
       const { db } = await import("@/lib/firebase");
@@ -820,22 +833,32 @@ function Index() {
       const tinhaResponsavelAntes = !!processo.responsavel?.trim();
       const vaiParaAguardando = !novoResponsavel?.trim();
 
-      const msgHistorico = vaiParaAguardando
-        ? "Processo retornado para Aguardando Distribuição"
-        : tinhaResponsavelAntes
-          ? `Processo redistribuído para ${novoResponsavel}`
-          : `Processo distribuído para ${novoResponsavel}`;
+      const msgHistorico = opcoes?.mensagemHistorico
+        ?? (vaiParaAguardando
+          ? "Processo retornado para Aguardando Distribuição"
+          : tinhaResponsavelAntes
+            ? `Processo redistribuído para ${novoResponsavel}`
+            : `Processo distribuído para ${novoResponsavel}`);
 
       const agoraISO = new Date().toISOString();
       const autorNome = nomeMilitarAtual;
 
-      // Atualiza o processo com responsável, data e autor
-      const atualizarProcessoPromise = atualizar(processoId, {
+      const patchProcesso: Partial<Processo> = {
         responsavel: novoResponsavel,
         descricao: msgHistorico,
         atualizadoEm: agoraISO,
         atualizadoPorNome: autorNome,
-      });
+      };
+
+      if (retrocessoFluxo) {
+        patchProcesso.pedidoSubsidios = {
+          ...(processo.pedidoSubsidios || {}),
+          situacaoFluxo: retrocessoFluxo,
+        };
+      }
+
+      // Atualiza o processo com responsável, data e autor
+      const atualizarProcessoPromise = atualizar(processoId, patchProcesso);
 
       // Mantém a coleção de distribuições em sincronia com o responsável atual.
       // O board usa assessorNome dessa coleção para decidir a coluna de cada card.
@@ -1367,6 +1390,7 @@ function Index() {
                 processos={filtrados}
                 filtroTipo={filtroTipo}
                 filtro={filtro}
+                busca={busca}
                 onEdit={handleEdit}
                 onDelete={handleRemover}
                 onMove={handleMoverStatus}
