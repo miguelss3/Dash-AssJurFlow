@@ -39,6 +39,11 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
   const [prazoInternoEdit, setPrazoInternoEdit] = useState("");
   const [prazoFatalEdit, setPrazoFatalEdit] = useState("");
   const [prazoRespostaEdit, setPrazoRespostaEdit] = useState("");
+  // V2.21 — Edição inline dos números de DIEx (enviado/recebido).
+  const [editandoDocs, setEditandoDocs] = useState(false);
+  const [savingDocs, setSavingDocs] = useState(false);
+  const [docEnviadoEdit, setDocEnviadoEdit] = useState("");
+  const [docRecebidoEdit, setDocRecebidoEdit] = useState("");
 
   const formatarDataHoraSegura = (valor?: string | null) => {
     if (!valor) return "—";
@@ -67,6 +72,18 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
     setPrazoFatalEdit(processo.prazoFatal || "");
     setPrazoRespostaEdit(processo.pedidoSubsidios?.prazoResposta || "");
     setEditandoPrazosDU(false);
+    // V2.21 — Sincroniza buffers de edição dos documentos.
+    setDocEnviadoEdit(
+      processo.pedidoSubsidios?.numeroDocumentoDU ||
+        processo.pedidoSubsidios?.numeroDiex ||
+        "",
+    );
+    setDocRecebidoEdit(
+      processo.respostaDU?.numeroDiex ||
+        processo.respostaDU?.numeroOficio ||
+        "",
+    );
+    setEditandoDocs(false);
   }, [open, processo]);
 
   // Guarda defensiva: o modal pode ser disparado a partir do calendário com um
@@ -75,16 +92,30 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
   // Mantido APÓS os hooks para não violar as Regras dos Hooks do React.
   if (!processo) return null;
 
+  // V2.23 — Sanitização: o Firestore rejeita `undefined` em writes
+  // ("Unsupported field value: undefined"). Esta função normaliza
+  // qualquer valor undefined ou string vazia para `null`, mantendo a
+  // semântica de "campo apagado" sem quebrar o updateDoc.
+  const sanitizarPatch = <T extends Record<string, unknown>>(patch: T): T => {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) out[k] = null;
+      else if (typeof v === "string" && v.trim() === "") out[k] = null;
+      else out[k] = v;
+    }
+    return out as T;
+  };
+
   const handleSalvarPrazosDU = async () => {
     try {
       setSavingPrazosDU(true);
       const processoRef = doc(db, "processos", processo.id);
-      await updateDoc(processoRef, {
-        prazo: prazoInternoEdit || null,
-        prazoFatal: prazoFatalEdit || null,
-        "pedidoSubsidios.prazoResposta": prazoRespostaEdit || null,
+      await updateDoc(processoRef, sanitizarPatch({
+        prazo: prazoInternoEdit,
+        prazoFatal: prazoFatalEdit,
+        "pedidoSubsidios.prazoResposta": prazoRespostaEdit,
         atualizadoEm: new Date().toISOString(),
-      });
+      }));
       setEditandoPrazosDU(false);
       toast.success("Prazos finais do DU atualizados com sucesso.");
     } catch (error) {
@@ -92,6 +123,52 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
       toast.error("Não foi possível salvar os prazos finais do DU.");
     } finally {
       setSavingPrazosDU(false);
+    }
+  };
+
+  // V2.21 — Persistência inline dos números de DIEx (enviado/recebido).
+  // V2.22 — Isolamento estrito: o ENVIADO só toca pedidoSubsidios; o
+  // RECEBIDO só toca respostaDU. Se o usuário digitar o mesmo número nos
+  // dois lados (entrada incoerente que originou o bug visual), o RECEBIDO
+  // é higienizado para preservar a semântica "DIEx da Assessoria nunca
+  // pode ser, ao mesmo tempo, recebimento da Unidade".
+  const handleSalvarDocs = async () => {
+    if (!processo) return;
+    try {
+      setSavingDocs(true);
+      const enviado = docEnviadoEdit.trim();
+      let recebido = docRecebidoEdit.trim();
+
+      if (enviado && recebido && enviado === recebido) {
+        const confirmar = typeof window !== "undefined"
+          ? window.confirm(
+              "O número informado em 'Recebido' é igual ao 'Enviado'. "
+                + "Um DIEx da Assessoria não pode ser também um recebimento da Unidade. "
+                + "Deseja limpar o campo 'Recebido'?",
+            )
+          : true;
+        if (!confirmar) {
+          setSavingDocs(false);
+          return;
+        }
+        recebido = "";
+        setDocRecebidoEdit("");
+      }
+
+      const processoRef = doc(db, "processos", processo.id);
+      await updateDoc(processoRef, sanitizarPatch({
+        "pedidoSubsidios.numeroDocumentoDU": enviado,
+        "pedidoSubsidios.numeroDiex": enviado,
+        "respostaDU.numeroDiex": recebido,
+        atualizadoEm: new Date().toISOString(),
+      }));
+      setEditandoDocs(false);
+      toast.success("Documentos atualizados com sucesso.");
+    } catch (error) {
+      console.error("Erro ao atualizar documentos DU:", error);
+      toast.error("Não foi possível salvar os documentos.");
+    } finally {
+      setSavingDocs(false);
     }
   };
   const prorrogacoesPA = isPA
@@ -178,7 +255,7 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className={`text-xs font-bold px-2 py-1 rounded ${
@@ -266,18 +343,70 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
             </div>
 
             {/* V2.20 — Coluna Documentos: enviados (DIEx do pedido) e recebidos
-                 (DIEx da resposta), com setinhas indicando o sentido. */}
+                 (DIEx da resposta), com setinhas indicando o sentido.
+                 V2.21 — Edição inline via botão "Editar documentos". */}
             {isDU && (
               <div className="space-y-4">
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Documentos</h4>
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Documentos</h4>
+                  <div className="flex items-center gap-2">
+                    {editandoDocs ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setEditandoDocs(false);
+                            setDocEnviadoEdit(
+                              processo.pedidoSubsidios?.numeroDocumentoDU ||
+                                processo.pedidoSubsidios?.numeroDiex ||
+                                "",
+                            );
+                            setDocRecebidoEdit(
+                              processo.respostaDU?.numeroDiex ||
+                                processo.respostaDU?.numeroOficio ||
+                                "",
+                            );
+                          }}
+                          disabled={savingDocs}
+                        >
+                          <X className="w-3.5 h-3.5 mr-1" />
+                          Cancelar
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleSalvarDocs}
+                          disabled={savingDocs}
+                        >
+                          <Save className="w-3.5 h-3.5 mr-1" />
+                          {savingDocs ? "Salvando..." : "Salvar"}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setEditandoDocs(true)}
+                      >
+                        <Pencil className="w-3.5 h-3.5 mr-1" />
+                        Editar documentos
+                      </Button>
+                    )}
+                  </div>
+                </div>
 
                 {(() => {
+                  // V2.22 — Leitura estrita: o ENVIADO só pode vir de
+                  // pedidoSubsidios; o RECEBIDO só pode vir de respostaDU.
+                  // Sem fallbacks cruzados (que causavam duplicação visual).
                   const docEnviado =
                     pedido?.numeroDocumentoDU || pedido?.numeroDiex || "";
                   const docRecebido =
                     respostaDU?.numeroDiex ||
                     respostaDU?.numeroOficio ||
-                    respostaDU?.numeroRecebido ||
                     "";
                   return (
                     <>
@@ -287,13 +416,22 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                           <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">
                             Enviado
                           </div>
-                          <div
-                            className={`text-sm mt-0.5 ${
-                              docEnviado ? "text-slate-800 font-medium" : "text-slate-400 italic"
-                            }`}
-                          >
-                            {docEnviado || "Pendente"}
-                          </div>
+                          {editandoDocs ? (
+                            <Input
+                              value={docEnviadoEdit}
+                              onChange={(e) => setDocEnviadoEdit(e.target.value)}
+                              placeholder="Nº DIEx enviado"
+                              className="mt-1 h-8 text-sm"
+                            />
+                          ) : (
+                            <div
+                              className={`text-sm mt-0.5 ${
+                                docEnviado ? "text-slate-800 font-medium" : "text-slate-400 italic"
+                              }`}
+                            >
+                              {docEnviado || "Pendente"}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -303,13 +441,22 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                           <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">
                             Recebido
                           </div>
-                          <div
-                            className={`text-sm mt-0.5 ${
-                              docRecebido ? "text-slate-800 font-medium" : "text-slate-400 italic"
-                            }`}
-                          >
-                            {docRecebido || "Pendente"}
-                          </div>
+                          {editandoDocs ? (
+                            <Input
+                              value={docRecebidoEdit}
+                              onChange={(e) => setDocRecebidoEdit(e.target.value)}
+                              placeholder="Nº DIEx recebido"
+                              className="mt-1 h-8 text-sm"
+                            />
+                          ) : (
+                            <div
+                              className={`text-sm mt-0.5 ${
+                                docRecebido ? "text-slate-800 font-medium" : "text-slate-400 italic"
+                              }`}
+                            >
+                              {docRecebido || "Pendente"}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </>

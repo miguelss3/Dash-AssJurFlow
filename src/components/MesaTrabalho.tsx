@@ -18,7 +18,7 @@ import { db } from "@/lib/firebase";
 import type { AuthUser } from "@/hooks/useAuth";
 import { DEFAULT_DU_BOARD_COLUMNS, DEFAULT_PA_EM_ANDAMENTO_COLUMNS, type SiteSettings } from "@/types/siteSettings";
 import { normalizarSetorUsuario } from "@/lib/userProfiles";
-import { diasRestantes } from "@/lib/prazo";
+import { diasRestantes, statusPrazo } from "@/lib/prazo";
 
 interface Props {
   processos: Processo[];
@@ -372,11 +372,17 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
       isAguardandoRespostaPorId.set(p.id, aguardandoResposta);
 
       if (aguardandoResposta && tipoCanonico === "DU") {
-        const prazoBase = p.pedidoSubsidios?.prazoResposta;
-        isAguardandoRespostaVencidoPorId.set(
-          p.id,
-          !!prazoBase && diasRestantes(prazoBase) < 0,
-        );
+        // V2.23 — Alinha a régua de "vencido" da coluna Aguardando Resposta
+        // com o filtro global do dashboard (statusPrazo). Considera vencido
+        // quando o prazo de resposta OU o prazo fatal estiverem em overdue;
+        // assim, um card sinalizado como "Vencido" no filtro global cai
+        // automaticamente na aba "Vencidos" desta coluna.
+        const prazoResposta = p.pedidoSubsidios?.prazoResposta;
+        const prazoFatal = p.prazoFatal;
+        const vencido =
+          statusPrazo(prazoResposta) === "overdue"
+          || statusPrazo(prazoFatal) === "overdue";
+        isAguardandoRespostaVencidoPorId.set(p.id, vencido);
       } else {
         isAguardandoRespostaVencidoPorId.set(p.id, false);
       }

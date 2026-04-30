@@ -266,7 +266,23 @@ export function AcoesDUModalNovo({
       const reiteracoesAtual = Number(pedidoAtual?.reiteracoes) || 0;
       const reiteracoesEfetivo = reiteracoesAtual + (extras?.reiteracoesIncrement ?? 0);
 
-      const pedidoSubsidiosPatch = {
+      // V2.23 — Sanitização defensiva: o Firestore rejeita writes com
+      // `undefined` ("Unsupported field value: undefined"). Convertemos
+      // recursivamente undefined → null nos objetos que serão gravados.
+      const sanitizar = (valor: unknown): unknown => {
+        if (valor === undefined) return null;
+        if (Array.isArray(valor)) return valor.map(sanitizar);
+        if (valor && typeof valor === "object" && !(valor instanceof Date)) {
+          const out: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(valor as Record<string, unknown>)) {
+            out[k] = sanitizar(v);
+          }
+          return out;
+        }
+        return valor;
+      };
+
+      const pedidoSubsidiosPatch = sanitizar({
         ...pedidoAtual,
         acaoPrincipal: acaoEfetiva,
         assinaturaDestino: destinoEfetivo,
@@ -293,21 +309,18 @@ export function AcoesDUModalNovo({
           proximaSituacao === "AGUARDANDO_RESPOSTA"
             ? autorMilitar
             : (pedidoAtual?.solicitadoPorNome as string) || "",
-      };
+      }) as Record<string, unknown>;
 
-      const previousDoc = { ...dataAtual };
-      delete (previousDoc as Record<string, unknown>).ultimaAcaoFluxo;
+      const previousDoc = sanitizar({ ...dataAtual }) as Record<string, unknown>;
+      delete previousDoc.ultimaAcaoFluxo;
 
-      await updateDoc(processoRef, {
+      await updateDoc(processoRef, sanitizar({
+        // V2.22 — Mantém as mutações de documento confinadas ao
+        // objeto `pedidoSubsidios` para evitar contaminação cruzada com
+        // `respostaDU` (causa do bug de DIEx duplicado V2.21).
         pedidoSubsidios: pedidoSubsidiosPatch,
         assinaturaDestino: destinoEfetivo,
-        numeroDocumentoDU: numeroDocEfetivo,
         possuiPrazoDU: possuiPrazoEfetivo,
-        // V2.4 — Espelho top-level dos campos de composição externa.
-        incluiDiexExterno: incluiDiexEfetivo,
-        incluiOficioExterno: incluiOficioEfetivo,
-        numeroDiexExterno: numeroDiexExternoEfetivo,
-        numeroOficioExterno: numeroOficioExternoEfetivo,
         status: LABEL_SITUACAO[proximaSituacao],
         descricao,
         atualizadoEm: Timestamp.now(),
@@ -318,7 +331,7 @@ export function AcoesDUModalNovo({
           criadoPorNome: autorMilitar,
           previousDoc,
         },
-      });
+      }) as Record<string, unknown>);
       await registrarHistorico(descricao);
 
       setSituacaoFluxo(proximaSituacao);

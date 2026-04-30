@@ -51,6 +51,30 @@ type ProrrogacaoEditavel = {
 // LOG DE VERIFICAÇÃO - ESTE LOG DEVE APARECER SEMPRE
 // console.log("🚀🚀🚀 ARQUIVO CadastroProcessoModal.tsx CARREGADO - VERSÃO NOVA COM LOGS! 🚀🚀🚀");
 
+// V2.24 — Sanitização recursiva: o Firestore rejeita writes contendo
+// `undefined` em qualquer profundidade ("Unsupported field value:
+// undefined"). Esta função percorre o payload (incluindo objetos
+// aninhados como `pedidoSubsidios` e `respostaDU` e arrays) e converte
+// qualquer `undefined` em `null`, preservando demais valores.
+const sanitizarPayload = (obj: any): any => {
+  if (obj === undefined) return null;
+  if (obj === null) return null;
+  if (obj instanceof Date) return obj;
+  if (Array.isArray(obj)) return obj.map(sanitizarPayload);
+  if (typeof obj === "object") {
+    // Preserva tipos especiais do Firestore (Timestamp, FieldValue, etc.)
+    // que possuem prototypes próprios e não devem ser desestruturados.
+    const proto = Object.getPrototypeOf(obj);
+    if (proto && proto !== Object.prototype) return obj;
+    const result: Record<string, any> = {};
+    for (const key in obj) {
+      result[key] = sanitizarPayload(obj[key]);
+    }
+    return result;
+  }
+  return obj;
+};
+
 export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess, siteSettings }: CadastroProcessoModalProps) {
   const { user } = useAuth();
   const ehAdminOuChefe = isAdmin(user);
@@ -689,9 +713,13 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
             numeroDocFinal: numeroDocFinalNormalizado || null,
           };
 
+          // V2.22 — A resposta da Unidade vive APENAS em `respostaDU`.
+          // Antes, copiávamos `numeroSaida` (DIEx da Assessoria) para
+          // `respostaDU.numeroDiex`, o que produzia duplicação visual
+          // entre Enviado/Recebido. Mantemos aqui somente o que
+          // realmente representa o documento recebido.
           dados.respostaDU = {
             ...respostaAtual,
-            numeroDiex: numeroSaidaNormalizado || null,
             numeroRecebido: numeroRecebidoNormalizado || null,
             numeroOficio: numeroDocFinalNormalizado || null,
           };
@@ -777,13 +805,18 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         
         // Remove campos imutáveis do update (Firestore rules bloqueiam alteração desses campos)
         const { criadoEm: _, userId: _uid, userEmail: _email, criadoPorUid: _cpUid, criadoPorEmail: _cpEmail, ...dadosUpdate } = dados;
-        
-        await updateDoc(processoRef, { 
-          ...dadosUpdate, 
+
+        // V2.24 — Sanitiza recursivamente o payload antes do updateDoc
+        // para impedir que campos undefined (ex.: pedidoSubsidios.solicitadoEm
+        // em processos legados) abortem a gravação no Firestore.
+        const payloadUpdate = sanitizarPayload({
+          ...dadosUpdate,
           atualizadoEm: agora,
           atualizadoPorNome: autorCadastro,
-          descricao: msgAtualizacao // Atualiza último movimento
+          descricao: msgAtualizacao,
         });
+
+        await updateDoc(processoRef, payloadUpdate);
 
         const historicoCol = collection(db, "processos", processo.id, "historico");
         await addDoc(historicoCol, {
@@ -827,7 +860,8 @@ export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess,
         //   numeroProcesso: dados.numeroProcesso
         // });
         
-        const processoRef = await addDoc(collection(db, "processos"), dados);
+        // V2.24 — Sanitiza payload de criação pelo mesmo motivo do update.
+        const processoRef = await addDoc(collection(db, "processos"), sanitizarPayload(dados));
         
         // console.log("✅ Processo criado com sucesso! ID:", processoRef.id);
 
