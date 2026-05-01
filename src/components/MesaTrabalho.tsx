@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useState } from "react";
 import type { Processo, StatusProcesso, TipoProcesso, FiltroPrazo } from "@/types/processo";
 import { AssessorGroup } from "./AssessorGroup";
+import { ChefeGroup } from "./ChefeGroup";
 import {
   DndContext,
   DragOverlay,
@@ -717,78 +718,147 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
               ) : isDUDuasLinhas ? (
                 <div className="space-y-4">
                   <div className="flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
-                    {colunasDUFixas.map((a) => (
-                      <AssessorGroup
-                        key={`${grupo.tipo}-fixa-${a.nome}`}
-                        responsavel={a.nome}
-                        tipo={grupo.tipo}
-                        processos={a.itensAtivos}
-                        processosPortariaAssinada={a.itensPortariaAssinada}
-                        processosAtrasados={a.itensAtrasados}
-                        processosConcluidos={a.itensConcluidos}
-                        ehAdmin={ehAdmin}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                        onMove={onMove}
-                        onReativarProcesso={onReativarProcesso}
-                        siteSettings={siteSettings}
-                        unreadProcessIds={unreadProcessIds}
-                        onReadProcess={onReadProcess}
-                        filtro={filtro}
-                        busca={busca}
-                        mapaCoresAssessores={mapaCoresAssessores}
-                      />
-                    ))}
+                    {colunasDUFixas.map((a) =>
+                      a.nome === "MESA DO CHEFE" ? (
+                        <ChefeGroup
+                          key={`${grupo.tipo}-chefe-${a.nome}`}
+                          responsavel={a.nome}
+                          tipo={grupo.tipo}
+                          processos={[
+                            ...a.itensAtivos,
+                            ...a.itensAtrasados,
+                            ...a.itensConcluidos,
+                            ...a.itensPortariaAssinada,
+                          ]}
+                          ehAdmin={ehAdmin}
+                          onEdit={onEdit}
+                          onDelete={onDelete}
+                          onMove={onMove}
+                          onReativarProcesso={onReativarProcesso}
+                          siteSettings={siteSettings}
+                          unreadProcessIds={unreadProcessIds}
+                          onReadProcess={onReadProcess}
+                          mapaCoresAssessores={mapaCoresAssessores}
+                        />
+                      ) : (
+                        <AssessorGroup
+                          key={`${grupo.tipo}-fixa-${a.nome}`}
+                          responsavel={a.nome}
+                          tipo={grupo.tipo}
+                          processos={a.itensAtivos}
+                          processosPortariaAssinada={a.itensPortariaAssinada}
+                          processosAtrasados={a.itensAtrasados}
+                          processosConcluidos={a.itensConcluidos}
+                          ehAdmin={ehAdmin}
+                          onEdit={onEdit}
+                          onDelete={onDelete}
+                          onMove={onMove}
+                          onReativarProcesso={onReativarProcesso}
+                          siteSettings={siteSettings}
+                          unreadProcessIds={unreadProcessIds}
+                          onReadProcess={onReadProcess}
+                          filtro={filtro}
+                          busca={busca}
+                          mapaCoresAssessores={mapaCoresAssessores}
+                        />
+                      )
+                    )}
                   </div>
                   <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
-                    {[...colunasDUAssessores, ...colunasDUEsperaDistribuicao].map((a) => (
-                      <AssessorGroup
-                        key={`${grupo.tipo}-assessor-${a.nome}`}
-                        responsavel={a.nome}
-                        tipo={grupo.tipo}
-                        processos={a.itensAtivos}
-                        processosPortariaAssinada={a.itensPortariaAssinada}
-                        processosAtrasados={a.itensAtrasados}
-                        processosConcluidos={a.itensConcluidos}
-                        ehAdmin={ehAdmin}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                        onMove={onMove}
-                        onReativarProcesso={onReativarProcesso}
-                        siteSettings={siteSettings}
-                        unreadProcessIds={unreadProcessIds}
-                        onReadProcess={onReadProcess}
-                        filtro={filtro}
-                        busca={busca}
-                        mapaCoresAssessores={mapaCoresAssessores}
-                      />
-                    ))}
+                    {[...colunasDUAssessores, ...colunasDUEsperaDistribuicao].map((a) =>
+                      a.nome === "MESA DO CHEFE" ? (
+                        <ChefeGroup
+                          key={`${grupo.tipo}-chefe-${a.nome}`}
+                          responsavel={a.nome}
+                          tipo={grupo.tipo}
+                          processos={[
+                            ...a.itensAtivos,
+                            ...a.itensAtrasados,
+                            ...a.itensConcluidos,
+                            ...a.itensPortariaAssinada,
+                          ]}
+                          ehAdmin={ehAdmin}
+                          onEdit={onEdit}
+                          onDelete={onDelete}
+                          onMove={onMove}
+                          onReativarProcesso={onReativarProcesso}
+                          siteSettings={siteSettings}
+                          unreadProcessIds={unreadProcessIds}
+                          onReadProcess={onReadProcess}
+                          mapaCoresAssessores={mapaCoresAssessores}
+                        />
+                      ) : (
+                        <AssessorGroup
+                          key={`${grupo.tipo}-assessor-${a.nome}`}
+                          responsavel={a.nome}
+                          tipo={grupo.tipo}
+                          processos={a.itensAtivos}
+                          processosPortariaAssinada={a.itensPortariaAssinada}
+                          processosAtrasados={a.itensAtrasados}
+                          processosConcluidos={a.itensConcluidos}
+                          ehAdmin={ehAdmin}
+                          onEdit={onEdit}
+                          onDelete={onDelete}
+                          onMove={onMove}
+                          onReativarProcesso={onReativarProcesso}
+                          siteSettings={siteSettings}
+                          unreadProcessIds={unreadProcessIds}
+                          onReadProcess={onReadProcess}
+                          filtro={filtro}
+                          busca={busca}
+                          mapaCoresAssessores={mapaCoresAssessores}
+                        />
+                      )
+                    )}
                   </div>
                 </div>
               ) : (
                 <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
-                  {grupo.assessores.map((a) => (
-                    <AssessorGroup
-                      key={`${grupo.tipo}-${a.nome}`}
-                      responsavel={a.nome}
-                      tipo={grupo.tipo}
-                      processos={a.itensAtivos}
-                      processosPortariaAssinada={a.itensPortariaAssinada}
-                      processosAtrasados={a.itensAtrasados}
-                      processosConcluidos={a.itensConcluidos}
-                      ehAdmin={ehAdmin}
-                      onEdit={onEdit}
-                      onDelete={onDelete}
-                      onMove={onMove}
-                      onReativarProcesso={onReativarProcesso}
-                      siteSettings={siteSettings}
-                      unreadProcessIds={unreadProcessIds}
-                      onReadProcess={onReadProcess}
-                      filtro={filtro}
-                      busca={busca}
-                      mapaCoresAssessores={mapaCoresAssessores}
-                    />
-                  ))}
+                  {grupo.assessores.map((a) =>
+                    a.nome === "MESA DO CHEFE" ? (
+                      <ChefeGroup
+                        key={`${grupo.tipo}-chefe-${a.nome}`}
+                        responsavel={a.nome}
+                        tipo={grupo.tipo}
+                        processos={[
+                          ...a.itensAtivos,
+                          ...a.itensAtrasados,
+                          ...a.itensConcluidos,
+                          ...a.itensPortariaAssinada,
+                        ]}
+                        ehAdmin={ehAdmin}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onMove={onMove}
+                        onReativarProcesso={onReativarProcesso}
+                        siteSettings={siteSettings}
+                        unreadProcessIds={unreadProcessIds}
+                        onReadProcess={onReadProcess}
+                        mapaCoresAssessores={mapaCoresAssessores}
+                      />
+                    ) : (
+                      <AssessorGroup
+                        key={`${grupo.tipo}-${a.nome}`}
+                        responsavel={a.nome}
+                        tipo={grupo.tipo}
+                        processos={a.itensAtivos}
+                        processosPortariaAssinada={a.itensPortariaAssinada}
+                        processosAtrasados={a.itensAtrasados}
+                        processosConcluidos={a.itensConcluidos}
+                        ehAdmin={ehAdmin}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onMove={onMove}
+                        onReativarProcesso={onReativarProcesso}
+                        siteSettings={siteSettings}
+                        unreadProcessIds={unreadProcessIds}
+                        onReadProcess={onReadProcess}
+                        filtro={filtro}
+                        busca={busca}
+                        mapaCoresAssessores={mapaCoresAssessores}
+                      />
+                    )
+                  )}
                 </div>
               )}
             </section>
