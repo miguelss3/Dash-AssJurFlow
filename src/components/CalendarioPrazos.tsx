@@ -50,7 +50,8 @@ import {
   type TipoEvento,
 } from "@/hooks/useEventosCalendario";
 import { statusPrazo } from "@/lib/prazo";
-import { DetalhesProcessoModal } from "@/components/DetalhesProcessoModal";
+import { DetalhesModalPA } from "@/components/DetalhesModalPA";
+import { DetalhesModalDU } from "@/components/DetalhesModalDU";
 import { toast } from "sonner";
 
 interface Props {
@@ -685,13 +686,23 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
       </Dialog>
 
       {processoSelecionado && (
-        <DetalhesProcessoModal
-          open={!!processoSelecionado}
-          onOpenChange={(open) => {
-            if (!open) setProcessoSelecionado(null);
-          }}
-          processo={processoSelecionado}
-        />
+        (processoSelecionado.setor === "PA" || processoSelecionado.tipo === "PA") ? (
+          <DetalhesModalPA
+            open={!!processoSelecionado}
+            onOpenChange={(open) => {
+              if (!open) setProcessoSelecionado(null);
+            }}
+            processo={processoSelecionado}
+          />
+        ) : (
+          <DetalhesModalDU
+            open={!!processoSelecionado}
+            onOpenChange={(open) => {
+              if (!open) setProcessoSelecionado(null);
+            }}
+            processo={processoSelecionado}
+          />
+        )
       )}
     </div>
   );
