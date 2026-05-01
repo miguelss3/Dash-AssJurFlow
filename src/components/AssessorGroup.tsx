@@ -24,10 +24,12 @@ interface Props {
   isWide?: boolean;
   filtro?: FiltroPrazo;
   busca?: string;
+  mapaCoresAssessores?: Record<string, string>;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca, mapaCoresAssessores = {} }: Props) {
   const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">("andamento");
+  const corColuna = mapaCoresAssessores[(responsavel || "").trim()];
 
   useEffect(() => {
     if (filtro === "vencidos") {
@@ -131,7 +133,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       return [
         { id: "andamento", scope: "DU", label: "No Prazo", order: 1, enabled: true },
         { id: "atraso", scope: "DU", label: "Vencidos", order: 2, enabled: true },
-        { id: "concluidos", scope: "DU", label: "Concluídos", order: 3, enabled: true },
+        { id: "concluidos", scope: "DU", label: "Finalizados", order: 3, enabled: true },
       ];
     }
 
@@ -174,6 +176,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
   return (
     <div 
       ref={setNodeRef}
+      style={corColuna ? { borderTopColor: corColuna, borderTopWidth: "4px" } : undefined}
       className={`shrink-0 w-[88vw] ${isWide ? "sm:w-[450px]" : "sm:w-[340px]"} snap-start flex flex-col rounded-3xl bg-card border shadow-card overflow-hidden transition-all ${
         isOver ? "border-blue-500 border-2 ring-2 ring-blue-200 scale-[1.02]" : "border-border"
       }`}
@@ -227,7 +230,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
                 ? isAguardandoRespostaDU
                   ? "Sem processos vencidos"
                   : "Sem processos em atraso"
-                : "Sem processos concluídos"}
+                : "Sem processos finalizados"}
           </div>
         ) : (
           processosDaAbaAtiva.map((p) => (
@@ -243,6 +246,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
               showActions
               naoLido={!!unreadProcessIds?.has(p.id)}
               onMarcarComoLido={onReadProcess}
+              corDestaque={mapaCoresAssessores[(p.responsavel || "").trim()]}
             />
           ))
         )}

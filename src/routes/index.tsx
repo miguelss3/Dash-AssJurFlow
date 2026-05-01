@@ -299,12 +299,27 @@ function Index() {
 
       if (filtro === "todos") return true;
       if (p.status === "concluido") return false;
-      const prazoFatal = p.prazoFatal;
-      if (!prazoFatal) return false;
-      const s = statusPrazo(prazoFatal);
-      if (filtro === "vencidos") return s === "overdue";
-      if (filtro === "hoje") return s === "today";
-      if (filtro === "semana") return s === "today" || s === "soon";
+
+      // Filtros de prazo (Vencidos/Hoje/Semana) sao exclusivos do setor DU.
+      if (setorProcesso !== "DU") return false;
+
+      const sFatal = statusPrazo(p.prazoFatal);
+      const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
+
+      if (filtro === "vencidos") {
+        return sFatal === "overdue" || sResp === "overdue";
+      }
+
+      if (filtro === "hoje") {
+        if (sFatal === "overdue" || sResp === "overdue") return false;
+        return sFatal === "today" || sResp === "today";
+      }
+
+      if (filtro === "semana") {
+        if (sFatal === "overdue" || sResp === "overdue") return false;
+        return sFatal === "today" || sFatal === "soon" || sResp === "today" || sResp === "soon";
+      }
+
       return true;
     });
   }, [processos, filtro, busca, filtroTipo, setorUsuario, ehAdmin]);

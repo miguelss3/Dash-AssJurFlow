@@ -10,11 +10,25 @@ import { Pencil, Trash2, UserPlus } from "lucide-react";
 import { useAuth, type AuthUser } from "@/hooks/useAuth";
 import { nomeMilitarUsuario } from "@/lib/userProfiles";
 
+const PALETA_CORES = [
+  "#ef4444",
+  "#f97316",
+  "#eab308",
+  "#84cc16",
+  "#10b981",
+  "#06b6d4",
+  "#3b82f6",
+  "#8b5cf6",
+  "#ec4899",
+  "#64748b",
+];
+
 interface Usuario extends AuthUser {
   id?: string;
   ativo?: boolean;
   dataCadastro?: string;
   atualizadoEm?: string;
+  corCard?: string;
 }
 
 export function GestaoEquipe() {
@@ -32,6 +46,7 @@ export function GestaoEquipe() {
     email: "",
     senha: "",
     isChefe: "Não",
+    corCard: "",
   });
 
   useEffect(() => {
@@ -61,6 +76,7 @@ export function GestaoEquipe() {
       email: "",
       senha: "",
       isChefe: "Não",
+      corCard: "",
     });
     setEditando(null);
   }
@@ -76,6 +92,7 @@ export function GestaoEquipe() {
       email: usuario.email || "",
       senha: "", // Nunca preencher senha ao editar
       isChefe: usuario.isChefe ? "Sim" : "Não",
+      corCard: usuario.corCard || "",
     });
   }
 
@@ -98,6 +115,7 @@ export function GestaoEquipe() {
         secao: formData.setor,
         ativo: true,
         atualizadoEm: agoraISO,
+        corCard: formData.corCard || deleteField() as unknown as string,
       };
 
       if (editando?.id) {
@@ -464,6 +482,43 @@ export function GestaoEquipe() {
             </select>
           </div>
 
+          <div>
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-2">
+              Cor de Destaque do Card
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setFormData({ ...formData, corCard: "" })}
+                className={`h-8 rounded-lg px-2 text-[11px] font-semibold border transition-colors ${
+                  !formData.corCard
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Padrão
+              </button>
+              {PALETA_CORES.map((cor) => {
+                const selecionada = formData.corCard === cor;
+                return (
+                  <button
+                    key={cor}
+                    type="button"
+                    aria-label={`Selecionar cor ${cor}`}
+                    title={cor}
+                    onClick={() => setFormData({ ...formData, corCard: cor })}
+                    className={`h-8 w-8 rounded-full border-2 transition-transform ${
+                      selecionada
+                        ? "border-slate-900 scale-110"
+                        : "border-white hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: cor }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex flex-col gap-2 pt-2">
             <Button type="submit" disabled={salvando} className="w-full">
               {salvando ? (
@@ -529,6 +584,12 @@ export function GestaoEquipe() {
                       {usuario.isChefe && (
                         <span className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 border border-amber-300">
                           Chefe
+                        </span>
+                      )}
+                      {usuario.corCard && (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border border-slate-300 bg-slate-50 text-slate-700">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: usuario.corCard }} />
+                          Cor Card
                         </span>
                       )}
                     </div>

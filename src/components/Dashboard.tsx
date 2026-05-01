@@ -92,23 +92,33 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
   });
 
   // O array `processos` agora vem HÍBRIDO do useProcessos: ATIVOS + Últimos 50
-  // CONCLUÍDOS (para a aba "Concluídos" do Kanban). Separamos aqui.
+  // FINALIZADOS (para a aba "Finalizados" do Kanban). Separamos aqui.
   const processosAtivos = useMemo(
     () => processos.filter((p) => p.status !== "concluido"),
     [processos],
   );
 
-  // ---------- KPIs de PRAZO (client-side, UNIFICADO DU + PA) ----------
-  // statusPrazo agora aceita Timestamp do Firestore OU String ISO (ver lib/prazo).
-  // Antes filtr\u00e1vamos s\u00f3 setor === "DU", o que escondia totalmente os prazos PA
-  // para o Admin. Agora consideramos QUALQUER processo ativo (n\u00e3o conclu\u00eddo) que
-  // tenha `prazoFatal` preenchido, independentemente do setor.
-  const processosComPrazo = processosAtivos.filter((p) => Boolean(p.prazoFatal));
-  const vencidos = processosComPrazo.filter((p) => statusPrazo(p.prazoFatal) === "overdue").length;
-  const hoje = processosComPrazo.filter((p) => statusPrazo(p.prazoFatal) === "today").length;
-  const semana = processosComPrazo.filter((p) => {
-    const s = statusPrazo(p.prazoFatal);
-    return s === "today" || s === "soon";
+  // ---------- KPIs de PRAZO (client-side, EXCLUSIVO DU) ----------
+  // statusPrazo aceita Timestamp do Firestore ou String ISO (ver lib/prazo).
+  // Regra de precedencia: vencido nao entra em "hoje" nem em "semana".
+  // Cada card DU considera prazoFatal e pedidoSubsidios.prazoResposta.
+  const processosDUAtivos = processosAtivos.filter(
+    (p) => (p.setor || p.tipo || "").toString().toUpperCase() === "DU",
+  );
+  const vencidos = processosDUAtivos.filter((p) => {
+    return statusPrazo(p.prazoFatal) === "overdue" || statusPrazo(p.pedidoSubsidios?.prazoResposta) === "overdue";
+  }).length;
+  const hoje = processosDUAtivos.filter((p) => {
+    const sFatal = statusPrazo(p.prazoFatal);
+    const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
+    if (sFatal === "overdue" || sResp === "overdue") return false;
+    return sFatal === "today" || sResp === "today";
+  }).length;
+  const semana = processosDUAtivos.filter((p) => {
+    const sFatal = statusPrazo(p.prazoFatal);
+    const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
+    if (sFatal === "overdue" || sResp === "overdue") return false;
+    return sFatal === "today" || sFatal === "soon" || sResp === "today" || sResp === "soon";
   }).length;
 
   // ---------- Contagem por setor a partir dos ATIVOS ----------
@@ -139,8 +149,8 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     [mesRef],
   );
 
-  // ---------- Estatísticas SERVIDOR (concluídos = ativo:false) ----------
-  // Como o useProcessos agora também carrega os ÚLTIMOS 50 concluídos no cliente,
+  // ---------- Estatísticas SERVIDOR (finalizados = status:concluido) ----------
+  // Como o useProcessos agora também carrega os ÚLTIMOS 50 finalizados no cliente,
   // poderíamos contar localmente — mas o limite de 50 é propositadamente baixo,
   // então continuamos batendo no servidor para o total HISTÓRICO real.
   const [stats, setStats] = useState<ServerStats>(STATS_INICIAIS);
@@ -172,22 +182,22 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
           ? [where("setor", "in", ["DU", "PA"])]
           : [];
 
-      // ---------- Contagem TOTAL de concluídos (ativo == false) ----------
+      // ---------- Contagem TOTAL de finalizados (status == concluido) ----------
       let totalConcluidos = 0;
       try {
         const qConcluidos = query(
           processosRef,
           ...escopoBase,
-          where("ativo", "==", false),
+          where("status", "==", "concluido"),
         );
         const snap = await getCountFromServer(qConcluidos);
         totalConcluidos = snap.data().count;
       } catch (err) {
-        console.error("Dashboard: falha ao contar concluídos (ativo==false):", err);
+        console.error("Dashboard: falha ao contar finalizados (status==concluido):", err);
       }
 
-      // ---------- Conclusões do mês (derivada do cache local de concluídos) ----------
-      // O useProcessos já baixou os últimos 50 concluídos ordenados por
+      // ---------- Finalizações do mês (derivada do cache local de finalizados) ----------
+      // O useProcessos já baixou os últimos 50 finalizados ordenados por
       // `atualizadoEm desc`, que cobre confortavelmente o mês corrente.
       const finalizadosMes = processos.reduce((acc, p) => {
         if (p.status !== "concluido") return acc;
@@ -217,7 +227,7 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
   const dadosHistoricosProntos = !stats.carregando || statsTimeout;
   const dadosProntos = dadosAtivosProntos && dadosHistoricosProntos;
 
-  // Tarefa 3: total geral = ativos (props) + concluídos (server).
+  // Tarefa 3: total geral = ativos (props) + finalizados (server).
   const totalGeral = acervoAtivo + totalConcluidos;
   const taxaConclusao =
     totalGeral > 0 ? Math.round((totalConcluidos / totalGeral) * 100) : 0;
@@ -381,17 +391,17 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
               <div>
                 <div className="flex items-end gap-2 leading-none">
                   <div className="text-5xl font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
-                    {mostrarPlaceholderHistorico ? placeholder : displayTotalConcluidos}
+                    {mostrarPlaceholderCombinado ? placeholder : `${displayTaxaConclusao}%`}
                   </div>
-                  <div className="mb-1 text-base font-bold text-[oklch(0.78_0.18_145)] opacity-80">
-                    {mostrarPlaceholderCombinado ? "…" : `${displayTaxaConclusao}%`}
+                  <div className="mb-1 text-base font-bold text-[oklch(0.78_0.18_145)] opacity-80 whitespace-nowrap">
+                    {mostrarPlaceholderHistorico ? "…" : `- ${displayTotalConcluidos} Finalizados`}
                   </div>
                 </div>
-                <p className="text-sm text-white/70 mt-2">Finalizados</p>
+                <p className="text-sm text-white/70 mt-2">Índice de Resolução</p>
                 <p className="text-xs text-white/50 mt-0.5">
                   {mostrarPlaceholderCombinado
                     ? "sincronizando com servidor…"
-                    : `${displayTaxaConclusao}% do total cadastrado`}
+                    : "do total do acervo cadastrado"}
                 </p>
                 <div className="mt-3 h-1.5 rounded-full bg-white/15 overflow-hidden">
                   <div
@@ -416,7 +426,7 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
           onClick={() => onFiltroChange("todos")}
         />
         <KpiCard
-          label="Conclusões no mês"
+          label="Finalizações no mês"
           value={mostrarPlaceholderHistorico ? placeholder : displayFinalizadosMes}
           icon={CheckCircle2}
           tone="green"

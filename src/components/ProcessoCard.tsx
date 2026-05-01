@@ -62,13 +62,15 @@ interface ProcessoCardProps {
   isDragging?: boolean;
   naoLido?: boolean;
   onMarcarComoLido?: (processoId: string) => void;
+  corDestaque?: string;
 }
 
 // O componente interno que renderiza o visual
-const ProcessoCardComponent = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido }: ProcessoCardProps) => {
+const ProcessoCardComponent = ({ processo, p: pAntigo, ehAdmin = false, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, showActions = true, isDragging = false, naoLido = false, onMarcarComoLido, corDestaque }: ProcessoCardProps) => {
   const p = processo || pAntigo!;
   const { user } = useAuth();
   const marcarComoLido = () => onMarcarComoLido?.(p.id);
+  const fundoDestaque = /^#([0-9a-fA-F]{6})$/.test(corDestaque || "") ? `${corDestaque}14` : undefined;
   
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
     id: p.id,
@@ -77,6 +79,13 @@ const ProcessoCardComponent = ({ processo, p: pAntigo, ehAdmin = false, onEdit, 
 
   const style = {
     transform: CSS.Translate.toString(transform),
+    ...(corDestaque
+      ? {
+          borderLeftColor: corDestaque,
+          borderLeftWidth: "4px",
+          backgroundColor: fundoDestaque,
+        }
+      : {}),
   };
   const setor = p.setor || p.tipo;
   const isDU = setor === "DU";

@@ -206,7 +206,7 @@ export const DEFAULT_COLUMN_TABS: ColumnTabSetting[] = [
   },
   {
     id: "concluidos",
-    label: "Concluidos",
+    label: "Finalizados",
     enabled: true,
     order: 30,
     scope: "PA",
@@ -220,7 +220,7 @@ export const DEFAULT_COLUMN_TABS: ColumnTabSetting[] = [
   },
   {
     id: "concluidos",
-    label: "Concluidos",
+    label: "Finalizados",
     enabled: true,
     order: 20,
     scope: "DU",

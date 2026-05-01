@@ -13,7 +13,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
-import { collection, getDocs, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   DndContext,
@@ -1150,67 +1150,123 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     setNovaOrigemDUDocumento("");
   };
 
-  const [migrandoAtivos, setMigrandoAtivos] = useState(false);
+  const [gerandoBackup, setGerandoBackup] = useState(false);
+  const [analisando, setAnalisando] = useState(false);
+  const [relatorioLimpeza, setRelatorioLimpeza] = useState<{ id: string; acoes: string[] }[] | null>(null);
+  const [executandoLimpeza, setExecutandoLimpeza] = useState(false);
 
-  const executarMigracaoAtivos = async () => {
-    const confirmado = window.confirm(
-      "⚠️ ATENÇÃO\n\nEste script percorrerá TODOS os processos da coleção e adicionará o campo `ativo` (true/false) com base no status atual.\n\n• Status 'concluido' / 'finalizado' → ativo: false\n• Demais status → ativo: true\n\nA operação deve ser executada UMA ÚNICA VEZ. Confirmar?"
-    );
-    if (!confirmado) return;
+  const handleBackupLocal = async () => {
+    try {
+      setGerandoBackup(true);
 
-    setMigrandoAtivos(true);
+      const snapshot = await getDocs(collection(db, "processos"));
+      const dados = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
 
-    const promessa = (async () => {
-      const snap = await getDocs(collection(db, "processos"));
-      const docs = snap.docs;
+      const jsonString = JSON.stringify(dados, null, 2);
+      const blob = new Blob([jsonString], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `backup_processos_${new Date().toISOString().split("T")[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
 
-      if (docs.length === 0) {
-        return { total: 0, ativos: 0, inativos: 0 };
+      toast.success("Backup salvo no seu computador!");
+    } catch (error) {
+      console.error("Erro ao gerar backup local dos processos:", error);
+      toast.error("Não foi possível gerar o backup local.");
+    } finally {
+      setGerandoBackup(false);
+    }
+  };
+
+  const handleAnalisarDados = async () => {
+    try {
+      setAnalisando(true);
+      const snapshot = await getDocs(collection(db, "processos"));
+      const correcoes: { id: string; acoes: string[] }[] = [];
+
+      snapshot.docs.forEach((processoDoc) => {
+        const data = processoDoc.data() as {
+          responsavel?: unknown;
+          pedidoSubsidios?: unknown;
+          respostaDU?: unknown;
+        };
+        const acoes: string[] = [];
+
+        if (typeof data.responsavel !== "string" || data.responsavel.trim() === "") {
+          acoes.push("Definir responsável padrão");
+        }
+
+        if (!data.pedidoSubsidios || typeof data.pedidoSubsidios !== "object" || Array.isArray(data.pedidoSubsidios)) {
+          acoes.push("Criar objeto pedidoSubsidios");
+        }
+
+        if (!data.respostaDU || typeof data.respostaDU !== "object" || Array.isArray(data.respostaDU)) {
+          acoes.push("Criar objeto respostaDU");
+        }
+
+        if (acoes.length > 0) {
+          correcoes.push({ id: processoDoc.id, acoes });
+        }
+      });
+
+      setRelatorioLimpeza(correcoes);
+      if (correcoes.length === 0) {
+        toast.success("Nenhum processo legado precisa de correção.");
+      } else {
+        toast.warning(`Foram encontrados ${correcoes.length} processos com ajustes pendentes.`);
       }
+    } catch (error) {
+      console.error("Erro ao analisar processos legados:", error);
+      toast.error("Não foi possível analisar os dados legados.");
+    } finally {
+      setAnalisando(false);
+    }
+  };
 
-      const TAMANHO_LOTE = 400; // < 500 (limite do Firestore writeBatch)
-      let ativos = 0;
-      let inativos = 0;
+  const handleExecutarLimpeza = async () => {
+    if (!relatorioLimpeza || relatorioLimpeza.length === 0) return;
 
-      for (let i = 0; i < docs.length; i += TAMANHO_LOTE) {
-        const lote = docs.slice(i, i + TAMANHO_LOTE);
+    try {
+      setExecutandoLimpeza(true);
+
+      const TAMANHO_LOTE = 400;
+      for (let i = 0; i < relatorioLimpeza.length; i += TAMANHO_LOTE) {
+        const lote = relatorioLimpeza.slice(i, i + TAMANHO_LOTE);
         const batch = writeBatch(db);
 
-        for (const d of lote) {
-          const data = d.data() as { status?: string };
-          const statusNorm = String(data.status || "")
-            .trim()
-            .toLowerCase();
-          const ehInativo = statusNorm === "concluido" || statusNorm === "concluído" || statusNorm === "finalizado";
-          const ativo = !ehInativo;
-          batch.update(d.ref, { ativo });
-          if (ativo) ativos += 1;
-          else inativos += 1;
-        }
+        lote.forEach((item) => {
+          const patch: Record<string, unknown> = {};
+
+          if (item.acoes.includes("Definir responsável padrão")) {
+            patch.responsavel = "Sem responsável";
+          }
+          if (item.acoes.includes("Criar objeto pedidoSubsidios")) {
+            patch.pedidoSubsidios = {};
+          }
+          if (item.acoes.includes("Criar objeto respostaDU")) {
+            patch.respostaDU = {};
+          }
+
+          batch.update(doc(db, "processos", item.id), patch);
+        });
 
         await batch.commit();
       }
 
-      return { total: docs.length, ativos, inativos };
-    })();
-
-    toast.promise(promessa, {
-      loading: "Migrando documentos... isso pode levar alguns segundos.",
-      success: ({ total, ativos, inativos }) =>
-        `Migração concluída: ${total} processos atualizados (${ativos} ativos, ${inativos} inativos).`,
-      error: (err: unknown) => {
-        const msg = err instanceof Error ? err.message : "Erro desconhecido";
-        console.error("Erro na migração de ativos:", err);
-        return `Falha na migração: ${msg}`;
-      },
-    });
-
-    try {
-      await promessa;
-    } catch {
-      // já tratado em toast.promise
+      toast.success(`Higienização concluída em ${relatorioLimpeza.length} processos.`);
+      setRelatorioLimpeza(null);
+    } catch (error) {
+      console.error("Erro ao executar higienização dos processos:", error);
+      toast.error("Não foi possível executar as correções no banco.");
     } finally {
-      setMigrandoAtivos(false);
+      setExecutandoLimpeza(false);
     }
   };
 
@@ -1414,6 +1470,71 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6 rounded-3xl border border-border bg-card p-5 shadow-sm">
+          <section className="rounded-2xl border border-border bg-card p-6 space-y-4">
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Gerenciamento de Dados e Manutenção</h3>
+              <p className="text-sm text-muted-foreground">
+                Utilize estas ferramentas para garantir a integridade do banco de dados e realizar backups.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBackupLocal}
+                disabled={gerandoBackup || analisando || executandoLimpeza || saving || loading}
+              >
+                {gerandoBackup ? "Gerando arquivo..." : "💾 Baixar Backup Local (JSON)"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAnalisarDados}
+                disabled={analisando || executandoLimpeza || gerandoBackup || saving || loading}
+              >
+                {analisando ? "Analisando..." : "🔍 Analisar Dados Legados"}
+              </Button>
+            </div>
+
+            {relatorioLimpeza && (
+              <div className="mt-4 rounded-xl border border-border bg-muted p-4">
+                <p className="mb-2 text-sm font-semibold">
+                  {relatorioLimpeza.length === 0
+                    ? "✅ Nenhum processo precisa de correção."
+                    : `⚠️ Foram encontrados ${relatorioLimpeza.length} processos precisando de higienização:`}
+                </p>
+
+                {relatorioLimpeza.length > 0 && (
+                  <>
+                    <div className="max-h-56 space-y-2 overflow-y-auto pr-1 text-xs text-muted-foreground">
+                      {relatorioLimpeza.slice(0, 20).map((item) => (
+                        <div key={item.id} className="rounded-lg border border-border bg-background px-3 py-2">
+                          <p className="font-semibold text-foreground">{item.id}</p>
+                          <p>{item.acoes.join(" • ")}</p>
+                        </div>
+                      ))}
+                      {relatorioLimpeza.length > 20 && (
+                        <p className="pt-1 text-[11px] font-medium">
+                          ...e mais {relatorioLimpeza.length - 20} processos no relatório.
+                        </p>
+                      )}
+                    </div>
+
+                    <Button
+                      type="button"
+                      onClick={handleExecutarLimpeza}
+                      disabled={executandoLimpeza}
+                      className="mt-3"
+                    >
+                      {executandoLimpeza ? "Corrigindo..." : "Executar Correções no Banco"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </section>
+
           <Collapsible open={openGeral} onOpenChange={setOpenGeral}>
             <div className="rounded-2xl border border-border bg-background/40 p-4">
               <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
@@ -2523,31 +2644,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
             </Button>
           </div>
 
-          <section className="mt-6 rounded-2xl border-2 border-destructive/40 bg-destructive/5 p-5 space-y-3">
-            <h4 className="text-sm font-bold uppercase tracking-wide text-destructive">
-              Zona de Manutenção (Uso Único)
-            </h4>
-            <p className="text-xs text-muted-foreground">
-              Migração estrutural: adiciona o campo <code className="rounded bg-muted px-1 py-0.5">ativo</code>{" "}
-              em todos os processos da coleção. Documentos com status{" "}
-              <strong>concluido / finalizado</strong> recebem <code>ativo: false</code>; os demais,{" "}
-              <code>ativo: true</code>. Após executar, a aplicação passará a filtrar a coleção apenas pelos
-              processos ativos, reduzindo drasticamente o volume de dados carregado no login.
-            </p>
-            <p className="text-xs font-semibold text-destructive">
-              ⚠️ Execute APENAS UMA VEZ. Reexecutar é seguro (idempotente), mas desnecessário.
-            </p>
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={executarMigracaoAtivos}
-                disabled={migrandoAtivos || saving || loading}
-              >
-                {migrandoAtivos ? "Migrando..." : "⚠️ MIGRAR DADOS (Rodar Apenas Uma Vez)"}
-              </Button>
-            </div>
-          </section>
         </div>
 
         <div className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm sticky top-4 self-start">

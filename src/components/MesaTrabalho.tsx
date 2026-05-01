@@ -44,8 +44,19 @@ interface Props {
 export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess, siteSettings, filtro, busca }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
-  const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string }[]>([]);
+  const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string; corCard?: string }[]>([]);
   const [responsaveisOtimizados, setResponsaveisOtimizados] = useState<Record<string, string>>({});
+
+  const mapaCoresAssessores = useMemo(() => {
+    const mapa: Record<string, string> = {};
+    assessoresDoSetor.forEach((assessor) => {
+      const nome = String(assessor.nome || "").trim();
+      const cor = String(assessor.corCard || "").trim();
+      if (!nome || !cor) return;
+      mapa[nome] = cor;
+    });
+    return mapa;
+  }, [assessoresDoSetor]);
 
   const paColunasEmAndamento = useMemo(() => {
     const base = siteSettings?.paEmAndamentoColumns?.length
@@ -163,17 +174,17 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
 
       try {
         const usuariosRef = collection(db, "usuarios");
-        const todosDocs: { nome: string; setor: string }[] = [];
+        const todosDocs: { nome: string; setor: string; corCard?: string }[] = [];
 
         for (const setorParaBuscar of setoresParaBuscar) {
           const q = query(usuariosRef, where("setor", "==", setorParaBuscar));
           const snapshot = await getDocs(q);
           snapshot.docs.forEach(doc => {
-            const data = doc.data() as { ativo?: boolean; nomeGuerra?: string; nome?: string; email?: string; posto?: string; setor?: string };
+            const data = doc.data() as { ativo?: boolean; nomeGuerra?: string; nome?: string; email?: string; posto?: string; setor?: string; corCard?: string };
             if (data.ativo === false) return;
             const nomeExibicao = data.nomeGuerra || data.nome || data.email?.split("@")[0] || "Assessor";
             const nomeCompleto = data.posto ? `${data.posto} ${nomeExibicao}`.trim() : nomeExibicao;
-            todosDocs.push({ nome: nomeCompleto, setor: data.setor || setorParaBuscar });
+            todosDocs.push({ nome: nomeCompleto, setor: data.setor || setorParaBuscar, corCard: data.corCard });
           });
         }
 
@@ -674,6 +685,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         filtro={filtro}
                         busca={busca}
                         isWide={a.nome === paColunaLabelPorId.get("sindicancia")}
+                        mapaCoresAssessores={mapaCoresAssessores}
                       />
                     ))}
                   </div>
@@ -696,7 +708,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
                         filtro={filtro}
-                      busca={busca}
+                        busca={busca}
+                        mapaCoresAssessores={mapaCoresAssessores}
                       />
                     ))}
                   </div>
@@ -722,7 +735,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
                         filtro={filtro}
-                      busca={busca}
+                        busca={busca}
+                        mapaCoresAssessores={mapaCoresAssessores}
                       />
                     ))}
                   </div>
@@ -745,7 +759,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                         unreadProcessIds={unreadProcessIds}
                         onReadProcess={onReadProcess}
                         filtro={filtro}
-                      busca={busca}
+                        busca={busca}
+                        mapaCoresAssessores={mapaCoresAssessores}
                       />
                     ))}
                   </div>
@@ -770,7 +785,8 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
                       unreadProcessIds={unreadProcessIds}
                       onReadProcess={onReadProcess}
                       filtro={filtro}
-                    busca={busca}
+                      busca={busca}
+                      mapaCoresAssessores={mapaCoresAssessores}
                     />
                   ))}
                 </div>
