@@ -13,7 +13,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
-import { collection, doc, getDocs, writeBatch } from "firebase/firestore";
+import { collection, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   DndContext,
@@ -1152,14 +1152,19 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
 
   const [gerandoBackup, setGerandoBackup] = useState(false);
   const [analisando, setAnalisando] = useState(false);
-  const [relatorioLimpeza, setRelatorioLimpeza] = useState<{ id: string; acoes: string[] }[] | null>(null);
+  const [relatorioLimpeza, setRelatorioLimpeza] = useState<
+    { id: string; acoes: string[]; patchNulos?: Record<string, unknown> }[] | null
+  >(null);
   const [executandoLimpeza, setExecutandoLimpeza] = useState(false);
+  const [restaurandoPA, setRestaurandoPA] = useState(false);
 
   const handleBackupLocal = async () => {
     try {
       setGerandoBackup(true);
 
-      const snapshot = await getDocs(collection(db, "processos"));
+      const processosRef = collection(db, "processos");
+      const q = query(processosRef, where("setor", "in", ["DU", "PA"]));
+      const snapshot = await getDocs(q);
       const dados = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -1188,31 +1193,61 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const handleAnalisarDados = async () => {
     try {
       setAnalisando(true);
-      const snapshot = await getDocs(collection(db, "processos"));
-      const correcoes: { id: string; acoes: string[] }[] = [];
+      const processosRef = collection(db, "processos");
+      const q = query(processosRef, where("setor", "in", ["DU", "PA"]));
+      const snapshot = await getDocs(q);
+      const correcoes: { id: string; acoes: string[]; patchNulos?: Record<string, unknown> }[] = [];
+
+      const coletarCamposNulos = (objeto: unknown, prefixo = "", patchNulos: Record<string, unknown>) => {
+        if (!objeto || typeof objeto !== "object" || Array.isArray(objeto)) return;
+
+        Object.entries(objeto as Record<string, unknown>).forEach(([chave, valor]) => {
+          const caminho = prefixo ? `${prefixo}.${chave}` : chave;
+
+          if (valor === null) {
+            patchNulos[caminho] = "";
+            return;
+          }
+
+          if (valor && typeof valor === "object" && !Array.isArray(valor)) {
+            coletarCamposNulos(valor, caminho, patchNulos);
+          }
+        });
+      };
 
       snapshot.docs.forEach((processoDoc) => {
         const data = processoDoc.data() as {
           responsavel?: unknown;
           pedidoSubsidios?: unknown;
           respostaDU?: unknown;
+          [key: string]: unknown;
         };
         const acoes: string[] = [];
+        const patchNulos: Record<string, unknown> = {};
+
+        coletarCamposNulos(data, "", patchNulos);
 
         if (typeof data.responsavel !== "string" || data.responsavel.trim() === "") {
           acoes.push("Definir responsável padrão");
+          delete patchNulos.responsavel;
         }
 
         if (!data.pedidoSubsidios || typeof data.pedidoSubsidios !== "object" || Array.isArray(data.pedidoSubsidios)) {
           acoes.push("Criar objeto pedidoSubsidios");
+          delete patchNulos.pedidoSubsidios;
         }
 
         if (!data.respostaDU || typeof data.respostaDU !== "object" || Array.isArray(data.respostaDU)) {
           acoes.push("Criar objeto respostaDU");
+          delete patchNulos.respostaDU;
+        }
+
+        if (Object.keys(patchNulos).length > 0) {
+          acoes.push("Regra 4 (Remoção de Nulos)");
         }
 
         if (acoes.length > 0) {
-          correcoes.push({ id: processoDoc.id, acoes });
+          correcoes.push({ id: processoDoc.id, acoes, patchNulos: Object.keys(patchNulos).length > 0 ? patchNulos : undefined });
         }
       });
 
@@ -1242,7 +1277,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
         const batch = writeBatch(db);
 
         lote.forEach((item) => {
-          const patch: Record<string, unknown> = {};
+          const patch: Record<string, unknown> = { ...(item.patchNulos || {}) };
 
           if (item.acoes.includes("Definir responsável padrão")) {
             patch.responsavel = "Sem responsável";
@@ -1267,6 +1302,47 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       toast.error("Não foi possível executar as correções no banco.");
     } finally {
       setExecutandoLimpeza(false);
+    }
+  };
+
+  const handleRestaurarPA = async () => {
+    try {
+      setRestaurandoPA(true);
+      const processosRef = collection(db, "processos");
+      const q = query(processosRef, where("setor", "==", "PA"));
+      const snapshot = await getDocs(q);
+
+      const docsParaAtualizar = snapshot.docs.filter((itemDoc) => {
+        const data = itemDoc.data() as { responsavel?: unknown };
+        const responsavel = typeof data.responsavel === "string" ? data.responsavel.trim() : "";
+        return responsavel === "Sem responsável" || responsavel === "";
+      });
+
+      if (docsParaAtualizar.length === 0) {
+        toast.info("Nenhum processo precisava de restauração.");
+        return;
+      }
+
+      const TAMANHO_LOTE = 400;
+      for (let i = 0; i < docsParaAtualizar.length; i += TAMANHO_LOTE) {
+        const lote = docsParaAtualizar.slice(i, i + TAMANHO_LOTE);
+        const batch = writeBatch(db);
+
+        lote.forEach((itemDoc) => {
+          const data = itemDoc.data() as { criadoPorNome?: unknown };
+          const criadoPorNome = typeof data.criadoPorNome === "string" ? data.criadoPorNome.trim() : "";
+          batch.update(itemDoc.ref, { responsavel: criadoPorNome || "" });
+        });
+
+        await batch.commit();
+      }
+
+      toast.success(`Sucesso! ${docsParaAtualizar.length} processos de PA retornaram para suas colunas.`);
+    } catch (error) {
+      console.error("Erro ao restaurar processos de PA:", error);
+      toast.error("Erro ao restaurar processos de PA.");
+    } finally {
+      setRestaurandoPA(false);
     }
   };
 
@@ -1483,7 +1559,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                 type="button"
                 variant="outline"
                 onClick={handleBackupLocal}
-                disabled={gerandoBackup || analisando || executandoLimpeza || saving || loading}
+                disabled={gerandoBackup || analisando || executandoLimpeza || restaurandoPA || saving || loading}
               >
                 {gerandoBackup ? "Gerando arquivo..." : "💾 Baixar Backup Local (JSON)"}
               </Button>
@@ -1491,9 +1567,18 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                 type="button"
                 variant="outline"
                 onClick={handleAnalisarDados}
-                disabled={analisando || executandoLimpeza || gerandoBackup || saving || loading}
+                disabled={analisando || executandoLimpeza || gerandoBackup || restaurandoPA || saving || loading}
               >
                 {analisando ? "Analisando..." : "🔍 Analisar Dados Legados"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleRestaurarPA}
+                disabled={restaurandoPA || analisando || executandoLimpeza || gerandoBackup || saving || loading}
+                className="border-amber-400/70 bg-amber-50 text-amber-900 hover:bg-amber-100"
+              >
+                {restaurandoPA ? "Restaurando..." : "🚑 Restaurar Colunas do PA"}
               </Button>
             </div>
 
