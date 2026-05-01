@@ -1,4 +1,5 @@
-import { ProcessoCard } from "./ProcessoCard";
+import { CardDU } from "./CardDU";
+import { CardPA } from "./CardPA";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
 import type { SiteSettings } from "@/types/siteSettings";
 import { useDroppable } from "@dnd-kit/core";
@@ -37,6 +38,7 @@ export function ChefeGroup({
   });
 
   const isDU = tipo === "DU";
+  const CardComponente = isDU ? CardDU : CardPA;
   const bgClass = isDU ? "bg-[var(--tipo-du-bg)]" : "bg-[var(--tipo-pa-bg)]";
   const textClass = isDU ? "text-[var(--tipo-du)]" : "text-[var(--tipo-pa)]";
   const borderClass = isDU ? "border-[var(--tipo-du)]/30" : "border-[var(--tipo-pa)]/30";
@@ -74,7 +76,7 @@ export function ChefeGroup({
           </div>
         ) : (
           processos.map((p) => (
-            <ProcessoCard
+            <CardComponente
               key={p.id}
               processo={p}
               ehAdmin={ehAdmin}

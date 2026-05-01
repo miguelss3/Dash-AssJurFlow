@@ -403,8 +403,12 @@ export function DetalhesProcessoModal({ open, onOpenChange, processo }: Detalhes
                   // pedidoSubsidios; o RECEBIDO só pode vir de respostaDU.
                   // Sem fallbacks cruzados (que causavam duplicação visual).
                   const docEnviado =
-                    pedido?.numeroDocumentoDU || pedido?.numeroDiex || "";
+                    pedido?.numeroOficioExterno ||
+                    pedido?.numeroDocumentoDU ||
+                    pedido?.numeroDiex ||
+                    "";
                   const docRecebido =
+                    respostaDU?.numeroOficioExterno ||
                     respostaDU?.numeroDiex ||
                     respostaDU?.numeroOficio ||
                     "";

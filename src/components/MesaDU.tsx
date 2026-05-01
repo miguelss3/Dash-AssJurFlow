@@ -13,7 +13,7 @@ import {
   DragStartEvent,
   DragEndEvent,
 } from "@dnd-kit/core";
-import { ProcessoCard } from "./ProcessoCard";
+import { CardDU } from "./CardDU";
 import type { SiteSettings } from "@/types/siteSettings";
 import { DEFAULT_DU_BOARD_COLUMNS } from "@/types/siteSettings";
 import { diasRestantes, statusPrazo } from "@/lib/prazo";
@@ -308,6 +308,11 @@ export function MesaDU({
     assessoresDesteTipo.forEach((assessor) => garantirChave(assessor.nome));
 
     const nomesAssessores = Array.from(new Set([...mapAtivos.keys(), ...mapConcluidos.keys()]));
+    const nomesAssessoresSet = new Set(
+      assessores
+        .map((a) => String(a.nome || "").trim())
+        .filter(Boolean),
+    );
 
     const assessoresOrdenados = nomesAssessores
       .map((nome) => ({
@@ -324,6 +329,9 @@ export function MesaDU({
           || nome === duColunaAguardandoResposta
           || nome === duColunaAguardandoDistribuicao
         ) {
+          return true;
+        }
+        if (nomesAssessoresSet.has(nome)) {
           return true;
         }
         return itensAtivos.length > 0 || itensPortariaAssinada.length > 0 || itensAtrasados.length > 0 || itensConcluidos.length > 0;
@@ -501,7 +509,7 @@ export function MesaDU({
       <DragOverlay>
         {activeProcesso ? (
           <div className="opacity-80 rotate-3 scale-105">
-            <ProcessoCard
+            <CardDU
               p={activeProcesso}
               ehAdmin={ehAdmin}
               onEdit={() => {}}

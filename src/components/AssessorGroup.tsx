@@ -1,4 +1,5 @@
-import { ProcessoCard } from "./ProcessoCard";
+import { CardDU } from "./CardDU";
+import { CardPA } from "./CardPA";
 import type { Processo, StatusProcesso, TipoProcesso, FiltroPrazo } from "@/types/processo";
 import { DEFAULT_COLUMN_TABS, DEFAULT_PA_EM_ANDAMENTO_COLUMNS, normalizarPAEmAndamentoColumns } from "@/types/siteSettings";
 import type { SiteSettings } from "@/types/siteSettings";
@@ -173,6 +174,8 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
         ? processosAtrasadosOrdenados
         : processosConcluidos;
 
+  const CardComponente = tipo === "DU" ? CardDU : CardPA;
+
   return (
     <div 
       ref={setNodeRef}
@@ -234,7 +237,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
           </div>
         ) : (
           processosDaAbaAtiva.map((p) => (
-            <ProcessoCard
+            <CardComponente
               key={p.id}
               processo={p}
               ehAdmin={ehAdmin}

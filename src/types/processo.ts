@@ -42,6 +42,7 @@ export interface PedidoSubsidios {
 
 export interface RespostaDU {
   numeroOficio?: string;
+  numeroOficioExterno?: string;
   numeroDiex?: string;
   numeroRecebido?: string;
   destinoDocumento?: string;

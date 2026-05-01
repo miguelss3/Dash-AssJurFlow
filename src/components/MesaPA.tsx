@@ -13,7 +13,7 @@ import {
   DragStartEvent,
   DragEndEvent,
 } from "@dnd-kit/core";
-import { ProcessoCard } from "./ProcessoCard";
+import { CardPA } from "./CardPA";
 import type { SiteSettings } from "@/types/siteSettings";
 import { DEFAULT_PA_EM_ANDAMENTO_COLUMNS } from "@/types/siteSettings";
 import { diasRestantes } from "@/lib/prazo";
@@ -220,6 +220,11 @@ export function MesaPA({
     };
 
     paColunaLabels.forEach(garantirChave);
+    garantirChave("MESA DO CHEFE");
+    assessores.forEach((assessor) => {
+      const nomeAssessor = String(assessor.nome || "").trim();
+      if (nomeAssessor) garantirChave(nomeAssessor);
+    });
 
     ativos.forEach((p) => {
       const colunaPortariaAssinadaPA = colunaPAPortariaAssinadaPorId.get(p.id) || null;
@@ -238,7 +243,9 @@ export function MesaPA({
         return;
       }
 
-      // Processos sem classificação especial são ignorados em PA
+      const responsavelNormalizado = String(p.responsavel || "").trim() || "MESA DO CHEFE";
+      garantirChave(responsavelNormalizado);
+      mapAtivos.get(responsavelNormalizado)!.push(p);
     });
 
     concluidosDoTipo.forEach((p) => {
@@ -246,10 +253,20 @@ export function MesaPA({
       if (colunaEspecialPA) {
         garantirChave(colunaEspecialPA);
         mapConcluidos.get(colunaEspecialPA)!.push(p);
+        return;
       }
+
+      const responsavelNormalizado = String(p.responsavel || "").trim() || "MESA DO CHEFE";
+      garantirChave(responsavelNormalizado);
+      mapConcluidos.get(responsavelNormalizado)!.push(p);
     });
 
     const nomesAssessores = Array.from(new Set([...mapAtivos.keys(), ...mapConcluidos.keys()]));
+    const nomesAssessoresSet = new Set(
+      assessores
+        .map((a) => String(a.nome || "").trim())
+        .filter(Boolean),
+    );
 
     const assessoresOrdenados = nomesAssessores
       .map((nome) => ({
@@ -261,6 +278,12 @@ export function MesaPA({
       }))
       .filter(({ nome, itensAtivos, itensPortariaAssinada, itensAtrasados, itensConcluidos }) => {
         if (paColunaLabelSet.has(nome)) {
+          return true;
+        }
+        if (nome === "MESA DO CHEFE") {
+          return true;
+        }
+        if (nomesAssessoresSet.has(nome)) {
           return true;
         }
         return itensAtivos.length > 0 || itensPortariaAssinada.length > 0 || itensAtrasados.length > 0 || itensConcluidos.length > 0;
@@ -277,7 +300,7 @@ export function MesaPA({
       });
 
     return assessoresOrdenados;
-  }, [processosEfetivos, paColunaLabelPorId, paColunaLabels, paColunaLabelSet]);
+  }, [processosEfetivos, paColunaLabelPorId, paColunaLabels, paColunaLabelSet, assessores]);
 
   if (grupos.length === 0) {
     return (
@@ -381,7 +404,7 @@ export function MesaPA({
       <DragOverlay>
         {activeProcesso ? (
           <div className="opacity-80 rotate-3 scale-105">
-            <ProcessoCard
+            <CardPA
               p={activeProcesso}
               ehAdmin={ehAdmin}
               onEdit={() => {}}
