@@ -164,12 +164,31 @@ export function MesaDU({
     if (onRedistribuir) {
       const responsavelFinal = novoResponsavel.includes("📥 Aguardando") ? "" : novoResponsavel;
 
+      // V3.2 — Anti-Limbo DU: se o card vier de uma fase de Chefia
+      // (situacaoFluxo CHEFIA_*) e estiver sendo solto numa coluna de
+      // assessor (responsavelFinal não vazio), forçamos o retorno do
+      // pedidoSubsidios.situacaoFluxo para "MESA_ASSESSOR" — evitando
+      // que o card volte a aparecer em "MESA DO CHEFE" e suma da UI.
+      const situacaoFluxoAtual = (processoAtual?.pedidoSubsidios?.situacaoFluxo || "")
+        .toString()
+        .toUpperCase();
+      const vinhaDaChefia =
+        situacaoFluxoAtual === "CHEFIA_DILIGENCIA"
+        || situacaoFluxoAtual === "CHEFIA_DEFESA";
+      const opcoesRedistribuicao =
+        responsavelFinal && vinhaDaChefia
+          ? {
+              situacaoFluxo: "MESA_ASSESSOR",
+              mensagemHistorico: `Processo devolvido ao assessor ${responsavelFinal} via Mesa DU.`,
+            }
+          : undefined;
+
       setResponsaveisOtimizados((prev) => ({
         ...prev,
         [processoId]: responsavelFinal,
       }));
 
-      Promise.resolve(onRedistribuir(processoId, responsavelFinal)).catch(() => {
+      Promise.resolve(onRedistribuir(processoId, responsavelFinal, opcoesRedistribuicao)).catch(() => {
         setResponsaveisOtimizados((prev) => ({
           ...prev,
           [processoId]: responsavelAnterior,
@@ -283,6 +302,24 @@ export function MesaDU({
     mapAtivos.set(duColunaAguardandoAssinatura, aguardandoAssinaturaDU);
 
     garantirChave(duColunaAguardandoDistribuicao);
+
+    // V3.2 — Auto-Resgate Anti-Limbo: processos em CHEFIA_DILIGENCIA que
+    // já possuem responsável humano (drag&drop bug ou fluxo paralelo) são
+    // espelhados também na coluna do próprio assessor, garantindo que
+    // nunca fiquem invisíveis caso o situacaoFluxo não tenha sido
+    // resetado para MESA_ASSESSOR.
+    const nomesAssessoresValidos = new Set(
+      assessores
+        .map((a) => String(a.nome || "").trim())
+        .filter(Boolean),
+    );
+    pendenciasChefia.forEach((p) => {
+      const responsavelKey = String(p.responsavel || "").trim();
+      if (!responsavelKey) return;
+      if (!nomesAssessoresValidos.has(responsavelKey)) return;
+      garantirChave(responsavelKey);
+      mapAtivos.get(responsavelKey)!.push(p);
+    });
 
     doTipoSemPendenciasChefia.forEach((p) => {
       let responsavelKey = p.responsavel || "";

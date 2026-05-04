@@ -314,10 +314,10 @@ export function AcoesDUModalNovo({
       const previousDoc = sanitizar({ ...dataAtual }) as Record<string, unknown>;
       delete previousDoc.ultimaAcaoFluxo;
 
-      await updateDoc(processoRef, sanitizar({
-        // V2.22 — Mantém as mutações de documento confinadas ao
-        // objeto `pedidoSubsidios` para evitar contaminação cruzada com
-        // `respostaDU` (causa do bug de DIEx duplicado V2.21).
+      // V2.22 — Mantém as mutações de documento confinadas ao
+      // objeto `pedidoSubsidios` para evitar contaminação cruzada com
+      // `respostaDU` (causa do bug de DIEx duplicado V2.21).
+      const payloadUpdate: Record<string, unknown> = {
         pedidoSubsidios: pedidoSubsidiosPatch,
         assinaturaDestino: destinoEfetivo,
         possuiPrazoDU: possuiPrazoEfetivo,
@@ -331,7 +331,18 @@ export function AcoesDUModalNovo({
           criadoPorNome: autorMilitar,
           previousDoc,
         },
-      }) as Record<string, unknown>);
+      };
+
+      // V3.3 — Sincroniza o prazo fatal na raiz do documento para que o
+      // Kanban e o Calendário reflitam o prazo efetivo do fluxo. Mantém
+      // `finalPrazo` por compatibilidade com cards/relatórios legados.
+      if (prazoEfetivo && possuiPrazoEfetivo) {
+        payloadUpdate.prazoFatalDU = prazoEfetivo;
+        payloadUpdate.prazoFatal = prazoEfetivo;
+        payloadUpdate.finalPrazo = prazoEfetivo;
+      }
+
+      await updateDoc(processoRef, sanitizar(payloadUpdate) as Record<string, unknown>);
       await registrarHistorico(descricao);
 
       setSituacaoFluxo(proximaSituacao);
@@ -494,6 +505,23 @@ export function AcoesDUModalNovo({
         return;
       }
     }
+  };
+
+  // V3.3 — Reiteração devolve o processo ao Assessor para que ele prepare
+  // a nova minuta e defina um novo prazo. Limpa os números/prazo ativos
+  // (o histórico permanece preservado em pedidoSubsidios.numeroDiexHistorico)
+  // e incrementa o contador oficial de reiterações.
+  const handleReiterar = () => {
+    void avancarFluxo("MESA_ASSESSOR", {
+      numeroDocumentoDU: "",
+      numeroDiexExterno: "",
+      numeroOficioExterno: "",
+      dataPrazo: "",
+      numeroRecebido: "",
+      reiteracoesIncrement: 1,
+      descricaoOverride:
+        "Assessor iniciou a Reiteração. Aguardando definição do novo prazo e envio para assinatura.",
+    });
   };
 
   // V2.7 — Marcha à Ré: minuta rejeitada na assinatura externa (Vigília SPED).
@@ -710,6 +738,16 @@ export function AcoesDUModalNovo({
                 className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-amber-400 text-amber-700 hover:bg-amber-50"
               >
                 Devolver ao Assessor
+              </button>
+            )}
+
+            {/* V3.2 — Reiteração rápida na fase de aguardo de resposta. */}
+            {situacaoFluxo === "AGUARDANDO_RESPOSTA" && (
+              <button
+                onClick={handleReiterar}
+                className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-blue-400 text-blue-700 hover:bg-blue-50"
+              >
+                Reiterar Pedido (Devolver à Chefia)
               </button>
             )}
 
