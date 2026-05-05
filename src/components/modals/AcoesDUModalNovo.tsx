@@ -219,6 +219,10 @@ export function AcoesDUModalNovo({
       incluiOficioExterno?: boolean;
       numeroDiexExterno?: string;
       numeroOficioExterno?: string;
+      // V3.9 — Limpeza de campos legados (Faxina Profunda da Reiteração).
+      numeroDiex?: string;
+      numeroSaida?: string;
+      prazoResposta?: string;
     },
   ) => {
     if (!processoId || !user) return;
@@ -287,10 +291,13 @@ export function AcoesDUModalNovo({
         acaoPrincipal: acaoEfetiva,
         assinaturaDestino: destinoEfetivo,
         dataPrazo: prazoEfetivo,
-        prazoResposta: prazoEfetivo,
+        prazoResposta: extras?.prazoResposta !== undefined ? extras.prazoResposta.trim() : prazoEfetivo,
         numeroDocumentoDU: numeroDocEfetivo,
-        numeroSaida: numeroDocEfetivo, // espelho legado
-        numeroDiex: numeroDocEfetivo || (pedidoAtual?.numeroDiex as string) || "",
+        numeroSaida: extras?.numeroSaida !== undefined ? extras.numeroSaida.trim() : numeroDocEfetivo, // espelho legado
+        numeroDiex:
+          extras?.numeroDiex !== undefined
+            ? extras.numeroDiex.trim()
+            : numeroDocEfetivo || (pedidoAtual?.numeroDiex as string) || "",
         numeroDiexHistorico,
         numeroRecebido: numeroRecebidoEfetivo,
         possuiPrazoDU: possuiPrazoEfetivo,
@@ -515,10 +522,13 @@ export function AcoesDUModalNovo({
   const handleReiterar = () => {
     void avancarFluxo("MESA_ASSESSOR", {
       numeroDocumentoDU: "",
+      numeroDiex: "",
       numeroDiexExterno: "",
       numeroOficioExterno: "",
-      dataPrazo: "",
+      numeroSaida: "",
       numeroRecebido: "",
+      dataPrazo: "",
+      prazoResposta: "",
       reiteracoesIncrement: 1,
       descricaoOverride:
         "Assessor iniciou a Reiteração. Aguardando definição do novo prazo e envio para assinatura.",

@@ -705,7 +705,13 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
             await updateDoc(processoRef, {
               "pedidoSubsidios.situacaoFluxo": "MESA_ASSESSOR",
               "pedidoSubsidios.numeroDocumentoDU": "",
+              "pedidoSubsidios.numeroDiex": "",
+              "pedidoSubsidios.numeroDiexExterno": "",
+              "pedidoSubsidios.numeroOficioExterno": "",
+              "pedidoSubsidios.numeroSaida": "",
+              "pedidoSubsidios.numeroRecebido": "",
               "pedidoSubsidios.dataPrazo": "",
+              "pedidoSubsidios.prazoResposta": "",
               "pedidoSubsidios.reiteracoes": reiteracoesAtual + 1,
               prazoFatalDU: null,
               prazoFatal: null,
