@@ -417,8 +417,8 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
       const autorEmailCadastro = user?.email || null;
 
       const assuntoFinal = isSindicanciaPA
-        ? `${assuntoSindicancia}${especificidadesSindicancia ? ` - ${especificidadesSindicancia}` : ""}`
-        : assunto;
+        ? `${assuntoSindicancia.trim()}${especificidadesSindicancia.trim() ? ` - ${especificidadesSindicancia.trim()}` : ""}`
+        : assunto.trim();
 
       const valorBasePortaria = isSindicanciaAntiga && anoLegado ? `${numeroProcesso}/${anoLegado}` : numeroProcesso;
       const primeiraPortariaFormatada = usaPortariaPA(tipoPA)
@@ -461,8 +461,8 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
       else statusInicial = "Distribuído";
 
       const dados: Record<string, unknown> = {
-        numeroProcesso: numeroFinal,
-        parte,
+        numeroProcesso: numeroFinal.trim(),
+        parte: parte.trim(),
         assunto: assuntoFinal,
         dataEntrada,
         observacoes: observacoes.trim() || null,

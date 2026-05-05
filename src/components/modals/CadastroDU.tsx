@@ -227,8 +227,8 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
 
       const dados: Record<string, unknown> = {
         numeroProcesso: numeroProcesso.trim(),
-        parte,
-        assunto,
+        parte: parte.trim(),
+        assunto: assunto.trim(),
         dataEntrada,
         observacoes: observacoes.trim() || null,
         setor: "DU",
