@@ -303,23 +303,11 @@ export function MesaDU({
 
     garantirChave(duColunaAguardandoDistribuicao);
 
-    // V3.2 — Auto-Resgate Anti-Limbo: processos em CHEFIA_DILIGENCIA que
-    // já possuem responsável humano (drag&drop bug ou fluxo paralelo) são
-    // espelhados também na coluna do próprio assessor, garantindo que
-    // nunca fiquem invisíveis caso o situacaoFluxo não tenha sido
-    // resetado para MESA_ASSESSOR.
-    const nomesAssessoresValidos = new Set(
-      assessores
-        .map((a) => String(a.nome || "").trim())
-        .filter(Boolean),
-    );
-    pendenciasChefia.forEach((p) => {
-      const responsavelKey = String(p.responsavel || "").trim();
-      if (!responsavelKey) return;
-      if (!nomesAssessoresValidos.has(responsavelKey)) return;
-      garantirChave(responsavelKey);
-      mapAtivos.get(responsavelKey)!.push(p);
-    });
+    // V3.6 — Regra estrita: processos em CHEFIA_DILIGENCIA/CHEFIA_DEFESA
+    // pertencem EXCLUSIVAMENTE à coluna "MESA DO CHEFE". A regra anterior
+    // (V3.2 Auto-Resgate Anti-Limbo) os duplicava na coluna do assessor,
+    // gerando o card-fantasma. A blindagem agora é feita no drag&drop:
+    // soltar na coluna do assessor força situacaoFluxo → MESA_ASSESSOR.
 
     doTipoSemPendenciasChefia.forEach((p) => {
       let responsavelKey = p.responsavel || "";
