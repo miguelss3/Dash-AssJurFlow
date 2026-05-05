@@ -60,7 +60,7 @@ const AcoesDUModalNovo = lazy(() =>
   import("@/components/modals/AcoesDUModalNovo").then((m) => ({ default: m.AcoesDUModalNovo })),
 );
 const AcoesPAModalNovo = lazy(() =>
-  import("@/components/modals/AcoesPAModalNovo").then((m) => ({ default: m.AcoesPAModalNovo })),
+  import("@/components/modals/AcoesPAModalV4").then((m) => ({ default: m.AcoesPAModalV4 })),
 );
 
 export const Route = createFileRoute("/")({

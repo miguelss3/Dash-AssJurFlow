@@ -40,7 +40,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { SiteSettings } from "@/types/siteSettings";
 
 const AcoesPAModalNovo = lazy(() =>
-  import("./modals/AcoesPAModalNovo").then((m) => ({ default: m.AcoesPAModalNovo })),
+  import("./modals/AcoesPAModalV4").then((m) => ({ default: m.AcoesPAModalV4 })),
 );
 
 interface CardPAProps {

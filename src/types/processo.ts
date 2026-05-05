@@ -8,6 +8,29 @@ export type StatusProcesso =
 export type TipoProcesso = "DU" | "PA" | "OUTRO";
 export type Prioridade = "liminar" | "urgente" | "normal";
 
+// V4.0 — Nova máquina de estados dos Processos Administrativos.
+// Estes estados convivem com o legado (`SituacaoFluxoPA` interno do
+// `AcoesPAModalNovo.tsx` antigo). Não remover o legado até a substituição
+// completa do modal de ações.
+export type SituacaoFluxoPA =
+  | "FAZENDO_PORTARIA"
+  | "ASSINANDO_PORTARIA"
+  | "AGUARDANDO_ENTREGA"
+  | "COM_ENCARREGADO"
+  | "FAZENDO_SOLUCAO"
+  | "ASSINANDO_SOLUCAO"
+  | "FINALIZADO";
+
+export const LABEL_SITUACAO_PA: Record<SituacaoFluxoPA, string> = {
+  FAZENDO_PORTARIA: "Fazendo Portaria",
+  ASSINANDO_PORTARIA: "Aguardando Assinatura da Portaria",
+  AGUARDANDO_ENTREGA: "Aguardando Entrega ao Encarregado",
+  COM_ENCARREGADO: "Com o Encarregado",
+  FAZENDO_SOLUCAO: "Fazendo Solução/Parecer",
+  ASSINANDO_SOLUCAO: "Aguardando Assinatura da Solução",
+  FINALIZADO: "Finalizado",
+};
+
 export interface PedidoSubsidios {
   tipoSolicitacao?: "primeira_vez" | "reiteracao";
   tipoDestino?: "interno" | "externo";
@@ -111,6 +134,9 @@ export interface Processo {
   resultadoFinalConselho?: string;
   teveRecurso?: boolean;
   membrosConselho?: string;
+  // V4.0 — Nova máquina de estados (paralela ao `situacaoFluxo` legado).
+  situacaoFluxoPA?: SituacaoFluxoPA;
+  finalizado?: boolean;
   subtipo?: string;        // IPM, Sindicância, Diligência
   faseAtual?: string;      // Em diligência, Portaria assinada, Para assinatura, Atrasado, Prazo não iniciado
   inicioPrazo?: string;    // ISO
