@@ -13,7 +13,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { toast } from "sonner";
-import { collection, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
+import { collection, deleteField, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
   DndContext,
@@ -1121,6 +1121,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
 
   const [gerandoBackup, setGerandoBackup] = useState(false);
   const [restaurandoPA, setRestaurandoPA] = useState(false);
+  const [sanitizandoPA, setSanitizandoPA] = useState(false);
 
   const handleBackupLocal = async () => {
     try {
@@ -1192,6 +1193,151 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       toast.error("Erro ao restaurar processos de PA.");
     } finally {
       setRestaurandoPA(false);
+    }
+  };
+
+  // V6.5 — Sanitização de Banco PA: migra documentos legados (situação em
+  // string única `situacaoFluxo` + flags ad‑hoc) para o esquema V4 com
+  // chaves específicas por motor (situacaoFluxoPA / situacaoFluxoConselho /
+  // situacaoFluxoIP) e expurga as chaves legadas. Restrita a setor === "PA".
+  const sanitizarBancoPA = async () => {
+    try {
+      setSanitizandoPA(true);
+
+      const processosRef = collection(db, "processos");
+      const q = query(processosRef, where("setor", "==", "PA"));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        toast.info("Nenhum processo PA encontrado para sanitizar.");
+        return;
+      }
+
+      // ----- Heurísticas de inferencia (replicam getSituacaoInicial do V4) -----
+      const inferirSituacaoPA = (data: Record<string, unknown>): 
+        | "FAZENDO_PORTARIA"
+        | "ASSINANDO_PORTARIA"
+        | "AGUARDANDO_ENTREGA"
+        | "COM_ENCARREGADO"
+        | "FAZENDO_SOLUCAO"
+        | "FINALIZADO" => {
+        const sitNova = data.situacaoFluxoPA as string | undefined;
+        if (sitNova === "FAZENDO_PORTARIA" || sitNova === "ASSINANDO_PORTARIA"
+          || sitNova === "AGUARDANDO_ENTREGA" || sitNova === "COM_ENCARREGADO"
+          || sitNova === "FAZENDO_SOLUCAO" || sitNova === "FINALIZADO") {
+          return sitNova;
+        }
+        if (data.finalizado || data.status === "concluido") return "FINALIZADO";
+
+        // V6.6 — mapeamento explícito dos status legados antes das heurísticas.
+        const sitLegado = ((data.situacaoFluxo as string | undefined) || "").toString().toUpperCase();
+        if (sitLegado === "EM_CURSO" || sitLegado === "C_EM_CURSO") return "COM_ENCARREGADO";
+        if (sitLegado === "AGUARDANDO_PRAZO") return "AGUARDANDO_ENTREGA";
+        if (sitLegado === "AGUARDANDO_CHEFIA" || sitLegado === "AGUARDANDO_CHEFIA_SOLUCAO"
+          || data.aguardandoAssinaturaCmt) return "ASSINANDO_PORTARIA";
+
+        const desc = ((data.descricao as string | undefined) || "").toLowerCase();
+        if (desc.includes("confec\u00e7\u00e3o da solu\u00e7\u00e3o") || desc.includes("confeccao da solucao") || desc.includes("parecer")) {
+          return "FAZENDO_SOLUCAO";
+        }
+        if (data.dataInicioPrazo) return "COM_ENCARREGADO";
+        if (data.dataAssinatura || data.portariaAssinadaEm) return "AGUARDANDO_ENTREGA";
+        return "FAZENDO_PORTARIA";
+      };
+
+      // Mapeia o resultado PA para o vocabulário do Conselho.
+      const inferirSituacaoConselho = (data: Record<string, unknown>):
+        | "FAZENDO_PORTARIA"
+        | "ASSINANDO_PORTARIA"
+        | "COM_CONSELHO"
+        | "FINALIZADO" => {
+        const sitJa = data.situacaoFluxoConselho as string | undefined;
+        if (sitJa === "FAZENDO_PORTARIA" || sitJa === "ASSINANDO_PORTARIA"
+          || sitJa === "COM_CONSELHO" || sitJa === "AGUARDANDO_DESPACHO_PRORROGACAO"
+          || sitJa === "TRIAGEM_AUTOS" || sitJa === "FAZENDO_RESPOSTA_RECURSO"
+          || sitJa === "DECISAO_AUTORIDADE" || sitJa === "ENVIO_ATH"
+          || sitJa === "FINALIZADO") {
+          return sitJa as "FAZENDO_PORTARIA" | "ASSINANDO_PORTARIA" | "COM_CONSELHO" | "FINALIZADO";
+        }
+        const base = inferirSituacaoPA(data);
+        if (base === "FINALIZADO") return "FINALIZADO";
+        if (base === "ASSINANDO_PORTARIA") return "ASSINANDO_PORTARIA";
+        if (base === "FAZENDO_PORTARIA") return "FAZENDO_PORTARIA";
+        // AGUARDANDO_ENTREGA / COM_ENCARREGADO / FAZENDO_SOLUCAO → COM_CONSELHO
+        return "COM_CONSELHO";
+      };
+
+      const inferirSituacaoIP = (data: Record<string, unknown>):
+        | "MESA_ASSESSOR"
+        | "NA_CHEFIA"
+        | "FINALIZADO" => {
+        const sitJa = data.situacaoFluxoIP as string | undefined;
+        if (sitJa === "MESA_ASSESSOR" || sitJa === "NA_CHEFIA" || sitJa === "FINALIZADO") {
+          return sitJa;
+        }
+        if (data.finalizado || data.status === "concluido") return "FINALIZADO";
+        const sitLegado = ((data.situacaoFluxo as string | undefined) || "").toString().toUpperCase();
+        if (data.aguardandoAssinaturaCmt || sitLegado === "AGUARDANDO_CHEFIA"
+          || sitLegado === "AGUARDANDO_CHEFIA_SOLUCAO") {
+          return "NA_CHEFIA";
+        }
+        return "MESA_ASSESSOR";
+      };
+
+      const normalizarTipo = (valor: unknown) => String(valor || "")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+      let totalAtualizados = 0;
+      const TAMANHO_LOTE = 400;
+      for (let i = 0; i < snapshot.docs.length; i += TAMANHO_LOTE) {
+        const lote = snapshot.docs.slice(i, i + TAMANHO_LOTE);
+        const batch = writeBatch(db);
+
+        for (const itemDoc of lote) {
+          const data = itemDoc.data() as Record<string, unknown>;
+
+          // Defesa em profundidade: NUNCA toca em DU.
+          if (data.setor !== "PA") continue;
+
+          const tipoNorm = normalizarTipo(data.tipoPA ?? data.subtipo);
+          const ehIP = tipoNorm.includes("investig") || tipoNorm.includes("outros") || tipoNorm === "";
+          const ehConselho = tipoNorm.includes("conselho");
+
+          const patch: Record<string, unknown> = {
+            // Expurgo permanente das chaves legadas.
+            fluxoIPM: deleteField(),
+            emDiligencia: deleteField(),
+            aguardandoAssinaturaCmt: deleteField(),
+            situacaoFluxo: deleteField(),
+          };
+
+          if (ehIP) {
+            patch.situacaoFluxoIP = inferirSituacaoIP(data);
+          } else if (ehConselho) {
+            patch.situacaoFluxoConselho = inferirSituacaoConselho(data);
+          } else {
+            patch.situacaoFluxoPA = inferirSituacaoPA(data);
+          }
+
+          // V6.6 — Marca finalizado:true APENAS quando o status legado for
+          // explicitamente "concluido". Não mexe em documentos não concluídos.
+          if (data.status === "concluido" && data.finalizado !== true) {
+            patch.finalizado = true;
+          }
+
+          batch.update(itemDoc.ref, patch);
+          totalAtualizados += 1;
+        }
+
+        await batch.commit();
+      }
+
+      toast.success(`Sanitização concluída! ${totalAtualizados} processos PA migrados para o esquema V4.`);
+    } catch (error) {
+      console.error("Erro ao sanitizar banco de PA:", error);
+      toast.error("Erro ao sanitizar banco de PA. Veja o console.");
+    } finally {
+      setSanitizandoPA(false);
     }
   };
 
@@ -1408,7 +1554,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                 type="button"
                 variant="outline"
                 onClick={handleBackupLocal}
-                disabled={gerandoBackup || restaurandoPA || saving || loading}
+                disabled={gerandoBackup || restaurandoPA || sanitizandoPA || saving || loading}
               >
                 {gerandoBackup ? "Gerando arquivo..." : "💾 Baixar Backup Local (JSON)"}
               </Button>
@@ -1416,10 +1562,19 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                 type="button"
                 variant="outline"
                 onClick={handleRestaurarPA}
-                disabled={restaurandoPA || gerandoBackup || saving || loading}
+                disabled={restaurandoPA || gerandoBackup || sanitizandoPA || saving || loading}
                 className="border-amber-400/70 bg-amber-50 text-amber-900 hover:bg-amber-100"
               >
                 {restaurandoPA ? "Restaurando..." : "🚑 Restaurar Colunas do PA"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={sanitizarBancoPA}
+                disabled={sanitizandoPA || gerandoBackup || restaurandoPA || saving || loading}
+                className="border-emerald-400/70 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
+              >
+                {sanitizandoPA ? "Sanitizando..." : "🧹 Sanitizar Banco de Dados PA (Migração V4)"}
               </Button>
             </div>
           </section>

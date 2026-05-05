@@ -290,10 +290,22 @@ export function MesaPA({
     });
 
     ativos.forEach((p) => {
-      // V6.4 — Sempre carimba o processo no bucket do responsável para a
-      // Mesa do Assessor, independentemente do roteamento gerencial.
+      // V6.6 — Mesa do Assessor: carimba o processo no bucket do responsável
+      // SOMENTE se a fase atual exigir ação da AssJur. Processos "Em Curso"
+      // (com o Encarregado / com o Conselho / em apuração de IP) ficam
+      // visíveis apenas no Kanban Geral, não poluem a mesa individual.
       const responsavelAssessor = String(p.responsavel || "").trim();
-      if (responsavelAssessor) {
+      const sitPA = String(p.situacaoFluxoPA || "").trim();
+      const sitConselho = String(p.situacaoFluxoConselho || "").trim();
+      const sitIP = String(p.situacaoFluxoIP || "").trim();
+      const sitLegado = String(p.situacaoFluxo || "").trim().toUpperCase();
+      const foraDaMesaAssessor =
+        sitPA === "COM_ENCARREGADO"
+        || sitConselho === "COM_CONSELHO"
+        || sitIP === "EM_APURACAO"
+        || sitLegado === "EM_CURSO"
+        || sitLegado === "C_EM_CURSO";
+      if (responsavelAssessor && !foraDaMesaAssessor) {
         garantirChave(responsavelAssessor);
         mapAssessorAtivos.get(responsavelAssessor)!.push(p);
       }
