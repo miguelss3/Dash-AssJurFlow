@@ -79,7 +79,12 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     return colunas.find((coluna) => coluna.id === "sindicancia")?.label || "📗 Sindicancias";
   }, [siteSettings?.paEmAndamentoColumns]);
 
-  const mostrarAbaPortariaAssinada = tipo === "PA" && responsavel.trim() === labelSindicanciaPA.trim();
+  // V5.2 — Aba "Portaria Assinada" agora vale para todas as colunas PA
+  // (Sindicância, IPM, Conselho, Investigação Preliminar e colunas de assessores).
+  // O `labelSindicanciaPA` permanece exportado apenas para compatibilidade com
+  // outras heurísticas legadas que possam depender dele.
+  void labelSindicanciaPA;
+  const mostrarAbaPortariaAssinada = tipo === "PA";
 
   const processosAtivosOrdenados = useMemo(() => {
     if (tipo !== "PA") return processos;

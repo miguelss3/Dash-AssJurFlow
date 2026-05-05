@@ -42,6 +42,25 @@ import type { SiteSettings } from "@/types/siteSettings";
 const AcoesPAModalNovo = lazy(() =>
   import("./modals/AcoesPAModalV4").then((m) => ({ default: m.AcoesPAModalV4 })),
 );
+const AcoesConselhoModalV4 = lazy(() =>
+  import("./modals/AcoesConselhoModalV4").then((m) => ({ default: m.AcoesConselhoModalV4 })),
+);
+const AcoesIPModalV4 = lazy(() =>
+  import("./modals/AcoesIPModalV4").then((m) => ({ default: m.AcoesIPModalV4 })),
+);
+
+// V5.1 — Router de modal de ações por tipoPA.
+type ModalAcaoPA = "PA" | "CONSELHO" | "IP";
+const resolverModalPA = (tipoPA?: string): ModalAcaoPA => {
+  const t = (tipoPA || "").trim().toLowerCase();
+  if (
+    t === "investigação preliminar"
+    || t === "investigacao preliminar"
+    || t === "outros"
+  ) return "IP";
+  if (t === "conselho de disciplina" || t === "conselho de justificação" || t === "conselho de justificacao") return "CONSELHO";
+  return "PA";
+};
 
 interface CardPAProps {
   processo?: Processo;
@@ -351,7 +370,16 @@ const CardPAComponent = ({
       </Card>
 
       <Suspense fallback={null}>
-        {modalAcoesPA && <AcoesPAModalNovo open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />}
+        {modalAcoesPA && (() => {
+          const variante = resolverModalPA(p.tipoPA);
+          if (variante === "IP") {
+            return <AcoesIPModalV4 open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />;
+          }
+          if (variante === "CONSELHO") {
+            return <AcoesConselhoModalV4 open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />;
+          }
+          return <AcoesPAModalNovo open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />;
+        })()}
       </Suspense>
 
       {modalDetalhes && <DetalhesModalPA open={modalDetalhes} onOpenChange={setModalDetalhes} processo={p} />}

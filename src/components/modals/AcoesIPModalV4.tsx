@@ -83,6 +83,7 @@ export function AcoesIPModalV4({
   const [carregando, setCarregando] = useState<boolean>(true);
   const [salvando, setSalvando] = useState<boolean>(false);
   const [parte, setParte] = useState<string>("");
+  const [tipoPA, setTipoPA] = useState<string>("Investigação Preliminar");
   const [situacaoAtual, setSituacaoAtual] =
     useState<SituacaoFluxoIP>("MESA_ASSESSOR");
   const [documentos, setDocumentos] = useState<DocumentoIP[]>([]);
@@ -117,13 +118,14 @@ export function AcoesIPModalV4({
           || (data?.finalizado ? "FINALIZADO" : "MESA_ASSESSOR");
         setSituacaoAtual(sit);
         setParte(((data?.cliente as string | undefined) || "").toString());
+        setTipoPA(((data?.tipoPA as string | undefined) || "Investigação Preliminar").toString());
         const docs = Array.isArray(data?.documentosIP)
           ? (data.documentosIP as DocumentoIP[])
           : [];
         setDocumentos(docs);
       } catch (error) {
         console.error("Erro ao carregar IP:", error);
-        toast.error("Não foi possível carregar a Investigação Preliminar.");
+        toast.error("Não foi possível carregar o processo.");
       } finally {
         if (!cancelado) setCarregando(false);
       }
@@ -204,7 +206,7 @@ export function AcoesIPModalV4({
         timestamp: new Date().toISOString(),
       });
       setSituacaoAtual(novaSituacao);
-      toast.success("Fluxo da IP atualizado.");
+      toast.success("Fluxo do processo atualizado.");
       if (onSuccess) onSuccess();
       if (isFinalizando) onOpenChange(false);
     } catch (error) {
@@ -270,7 +272,7 @@ export function AcoesIPModalV4({
         timestamp: new Date().toISOString(),
       });
       setNovaNota("");
-      toast.success("Nota registrada no diário.");
+      toast.success("Anotação registrada.");
     } catch (error) {
       console.error("Erro ao registrar nota IP:", error);
       toast.error("Não foi possível registrar a nota.");
@@ -295,9 +297,9 @@ export function AcoesIPModalV4({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Investigação Preliminar - {numeroProcesso}</DialogTitle>
+          <DialogTitle>{tipoPA} - {numeroProcesso}</DialogTitle>
           <DialogDescription className="sr-only">
-            Workspace da Investigação Preliminar (V5.1).
+            Workspace flexível do processo (V5.1).
           </DialogDescription>
         </DialogHeader>
 
@@ -432,10 +434,10 @@ export function AcoesIPModalV4({
               )}
             </div>
 
-            {/* Bloco 2 — Diário da Investigação */}
+            {/* Bloco 2 — Anotações */}
             <div className={FORM_CONTAINER}>
               <h4 className="text-sm font-semibold text-slate-800 mb-1">
-                Diário da Investigação
+                Anotações
               </h4>
               <p className="text-xs text-slate-600 mb-3">
                 Anotações livres ficam salvas no histórico do processo.
@@ -467,7 +469,7 @@ export function AcoesIPModalV4({
                   <Textarea
                     value={novaNota}
                     onChange={(e) => setNovaNota(e.target.value)}
-                    placeholder="Registre uma nota da investigação..."
+                    placeholder="Registre uma anotação..."
                     rows={3}
                   />
                   <div className="flex justify-end">
@@ -495,7 +497,7 @@ export function AcoesIPModalV4({
                     onClick={() =>
                       void avancarFluxo(
                         "NA_CHEFIA",
-                        "Investigação encaminhada para despacho com a Chefia.",
+                        "Processo encaminhado para despacho com a Chefia.",
                       )
                     }
                   >
@@ -508,12 +510,12 @@ export function AcoesIPModalV4({
                     onClick={() =>
                       void avancarFluxo(
                         "FINALIZADO",
-                        "Investigação Preliminar finalizada.",
+                        "Processo finalizado.",
                         true,
                       )
                     }
                   >
-                    Finalizar Investigação
+                    Finalizar Processo
                   </button>
                 </div>
               )}
@@ -540,19 +542,19 @@ export function AcoesIPModalV4({
                     onClick={() =>
                       void avancarFluxo(
                         "FINALIZADO",
-                        "Investigação Preliminar finalizada pela Chefia.",
+                        "Processo finalizado pela Chefia.",
                         true,
                       )
                     }
                   >
-                    Finalizar Investigação
+                    Finalizar Processo
                   </button>
                 </div>
               )}
 
               {finalizado && (
                 <p className="text-center text-sm text-slate-600 font-semibold">
-                  Investigação Encerrada
+                  Processo Encerrado
                 </p>
               )}
             </div>

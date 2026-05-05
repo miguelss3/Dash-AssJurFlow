@@ -163,23 +163,71 @@ export function MesaPA({
     setActiveProcesso(null);
   };
 
+  // V5.2 — Classificação universal das abas PA para todos os motores.
+  // Considera estados de:
+  //   • Legado: situacaoFluxo ("EM_CURSO", "AGUARDANDO_PRAZO", etc.)
+  //   • V4   : situacaoFluxoPA (FAZENDO_PORTARIA → FINALIZADO)
+  //   • V5.0 : situacaoFluxoConselho (FAZENDO_PORTARIA → FINALIZADO)
+  //   • V5.1 : situacaoFluxoIP (MESA_ASSESSOR | NA_CHEFIA | FINALIZADO)
+  const PORTARIA_LEGADA = new Set([
+    "AGUARDANDO_PRAZO",
+    "AGUARDANDO_CHEFIA",
+    "AGUARDANDO_CHEFIA_SOLUCAO",
+    "C_MEMORIA",
+    "C_PORTARIA",
+  ]);
+
   const classificarPA = (p: Processo, tipoNorm: string): { emAndamento: string | null; portaria: string | null; atrasado: boolean } => {
     const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
-    const emCurso = situacaoFluxo === "EM_CURSO" || situacaoFluxo === "C_EM_CURSO";
+    const situacaoPA = (p.situacaoFluxoPA || "").toString().trim();
+    const situacaoConselho = (p.situacaoFluxoConselho || "").toString().trim();
+    const situacaoIP = (p.situacaoFluxoIP || "").toString().trim();
+
+    // Coluna PA pelo tipo do processo.
+    let colunaTipo: string | null = null;
+    if (tipoNorm.includes("conselho")) colunaTipo = paColunaLabelPorId.get("conselho") || null;
+    else if (tipoNorm.includes("ipm")) colunaTipo = paColunaLabelPorId.get("ipm") || null;
+    else if (tipoNorm.includes("sindic")) colunaTipo = paColunaLabelPorId.get("sindicancia") || null;
+    // Investigação Preliminar não possui coluna específica — cai na coluna do assessor.
+
+    const finalizadoNovo =
+      situacaoPA === "FINALIZADO"
+      || situacaoConselho === "FINALIZADO"
+      || situacaoIP === "FINALIZADO";
+
+    const emAndamentoNovo = !finalizadoNovo && (
+      // V4 PA: qualquer estado ativo que não seja a aguardar assinatura.
+      (situacaoPA !== "" && situacaoPA !== "ASSINANDO_PORTARIA")
+      // V5.0 Conselho.
+      || (situacaoConselho !== "" && situacaoConselho !== "ASSINANDO_PORTARIA")
+      // V5.1 IP.
+      || situacaoIP === "MESA_ASSESSOR"
+    );
+
+    const portariaNova =
+      situacaoPA === "ASSINANDO_PORTARIA"
+      || situacaoConselho === "ASSINANDO_PORTARIA"
+      || situacaoIP === "NA_CHEFIA"
+      || PORTARIA_LEGADA.has(situacaoFluxo);
+
+    // Legado: "EM_CURSO" / "C_EM_CURSO" continuam alimentando a coluna do tipo.
+    const emCursoLegado = situacaoFluxo === "EM_CURSO" || situacaoFluxo === "C_EM_CURSO";
+
     let emAndamento: string | null = null;
-    if (emCurso) {
-      if (tipoNorm.includes("conselho")) emAndamento = paColunaLabelPorId.get("conselho") || null;
-      else if (tipoNorm.includes("ipm")) emAndamento = paColunaLabelPorId.get("ipm") || null;
-      else if (tipoNorm.includes("sindic")) emAndamento = paColunaLabelPorId.get("sindicancia") || null;
+    if (colunaTipo && (emCursoLegado || emAndamentoNovo)) {
+      emAndamento = colunaTipo;
     }
 
     let portaria: string | null = null;
-    if (situacaoFluxo === "AGUARDANDO_PRAZO" && tipoNorm.includes("sindic")) {
-      portaria = paColunaLabelPorId.get("sindicancia") || null;
+    // A aba "Portaria Assinada" mantém a regra histórica de morar na coluna do tipo;
+    // se não houver coluna do tipo (ex.: IP), a card cai na coluna do assessor com
+    // a tab "Portaria Assinada" também visível (V5.2).
+    if (portariaNova && colunaTipo) {
+      portaria = colunaTipo;
     }
 
     let atrasado = false;
-    if (emCurso) {
+    if (!finalizadoNovo && (emAndamento || emAndamentoNovo)) {
       const prazoBase = p.prazoFatal || p.finalPrazo;
       atrasado = !!prazoBase && diasRestantes(prazoBase) < 0;
     }
@@ -243,8 +291,25 @@ export function MesaPA({
         return;
       }
 
+      // V5.2 — Sem coluna do tipo (ex.: Investigação Preliminar): usa coluna do
+      // assessor mas respeita a aba (Portaria Assinada / Em Atraso).
       const responsavelNormalizado = String(p.responsavel || "").trim() || "MESA DO CHEFE";
       garantirChave(responsavelNormalizado);
+      const situacaoIP = (p.situacaoFluxoIP || "").toString().trim();
+      const situacaoPA = (p.situacaoFluxoPA || "").toString().trim();
+      const situacaoConselho = (p.situacaoFluxoConselho || "").toString().trim();
+      const portariaSemColuna =
+        situacaoIP === "NA_CHEFIA"
+        || situacaoPA === "ASSINANDO_PORTARIA"
+        || situacaoConselho === "ASSINANDO_PORTARIA";
+      if (portariaSemColuna) {
+        mapPortariaAssinada.get(responsavelNormalizado)!.push(p);
+        return;
+      }
+      if (isPAAtrasadoPorId.get(p.id)) {
+        mapAtrasados.get(responsavelNormalizado)!.push(p);
+        return;
+      }
       mapAtivos.get(responsavelNormalizado)!.push(p);
     });
 

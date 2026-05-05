@@ -62,6 +62,24 @@ const AcoesDUModalNovo = lazy(() =>
 const AcoesPAModalNovo = lazy(() =>
   import("@/components/modals/AcoesPAModalV4").then((m) => ({ default: m.AcoesPAModalV4 })),
 );
+const AcoesConselhoModalV4 = lazy(() =>
+  import("@/components/modals/AcoesConselhoModalV4").then((m) => ({ default: m.AcoesConselhoModalV4 })),
+);
+const AcoesIPModalV4 = lazy(() =>
+  import("@/components/modals/AcoesIPModalV4").then((m) => ({ default: m.AcoesIPModalV4 })),
+);
+
+// V5.1 — Router de modal de ações por tipoPA.
+const resolverModalPARoute = (tipoPA?: string): "PA" | "CONSELHO" | "IP" => {
+  const t = (tipoPA || "").trim().toLowerCase();
+  if (
+    t === "investigação preliminar"
+    || t === "investigacao preliminar"
+    || t === "outros"
+  ) return "IP";
+  if (t === "conselho de disciplina" || t === "conselho de justificação" || t === "conselho de justificacao") return "CONSELHO";
+  return "PA";
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -1494,6 +1512,26 @@ function Index() {
           {normalizarSetor(processoAcaoSelecionado.setor || processoAcaoSelecionado.tipo) ===
           "DU" ? (
             <AcoesDUModalNovo
+              open={processoAcaoOpen}
+              onOpenChange={(open) => {
+                setProcessoAcaoOpen(open);
+                if (!open) setProcessoAcaoSelecionado(null);
+              }}
+              processoId={processoAcaoSelecionado.id}
+              numeroProcesso={processoAcaoSelecionado.numero}
+            />
+          ) : resolverModalPARoute(processoAcaoSelecionado.tipoPA) === "IP" ? (
+            <AcoesIPModalV4
+              open={processoAcaoOpen}
+              onOpenChange={(open) => {
+                setProcessoAcaoOpen(open);
+                if (!open) setProcessoAcaoSelecionado(null);
+              }}
+              processoId={processoAcaoSelecionado.id}
+              numeroProcesso={processoAcaoSelecionado.numero}
+            />
+          ) : resolverModalPARoute(processoAcaoSelecionado.tipoPA) === "CONSELHO" ? (
+            <AcoesConselhoModalV4
               open={processoAcaoOpen}
               onOpenChange={(open) => {
                 setProcessoAcaoOpen(open);

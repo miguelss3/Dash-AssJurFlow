@@ -472,7 +472,22 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
       };
 
       if (!processo?.id) {
-        dados.situacaoFluxoPA = "FAZENDO_PORTARIA";
+        // V5.2 — payload inicial conforme o motor do tipoPA.
+        //   • Investigação Preliminar / Outros → motor IP (ping-pong).
+        //   • Conselho de Disciplina/Justificação → motor Conselho.
+        //   • Demais (IPM, Sindicância) → motor PA padrão.
+        const tNorm = tipoPA.trim().toLowerCase();
+        const ehIPouOutros =
+          tNorm === "investigação preliminar"
+          || tNorm === "investigacao preliminar"
+          || tNorm === "outros";
+        if (ehIPouOutros) {
+          dados.situacaoFluxoIP = "MESA_ASSESSOR";
+        } else if (isConselhoPASelecionado) {
+          dados.situacaoFluxoConselho = "FAZENDO_PORTARIA";
+        } else {
+          dados.situacaoFluxoPA = "FAZENDO_PORTARIA";
+        }
         dados.finalizado = false;
       }
 
