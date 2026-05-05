@@ -7,7 +7,8 @@ export type SituacaoFluxoDU =
   | "MESA_ASSESSOR"
   | "CHEFIA_DILIGENCIA"
   | "AGUARDANDO_ASSINATURA"
-  | "AGUARDANDO_RESPOSTA";
+  | "AGUARDANDO_RESPOSTA"
+  | "FINALIZADO";
 
 export type AcaoPrincipal = "DILIGENCIA" | "DEFESA";
 
@@ -32,6 +33,7 @@ export const LABEL_SITUACAO: Record<SituacaoFluxoDU, string> = {
   CHEFIA_DILIGENCIA: "Na Chefia",
   AGUARDANDO_ASSINATURA: "Aguardando Assinatura no SPED",
   AGUARDANDO_RESPOSTA: "Aguardando Resposta",
+  FINALIZADO: "Finalizado",
 };
 
 // Identidade visual unificada — "Despacho de Documento".

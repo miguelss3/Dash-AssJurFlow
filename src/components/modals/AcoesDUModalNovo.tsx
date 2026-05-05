@@ -378,6 +378,7 @@ export function AcoesDUModalNovo({
         status: "concluido",
         descricao,
         finalizado: true,
+        "pedidoSubsidios.situacaoFluxo": "FINALIZADO",
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
         ultimaAcaoFluxo: {

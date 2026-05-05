@@ -672,9 +672,15 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       const hoje = new Date();
       hoje.setHours(0, 0, 0, 0);
 
-      const processosParaVerificar = processos.filter(
-        (p) => p.setor === "DU" && p.pedidoSubsidios?.situacaoFluxo === "AGUARDANDO_RESPOSTA",
-      );
+      const processosParaVerificar = processos.filter((p) => {
+        const extra = p as unknown as { finalizado?: boolean; ativo?: boolean };
+        return (
+          p.setor === "DU"
+          && p.pedidoSubsidios?.situacaoFluxo === "AGUARDANDO_RESPOSTA"
+          && extra.finalizado !== true
+          && extra.ativo !== false
+        );
+      });
 
       for (const p of processosParaVerificar) {
         const prazoStr =
