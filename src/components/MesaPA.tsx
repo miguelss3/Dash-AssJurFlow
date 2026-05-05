@@ -266,11 +266,20 @@ export function MesaPA({
     const mapAtrasados = new Map<string, Processo[]>();
     const mapConcluidos = new Map<string, Processo[]>();
 
+    // V6.4 — Mapas paralelos indexados estritamente pelo `responsavel`,
+    // alimentando a Mesa do Assessor com TODOS os processos atribuídos ao
+    // assessor, mesmo que também apareçam nas colunas de tipo (Sindicância,
+    // IPM, Conselho). Garante que nada do trabalho do assessor fique invisível.
+    const mapAssessorAtivos = new Map<string, Processo[]>();
+    const mapAssessorConcluidos = new Map<string, Processo[]>();
+
     const garantirChave = (chave: string) => {
       if (!mapAtivos.has(chave)) mapAtivos.set(chave, []);
       if (!mapPortariaAssinada.has(chave)) mapPortariaAssinada.set(chave, []);
       if (!mapAtrasados.has(chave)) mapAtrasados.set(chave, []);
       if (!mapConcluidos.has(chave)) mapConcluidos.set(chave, []);
+      if (!mapAssessorAtivos.has(chave)) mapAssessorAtivos.set(chave, []);
+      if (!mapAssessorConcluidos.has(chave)) mapAssessorConcluidos.set(chave, []);
     };
 
     paColunaLabels.forEach(garantirChave);
@@ -281,6 +290,14 @@ export function MesaPA({
     });
 
     ativos.forEach((p) => {
+      // V6.4 — Sempre carimba o processo no bucket do responsável para a
+      // Mesa do Assessor, independentemente do roteamento gerencial.
+      const responsavelAssessor = String(p.responsavel || "").trim();
+      if (responsavelAssessor) {
+        garantirChave(responsavelAssessor);
+        mapAssessorAtivos.get(responsavelAssessor)!.push(p);
+      }
+
       const colunaPortariaAssinadaPA = colunaPAPortariaAssinadaPorId.get(p.id) || null;
       if (colunaPortariaAssinadaPA) {
         mapPortariaAssinada.get(colunaPortariaAssinadaPA)!.push(p);
@@ -320,6 +337,13 @@ export function MesaPA({
     });
 
     concluidosDoTipo.forEach((p) => {
+      // V6.4 — Também carimba concluídos no bucket do responsável.
+      const responsavelAssessor = String(p.responsavel || "").trim();
+      if (responsavelAssessor) {
+        garantirChave(responsavelAssessor);
+        mapAssessorConcluidos.get(responsavelAssessor)!.push(p);
+      }
+
       const colunaEspecialPA = colunaPAEmAndamentoPorId.get(p.id) || null;
       if (colunaEspecialPA) {
         garantirChave(colunaEspecialPA);
@@ -346,6 +370,9 @@ export function MesaPA({
         itensPortariaAssinada: mapPortariaAssinada.get(nome) || [],
         itensAtrasados: mapAtrasados.get(nome) || [],
         itensConcluidos: mapConcluidos.get(nome) || [],
+        // V6.4 — Conjunto completo por responsável para a Mesa do Assessor.
+        itensAssessorAtivosTotal: mapAssessorAtivos.get(nome) || [],
+        itensAssessorConcluidosTotal: mapAssessorConcluidos.get(nome) || [],
       }))
       .filter(({ nome, itensAtivos, itensPortariaAssinada, itensAtrasados, itensConcluidos }) => {
         if (paColunaLabelSet.has(nome)) {
@@ -452,10 +479,13 @@ export function MesaPA({
                   key={`PA-assessor-${a.nome}`}
                   responsavel={a.nome}
                   tipo="PA"
-                  processos={a.itensAtivos}
-                  processosPortariaAssinada={a.itensPortariaAssinada}
-                  processosAtrasados={a.itensAtrasados}
-                  processosConcluidos={a.itensConcluidos}
+                  /* V6.4 — Mesa do Assessor: alimenta com a carga total do
+                     responsável (catch-all). vistaAssessor mescla tudo na aba
+                     "Em Andamento" e exibe "Concluídos" íntegros. */
+                  processos={a.itensAssessorAtivosTotal}
+                  processosPortariaAssinada={[]}
+                  processosAtrasados={[]}
+                  processosConcluidos={a.itensAssessorConcluidosTotal}
                   ehAdmin={ehAdmin}
                   onEdit={onEdit}
                   onDelete={onDelete}

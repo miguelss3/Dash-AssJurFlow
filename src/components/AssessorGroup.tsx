@@ -186,15 +186,31 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
   }, [aba, abasConfiguradas]);
 
   const processosDaAbaAtiva = vistaAssessor
-    ? (abaAtiva === "concluidos"
-        ? processosConcluidos
-        // V5.3 — Em Andamento na Mesa do Assessor engloba ativos +
-        // atrasados + portarias assinadas (todo o não finalizado).
-        : [
-            ...processosAtivosOrdenados,
-            ...processosAtrasadosOrdenados,
-            ...processosPortariaAssinada,
-          ])
+    ? (() => {
+        // V6.4 — Mesa do Assessor: catch-all incondicional.
+        // "Em Andamento" = qualquer processo NÃO finalizado (sem checagem de
+        // prazo, situacaoFluxo, etc.). "Concluídos" = qualquer processo
+        // finalizado. Variantes de case ("Concluído"/"concluido") são tratadas.
+        const ehConcluido = (p: Processo) => {
+          const st = String(p.status || "").trim().toLowerCase();
+          return p.finalizado === true || st === "concluido" || st === "concluído";
+        };
+        const ehAtivo = (p: Processo) => !ehConcluido(p);
+
+        const universo = [
+          ...processos,
+          ...processosAtrasados,
+          ...processosPortariaAssinada,
+          ...processosConcluidos,
+        ];
+        const dedup = new Map<string, Processo>();
+        for (const p of universo) {
+          if (p && p.id && !dedup.has(p.id)) dedup.set(p.id, p);
+        }
+        const lista = Array.from(dedup.values());
+
+        return abaAtiva === "concluidos" ? lista.filter(ehConcluido) : lista.filter(ehAtivo);
+      })()
     : abaAtiva === "portaria_assinada"
       ? processosPortariaAssinada
       : abaAtiva === "andamento"
@@ -226,9 +242,30 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
         <div className="rounded-xl bg-muted p-1 gap-1 grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, abasConfiguradas.length)}, minmax(0, 1fr))` }}>
           {abasConfiguradas.map((tab) => {
             const count = vistaAssessor
-              ? (tab.id === "concluidos"
-                  ? processosConcluidos.length
-                  : processos.length + processosAtrasados.length + processosPortariaAssinada.length)
+              ? (() => {
+                  // V6.4 — Contadores baseados no mesmo catch-all do conteúdo.
+                  const ehConcluidoCount = (p: Processo) => {
+                    const st = String(p.status || "").trim().toLowerCase();
+                    return p.finalizado === true || st === "concluido" || st === "concluído";
+                  };
+                  const universo = [
+                    ...processos,
+                    ...processosAtrasados,
+                    ...processosPortariaAssinada,
+                    ...processosConcluidos,
+                  ];
+                  const ids = new Set<string>();
+                  const lista: Processo[] = [];
+                  for (const p of universo) {
+                    if (p && p.id && !ids.has(p.id)) {
+                      ids.add(p.id);
+                      lista.push(p);
+                    }
+                  }
+                  return tab.id === "concluidos"
+                    ? lista.filter(ehConcluidoCount).length
+                    : lista.filter((p) => !ehConcluidoCount(p)).length;
+                })()
               : tab.id === "andamento"
                 ? processos.length
                 : tab.id === "portaria_assinada"
