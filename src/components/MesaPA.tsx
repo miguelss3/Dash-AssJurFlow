@@ -459,6 +459,7 @@ export function MesaPA({
                   unreadProcessIds={unreadProcessIds}
                   onReadProcess={onReadProcess}
                   mapaCoresAssessores={mapaCoresAssessores}
+                  vistaAssessor
                 />
               )
             )}
