@@ -11,7 +11,7 @@ import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
-import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { calcularFaixasProrrogacaoPA, calcularPrazoFinalPA } from "@/lib/prazo";
@@ -425,6 +425,28 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
         ? formatarPortaria(valorBasePortaria)
         : numeroProcesso;
       const numeroFinal = (mudouEncarregado && novaPortaria) ? formatarPortaria(novaPortaria) : primeiraPortariaFormatada;
+
+      // Verificação de duplicidade PA
+      if (numeroFinal.trim()) {
+        const q = query(
+          collection(db, "processos"),
+          where("numeroProcesso", "==", numeroFinal.trim())
+        );
+        const querySnapshot = await getDocs(q);
+
+        let isDuplicate = false;
+        querySnapshot.forEach((docSnap) => {
+          if (!processo?.id || docSnap.id !== processo.id) {
+            isDuplicate = true;
+          }
+        });
+
+        if (isDuplicate) {
+          toast.error(`Já existe um processo cadastrado com o número ${numeroFinal.trim()}.`);
+          setLoading(false);
+          return;
+        }
+      }
 
       const encarregadoPrimeiro = `${postoEncarregado} ${nomeEncarregado}`.trim() || null;
       const encarregadoAtualInformado = `${postoEncarregadoAtual} ${nomeEncarregadoAtual}`.trim() || null;

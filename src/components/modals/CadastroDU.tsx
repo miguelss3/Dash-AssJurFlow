@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
-import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
 import {
@@ -190,6 +190,27 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
 
       if (!ehAdminOuChefe && setorPerfilCanonico && setorPerfilCanonico !== "DU") {
         toast.error("Seu perfil no Firestore não está vinculado ao setor DU.");
+        return;
+      }
+    }
+
+    // Verificação de duplicidade DU
+    if (numeroProcesso.trim()) {
+      const q = query(
+        collection(db, "processos"),
+        where("numeroProcesso", "==", numeroProcesso.trim())
+      );
+      const querySnapshot = await getDocs(q);
+
+      let isDuplicate = false;
+      querySnapshot.forEach((docSnap) => {
+        if (!processo?.id || docSnap.id !== processo.id) {
+          isDuplicate = true;
+        }
+      });
+
+      if (isDuplicate) {
+        toast.error(`Já existe um processo cadastrado com o número ${numeroProcesso.trim()}.`);
         return;
       }
     }

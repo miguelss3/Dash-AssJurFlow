@@ -12,6 +12,7 @@ import {
   writeBatch,
   orderBy,
   limit,
+  Timestamp,
   type Query,
 } from "firebase/firestore";
 import { db, auth } from "../lib/firebase";
@@ -655,6 +656,77 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       throw err;
     }
   };
+
+  // -------------------------------------------------------------------
+  // V3.5 — Robô Vigia do Kanban DU.
+  // Varre processos DU em AGUARDANDO_RESPOSTA cujo prazo já venceu por
+  // mais de 1 dia de tolerância e os devolve automaticamente à mesa do
+  // assessor, limpando número/prazo e incrementando o contador de
+  // reiterações. Usa dot notation no updateDoc para não sobrescrever os
+  // demais campos de `pedidoSubsidios`.
+  // -------------------------------------------------------------------
+  useEffect(() => {
+    if (!processos || processos.length === 0) return;
+
+    const varrerProcessosVencidos = async () => {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const processosParaVerificar = processos.filter(
+        (p) => p.setor === "DU" && p.pedidoSubsidios?.situacaoFluxo === "AGUARDANDO_RESPOSTA",
+      );
+
+      for (const p of processosParaVerificar) {
+        const prazoStr =
+          (p as unknown as Record<string, string | undefined>).prazoFatalDU
+          || p.prazoFatal
+          || p.pedidoSubsidios?.dataPrazo
+          || p.pedidoSubsidios?.prazoResposta;
+        if (!prazoStr) continue;
+
+        const dataPrazo = new Date(`${prazoStr}T00:00:00`);
+        if (Number.isNaN(dataPrazo.getTime())) continue;
+        const dataLimite = new Date(dataPrazo);
+        dataLimite.setDate(dataLimite.getDate() + 1);
+
+        if (hoje > dataLimite) {
+          try {
+            const processoRef = doc(db, "processos", p.id);
+            const reiteracoesAtual = Number(p.pedidoSubsidios?.reiteracoes) || 0;
+            const msgSistema =
+              "🤖 SISTEMA: Prazo vencido com tolerância ultrapassada. Processo retornado automaticamente para a mesa do assessor para providências de reiteração.";
+
+            await updateDoc(processoRef, {
+              "pedidoSubsidios.situacaoFluxo": "MESA_ASSESSOR",
+              "pedidoSubsidios.numeroDocumentoDU": "",
+              "pedidoSubsidios.dataPrazo": "",
+              "pedidoSubsidios.reiteracoes": reiteracoesAtual + 1,
+              prazoFatalDU: null,
+              prazoFatal: null,
+              finalPrazo: null,
+              status: "Mesa do Assessor",
+              descricao: msgSistema,
+              atualizadoEm: Timestamp.now(),
+              atualizadoPorNome: "Robô do Sistema",
+            });
+
+            await addDoc(collection(db, `processos/${p.id}/historico`), {
+              autor: "Robô do Sistema",
+              autorId: "sistema",
+              texto: msgSistema,
+              timestamp: new Date().toISOString(),
+            });
+
+            console.log(`🤖 Vigia: Processo ${p.numero} resgatado automaticamente!`);
+          } catch (error) {
+            console.error("Erro no Robô Vigia ao tentar resgatar processo:", error);
+          }
+        }
+      }
+    };
+
+    void varrerProcessosVencidos();
+  }, [processos]);
 
   return { 
     processos, 
