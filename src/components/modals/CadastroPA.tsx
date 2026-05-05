@@ -130,7 +130,8 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
   const [observacoes, setObservacoes] = useState("");
 
   const [tipoPA, setTipoPA] = useState("");
-  const [fluxoIPM, setFluxoIPM] = useState<"Novo" | "Diligência" | "Sindicância Antigo">("Novo");
+  // V4.7: campo legado `fluxoIPM` removido. Todo PA novo nasce na fase
+  // FAZENDO_PORTARIA do motor V4 (situacaoFluxoPA).
   const [anoLegado, setAnoLegado] = useState("");
   const [postoEncarregado, setPostoEncarregado] = useState("");
   const [nomeEncarregado, setNomeEncarregado] = useState("");
@@ -155,7 +156,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
     setDataEntrada(new Date().toISOString().split("T")[0]);
     setObservacoes("");
     setTipoPA("");
-    setFluxoIPM("Novo");
     setAnoLegado("");
     setPostoEncarregado("");
     setNomeEncarregado("");
@@ -179,13 +179,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
 
     setTipoPA(p.tipoPA || "");
     const conselhoPA = p.tipoPA === "Conselho de Disciplina" || p.tipoPA === "Conselho de Justificação";
-
-    const temDiligencia = p.faseAtual?.includes?.("diligencia") || p.faseAtual?.includes?.("Diligência");
-    const ehLegado = p.faseAtual?.includes?.("Antiga") || p.faseAtual?.includes?.("antiga");
-
-    if (ehLegado) setFluxoIPM("Sindicância Antigo");
-    else if (temDiligencia) setFluxoIPM("Diligência");
-    else setFluxoIPM("Novo");
 
     if (p.encarregado) {
       const partes = p.encarregado.split(" ");
@@ -338,8 +331,9 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
 
     const isSindicanciaPA = tipoPA === "Sindicância";
     const isConselhoPASelecionado = isConselhoPA(tipoPA);
-    const isDiligenciaPA = aceitaDiligencia(tipoPA) && fluxoIPM === "Diligência";
-    const isSindicanciaAntiga = isSindicanciaPA && fluxoIPM === "Sindicância Antigo";
+    // V4.7: diligência/legado não existem mais como fluxo paralelo no cadastro.
+    const isDiligenciaPA = false;
+    const isSindicanciaAntiga = false;
 
     if (isSindicanciaPA && !assuntoSindicancia) {
       toast.error("Selecione o assunto da Sindicância.");
@@ -455,11 +449,9 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
         ? encarregadoPresidente
         : ((isDiligenciaPA && mudouEncarregado) ? encarregadoAtualInformado : encarregadoPrimeiro);
 
-      let statusInicial = "Aguardando Distribuição";
-      if (isSindicanciaAntiga) statusInicial = "Atrasado";
-      else if (isDiligenciaPA) statusInicial = "Diligência";
-      else statusInicial = "Distribuído";
-
+      // V4.7: payload sanitizado. Removidos campos legados (status, fluxoIPM,
+      // emDiligencia, aguardandoAssinaturaCmt). O motor V4 (situacaoFluxoPA)
+      // é injetado apenas na criação; updates não tocam no estado do fluxo.
       const dados: Record<string, unknown> = {
         numeroProcesso: numeroFinal.trim(),
         parte: parte.trim(),
@@ -467,8 +459,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
         dataEntrada,
         observacoes: observacoes.trim() || null,
         setor: "PA",
-        status: statusInicial,
-        finalizado: processo?.id ? (processo.status === "concluido") : false,
         criadoEm: processo?.id ? undefined : agora,
         atualizadoEm: agora,
         userId: user!.uid,
@@ -479,11 +469,12 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
 
         tipoPA,
         encarregado: encarregadoFinal,
-        isLegado: isSindicanciaAntiga,
-        fluxoIPM: (aceitaDiligencia(tipoPA) || isSindicanciaAntiga) ? fluxoIPM : null,
-        emDiligencia: isDiligenciaPA,
-        aguardandoAssinaturaCmt: !isSindicanciaAntiga,
       };
+
+      if (!processo?.id) {
+        dados.situacaoFluxoPA = "FAZENDO_PORTARIA";
+        dados.finalizado = false;
+      }
 
       if (isSindicanciaPA) {
         dados.assuntoSindicancia = assuntoSindicancia;
@@ -651,11 +642,12 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
     }
   };
 
-  const mostrarFluxoIPM = aceitaDiligencia(tipoPA);
+  // V4.7: blocos de UI dependentes de `fluxoIPM` foram desativados.
+  const mostrarFluxoIPM = false;
   const mostrarEncarregado = aceitaDiligencia(tipoPA);
   const mostrarPresidenteConselho = isConselhoPA(tipoPA);
-  const mostrarAnoLegado = tipoPA === "Sindicância" && fluxoIPM === "Sindicância Antigo";
-  const mostrarMudancaEncarregado = aceitaDiligencia(tipoPA) && fluxoIPM === "Diligência";
+  const mostrarAnoLegado = false;
+  const mostrarMudancaEncarregado = false;
   const mostrarAssuntoSindicancia = tipoPA === "Sindicância";
 
   return (
@@ -683,35 +675,7 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
             </Select>
           </div>
 
-          {mostrarFluxoIPM && (
-            <div className="space-y-3 p-4 border rounded-lg bg-slate-50">
-              <Label className="text-base font-semibold">Fluxo de {tipoPA || "Procedimento"}</Label>
-              <RadioGroup value={fluxoIPM} onValueChange={(v) => setFluxoIPM(v as "Novo" | "Diligência" | "Sindicância Antigo")}>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="Novo" id="fluxo-novo" />
-                  <Label htmlFor="fluxo-novo" className="font-normal cursor-pointer">Novo {tipoPA}</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="Diligência" id="fluxo-diligencia" />
-                  <Label htmlFor="fluxo-diligencia" className="font-normal cursor-pointer">Diligência</Label>
-                </div>
-                {tipoPA === "Sindicância" && (
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="Sindicância Antigo" id="fluxo-antigo" />
-                    <Label htmlFor="fluxo-antigo" className="font-normal cursor-pointer">Sindicância Antiga (Acervo)</Label>
-                  </div>
-                )}
-              </RadioGroup>
-              {fluxoIPM === "Diligência" && (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    {tipoPA || "Procedimento"} em diligência: após o cadastro o card volta para a mesa e o prazo é iniciado depois pelo assessor.
-                  </AlertDescription>
-                </Alert>
-              )}
-            </div>
-          )}
+          {/* V4.7: bloco "Fluxo de Sindicância" removido (campo legado fluxoIPM). */}
 
           {mostrarAnoLegado && (
             <div className="space-y-2">
@@ -773,7 +737,7 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
 
           {mostrarEncarregado && (
             <div className="space-y-4 p-4 border rounded-lg bg-slate-50">
-              <h4 className="font-semibold text-sm">{fluxoIPM === "Diligência" ? "Encarregado da 1ª Portaria" : "Encarregado"}</h4>
+              <h4 className="font-semibold text-sm">Encarregado</h4>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="postoEncarregado">Posto *</Label>

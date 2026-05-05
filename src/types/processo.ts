@@ -31,6 +31,33 @@ export const LABEL_SITUACAO_PA: Record<SituacaoFluxoPA, string> = {
   FINALIZADO: "Finalizado",
 };
 
+// V5.0 — Máquina de estados exclusiva dos Conselhos (Disciplina/Justificação).
+// O rito é diferente do PA comum: prazo de 30 dias corridos a partir de
+// (assinatura + 1 dia), prorrogações de 20 dias, triagem de recurso e
+// envio final à ATH. Convive com `SituacaoFluxoPA` sem cruzamento.
+export type SituacaoFluxoConselho =
+  | "FAZENDO_PORTARIA"
+  | "ASSINANDO_PORTARIA"
+  | "COM_CONSELHO"
+  | "AGUARDANDO_DESPACHO_PRORROGACAO"
+  | "TRIAGEM_AUTOS"
+  | "FAZENDO_RESPOSTA_RECURSO"
+  | "DECISAO_AUTORIDADE"
+  | "ENVIO_ATH"
+  | "FINALIZADO";
+
+export const LABEL_SITUACAO_CONSELHO: Record<SituacaoFluxoConselho, string> = {
+  FAZENDO_PORTARIA: "Portaria Confeccionada",
+  ASSINANDO_PORTARIA: "Aguardando Assinatura da Portaria",
+  COM_CONSELHO: "Em Andamento (Com o Conselho)",
+  AGUARDANDO_DESPACHO_PRORROGACAO: "Aguardando Despacho (Prorrogação)",
+  TRIAGEM_AUTOS: "Triagem dos Autos Concluídos",
+  FAZENDO_RESPOSTA_RECURSO: "Elaborando Resposta a Recurso",
+  DECISAO_AUTORIDADE: "Aguardando Decisão da Autoridade",
+  ENVIO_ATH: "Aguardando Envio à ATH",
+  FINALIZADO: "Finalizado",
+};
+
 export interface PedidoSubsidios {
   tipoSolicitacao?: "primeira_vez" | "reiteracao";
   tipoDestino?: "interno" | "externo";
@@ -136,6 +163,12 @@ export interface Processo {
   membrosConselho?: string;
   // V4.0 — Nova máquina de estados (paralela ao `situacaoFluxo` legado).
   situacaoFluxoPA?: SituacaoFluxoPA;
+  // V5.0 — Máquina de estados exclusiva dos Conselhos.
+  situacaoFluxoConselho?: SituacaoFluxoConselho;
+  numeroMemoriaAth?: string;
+  pendenciaProrrogacao?: string;
+  prazoRespostaRecurso?: string;
+  docEnvioAth?: string;
   finalizado?: boolean;
   subtipo?: string;        // IPM, Sindicância, Diligência
   faseAtual?: string;      // Em diligência, Portaria assinada, Para assinatura, Atrasado, Prazo não iniciado
