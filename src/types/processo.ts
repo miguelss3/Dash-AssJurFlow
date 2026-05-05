@@ -22,7 +22,7 @@ export type SituacaoFluxoPA =
   | "FINALIZADO";
 
 export const LABEL_SITUACAO_PA: Record<SituacaoFluxoPA, string> = {
-  FAZENDO_PORTARIA: "Fazendo Portaria",
+  FAZENDO_PORTARIA: "Portaria Confeccionada",
   ASSINANDO_PORTARIA: "Aguardando Assinatura da Portaria",
   AGUARDANDO_ENTREGA: "Aguardando Entrega ao Encarregado",
   COM_ENCARREGADO: "Com o Encarregado",

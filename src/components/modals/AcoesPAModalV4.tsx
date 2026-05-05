@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addDoc, collection, doc, getDoc, Timestamp, updateDoc } from "firebase/firestore";
+import { addDoc, arrayUnion, collection, doc, getDoc, Timestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -24,6 +24,47 @@ import type { SiteSettings } from "@/types/siteSettings";
 // máquina de estados em 6+1 etapas. NÃO substitui o modal antigo: deve
 // ser plugado nas listas/Kanban somente após validação manual.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// V4.4 — Tradutor heurístico de PAs legados.
+// Processos PA criados antes da migração não possuem `situacaoFluxoPA`.
+// Inferimos a etapa nova lendo as variáveis legadas (dataInicioPrazo,
+// dataAssinatura, aguardandoAssinaturaCmt, descricao). Mantemos a ordem
+// dos checks do mais avançado para o mais inicial — o primeiro match vence.
+// ---------------------------------------------------------------------------
+const getSituacaoInicial = (p: Record<string, unknown>): SituacaoFluxoPA => {
+  // 1. Já migrado: confia na fase salva.
+  const sitNova = p.situacaoFluxoPA as SituacaoFluxoPA | undefined;
+  if (sitNova) return sitNova;
+
+  // 2. Finalizado.
+  if (p.finalizado || p.status === "concluido") return "FINALIZADO";
+
+  // 3. Fase de Solução (heurística textual em descricao).
+  const desc = ((p.descricao as string | undefined) || "").toLowerCase();
+  if (desc.includes("confecção da solução") || desc.includes("confeccao da solucao") || desc.includes("parecer")) {
+    return "FAZENDO_SOLUCAO";
+  }
+
+  // 4. Prazo iniciado → autos com o Encarregado.
+  if (p.dataInicioPrazo) return "COM_ENCARREGADO";
+
+  // 5. Portaria assinada (ou status legado AGUARDANDO_PRAZO), aguardando entrega.
+  if (
+    p.dataAssinatura
+    || p.portariaAssinadaEm
+    || ((p.situacaoFluxo as string | undefined) || "").toString().toUpperCase() === "AGUARDANDO_PRAZO"
+  ) {
+    return "AGUARDANDO_ENTREGA";
+  }
+
+  // 6. Na Chefia/Cmt aguardando a caneta.
+  const sitLegado = ((p.situacaoFluxo as string | undefined) || "").toString().toUpperCase();
+  if (sitLegado === "AGUARDANDO_CHEFIA" || p.aguardandoAssinaturaCmt) return "ASSINANDO_PORTARIA";
+
+  // 7. Fallback real: minuta sendo elaborada.
+  return "FAZENDO_PORTARIA";
+};
 
 interface AcoesPAModalV4Props {
   open: boolean;
@@ -53,6 +94,13 @@ export function AcoesPAModalV4({
   const [parte, setParte] = useState<string>("");
   const [situacaoAtualState, setSituacaoAtualState] = useState<SituacaoFluxoPA>("FAZENDO_PORTARIA");
 
+  // V4.5 — Estado da prorrogação de prazo (fase COM_ENCARREGADO).
+  const [isProrrogando, setIsProrrogando] = useState<boolean>(false);
+  const [diasProrrogacao, setDiasProrrogacao] = useState<number>(20);
+  const [docProrrogacao, setDocProrrogacao] = useState<string>("");
+  const [prazoFatalAtual, setPrazoFatalAtual] = useState<string>("");
+  const [dataInicioPrazoAtual, setDataInicioPrazoAtual] = useState<string>("");
+
   // ---------------- Carga ----------------
   useEffect(() => {
     if (!open || !processoId) return;
@@ -63,10 +111,17 @@ export function AcoesPAModalV4({
         const snap = await getDoc(doc(db, "processos", processoId));
         if (cancelado) return;
         const data = snap.exists() ? (snap.data() as Record<string, unknown>) : {};
-        const sit = (data?.situacaoFluxoPA as SituacaoFluxoPA | undefined)
-          || ((data?.finalizado as boolean | undefined) ? "FINALIZADO" : "FAZENDO_PORTARIA");
+        // V4.4 — Tradutor heurístico aplicado na carga.
+        const sit = getSituacaoInicial(data);
         setSituacaoAtualState(sit);
         setParte(((data?.cliente as string | undefined) || "").toString());
+        // V4.5 — Captura prazos atuais para o motor de prorrogação.
+        setPrazoFatalAtual(
+          ((data?.prazoFatal as string | undefined)
+            || (data?.finalPrazo as string | undefined)
+            || "").toString(),
+        );
+        setDataInicioPrazoAtual(((data?.dataInicioPrazo as string | undefined) || "").toString());
       } catch (error) {
         console.error("Erro ao carregar fluxo PA:", error);
         toast.error("Não foi possível carregar o fluxo do processo.");
@@ -113,6 +168,71 @@ export function AcoesPAModalV4({
     } catch (error) {
       console.error("Erro ao avançar fluxo PA:", error);
       toast.error("Não foi possível atualizar o fluxo PA.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  // ---------------- V4.5 — Motor de Prorrogação ----------------
+  // Soma `diasProrrogacao` ao prazo fatal corrente (prazoFatal → finalPrazo →
+  // dataInicioPrazo → hoje, nessa ordem) e grava o novo prazo nos dois campos
+  // de raiz (prazoFatal/finalPrazo) usados pelo Kanban e pelo Calendário.
+  // Mantém histórico imutável via arrayUnion em `prorrogacoes`.
+  const handleProrrogar = async () => {
+    if (!processoId || !user) return;
+    const dias = Number(diasProrrogacao);
+    if (!Number.isFinite(dias) || dias <= 0) {
+      toast.error("Informe um número válido de dias.");
+      return;
+    }
+    const docNumero = docProrrogacao.trim();
+    if (!docNumero) {
+      toast.error("Informe o documento de referência da prorrogação.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      const baseStr = prazoFatalAtual || dataInicioPrazoAtual || "";
+      const base = baseStr ? new Date(baseStr) : new Date();
+      if (Number.isNaN(base.getTime())) {
+        toast.error("Não foi possível ler o prazo atual do processo.");
+        return;
+      }
+      base.setDate(base.getDate() + dias);
+      const novoPrazoISO = base.toISOString().slice(0, 10);
+
+      const novaProrrogacao = {
+        dias,
+        doc: docNumero,
+        por: autorMilitar,
+        em: new Date().toISOString(),
+      };
+
+      const processoRef = doc(db, "processos", processoId);
+      await updateDoc(processoRef, {
+        prazoFatal: novoPrazoISO,
+        finalPrazo: novoPrazoISO,
+        prorrogacoes: arrayUnion(novaProrrogacao),
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+      });
+      const msg = `Prazo prorrogado em +${dias} dias. Doc: ${docNumero}`;
+      await addDoc(collection(db, `processos/${processoId}/historico`), {
+        autor: autorMilitar,
+        autorId: user.uid || "sistema",
+        texto: msg,
+        timestamp: new Date().toISOString(),
+      });
+
+      toast.success("Prazo prorrogado com sucesso.");
+      setPrazoFatalAtual(novoPrazoISO);
+      setIsProrrogando(false);
+      setDocProrrogacao("");
+      setDiasProrrogacao(20);
+      if (onSuccess) onSuccess();
+    } catch (error) {
+      console.error("Erro ao prorrogar prazo PA:", error);
+      toast.error("Não foi possível prorrogar o prazo.");
     } finally {
       setSalvando(false);
     }
@@ -225,30 +345,97 @@ export function AcoesPAModalV4({
             <p className="text-xs text-slate-600 mb-4">
               Autos com o Encarregado. Receba as conclusões ou prorrogue o prazo, se necessário.
             </p>
-            <div className="space-y-2">
-              <button
-                type="button"
-                className={SECONDARY_BTN}
-                disabled
-                title="Funcionalidade prevista para a próxima etapa."
-              >
-                Prorrogar Prazo
-              </button>
-              <button
-                type="button"
-                disabled={salvando}
-                className={PRIMARY_BTN}
-                onClick={() =>
-                  void avancarFluxo(
-                    "FAZENDO_SOLUCAO",
-                    {},
-                    "Autos entregues pelo Encarregado. Iniciando fase de Solução/Parecer.",
-                  )
-                }
-              >
-                Receber Autos Concluídos
-              </button>
-            </div>
+            {(prazoFatalAtual || dataInicioPrazoAtual) && (
+              <div className="mb-4 grid grid-cols-2 gap-3 text-xs text-slate-700">
+                {dataInicioPrazoAtual && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="text-[10px] font-bold uppercase text-slate-500">Início do Prazo</div>
+                    <div>{dataInicioPrazoAtual}</div>
+                  </div>
+                )}
+                {prazoFatalAtual && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                    <div className="text-[10px] font-bold uppercase text-slate-500">Prazo Fatal Atual</div>
+                    <div>{prazoFatalAtual}</div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isProrrogando ? (
+              <div className="space-y-3 rounded-lg border border-slate-300 bg-white p-4">
+                <h5 className="text-sm font-semibold text-slate-800">Prorrogação de Prazo</h5>
+                <div>
+                  <Label htmlFor="prorr-dias" className="text-slate-700">Dias</Label>
+                  <Input
+                    id="prorr-dias"
+                    type="number"
+                    min={1}
+                    value={diasProrrogacao}
+                    onChange={(e) => setDiasProrrogacao(Number(e.target.value))}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="prorr-doc" className="text-slate-700">
+                    Documento (Ex: Nota nº 123/2026)
+                  </Label>
+                  <Input
+                    id="prorr-doc"
+                    type="text"
+                    value={docProrrogacao}
+                    onChange={(e) => setDocProrrogacao(e.target.value)}
+                    placeholder="Nota nº ___/____"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={salvando || !docProrrogacao.trim() || !diasProrrogacao}
+                    className={PRIMARY_BTN}
+                    onClick={() => void handleProrrogar()}
+                  >
+                    Confirmar Prorrogação
+                  </button>
+                  <button
+                    type="button"
+                    className={SECONDARY_BTN}
+                    disabled={salvando}
+                    onClick={() => {
+                      setIsProrrogando(false);
+                      setDocProrrogacao("");
+                      setDiasProrrogacao(20);
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className={SECONDARY_BTN}
+                  disabled={salvando}
+                  onClick={() => setIsProrrogando(true)}
+                >
+                  Solicitar Prorrogação de Prazo
+                </button>
+                <button
+                  type="button"
+                  disabled={salvando}
+                  className={PRIMARY_BTN}
+                  onClick={() =>
+                    void avancarFluxo(
+                      "FAZENDO_SOLUCAO",
+                      {},
+                      "Autos entregues pelo Encarregado. Iniciando fase de Solução/Parecer.",
+                    )
+                  }
+                >
+                  Receber Autos Concluídos
+                </button>
+              </div>
+            )}
           </div>
         );
 
