@@ -58,6 +58,26 @@ export const LABEL_SITUACAO_CONSELHO: Record<SituacaoFluxoConselho, string> = {
   FINALIZADO: "Finalizado",
 };
 
+// V5.1 — Motor "Ping-Pong" de Investigação Preliminar (IP).
+// Fluxo deliberadamente livre: o status só registra de quem é a "bola"
+// (Assessor x Chefia) ou se foi finalizado. Toda a riqueza fica em
+// `documentosIP` e na subcoleção /historico (notas livres).
+export type SituacaoFluxoIP = "MESA_ASSESSOR" | "NA_CHEFIA" | "FINALIZADO";
+
+export const LABEL_SITUACAO_IP: Record<SituacaoFluxoIP, string> = {
+  MESA_ASSESSOR: "Na Mesa do Assessor",
+  NA_CHEFIA: "Com a Chefia",
+  FINALIZADO: "Finalizado",
+};
+
+export interface DocumentoIP {
+  tipo: "Expedido" | "Recebido";
+  descricao: string;
+  data: string;
+  registradoPor: string;
+  registradoEm?: string;
+}
+
 export interface PedidoSubsidios {
   tipoSolicitacao?: "primeira_vez" | "reiteracao";
   tipoDestino?: "interno" | "externo";
@@ -169,6 +189,9 @@ export interface Processo {
   pendenciaProrrogacao?: string;
   prazoRespostaRecurso?: string;
   docEnvioAth?: string;
+  // V5.1 — Motor Ping-Pong de Investigação Preliminar.
+  situacaoFluxoIP?: SituacaoFluxoIP;
+  documentosIP?: DocumentoIP[];
   finalizado?: boolean;
   subtipo?: string;        // IPM, Sindicância, Diligência
   faseAtual?: string;      // Em diligência, Portaria assinada, Para assinatura, Atrasado, Prazo não iniciado
