@@ -39,7 +39,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import type { SiteSettings } from "@/types/siteSettings";
 
-const AcoesPAModalNovo = lazy(() =>
+const AcoesPAModalV4 = lazy(() =>
   import("./modals/AcoesPAModalV4").then((m) => ({ default: m.AcoesPAModalV4 })),
 );
 const AcoesConselhoModalV4 = lazy(() =>
@@ -378,7 +378,7 @@ const CardPAComponent = ({
           if (variante === "CONSELHO") {
             return <AcoesConselhoModalV4 open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />;
           }
-          return <AcoesPAModalNovo open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />;
+          return <AcoesPAModalV4 open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />;
         })()}
       </Suspense>
 

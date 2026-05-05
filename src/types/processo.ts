@@ -8,10 +8,9 @@ export type StatusProcesso =
 export type TipoProcesso = "DU" | "PA" | "OUTRO";
 export type Prioridade = "liminar" | "urgente" | "normal";
 
-// V4.0 — Nova máquina de estados dos Processos Administrativos.
-// Estes estados convivem com o legado (`SituacaoFluxoPA` interno do
-// `AcoesPAModalNovo.tsx` antigo). Não remover o legado até a substituição
-// completa do modal de ações.
+// V4.0 — Máquina de estados dos Processos Administrativos.
+// V5.3: o modal legado `AcoesPAModalNovo.tsx` foi removido; o motor é
+// orquestrado por `AcoesPAModalV4`, `AcoesConselhoModalV4` e `AcoesIPModalV4`.
 export type SituacaoFluxoPA =
   | "FAZENDO_PORTARIA"
   | "ASSINANDO_PORTARIA"

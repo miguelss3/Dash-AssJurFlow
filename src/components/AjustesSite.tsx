@@ -224,16 +224,12 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [openPAPrazos, setOpenPAPrazos] = useState(false);
   const [openPAAbas, setOpenPAAbas] = useState(false);
   const [openPAFluxo, setOpenPAFluxo] = useState(false);
-  const [openDUColunas, setOpenDUColunas] = useState(false);
   const [openDUAssuntos, setOpenDUAssuntos] = useState(false);
   const [openDUOrigens, setOpenDUOrigens] = useState(false);
   const [openDUSecoes, setOpenDUSecoes] = useState(false);
   const [selectedPAPreviewColumnId, setSelectedPAPreviewColumnId] =
     useState<PAInProgressColumnId>("sindicancia");
   const [selectedPAPreviewTabId, setSelectedPAPreviewTabId] = useState<ColumnTabId>("andamento");
-  const [selectedDUPreviewColumnId, setSelectedDUPreviewColumnId] =
-    useState<DUBoardColumnId>("aguardando_resposta");
-  const [selectedDUPreviewTabId, setSelectedDUPreviewTabId] = useState<ColumnTabId>("andamento");
   const [modoPAAvancado, setModoPAAvancado] = useState(false);
   const [selectedFlowActionIndex, setSelectedFlowActionIndex] = useState<number | null>(null);
   const selectedFlowEditorRef = useRef<HTMLDivElement | null>(null);
@@ -633,23 +629,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     });
   };
 
-  const updateDUBoardColumn = (id: DUBoardColumnId, patch: Partial<DUBoardColumnSetting>) => {
-    setForm((prev) => {
-      const lista = prev.duBoardColumns.map((coluna) => {
-        if (coluna.id !== id) return coluna;
-        return {
-          ...coluna,
-          ...patch,
-        };
-      });
-
-      return {
-        ...prev,
-        duBoardColumns: lista,
-      };
-    });
-  };
-
   const updateColumnTab = (
     scope: "PA" | "DU",
     id: ColumnTabId,
@@ -736,8 +715,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     [paColumnTabs],
   );
 
-  const duPreviewColumns = useMemo(() => duBoardColumnsOrdenadas, [duBoardColumnsOrdenadas]);
-
   useEffect(() => {
     if (paPreviewColumns.length === 0) return;
     const existe = paPreviewColumns.some((coluna) => coluna.id === selectedPAPreviewColumnId);
@@ -753,14 +730,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       setSelectedPAPreviewTabId(paPreviewTabs[0].id);
     }
   }, [paPreviewTabs, selectedPAPreviewTabId]);
-
-  useEffect(() => {
-    if (duPreviewColumns.length === 0) return;
-    const existe = duPreviewColumns.some((coluna) => coluna.id === selectedDUPreviewColumnId);
-    if (!existe) {
-      setSelectedDUPreviewColumnId(duPreviewColumns[0].id);
-    }
-  }, [duPreviewColumns, selectedDUPreviewColumnId]);
 
   const paFlowEditGroups = useMemo(
     () => ({
@@ -1151,11 +1120,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   };
 
   const [gerandoBackup, setGerandoBackup] = useState(false);
-  const [analisando, setAnalisando] = useState(false);
-  const [relatorioLimpeza, setRelatorioLimpeza] = useState<
-    { id: string; acoes: string[]; patchNulos?: Record<string, unknown> }[] | null
-  >(null);
-  const [executandoLimpeza, setExecutandoLimpeza] = useState(false);
   const [restaurandoPA, setRestaurandoPA] = useState(false);
 
   const handleBackupLocal = async () => {
@@ -1187,121 +1151,6 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       toast.error("Não foi possível gerar o backup local.");
     } finally {
       setGerandoBackup(false);
-    }
-  };
-
-  const handleAnalisarDados = async () => {
-    try {
-      setAnalisando(true);
-      const processosRef = collection(db, "processos");
-      const q = query(processosRef, where("setor", "in", ["DU", "PA"]));
-      const snapshot = await getDocs(q);
-      const correcoes: { id: string; acoes: string[]; patchNulos?: Record<string, unknown> }[] = [];
-
-      const coletarCamposNulos = (objeto: unknown, prefixo = "", patchNulos: Record<string, unknown>) => {
-        if (!objeto || typeof objeto !== "object" || Array.isArray(objeto)) return;
-
-        Object.entries(objeto as Record<string, unknown>).forEach(([chave, valor]) => {
-          const caminho = prefixo ? `${prefixo}.${chave}` : chave;
-
-          if (valor === null) {
-            patchNulos[caminho] = "";
-            return;
-          }
-
-          if (valor && typeof valor === "object" && !Array.isArray(valor)) {
-            coletarCamposNulos(valor, caminho, patchNulos);
-          }
-        });
-      };
-
-      snapshot.docs.forEach((processoDoc) => {
-        const data = processoDoc.data() as {
-          responsavel?: unknown;
-          pedidoSubsidios?: unknown;
-          respostaDU?: unknown;
-          [key: string]: unknown;
-        };
-        const acoes: string[] = [];
-        const patchNulos: Record<string, unknown> = {};
-
-        coletarCamposNulos(data, "", patchNulos);
-
-        if (typeof data.responsavel !== "string" || data.responsavel.trim() === "") {
-          acoes.push("Definir responsável padrão");
-          delete patchNulos.responsavel;
-        }
-
-        if (!data.pedidoSubsidios || typeof data.pedidoSubsidios !== "object" || Array.isArray(data.pedidoSubsidios)) {
-          acoes.push("Criar objeto pedidoSubsidios");
-          delete patchNulos.pedidoSubsidios;
-        }
-
-        if (!data.respostaDU || typeof data.respostaDU !== "object" || Array.isArray(data.respostaDU)) {
-          acoes.push("Criar objeto respostaDU");
-          delete patchNulos.respostaDU;
-        }
-
-        if (Object.keys(patchNulos).length > 0) {
-          acoes.push("Regra 4 (Remoção de Nulos)");
-        }
-
-        if (acoes.length > 0) {
-          correcoes.push({ id: processoDoc.id, acoes, patchNulos: Object.keys(patchNulos).length > 0 ? patchNulos : undefined });
-        }
-      });
-
-      setRelatorioLimpeza(correcoes);
-      if (correcoes.length === 0) {
-        toast.success("Nenhum processo legado precisa de correção.");
-      } else {
-        toast.warning(`Foram encontrados ${correcoes.length} processos com ajustes pendentes.`);
-      }
-    } catch (error) {
-      console.error("Erro ao analisar processos legados:", error);
-      toast.error("Não foi possível analisar os dados legados.");
-    } finally {
-      setAnalisando(false);
-    }
-  };
-
-  const handleExecutarLimpeza = async () => {
-    if (!relatorioLimpeza || relatorioLimpeza.length === 0) return;
-
-    try {
-      setExecutandoLimpeza(true);
-
-      const TAMANHO_LOTE = 400;
-      for (let i = 0; i < relatorioLimpeza.length; i += TAMANHO_LOTE) {
-        const lote = relatorioLimpeza.slice(i, i + TAMANHO_LOTE);
-        const batch = writeBatch(db);
-
-        lote.forEach((item) => {
-          const patch: Record<string, unknown> = { ...(item.patchNulos || {}) };
-
-          if (item.acoes.includes("Definir responsável padrão")) {
-            patch.responsavel = "Sem responsável";
-          }
-          if (item.acoes.includes("Criar objeto pedidoSubsidios")) {
-            patch.pedidoSubsidios = {};
-          }
-          if (item.acoes.includes("Criar objeto respostaDU")) {
-            patch.respostaDU = {};
-          }
-
-          batch.update(doc(db, "processos", item.id), patch);
-        });
-
-        await batch.commit();
-      }
-
-      toast.success(`Higienização concluída em ${relatorioLimpeza.length} processos.`);
-      setRelatorioLimpeza(null);
-    } catch (error) {
-      console.error("Erro ao executar higienização dos processos:", error);
-      toast.error("Não foi possível executar as correções no banco.");
-    } finally {
-      setExecutandoLimpeza(false);
     }
   };
 
@@ -1559,65 +1408,20 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
                 type="button"
                 variant="outline"
                 onClick={handleBackupLocal}
-                disabled={gerandoBackup || analisando || executandoLimpeza || restaurandoPA || saving || loading}
+                disabled={gerandoBackup || restaurandoPA || saving || loading}
               >
                 {gerandoBackup ? "Gerando arquivo..." : "💾 Baixar Backup Local (JSON)"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleAnalisarDados}
-                disabled={analisando || executandoLimpeza || gerandoBackup || restaurandoPA || saving || loading}
-              >
-                {analisando ? "Analisando..." : "🔍 Analisar Dados Legados"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
                 onClick={handleRestaurarPA}
-                disabled={restaurandoPA || analisando || executandoLimpeza || gerandoBackup || saving || loading}
+                disabled={restaurandoPA || gerandoBackup || saving || loading}
                 className="border-amber-400/70 bg-amber-50 text-amber-900 hover:bg-amber-100"
               >
                 {restaurandoPA ? "Restaurando..." : "🚑 Restaurar Colunas do PA"}
               </Button>
             </div>
-
-            {relatorioLimpeza && (
-              <div className="mt-4 rounded-xl border border-border bg-muted p-4">
-                <p className="mb-2 text-sm font-semibold">
-                  {relatorioLimpeza.length === 0
-                    ? "✅ Nenhum processo precisa de correção."
-                    : `⚠️ Foram encontrados ${relatorioLimpeza.length} processos precisando de higienização:`}
-                </p>
-
-                {relatorioLimpeza.length > 0 && (
-                  <>
-                    <div className="max-h-56 space-y-2 overflow-y-auto pr-1 text-xs text-muted-foreground">
-                      {relatorioLimpeza.slice(0, 20).map((item) => (
-                        <div key={item.id} className="rounded-lg border border-border bg-background px-3 py-2">
-                          <p className="font-semibold text-foreground">{item.id}</p>
-                          <p>{item.acoes.join(" • ")}</p>
-                        </div>
-                      ))}
-                      {relatorioLimpeza.length > 20 && (
-                        <p className="pt-1 text-[11px] font-medium">
-                          ...e mais {relatorioLimpeza.length - 20} processos no relatório.
-                        </p>
-                      )}
-                    </div>
-
-                    <Button
-                      type="button"
-                      onClick={handleExecutarLimpeza}
-                      disabled={executandoLimpeza}
-                      className="mt-3"
-                    >
-                      {executandoLimpeza ? "Corrigindo..." : "Executar Correções no Banco"}
-                    </Button>
-                  </>
-                )}
-              </div>
-            )}
           </section>
 
           <Collapsible open={openGeral} onOpenChange={setOpenGeral}>
@@ -2343,161 +2147,9 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
               </CollapsibleTrigger>
 
               <CollapsibleContent className="pt-4 space-y-5">
-                <Collapsible open={openDUColunas} onOpenChange={setOpenDUColunas}>
-                  <section className="space-y-4">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
-                      <div>
-                        <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
-                          <Settings2 className="h-4 w-4 text-[var(--tipo-du)]" />
-                          Colunas de DU
-                        </h4>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Edite os nomes das colunas especiais do quadro DU.
-                        </p>
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${openDUColunas ? "rotate-180" : ""}`}
-                      />
-                    </CollapsibleTrigger>
-
-                    <CollapsibleContent className="pt-2 space-y-3">
-                      <div className="rounded-2xl border border-border bg-muted/20 p-3 space-y-3">
-                        <p className="text-xs font-bold uppercase tracking-wide text-slate-700">
-                          Prévia visual das colunas DU
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          Clique no chip da coluna ou na aba para editar diretamente nesta prévia.
-                        </p>
-
-                        <div className="flex gap-3 overflow-x-auto pb-2">
-                          {duPreviewColumns.map((coluna) => (
-                            <div
-                              key={`preview-du-col-${coluna.id}`}
-                              className={`min-w-[260px] rounded-2xl border p-3 space-y-3 ${selectedDUPreviewColumnId === coluna.id ? "border-[var(--tipo-du)]/40 bg-background" : "border-border bg-card"} ${coluna.enabled !== false ? "" : "opacity-60"}`}
-                            >
-                              <button
-                                type="button"
-                                onClick={() => setSelectedDUPreviewColumnId(coluna.id)}
-                                className="inline-flex items-center rounded-full border border-[var(--tipo-du)]/30 bg-[var(--tipo-du-bg)] px-3 py-1 text-xs font-bold text-[var(--tipo-du)]"
-                              >
-                                DU · {coluna.label}
-                              </button>
-
-                              <div
-                                className="rounded-xl bg-muted p-1 gap-1 grid"
-                                style={{
-                                  gridTemplateColumns: `repeat(${Math.max(1, duColumnTabs.filter((a) => a.enabled !== false).length)}, minmax(0, 1fr))`,
-                                }}
-                              >
-                                {duColumnTabs
-                                  .filter((a) => a.enabled !== false)
-                                  .map((aba) => {
-                                    const count = aba.id === "andamento" ? 1 : 0;
-                                    const active = selectedDUPreviewTabId === aba.id;
-
-                                    return (
-                                      <button
-                                        key={`preview-du-tab-${coluna.id}-${aba.id}`}
-                                        type="button"
-                                        onClick={() => {
-                                          setSelectedDUPreviewColumnId(coluna.id);
-                                          setSelectedDUPreviewTabId(aba.id);
-                                        }}
-                                        className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide leading-tight ${
-                                          active
-                                            ? "bg-background text-foreground shadow-sm"
-                                            : "text-muted-foreground hover:text-foreground"
-                                        }`}
-                                      >
-                                        <span className="block">{aba.label}</span>
-                                        <span className="block mt-1 text-[11px]">({count})</span>
-                                      </button>
-                                    );
-                                  })}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {(() => {
-                          const colunaSelecionada = duBoardColumnsOrdenadas.find(
-                            (c) => c.id === selectedDUPreviewColumnId,
-                          );
-                          const abaSelecionada = duColumnTabs.find(
-                            (aba) => aba.id === selectedDUPreviewTabId,
-                          );
-                          if (!colunaSelecionada || !abaSelecionada) return null;
-
-                          return (
-                            <div className="rounded-xl border border-sky-200 bg-sky-50/40 p-3 space-y-3">
-                              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-700">
-                                Edição da coluna DU selecionada
-                              </p>
-
-                              <div className="space-y-2">
-                                <Label htmlFor="du-preview-column-label">
-                                  Nome da coluna (chip)
-                                </Label>
-                                <Input
-                                  id="du-preview-column-label"
-                                  value={colunaSelecionada.label}
-                                  onChange={(e) =>
-                                    updateDUBoardColumn(colunaSelecionada.id, {
-                                      label: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Ex: 📩 Aguardando Resposta"
-                                />
-                              </div>
-
-                              <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  checked={colunaSelecionada.enabled !== false}
-                                  onChange={(e) =>
-                                    updateDUBoardColumn(colunaSelecionada.id, {
-                                      enabled: e.target.checked,
-                                    })
-                                  }
-                                  className="h-4 w-4 rounded border-border"
-                                />
-                                Coluna habilitada
-                              </label>
-
-                              <div className="space-y-2">
-                                <Label htmlFor="du-preview-tab-label">Nome da aba</Label>
-                                <Input
-                                  id="du-preview-tab-label"
-                                  value={abaSelecionada.label}
-                                  onChange={(e) =>
-                                    updateColumnTab("DU", abaSelecionada.id, {
-                                      label: e.target.value,
-                                    })
-                                  }
-                                  placeholder="Ex: Em Andamento"
-                                />
-                              </div>
-
-                              <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-700">
-                                <input
-                                  type="checkbox"
-                                  checked={abaSelecionada.enabled !== false}
-                                  onChange={(e) =>
-                                    updateColumnTab("DU", abaSelecionada.id, {
-                                      enabled: e.target.checked,
-                                    })
-                                  }
-                                  className="h-4 w-4 rounded border-border"
-                                />
-                                Aba habilitada
-                              </label>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </CollapsibleContent>
-                  </section>
-                </Collapsible>
+                {/* V5.3 — Bloco "Colunas de DU" removido. As labels e a habilitação
+                    das colunas DU permanecem persistidas via duBoardColumns
+                    (DEFAULT_DU_BOARD_COLUMNS), porém a UI de edição foi descontinuada. */}
 
                 {/* V2.11 — Bloco "Ações do Fluxo DU" removido. O motor V2.9 do
                     AcoesDUModalNovo é hardcoded; configurar essas ações

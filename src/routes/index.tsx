@@ -59,7 +59,7 @@ const AjustesSite = lazy(() =>
 const AcoesDUModalNovo = lazy(() =>
   import("@/components/modals/AcoesDUModalNovo").then((m) => ({ default: m.AcoesDUModalNovo })),
 );
-const AcoesPAModalNovo = lazy(() =>
+const AcoesPAModalV4 = lazy(() =>
   import("@/components/modals/AcoesPAModalV4").then((m) => ({ default: m.AcoesPAModalV4 })),
 );
 const AcoesConselhoModalV4 = lazy(() =>
@@ -1541,7 +1541,7 @@ function Index() {
               numeroProcesso={processoAcaoSelecionado.numero}
             />
           ) : (
-            <AcoesPAModalNovo
+            <AcoesPAModalV4
               open={processoAcaoOpen}
               onOpenChange={(open) => {
                 setProcessoAcaoOpen(open);

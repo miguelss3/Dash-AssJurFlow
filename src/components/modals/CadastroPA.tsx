@@ -657,8 +657,7 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
     }
   };
 
-  // V4.7: blocos de UI dependentes de `fluxoIPM` foram desativados.
-  const mostrarFluxoIPM = false;
+  // V5.3: bloco UI dependente de `fluxoIPM` removido (campo legado).
   const mostrarEncarregado = aceitaDiligencia(tipoPA);
   const mostrarPresidenteConselho = isConselhoPA(tipoPA);
   const mostrarAnoLegado = false;

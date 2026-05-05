@@ -20,7 +20,7 @@ import type { SiteSettings } from "@/types/siteSettings";
 
 // ---------------------------------------------------------------------------
 // V4.0 — AcoesPAModalV4 (orquestrador de Processos Administrativos)
-// Componente PARALELO ao `AcoesPAModalNovo` legado. Implementa a nova
+// V5.3: substituiu definitivamente o `AcoesPAModalNovo` legado. Implementa a
 // máquina de estados em 6+1 etapas. NÃO substitui o modal antigo: deve
 // ser plugado nas listas/Kanban somente após validação manual.
 // ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ interface AcoesPAModalV4Props {
   onOpenChange: (open: boolean) => void;
   processoId: string;
   numeroProcesso: string;
-  // Mantidos por compatibilidade com a assinatura legada do AcoesPAModalNovo.
+  // Mantidos por compatibilidade com a assinatura padrão dos modais de ação.
   // V4 ignora `siteSettings` (não utiliza configurações dinâmicas de fluxo).
   siteSettings?: SiteSettings;
   onSuccess?: () => void;
