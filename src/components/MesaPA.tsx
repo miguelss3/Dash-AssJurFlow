@@ -235,8 +235,14 @@ export function MesaPA({
   };
 
   const grupos = useMemo(() => {
-    const ativos = processosEfetivos.filter((p) => p.status !== "concluido");
-    const concluidosDoTipo = processosEfetivos.filter((p) => p.status === "concluido");
+    // V6.2 — Blindagem contra documentos legados: usar ambos os campos para
+    // classificar ativos/concluídos. `finalizado` pode estar ausente (undefined)
+    // em registros antigos; nesse caso confiamos em `status`.
+    const ehProcessoAtivo = (p: Processo) => !p.finalizado && p.status !== "concluido";
+    const ehProcessoConcluido = (p: Processo) => p.finalizado === true || p.status === "concluido";
+
+    const ativos = processosEfetivos.filter(ehProcessoAtivo);
+    const concluidosDoTipo = processosEfetivos.filter(ehProcessoConcluido);
 
     const colunaPAEmAndamentoPorId = new Map<string, string | null>();
     const colunaPAPortariaAssinadaPorId = new Map<string, string | null>();

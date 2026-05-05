@@ -201,7 +201,7 @@ export function MesaDU({
   };
 
   const grupos = useMemo(() => {
-    const ativos = processosEfetivos.filter((p) => p.status !== "concluido");
+    const ativos = processosEfetivos.filter((p) => !p.finalizado && p.status !== "concluido");
 
     const SITUACOES_PENDENCIA_CHEFIA = new Set([
       "aguardando_assinatura_secao",
@@ -246,7 +246,7 @@ export function MesaDU({
     }
 
     const doTipo = ativos;
-    const concluidosDoTipo = processosEfetivos.filter((p) => p.status === "concluido");
+    const concluidosDoTipo = processosEfetivos.filter((p) => p.finalizado === true || p.status === "concluido");
 
     const aguardandoRespostaDUAtivos: Processo[] = [];
     const aguardandoRespostaDUVencidos: Processo[] = [];
