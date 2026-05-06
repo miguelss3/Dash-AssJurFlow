@@ -136,6 +136,16 @@ export function AcoesPAModalV4({
 
   const situacaoAtual: SituacaoFluxoPA = useMemo(() => situacaoAtualState, [situacaoAtualState]);
 
+  const somarDiasISO = (baseISO: string, dias: number) => {
+    const base = baseISO ? new Date(`${baseISO}T00:00:00`) : new Date();
+    if (Number.isNaN(base.getTime())) {
+      const hoje = new Date();
+      return new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + dias).toISOString().slice(0, 10);
+    }
+    const dt = new Date(base.getFullYear(), base.getMonth(), base.getDate() + dias);
+    return dt.toISOString().slice(0, 10);
+  };
+
   // ---------------- Persistência ----------------
   const avancarFluxo = async (
     novaSituacao: SituacaoFluxoPA,
@@ -424,13 +434,22 @@ export function AcoesPAModalV4({
                   type="button"
                   disabled={salvando}
                   className={PRIMARY_BTN}
-                  onClick={() =>
+                  onClick={() => {
+                    const hoje = new Date().toISOString().slice(0, 10);
+                    const prazoSolucao = somarDiasISO(hoje, 10);
+
                     void avancarFluxo(
                       "FAZENDO_SOLUCAO",
-                      {},
-                      "Autos entregues pelo Encarregado. Iniciando fase de Solução/Parecer.",
-                    )
-                  }
+                      {
+                        dataInicioPrazo: hoje,
+                        prazoFatal: prazoSolucao,
+                        finalPrazo: prazoSolucao,
+                        status: "andamento",
+                        descricao: "Sindicância entregue pelo encarregado. Iniciado prazo de 10 dias para confecção da solução.",
+                      },
+                      "Sindicância entregue pelo encarregado. Iniciado prazo de 10 dias para confecção da solução.",
+                    );
+                  }}
                 >
                   Receber Autos Concluídos
                 </button>

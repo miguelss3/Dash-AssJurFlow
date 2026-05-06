@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   type LucideIcon,
 } from "lucide-react";
-import { calcularFaixasProrrogacaoPA, formatarData } from "@/lib/prazo";
+import { calcularFaixasProrrogacaoPA, diasRestantes, formatarData } from "@/lib/prazo";
 import { getBadgeSituacaoPA } from "@/lib/utils";
 
 interface DetalhesModalPAProps {
@@ -41,6 +41,19 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
     situacaoFluxoLegado: processo.situacaoFluxo,
     status: processo.faseAtual || processo.status,
   });
+
+  const normalizarSituacao = (valor?: string) =>
+    String(valor || "")
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  const sitPA = normalizarSituacao(processo.situacaoFluxoPA);
+  const emPrazoSolucao = sitPA === "FAZENDO_SOLUCAO" || sitPA === "ASSINANDO_SOLUCAO";
+  const diasPrazoSolucao = processo.prazoFatal ? diasRestantes(processo.prazoFatal) : null;
 
   const formatarDataHoraSegura = (valor?: string | null) => {
     if (!valor) return "—";
@@ -120,9 +133,21 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
               <InfoRow icon={Calendar} label="Data de Entrada" value={processo.dataEntrada ? formatarData(processo.dataEntrada) : undefined} />
-              <InfoRow icon={Calendar} label="Início do Prazo" value={processo.dataInicioPrazo ? formatarData(processo.dataInicioPrazo) : undefined} />
-              <InfoRow icon={Clock} label="Prazo Fatal" value={processo.prazoFatal ? formatarData(processo.prazoFatal) : undefined} />
+              <InfoRow icon={Calendar} label={emPrazoSolucao ? "Início do Prazo da Solução" : "Início do Prazo"} value={processo.dataInicioPrazo ? formatarData(processo.dataInicioPrazo) : undefined} />
+              <InfoRow icon={Clock} label={emPrazoSolucao ? "Prazo da Solução (10 dias)" : "Prazo Fatal"} value={processo.prazoFatal ? formatarData(processo.prazoFatal) : undefined} />
               <InfoRow icon={Clock} label="Prazo Final" value={processo.finalPrazo ? formatarData(processo.finalPrazo) : undefined} />
+              {emPrazoSolucao && (
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+                  <div className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">Prazo da Solução (Mesa do Assessor)</div>
+                  <div className="text-sm text-indigo-900 mt-1">
+                    {diasPrazoSolucao === null
+                      ? "Prazo em andamento."
+                      : diasPrazoSolucao < 0
+                        ? `Prazo vencido ha ${Math.abs(diasPrazoSolucao)} dia(s).`
+                        : `Restam ${diasPrazoSolucao} dia(s) para confeccao da solucao.`}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

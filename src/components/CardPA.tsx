@@ -135,6 +135,25 @@ const CardPAComponent = ({
     status: p.faseAtual || p.status,
   });
 
+  const normalizarSituacao = (valor?: string) =>
+    String(valor || "")
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  const sitPA = normalizarSituacao(p.situacaoFluxoPA);
+  const sitIP = normalizarSituacao(p.situacaoFluxoIP);
+  const badgeExibicaoPA =
+    sitIP === "MESA_ASSESSOR"
+    || sitPA === "FAZENDO_PORTARIA"
+    || sitPA === "FAZENDO_SOLUCAO"
+    || sitPA === "ASSINANDO_SOLUCAO"
+      ? "Mesa do Assessor"
+      : badgeSituacaoPA;
+
   const [modalAcoesPA, setModalAcoesPA] = useState(false);
   const [modalDetalhes, setModalDetalhes] = useState(false);
   const [modalChat, setModalChat] = useState(false);
@@ -255,7 +274,7 @@ const CardPAComponent = ({
               ) : p.processoReaberto ? (
                 <Badge variant="outline" className="text-[10px] h-5 border-blue-300 text-blue-700 bg-blue-50">Processo reaberto</Badge>
               ) : (
-                <Badge variant="outline" className="text-[10px] h-5 border-amber-300 text-amber-800 bg-amber-50">{badgeSituacaoPA}</Badge>
+                <Badge variant="outline" className="text-[10px] h-5 border-amber-300 text-amber-800 bg-amber-50">{badgeExibicaoPA}</Badge>
               )}
             </div>
           </div>
