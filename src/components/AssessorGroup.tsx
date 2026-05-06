@@ -185,39 +185,61 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     return existe ? aba : abasConfiguradas[0]?.id || "andamento";
   }, [aba, abasConfiguradas]);
 
-  const processosDaAbaAtiva = vistaAssessor
-    ? (() => {
-        // V6.4 — Mesa do Assessor: catch-all incondicional.
-        // "Em Andamento" = qualquer processo NÃO finalizado (sem checagem de
-        // prazo, situacaoFluxo, etc.). "Concluídos" = qualquer processo
-        // finalizado. Variantes de case ("Concluído"/"concluido") são tratadas.
-        const ehConcluido = (p: Processo) => {
-          const st = String(p.status || "").trim().toLowerCase();
-          return p.finalizado === true || st === "concluido" || st === "concluído";
-        };
-        const ehAtivo = (p: Processo) => !ehConcluido(p);
+  const isVisaoAssessorPA = vistaAssessor && tipo === "PA";
 
-        const universo = [
-          ...processos,
-          ...processosAtrasados,
-          ...processosPortariaAssinada,
-          ...processosConcluidos,
-        ];
-        const dedup = new Map<string, Processo>();
-        for (const p of universo) {
-          if (p && p.id && !dedup.has(p.id)) dedup.set(p.id, p);
-        }
-        const lista = Array.from(dedup.values());
+  const ehConcluidoPA = (p: Processo) => {
+    const st = String(p.status || "").trim().toLowerCase();
+    return p.finalizado === true || st === "concluido" || st === "concluído";
+  };
 
-        return abaAtiva === "concluidos" ? lista.filter(ehConcluido) : lista.filter(ehAtivo);
-      })()
-    : abaAtiva === "portaria_assinada"
-      ? processosPortariaAssinada
-      : abaAtiva === "andamento"
-        ? processosAtivosOrdenados
-        : abaAtiva === "atraso"
-          ? processosAtrasadosOrdenados
-          : processosConcluidos;
+  const isNaMesaDoAssessorPA = (processo: Processo) => {
+    const stNorm = String(processo.status || "").trim().toLowerCase();
+    const isProcessoAtivo =
+      processo.setor === "PA" &&
+      processo.finalizado !== true &&
+      stNorm !== "concluido" &&
+      stNorm !== "concluído";
+
+    if (!isProcessoAtivo) return false;
+
+    if (isVisaoAssessorPA) {
+      const sitPA = String(processo.situacaoFluxoPA || "").trim().toUpperCase();
+      const sitConselho = String(processo.situacaoFluxoConselho || "").trim().toUpperCase();
+      const sitLegado = String(processo.situacaoFluxo || "").trim().toUpperCase();
+
+      const pertenceAoAssessor = String(processo.responsavel || "").trim() === String(responsavel || "").trim();
+      if (!pertenceAoAssessor) return false;
+
+      // Oculta da mesa individual tudo que já está com encarregados/conselho
+      if (sitPA === "COM_ENCARREGADO" || sitPA === "AGUARDANDO_PRAZO") return false;
+      if (sitConselho === "COM_CONSELHO") return false;
+      if (sitLegado === "EM_CURSO" || sitLegado === "AGUARDANDO_PRAZO") return false;
+
+      return true;
+    }
+
+    return true;
+  };
+
+  const getProcessosVisiveis = () => {
+    if (!vistaAssessor) {
+      if (abaAtiva === "portaria_assinada") return processosPortariaAssinada;
+      if (abaAtiva === "andamento") return processosAtivosOrdenados;
+      if (abaAtiva === "atraso") return processosAtrasadosOrdenados;
+      return processosConcluidos;
+    }
+
+    const universo = [...processos, ...processosAtrasados, ...processosPortariaAssinada, ...processosConcluidos];
+    const dedup = Array.from(new Map(universo.filter(p => p?.id).map(p => [p.id, p])).values());
+
+    if (abaAtiva === "concluidos") {
+      return dedup.filter((p) => ehConcluidoPA(p) && String(p.responsavel || "").trim() === String(responsavel || "").trim());
+    }
+
+    return dedup.filter(isNaMesaDoAssessorPA);
+  };
+
+  const processosDaAbaAtiva = getProcessosVisiveis();
 
   const CardComponente = tipo === "DU" ? CardDU : CardPA;
 
@@ -243,28 +265,12 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
           {abasConfiguradas.map((tab) => {
             const count = vistaAssessor
               ? (() => {
-                  // V6.4 — Contadores baseados no mesmo catch-all do conteúdo.
-                  const ehConcluidoCount = (p: Processo) => {
-                    const st = String(p.status || "").trim().toLowerCase();
-                    return p.finalizado === true || st === "concluido" || st === "concluído";
-                  };
-                  const universo = [
-                    ...processos,
-                    ...processosAtrasados,
-                    ...processosPortariaAssinada,
-                    ...processosConcluidos,
-                  ];
-                  const ids = new Set<string>();
-                  const lista: Processo[] = [];
-                  for (const p of universo) {
-                    if (p && p.id && !ids.has(p.id)) {
-                      ids.add(p.id);
-                      lista.push(p);
-                    }
+                  const universo = [...processos, ...processosAtrasados, ...processosPortariaAssinada, ...processosConcluidos];
+                  const dedup = Array.from(new Map(universo.filter(p => p?.id).map(p => [p.id, p])).values());
+                  if (tab.id === "concluidos") {
+                    return dedup.filter(p => ehConcluidoPA(p) && String(p.responsavel || "").trim() === String(responsavel || "").trim()).length;
                   }
-                  return tab.id === "concluidos"
-                    ? lista.filter(ehConcluidoCount).length
-                    : lista.filter((p) => !ehConcluidoCount(p)).length;
+                  return dedup.filter(isNaMesaDoAssessorPA).length;
                 })()
               : tab.id === "andamento"
                 ? processos.length

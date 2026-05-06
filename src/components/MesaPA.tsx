@@ -183,34 +183,22 @@ export function MesaPA({
     const situacaoConselho = (p.situacaoFluxoConselho || "").toString().trim();
     const situacaoIP = (p.situacaoFluxoIP || "").toString().trim();
 
-    // Coluna PA pelo tipo do processo.
+    // Coluna PA pelo tipo com Fallback blindado
     let colunaTipo: string | null = null;
-    if (tipoNorm.includes("conselho")) colunaTipo = paColunaLabelPorId.get("conselho") || null;
-    else if (tipoNorm.includes("ipm")) colunaTipo = paColunaLabelPorId.get("ipm") || null;
-    else if (tipoNorm.includes("sindic")) colunaTipo = paColunaLabelPorId.get("sindicancia") || null;
-    // Investigação Preliminar não possui coluna específica — cai na coluna do assessor.
+    if (tipoNorm.includes("conselho")) colunaTipo = paColunaLabelPorId.get("conselho") || "📕 Conselhos";
+    else if (tipoNorm.includes("ipm")) colunaTipo = paColunaLabelPorId.get("ipm") || "📘 IPM";
+    else if (tipoNorm.includes("sindic")) colunaTipo = paColunaLabelPorId.get("sindicancia") || "📗 Sindicâncias";
 
-    const finalizadoNovo =
-      situacaoPA === "FINALIZADO"
-      || situacaoConselho === "FINALIZADO"
-      || situacaoIP === "FINALIZADO";
-
-    const emAndamentoNovo = !finalizadoNovo && (
-      // V4 PA: qualquer estado ativo que não seja a aguardar assinatura.
-      (situacaoPA !== "" && situacaoPA !== "ASSINANDO_PORTARIA")
-      // V5.0 Conselho.
-      || (situacaoConselho !== "" && situacaoConselho !== "ASSINANDO_PORTARIA")
-      // V5.1 IP.
-      || situacaoIP === "MESA_ASSESSOR"
-    );
+    const finalizadoNovo = situacaoPA === "FINALIZADO" || situacaoConselho === "FINALIZADO" || situacaoIP === "FINALIZADO";
 
     const portariaNova =
       situacaoPA === "ASSINANDO_PORTARIA"
+      || situacaoPA === "AGUARDANDO_ENTREGA"
       || situacaoConselho === "ASSINANDO_PORTARIA"
       || situacaoIP === "NA_CHEFIA"
       || PORTARIA_LEGADA.has(situacaoFluxo);
 
-    // Legado: "EM_CURSO" / "C_EM_CURSO" continuam alimentando a coluna do tipo.
+    const emAndamentoNovo = !finalizadoNovo && !portariaNova;
     const emCursoLegado = situacaoFluxo === "EM_CURSO" || situacaoFluxo === "C_EM_CURSO";
 
     let emAndamento: string | null = null;
@@ -219,9 +207,6 @@ export function MesaPA({
     }
 
     let portaria: string | null = null;
-    // A aba "Portaria Assinada" mantém a regra histórica de morar na coluna do tipo;
-    // se não houver coluna do tipo (ex.: IP), a card cai na coluna do assessor com
-    // a tab "Portaria Assinada" também visível (V5.2).
     if (portariaNova && colunaTipo) {
       portaria = colunaTipo;
     }
@@ -238,8 +223,14 @@ export function MesaPA({
     // V6.2 — Blindagem contra documentos legados: usar ambos os campos para
     // classificar ativos/concluídos. `finalizado` pode estar ausente (undefined)
     // em registros antigos; nesse caso confiamos em `status`.
-    const ehProcessoAtivo = (p: Processo) => !p.finalizado && p.status !== "concluido";
-    const ehProcessoConcluido = (p: Processo) => p.finalizado === true || p.status === "concluido";
+    const ehProcessoAtivo = (p: Processo) => {
+      const statusNorm = String(p.status || "").trim().toLowerCase();
+      return p.finalizado !== true && statusNorm !== "concluido" && statusNorm !== "concluído";
+    };
+    const ehProcessoConcluido = (p: Processo) => {
+      const statusNorm = String(p.status || "").trim().toLowerCase();
+      return p.finalizado === true || statusNorm === "concluido" || statusNorm === "concluído";
+    };
 
     const ativos = processosEfetivos.filter(ehProcessoAtivo);
     const concluidosDoTipo = processosEfetivos.filter(ehProcessoConcluido);
@@ -266,10 +257,8 @@ export function MesaPA({
     const mapAtrasados = new Map<string, Processo[]>();
     const mapConcluidos = new Map<string, Processo[]>();
 
-    // V6.4 — Mapas paralelos indexados estritamente pelo `responsavel`,
-    // alimentando a Mesa do Assessor com TODOS os processos atribuídos ao
-    // assessor, mesmo que também apareçam nas colunas de tipo (Sindicância,
-    // IPM, Conselho). Garante que nada do trabalho do assessor fique invisível.
+    // Mesa do Assessor: conjunto estritamente limitado às fases em que a
+    // atuação da Assessoria Jurídica é necessária.
     const mapAssessorAtivos = new Map<string, Processo[]>();
     const mapAssessorConcluidos = new Map<string, Processo[]>();
 
@@ -290,22 +279,11 @@ export function MesaPA({
     });
 
     ativos.forEach((p) => {
-      // V6.6 — Mesa do Assessor: carimba o processo no bucket do responsável
-      // SOMENTE se a fase atual exigir ação da AssJur. Processos "Em Curso"
-      // (com o Encarregado / com o Conselho / em apuração de IP) ficam
-      // visíveis apenas no Kanban Geral, não poluem a mesa individual.
       const responsavelAssessor = String(p.responsavel || "").trim();
-      const sitPA = String(p.situacaoFluxoPA || "").trim();
-      const sitConselho = String(p.situacaoFluxoConselho || "").trim();
-      const sitIP = String(p.situacaoFluxoIP || "").trim();
-      const sitLegado = String(p.situacaoFluxo || "").trim().toUpperCase();
-      const foraDaMesaAssessor =
-        sitPA === "COM_ENCARREGADO"
-        || sitConselho === "COM_CONSELHO"
-        || sitIP === "EM_APURACAO"
-        || sitLegado === "EM_CURSO"
-        || sitLegado === "C_EM_CURSO";
-      if (responsavelAssessor && !foraDaMesaAssessor) {
+      // Kanban Geral e Mesa do Assessor compartilham a mesma fonte de ativos,
+      // mas o filtro restritivo da mesa individual é aplicado no componente
+      // AssessorGroup quando `vistaAssessor` está habilitada.
+      if (responsavelAssessor) {
         garantirChave(responsavelAssessor);
         mapAssessorAtivos.get(responsavelAssessor)!.push(p);
       }
@@ -336,6 +314,7 @@ export function MesaPA({
       const portariaSemColuna =
         situacaoIP === "NA_CHEFIA"
         || situacaoPA === "ASSINANDO_PORTARIA"
+        || situacaoPA === "AGUARDANDO_ENTREGA"
         || situacaoConselho === "ASSINANDO_PORTARIA";
       if (portariaSemColuna) {
         mapPortariaAssinada.get(responsavelNormalizado)!.push(p);
@@ -464,8 +443,10 @@ export function MesaPA({
             ))}
           </div>
           <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
-            {colunasPAAssessores.map((a) =>
-              a.nome === "MESA DO CHEFE" ? (
+            {colunasPAAssessores.map((a) => {
+              const isColunaGeral = paColunaLabelSet.has(a.nome);
+
+              return a.nome === "MESA DO CHEFE" ? (
                 <ChefeGroup
                   key={`PA-chefe-${a.nome}`}
                   responsavel={a.nome}
@@ -491,13 +472,11 @@ export function MesaPA({
                   key={`PA-assessor-${a.nome}`}
                   responsavel={a.nome}
                   tipo="PA"
-                  /* V6.4 — Mesa do Assessor: alimenta com a carga total do
-                     responsável (catch-all). vistaAssessor mescla tudo na aba
-                     "Em Andamento" e exibe "Concluídos" íntegros. */
-                  processos={a.itensAssessorAtivosTotal}
-                  processosPortariaAssinada={[]}
-                  processosAtrasados={[]}
-                  processosConcluidos={a.itensAssessorConcluidosTotal}
+                  processos={isColunaGeral ? a.itensAtivos : a.itensAssessorAtivosTotal}
+                  processosPortariaAssinada={isColunaGeral ? a.itensPortariaAssinada : []}
+                  processosAtrasados={isColunaGeral ? a.itensAtrasados : []}
+                  processosConcluidos={isColunaGeral ? a.itensConcluidos : a.itensAssessorConcluidosTotal}
+                  vistaAssessor={!isColunaGeral}
                   ehAdmin={ehAdmin}
                   onEdit={onEdit}
                   onDelete={onDelete}
@@ -507,10 +486,9 @@ export function MesaPA({
                   unreadProcessIds={unreadProcessIds}
                   onReadProcess={onReadProcess}
                   mapaCoresAssessores={mapaCoresAssessores}
-                  vistaAssessor
                 />
-              )
-            )}
+              );
+            })}
           </div>
         </div>
       </section>
