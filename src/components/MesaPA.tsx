@@ -146,12 +146,30 @@ export function MesaPA({
     if (onRedistribuir) {
       const responsavelFinal = novoResponsavel === "" ? "" : novoResponsavel;
 
+      const tipoPANorm = String(processoAtual?.tipoPA || processoAtual?.subtipo || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+      const ehIP =
+        tipoPANorm.includes("investigacao preliminar")
+        || tipoPANorm.includes("investigacao")
+        || tipoPANorm.includes("ipm")
+        || tipoPANorm === "outros";
+
+      const opcoesRedistribuicao = ehIP
+        ? {
+            situacaoFluxo: "MESA_ASSESSOR",
+            mensagemHistorico: `Processo redistribuído para ${responsavelFinal} (Mesa do Assessor).`,
+          }
+        : undefined;
+
       setResponsaveisOtimizados((prev) => ({
         ...prev,
         [processoId]: responsavelFinal,
       }));
 
-      Promise.resolve(onRedistribuir(processoId, responsavelFinal)).catch(() => {
+      Promise.resolve(onRedistribuir(processoId, responsavelFinal, opcoesRedistribuicao)).catch(() => {
         setResponsaveisOtimizados((prev) => ({
           ...prev,
           [processoId]: responsavelAnterior,

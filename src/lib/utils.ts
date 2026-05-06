@@ -33,7 +33,7 @@ const BADGE_SITUACAO_PA: Record<string, string> = {
   ASSINANDO_SOLUCAO: "Aguardando Assinatura da Solucao",
   COM_CONSELHO: "Com o Conselho",
   NA_CHEFIA: "Na Chefia",
-  MESA_ASSESSOR: "Na Mesa do Assessor",
+  MESA_ASSESSOR: "Mesa do Assessor",
   FINALIZADO: "Finalizado",
 };
 

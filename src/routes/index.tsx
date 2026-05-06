@@ -884,10 +884,29 @@ function Index() {
       };
 
       if (retrocessoFluxo) {
-        patchProcesso.pedidoSubsidios = {
-          ...(processo.pedidoSubsidios || {}),
-          situacaoFluxo: retrocessoFluxo,
-        };
+        const setorNorm = String(processo.setor || "").trim().toUpperCase();
+        const tipoPANorm = String(processo.tipoPA || processo.subtipo || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase()
+          .trim();
+        const ehIPPA =
+          setorNorm === "PA"
+          && (
+            tipoPANorm.includes("investigacao preliminar")
+            || tipoPANorm.includes("investigacao")
+            || tipoPANorm.includes("ipm")
+            || tipoPANorm === "outros"
+          );
+
+        if (ehIPPA) {
+          patchProcesso.situacaoFluxoIP = retrocessoFluxo as Processo["situacaoFluxoIP"];
+        } else {
+          patchProcesso.pedidoSubsidios = {
+            ...(processo.pedidoSubsidios || {}),
+            situacaoFluxo: retrocessoFluxo,
+          };
+        }
       }
 
       // Atualiza o processo com responsável, data e autor
