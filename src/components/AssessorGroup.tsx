@@ -215,6 +215,9 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       const sitPA = normalizarSituacao(processo.situacaoFluxoPA);
       const sitConselho = normalizarSituacao(processo.situacaoFluxoConselho);
       const sitLegado = normalizarSituacao(processo.situacaoFluxo);
+      const emFaseAssessorSolucao =
+        sitPA === "FAZENDO_SOLUCAO" ||
+        sitPA === "ASSINANDO_SOLUCAO";
 
       const isComEncarregado =
         sitPA === "COM_ENCARREGADO" ||
@@ -232,7 +235,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       const possuiEncarregado = String(processo.encarregado || "").trim().length > 0;
       const prazoJaIniciado = !!(processo.dataInicioPrazo || processo.inicioPrazo);
       const temProrrogacao = Array.isArray(processo.prorrogacoes) && processo.prorrogacoes.length > 0;
-      const isComEncarregadoInferido = possuiEncarregado && (prazoJaIniciado || temProrrogacao);
+      const isComEncarregadoInferido = !emFaseAssessorSolucao && possuiEncarregado && (prazoJaIniciado || temProrrogacao);
 
       const pertenceAoAssessor = String(processo.responsavel || "").trim() === String(responsavel || "").trim();
 

@@ -188,6 +188,10 @@ export function MesaPA({
     const situacaoConselho = normalizarSituacao(p.situacaoFluxoConselho);
     const situacaoIP = normalizarSituacao(p.situacaoFluxoIP);
 
+    const isFaseAssessorSolucao =
+      situacaoPA === "FAZENDO_SOLUCAO" ||
+      situacaoPA === "ASSINANDO_SOLUCAO";
+
     // 1. Identifica a coluna
     let colunaTipo: string | null = null;
     if (tipoNorm.includes("conselho")) colunaTipo = paColunaLabelPorId.get("conselho") || "📕 Conselhos";
@@ -219,6 +223,12 @@ export function MesaPA({
 
     if (isPortariaAssinada && colunaTipo) {
       return { emAndamento: null, portaria: colunaTipo, atrasado: false };
+    }
+
+    // Fase de solução é de atuação direta do assessor responsável.
+    // Não deve cair na coluna geral (Sindicâncias/IPM/Conselhos).
+    if (isFaseAssessorSolucao) {
+      return { emAndamento: null, portaria: null, atrasado: false };
     }
 
     // 4. Se chegou aqui, está na mão do Encarregado (Em Andamento Real)
