@@ -382,6 +382,9 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                 resultadoFinalConselho: procData.resultadoFinalConselho,
                 teveRecurso: procData.teveRecurso === true,
                 membrosConselho: procData.membrosConselho,
+                situacaoFluxoPA: procData.situacaoFluxoPA,
+                situacaoFluxoConselho: procData.situacaoFluxoConselho,
+                situacaoFluxoIP: procData.situacaoFluxoIP,
                 atualizadoEm: toIsoString(procData.atualizadoEm),
                 pedidoSubsidios: procData.pedidoSubsidios
                   ? {

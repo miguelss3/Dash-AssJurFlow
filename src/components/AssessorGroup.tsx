@@ -187,6 +187,15 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
 
   const isVisaoAssessorPA = vistaAssessor && tipo === "PA";
 
+  const normalizarSituacao = (valor: unknown) =>
+    String(valor || "")
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
   const ehConcluidoPA = (p: Processo) => {
     const st = String(p.status || "").trim().toLowerCase();
     return p.finalizado === true || st === "concluido" || st === "concluído";
@@ -203,25 +212,37 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     if (!isProcessoAtivo) return false;
 
     if (isVisaoAssessorPA) {
-      const sitPA = String(processo.situacaoFluxoPA || "").trim().toUpperCase();
-      const sitConselho = String(processo.situacaoFluxoConselho || "").trim().toUpperCase();
-      const sitLegado = String(processo.situacaoFluxo || "").trim().toUpperCase();
+      const sitPA = normalizarSituacao(processo.situacaoFluxoPA);
+      const sitConselho = normalizarSituacao(processo.situacaoFluxoConselho);
+      const sitLegado = normalizarSituacao(processo.situacaoFluxo);
+
+      const isComEncarregado =
+        sitPA === "COM_ENCARREGADO" ||
+        sitPA === "ASSINANDO_PORTARIA" ||
+        sitPA === "AGUARDANDO_ENTREGA" ||
+        sitPA === "AGUARDANDO_PRAZO" ||
+        sitConselho === "COM_CONSELHO" ||
+        sitLegado === "EM_CURSO" ||
+        sitLegado === "C_EM_CURSO" ||
+        sitLegado === "AGUARDANDO_PRAZO";
+
+      // Fallback para bases legadas/inconsistentes:
+      // se já existe encarregado e há sinal de prazo correndo (início/prorrogação),
+      // o processo deve sair da mesa individual.
+      const possuiEncarregado = String(processo.encarregado || "").trim().length > 0;
+      const prazoJaIniciado = !!(processo.dataInicioPrazo || processo.inicioPrazo);
+      const temProrrogacao = Array.isArray(processo.prorrogacoes) && processo.prorrogacoes.length > 0;
+      const isComEncarregadoInferido = possuiEncarregado && (prazoJaIniciado || temProrrogacao);
 
       const pertenceAoAssessor = String(processo.responsavel || "").trim() === String(responsavel || "").trim();
-      if (!pertenceAoAssessor) return false;
 
-      // Oculta da mesa individual tudo que já está com encarregados/conselho
-      if (sitPA === "COM_ENCARREGADO" || sitPA === "AGUARDANDO_PRAZO") return false;
-      if (sitConselho === "COM_CONSELHO") return false;
-      if (sitLegado === "EM_CURSO" || sitLegado === "AGUARDANDO_PRAZO") return false;
-
-      return true;
+      return pertenceAoAssessor && !isComEncarregado && !isComEncarregadoInferido;
     }
 
-    return true;
+    return isProcessoAtivo;
   };
 
-  const getProcessosVisiveis = () => {
+  const processosDaAbaAtiva = (() => {
     if (!vistaAssessor) {
       if (abaAtiva === "portaria_assinada") return processosPortariaAssinada;
       if (abaAtiva === "andamento") return processosAtivosOrdenados;
@@ -229,17 +250,25 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       return processosConcluidos;
     }
 
-    const universo = [...processos, ...processosAtrasados, ...processosPortariaAssinada, ...processosConcluidos];
-    const dedup = Array.from(new Map(universo.filter(p => p?.id).map(p => [p.id, p])).values());
+    const universo = [
+      ...processos,
+      ...processosAtrasados,
+      ...processosPortariaAssinada,
+      ...processosConcluidos,
+    ];
+    
+    const dedup = new Map<string, Processo>();
+    for (const p of universo) {
+      if (p && p.id && !dedup.has(p.id)) dedup.set(p.id, p);
+    }
+    const lista = Array.from(dedup.values());
 
     if (abaAtiva === "concluidos") {
-      return dedup.filter((p) => ehConcluidoPA(p) && String(p.responsavel || "").trim() === String(responsavel || "").trim());
+      return lista.filter((p) => ehConcluidoPA(p) && String(p.responsavel || "").trim() === String(responsavel || "").trim());
     }
 
-    return dedup.filter(isNaMesaDoAssessorPA);
-  };
-
-  const processosDaAbaAtiva = getProcessosVisiveis();
+    return lista.filter(isNaMesaDoAssessorPA);
+  })();
 
   const CardComponente = tipo === "DU" ? CardDU : CardPA;
 

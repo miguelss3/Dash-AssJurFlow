@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { calcularFaixasProrrogacaoPA, formatarData } from "@/lib/prazo";
+import { getBadgeSituacaoPA } from "@/lib/utils";
 
 interface DetalhesModalPAProps {
   open: boolean;
@@ -32,6 +33,14 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
     por: processo.prorrogacoes?.[index]?.por,
     em: processo.prorrogacoes?.[index]?.em,
   }));
+
+  const badgeSituacaoPA = getBadgeSituacaoPA({
+    situacaoFluxoPA: processo.situacaoFluxoPA,
+    situacaoFluxoConselho: processo.situacaoFluxoConselho,
+    situacaoFluxoIP: processo.situacaoFluxoIP,
+    situacaoFluxoLegado: processo.situacaoFluxo,
+    status: processo.faseAtual || processo.status,
+  });
 
   const formatarDataHoraSegura = (valor?: string | null) => {
     if (!valor) return "—";
@@ -91,6 +100,9 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                   {processo.status}
                 </Badge>
               )}
+              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300">
+                {badgeSituacaoPA}
+              </Badge>
             </div>
           </div>
 

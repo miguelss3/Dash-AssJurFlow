@@ -164,59 +164,76 @@ export function MesaPA({
   };
 
   // V5.2 — Classificação universal das abas PA para todos os motores.
-  // Considera estados de:
-  //   • Legado: situacaoFluxo ("EM_CURSO", "AGUARDANDO_PRAZO", etc.)
-  //   • V4   : situacaoFluxoPA (FAZENDO_PORTARIA → FINALIZADO)
-  //   • V5.0 : situacaoFluxoConselho (FAZENDO_PORTARIA → FINALIZADO)
-  //   • V5.1 : situacaoFluxoIP (MESA_ASSESSOR | NA_CHEFIA | FINALIZADO)
   const PORTARIA_LEGADA = new Set([
     "AGUARDANDO_PRAZO",
+    "AGUARDANDO_ENTREGA",
     "AGUARDANDO_CHEFIA",
     "AGUARDANDO_CHEFIA_SOLUCAO",
     "C_MEMORIA",
     "C_PORTARIA",
   ]);
 
-  const classificarPA = (p: Processo, tipoNorm: string): { emAndamento: string | null; portaria: string | null; atrasado: boolean } => {
-    const situacaoFluxo = (p.situacaoFluxo || "").toString().trim();
-    const situacaoPA = (p.situacaoFluxoPA || "").toString().trim();
-    const situacaoConselho = (p.situacaoFluxoConselho || "").toString().trim();
-    const situacaoIP = (p.situacaoFluxoIP || "").toString().trim();
+  const normalizarSituacao = (valor: unknown) =>
+    String(valor || "")
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
 
-    // Coluna PA pelo tipo com Fallback blindado
+  const classificarPA = (p: Processo, tipoNorm: string): { emAndamento: string | null; portaria: string | null; atrasado: boolean } => {
+    const situacaoFluxo = normalizarSituacao(p.situacaoFluxo);
+    const situacaoPA = normalizarSituacao(p.situacaoFluxoPA);
+    const situacaoConselho = normalizarSituacao(p.situacaoFluxoConselho);
+    const situacaoIP = normalizarSituacao(p.situacaoFluxoIP);
+
+    // 1. Identifica a coluna
     let colunaTipo: string | null = null;
     if (tipoNorm.includes("conselho")) colunaTipo = paColunaLabelPorId.get("conselho") || "📕 Conselhos";
     else if (tipoNorm.includes("ipm")) colunaTipo = paColunaLabelPorId.get("ipm") || "📘 IPM";
-    else if (tipoNorm.includes("sindic")) colunaTipo = paColunaLabelPorId.get("sindicancia") || "📗 Sindicâncias";
+    else if (tipoNorm.includes("sindic")) colunaTipo = paColunaLabelPorId.get("sindicancia") || "📗 Sindicancias";
 
-    const finalizadoNovo = situacaoPA === "FINALIZADO" || situacaoConselho === "FINALIZADO" || situacaoIP === "FINALIZADO";
+    // 2. Verifica se está fechado
+    const stNorm = String(p.status || "").trim().toLowerCase();
+    const finalizadoNovo =
+      situacaoPA === "FINALIZADO" ||
+      situacaoConselho === "FINALIZADO" ||
+      situacaoIP === "FINALIZADO" ||
+      p.finalizado === true ||
+      stNorm === "concluido" ||
+      stNorm === "concluído";
 
-    const portariaNova =
-      situacaoPA === "ASSINANDO_PORTARIA"
-      || situacaoPA === "AGUARDANDO_ENTREGA"
-      || situacaoConselho === "ASSINANDO_PORTARIA"
-      || situacaoIP === "NA_CHEFIA"
-      || PORTARIA_LEGADA.has(situacaoFluxo);
+    if (finalizadoNovo) {
+      return { emAndamento: null, portaria: null, atrasado: false };
+    }
 
-    const emAndamentoNovo = !finalizadoNovo && !portariaNova;
-    const emCursoLegado = situacaoFluxo === "EM_CURSO" || situacaoFluxo === "C_EM_CURSO";
+    // 3. Verifica se é portaria assinada E trava (BLINDAGEM CONTRA DUPLA CONTAGEM)
+    const isPortariaAssinada =
+      situacaoPA === "ASSINANDO_PORTARIA" ||
+      situacaoPA === "AGUARDANDO_ENTREGA" ||
+      situacaoPA === "AGUARDANDO_PRAZO" ||
+      situacaoConselho === "ASSINANDO_PORTARIA" ||
+      situacaoIP === "NA_CHEFIA" ||
+      PORTARIA_LEGADA.has(situacaoFluxo);
 
+    if (isPortariaAssinada && colunaTipo) {
+      return { emAndamento: null, portaria: colunaTipo, atrasado: false };
+    }
+
+    // 4. Se chegou aqui, está na mão do Encarregado (Em Andamento Real)
     let emAndamento: string | null = null;
-    if (colunaTipo && (emCursoLegado || emAndamentoNovo)) {
-      emAndamento = colunaTipo;
-    }
-
-    let portaria: string | null = null;
-    if (portariaNova && colunaTipo) {
-      portaria = colunaTipo;
-    }
-
     let atrasado = false;
-    if (!finalizadoNovo && (emAndamento || emAndamentoNovo)) {
+
+    if (colunaTipo) {
+      emAndamento = colunaTipo;
       const prazoBase = p.prazoFatal || p.finalPrazo;
-      atrasado = !!prazoBase && diasRestantes(prazoBase) < 0;
+      if (prazoBase && diasRestantes(prazoBase) < 0) {
+        atrasado = true;
+      }
     }
-    return { emAndamento, portaria, atrasado };
+
+    return { emAndamento, portaria: null, atrasado };
   };
 
   const grupos = useMemo(() => {
@@ -280,10 +297,21 @@ export function MesaPA({
 
     ativos.forEach((p) => {
       const responsavelAssessor = String(p.responsavel || "").trim();
-      // Kanban Geral e Mesa do Assessor compartilham a mesma fonte de ativos,
-      // mas o filtro restritivo da mesa individual é aplicado no componente
-      // AssessorGroup quando `vistaAssessor` está habilitada.
-      if (responsavelAssessor) {
+      const sitPA = normalizarSituacao(p.situacaoFluxoPA);
+      const sitConselho = normalizarSituacao(p.situacaoFluxoConselho);
+      const sitLegado = normalizarSituacao(p.situacaoFluxo);
+
+      const bloquearMesaAssessorPA =
+        sitPA === "COM_ENCARREGADO" ||
+        sitPA === "ASSINANDO_PORTARIA" ||
+        sitPA === "AGUARDANDO_ENTREGA" ||
+        sitPA === "AGUARDANDO_PRAZO" ||
+        sitConselho === "COM_CONSELHO" ||
+        sitLegado === "EM_CURSO" ||
+        sitLegado === "C_EM_CURSO" ||
+        sitLegado === "AGUARDANDO_PRAZO";
+
+      if (responsavelAssessor && !bloquearMesaAssessorPA) {
         garantirChave(responsavelAssessor);
         mapAssessorAtivos.get(responsavelAssessor)!.push(p);
       }
@@ -308,9 +336,9 @@ export function MesaPA({
       // assessor mas respeita a aba (Portaria Assinada / Em Atraso).
       const responsavelNormalizado = String(p.responsavel || "").trim() || "MESA DO CHEFE";
       garantirChave(responsavelNormalizado);
-      const situacaoIP = (p.situacaoFluxoIP || "").toString().trim();
-      const situacaoPA = (p.situacaoFluxoPA || "").toString().trim();
-      const situacaoConselho = (p.situacaoFluxoConselho || "").toString().trim();
+      const situacaoIP = normalizarSituacao(p.situacaoFluxoIP);
+      const situacaoPA = normalizarSituacao(p.situacaoFluxoPA);
+      const situacaoConselho = normalizarSituacao(p.situacaoFluxoConselho);
       const portariaSemColuna =
         situacaoIP === "NA_CHEFIA"
         || situacaoPA === "ASSINANDO_PORTARIA"

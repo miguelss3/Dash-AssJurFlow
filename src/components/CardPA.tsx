@@ -33,6 +33,7 @@ import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Time
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
+import { getBadgeSituacaoPA } from "@/lib/utils";
 import { DetalhesModalPA } from "./DetalhesModalPA";
 import { ChatModal } from "./ChatModal";
 import { useDraggable } from "@dnd-kit/core";
@@ -125,6 +126,14 @@ const CardPAComponent = ({
     por: p.prorrogacoes?.[index]?.por,
     em: p.prorrogacoes?.[index]?.em,
   }));
+
+  const badgeSituacaoPA = getBadgeSituacaoPA({
+    situacaoFluxoPA: p.situacaoFluxoPA,
+    situacaoFluxoConselho: p.situacaoFluxoConselho,
+    situacaoFluxoIP: p.situacaoFluxoIP,
+    situacaoFluxoLegado: p.situacaoFluxo,
+    status: p.faseAtual || p.status,
+  });
 
   const [modalAcoesPA, setModalAcoesPA] = useState(false);
   const [modalDetalhes, setModalDetalhes] = useState(false);
@@ -245,7 +254,9 @@ const CardPAComponent = ({
                 <Badge variant="outline" className="text-[10px] h-5 border-green-400 text-green-800 bg-green-50">Finalizado</Badge>
               ) : p.processoReaberto ? (
                 <Badge variant="outline" className="text-[10px] h-5 border-blue-300 text-blue-700 bg-blue-50">Processo reaberto</Badge>
-              ) : null}
+              ) : (
+                <Badge variant="outline" className="text-[10px] h-5 border-amber-300 text-amber-800 bg-amber-50">{badgeSituacaoPA}</Badge>
+              )}
             </div>
           </div>
 
