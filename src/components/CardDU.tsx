@@ -99,11 +99,17 @@ const CardDUComponent = ({
 
   const situacaoSubsidio = p.pedidoSubsidios?.situacaoFluxo;
   const statusNormalizado = (p.status || "").toString().trim().toLowerCase();
+  const responsavelAtribuido = String(p.responsavel || "").trim().length > 0;
+  const statusAguardandoDistribuicao = statusNormalizado.includes("aguardando distribuicao") || statusNormalizado.includes("aguardando distribuição");
+  const chefiaSemResponsavel =
+    (situacaoSubsidio === "CHEFIA_DILIGENCIA" || situacaoSubsidio === "CHEFIA_DEFESA")
+    && !responsavelAtribuido;
   const badgeAcaoChefia = (() => {
+    if (statusAguardandoDistribuicao || chefiaSemResponsavel) return "Aguardando Distribuição";
     if (situacaoSubsidio === "aguardando_assinatura_secao") return "Assinatura do Chefe de Seção";
     if (situacaoSubsidio === "aguardando_aprovacao_externa") return "Envio para aprovação do CHEM";
-    if (situacaoSubsidio === "CHEFIA_DILIGENCIA") return "Na Chefia - Diligência";
-    if (situacaoSubsidio === "CHEFIA_DEFESA") return "Na Chefia - Defesa";
+    if (situacaoSubsidio === "CHEFIA_DILIGENCIA" && responsavelAtribuido) return "Na Chefia - Diligência";
+    if (situacaoSubsidio === "CHEFIA_DEFESA" && responsavelAtribuido) return "Na Chefia - Defesa";
     if (situacaoSubsidio === "AGUARDANDO_CHEM_DILIGENCIA") return "Aguardando Assinatura do CHEM";
     if (situacaoSubsidio === "AGUARDANDO_CHEM_DEFESA") return "Aguardando Assinatura do CHEM";
     if (situacaoSubsidio === "AGUARDANDO_RESPOSTA") return "Aguardando Resposta";

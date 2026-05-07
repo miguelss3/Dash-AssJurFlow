@@ -424,6 +424,7 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
       if (numeroFinal.trim()) {
         const q = query(
           collection(db, "processos"),
+          where("setor", "==", "PA"),
           where("numeroProcesso", "==", numeroFinal.trim())
         );
         const querySnapshot = await getDocs(q);
@@ -604,6 +605,7 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
       } else {
         const msgCadastro = `Processo Cadastrado por ${autorCadastro}.`;
         dados.descricao = msgCadastro;
+        dados.ativo = true;
 
         const processoRef = await addDoc(collection(db, "processos"), sanitizarPayload(dados) as Record<string, unknown>);
 

@@ -194,30 +194,31 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
       }
     }
 
-    // Verificação de duplicidade DU
-    if (numeroProcesso.trim()) {
-      const q = query(
-        collection(db, "processos"),
-        where("numeroProcesso", "==", numeroProcesso.trim())
-      );
-      const querySnapshot = await getDocs(q);
-
-      let isDuplicate = false;
-      querySnapshot.forEach((docSnap) => {
-        if (!processo?.id || docSnap.id !== processo.id) {
-          isDuplicate = true;
-        }
-      });
-
-      if (isDuplicate) {
-        toast.error(`Já existe um processo cadastrado com o número ${numeroProcesso.trim()}.`);
-        return;
-      }
-    }
-
     setLoading(true);
 
     try {
+      // Verificação de duplicidade DU
+      if (numeroProcesso.trim()) {
+        const q = query(
+          collection(db, "processos"),
+          where("setor", "==", "DU"),
+          where("numeroProcesso", "==", numeroProcesso.trim())
+        );
+        const querySnapshot = await getDocs(q);
+
+        let isDuplicate = false;
+        querySnapshot.forEach((docSnap) => {
+          if (!processo?.id || docSnap.id !== processo.id) {
+            isDuplicate = true;
+          }
+        });
+
+        if (isDuplicate) {
+          toast.error(`Já existe um processo cadastrado com o número ${numeroProcesso.trim()}.`);
+          setLoading(false);
+          return;
+        }
+      }
       const agora = Timestamp.now();
       const agoraISO = new Date().toISOString();
       const nomeBaseAutor = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
@@ -328,6 +329,7 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
       } else {
         const msgCadastro = `Processo Cadastrado por ${autorCadastro}.`;
         dados.descricao = msgCadastro;
+        dados.ativo = true;
 
         const processoRef = await addDoc(collection(db, "processos"), sanitizarPayload(dados) as Record<string, unknown>);
 
