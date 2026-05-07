@@ -35,6 +35,7 @@ import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Time
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { formatarData, diasRestantes } from "@/lib/prazo";
+import { getBadgeSituacaoDUContextual } from "@/lib/utils";
 import { DetalhesModalDU } from "./DetalhesModalDU";
 import { ChatModal } from "./ChatModal";
 import { useDraggable } from "@dnd-kit/core";
@@ -98,27 +99,11 @@ const CardDUComponent = ({
   };
 
   const situacaoSubsidio = p.pedidoSubsidios?.situacaoFluxo;
-  const statusNormalizado = (p.status || "").toString().trim().toLowerCase();
-  const responsavelAtribuido = String(p.responsavel || "").trim().length > 0;
-  const statusAguardandoDistribuicao = statusNormalizado.includes("aguardando distribuicao") || statusNormalizado.includes("aguardando distribuição");
-  const chefiaSemResponsavel =
-    (situacaoSubsidio === "CHEFIA_DILIGENCIA" || situacaoSubsidio === "CHEFIA_DEFESA")
-    && !responsavelAtribuido;
-  const badgeAcaoChefia = (() => {
-    if (statusAguardandoDistribuicao || chefiaSemResponsavel) return "Aguardando Distribuição";
-    if (situacaoSubsidio === "aguardando_assinatura_secao") return "Assinatura do Chefe de Seção";
-    if (situacaoSubsidio === "aguardando_aprovacao_externa") return "Envio para aprovação do CHEM";
-    if (situacaoSubsidio === "CHEFIA_DILIGENCIA" && responsavelAtribuido) return "Na Chefia - Diligência";
-    if (situacaoSubsidio === "CHEFIA_DEFESA" && responsavelAtribuido) return "Na Chefia - Defesa";
-    if (situacaoSubsidio === "AGUARDANDO_CHEM_DILIGENCIA") return "Aguardando Assinatura do CHEM";
-    if (situacaoSubsidio === "AGUARDANDO_CHEM_DEFESA") return "Aguardando Assinatura do CHEM";
-    if (situacaoSubsidio === "AGUARDANDO_RESPOSTA") return "Aguardando Resposta";
-    if (situacaoSubsidio === "APTO_FINALIZAR") return "Liberado para Finalização";
-    if (statusNormalizado.includes("aguardando conferencia da chefia")) return "Conferência do Chefe/Admin";
-    if (situacaoSubsidio === "aprovado_externo_enviado_chem" || statusNormalizado.includes("aguardando assinatura do chem")) return "Aguardando Assinatura do CHEM";
-    if (situacaoSubsidio === "resposta_assinada_chem") return "Liberado para Finalização";
-    return null;
-  })();
+  const badgeAcaoChefia = getBadgeSituacaoDUContextual({
+    situacaoFluxo: situacaoSubsidio,
+    status: p.status,
+    responsavel: p.responsavel,
+  });
 
   const [modalAcoesDU, setModalAcoesDU] = useState(false);
   const [modalDetalhes, setModalDetalhes] = useState(false);
