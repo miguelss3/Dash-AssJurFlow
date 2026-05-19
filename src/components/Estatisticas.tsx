@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   BarChart,
   Bar,
@@ -234,6 +234,14 @@ export function Estatisticas({ processos }: Props) {
 
   const taxaSucesso = total ? Math.round((concluidos / total) * 100) : 0;
   const topResp = dadosResponsavel[0];
+
+  // AUDITORIA PROFUNDA DE IDs
+  useEffect(() => {
+    console.group("Auditoria de Processos - Estatísticas");
+    console.log("Total recebido:", processos.length);
+    console.log("IDs dos processos contados:", processos.map(p => p.numero));
+    console.groupEnd();
+  }, [processos]);
 
   return (
     <div className="space-y-5 indicadores-print-root" ref={indicadoresPrintRef}>

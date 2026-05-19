@@ -342,6 +342,38 @@ function Index() {
     });
   }, [processos, filtro, busca, filtroTipo, setorUsuario, ehAdmin]);
 
+  // LOG DE AUDITORIA
+  useEffect(() => {
+    if (!loadingProcessos) {
+      const concluidosTotal = processos.filter(p => p.status === 'concluido').length;
+      const totalDashboard = processosParaDashboard.filter(p => p.status === 'concluido').length;
+      const totalFiltrados = filtrados.filter(p => p.status === 'concluido').length;
+
+      console.table({
+        "Fonte de Dados": ["Global (Snapshot)", "Para Dashboard", "Para Kanban (Filtrados)"],
+        "Qtd Concluidos": [concluidosTotal, totalDashboard, totalFiltrados]
+      });
+    }
+  }, [processos, processosParaDashboard, filtrados, loadingProcessos]);
+
+  useEffect(() => {
+    if (!loadingProcessos) {
+      // 1. Verificar Duplicidade de ID
+      const ids = processos.map(p => p.id);
+      const duplicados = ids.filter((id, index) => ids.indexOf(id) !== index);
+
+      // 2. Verificar processos que chegam no Kanban mas são filtrados
+      const idsNoKanban = filtrados.map(p => p.id);
+      const ocultos = processos.filter(p => !idsNoKanban.includes(p.id));
+
+      console.group("Relatório de Auditoria de Dados");
+      console.log("Total no banco:", processos.length);
+      console.log("IDs duplicados encontrados:", duplicados);
+      console.log("IDs ocultos do Kanban:", ocultos.map(o => `${o.numero} (ID: ${o.id})`));
+      console.groupEnd();
+    }
+  }, [processos, filtrados, loadingProcessos]);
+
   const nomeMilitarAtual = useMemo(() => {
     if (!user) return "Sistema";
     const nomeBase = user.nomeGuerra || user.nome || user.email?.split("@")[0] || "Usuário";

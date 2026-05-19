@@ -215,24 +215,23 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     };
   }, [user, ehAdmin, escopoSetor, mesRef, processos]);
 
-  // ---------- Derivados ----------
-  const { totalConcluidos, finalizadosMes } = stats;
+  // ---------- Derivados (Agora usando a prop 'processos' como fonte única de verdade) ----------
+  const { finalizadosMes } = stats;
 
-  // V2.13 — Optimistic UI: separamos os gates de carregamento por origem do dado.
-  //   - `dadosAtivosProntos`: depende apenas do snapshot local de processos ATIVOS
-  //     (Kanban + KPIs urgentes). Libera assim que o cache do Firestore responder.
-  //   - `dadosHistoricosProntos`: depende do `getCountFromServer` (Acervo Histórico).
-  //     Pode demorar mais alguns segundos sem bloquear a UI principal.
+  const totalConcluidosLocal = processos.filter(p => p.status === "concluido").length;
+  const totalGeralLocal = processos.length;
+
+  const taxaConclusao = totalGeralLocal > 0 ? Math.round((totalConcluidosLocal / totalGeralLocal) * 100) : 0;
+  const resolutividadeMes = criadosMes > 0 ? Math.round((finalizadosMes / criadosMes) * 100) : 0;
+
+  // V2.13 — Optimistic UI: gates de carregamento mantidos apenas para placeholders/cache.
   const dadosAtivosProntos = !loadingProcessos;
   const dadosHistoricosProntos = !stats.carregando || statsTimeout;
   const dadosProntos = dadosAtivosProntos && dadosHistoricosProntos;
 
-  // Tarefa 3: total geral = ativos (props) + finalizados (server).
-  const totalGeral = acervoAtivo + totalConcluidos;
-  const taxaConclusao =
-    totalGeral > 0 ? Math.round((totalConcluidos / totalGeral) * 100) : 0;
-  const resolutividadeMes =
-    criadosMes > 0 ? Math.round((finalizadosMes / criadosMes) * 100) : 0;
+  // Aliases retrocompatíveis para o restante do componente.
+  const totalConcluidos = totalConcluidosLocal;
+  const totalGeral = totalGeralLocal;
 
   // V2.14 — Persiste métricas no localStorage assim que tudo confirma do servidor.
   useEffect(() => {
@@ -276,16 +275,17 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
   // V2.14 — Valores de exibição: dados frescos quando prontos, senão cache.
   const displayCriadosMes = dadosAtivosProntos ? criadosMes : (cachedMetrics?.criadosMes ?? 0);
   const displayFinalizadosMes = dadosHistoricosProntos ? finalizadosMes : (cachedMetrics?.finalizadosMes ?? 0);
-  const displayResolutividadeMes = dadosProntos ? resolutividadeMes : (cachedMetrics?.resolutividadeMes ?? 0);
-  const displayTotalConcluidos = dadosHistoricosProntos ? totalConcluidos : (cachedMetrics?.totalConcluidos ?? 0);
-  const displayTotalGeral = dadosHistoricosProntos ? totalGeral : (cachedMetrics?.totalGeral ?? 0);
+  // Totais agora derivam diretamente da prop `processos` (fonte única de verdade).
+  const displayResolutividadeMes = resolutividadeMes;
+  const displayTotalConcluidos = totalConcluidosLocal;
+  const displayTotalGeral = totalGeralLocal;
   const displayAtivosDU = dadosAtivosProntos ? ativosDU : (cachedMetrics?.ativosDU ?? 0);
   const displayAtivosPA = dadosAtivosProntos ? ativosPA : (cachedMetrics?.ativosPA ?? 0);
   const displayAcervoAtivo = dadosAtivosProntos ? acervoAtivo : (cachedMetrics?.acervoAtivo ?? 0);
   const displayVencidos = dadosAtivosProntos ? vencidos : (cachedMetrics?.vencidos ?? 0);
   const displayHoje = dadosAtivosProntos ? hoje : (cachedMetrics?.hoje ?? 0);
   const displaySemana = dadosAtivosProntos ? semana : (cachedMetrics?.semana ?? 0);
-  const displayTaxaConclusao = dadosProntos ? taxaConclusao : (cachedMetrics?.taxaConclusao ?? 0);
+  const displayTaxaConclusao = taxaConclusao;
 
   // V2.14 — Atualizando: cache disponível mas servidor ainda confirmando.
   const isUpdating = !dadosProntos && cachedMetrics !== null;
