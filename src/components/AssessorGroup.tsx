@@ -141,6 +141,15 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
         : processosConcluidos;
 
   const abasConfiguradas = useMemo(() => {
+    const nomeNormalizado = responsavel.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    // Identifica colunas de transição de forma robusta
+    const ehColunaTransicao = nomeNormalizado.includes("aguardando assinatura") || nomeNormalizado.includes("aguardando distribuicao");
+
+    if (ehColunaTransicao) {
+      return [{ id: "andamento", scope: "DU", label: "Em Andamento", order: 1, enabled: true }];
+    }
+
     if (vistaAssessor) {
       // V5.3 — Mesa do Assessor: apenas "Em Andamento" e "Concluídos".
       return [
@@ -304,13 +313,15 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
                   }
                   return dedup.filter(isNaMesaDoAssessorPA).length;
                 })()
-              : tab.id === "andamento"
-                ? processos.length
-                : tab.id === "portaria_assinada"
-                  ? processosPortariaAssinada.length
-                : tab.id === "atraso"
-                  ? processosAtrasados.length
-                  : processosConcluidos.length;
+              : (() => {
+                  // Regra de segurança: se a aba não deve existir, o count é 0
+                  if (responsavel.toLowerCase().includes("aguardando") && tab.id !== "andamento") return 0;
+
+                  if (tab.id === "andamento") return processos.length;
+                  if (tab.id === "portaria_assinada") return processosPortariaAssinada.length;
+                  if (tab.id === "atraso") return processosAtrasados.length;
+                  return processosConcluidos.length;
+                })();
 
             return (
               <button
