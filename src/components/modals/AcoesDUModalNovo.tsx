@@ -394,24 +394,76 @@ export function AcoesDUModalNovo({
       const processoRef = doc(db, "processos", processoId);
       const snap = await getDoc(processoRef);
       const dataAtual = (snap.exists() ? snap.data() : {}) as Record<string, unknown>;
+      const pedidoAtual = (dataAtual?.pedidoSubsidios as Record<string, unknown>) || {};
       const previousDoc = { ...dataAtual };
       delete (previousDoc as Record<string, unknown>).ultimaAcaoFluxo;
       const descricao = "Processo finalizado no fluxo DU.";
+
+      const agoraISO = new Date().toISOString();
+
+      // --- LÓGICA DE CAPTURA DE HISTÓRICO ---
+      const numeroDocEfetivo = numeroDocumentoDU.trim();
+      const numeroDiexExternoEfetivo = numeroDiexExterno.trim();
+      const numeroOficioExternoEfetivo = numeroOficioExterno.trim();
+
+      const historicoExistente = Array.isArray(pedidoAtual?.numeroDiexHistorico)
+        ? (pedidoAtual.numeroDiexHistorico as Array<unknown>)
+        : [];
+
+      const novosNumeros = [
+        numeroDocEfetivo,
+        numeroDiexExternoEfetivo,
+        numeroOficioExternoEfetivo,
+      ].filter((s) => s && s.trim().length > 0);
+
+      const numerosExistentes = new Set(
+        historicoExistente
+          .map((item: unknown) =>
+            typeof item === "string"
+              ? item
+              : (item as { numero?: string })?.numero,
+          )
+          .filter(Boolean),
+      );
+
+      const novosItens = novosNumeros
+        .filter((n) => !numerosExistentes.has(n))
+        .map((n) => ({
+          numero: n,
+          dataEnvio: agoraISO,
+          prazo: dataPrazo.trim() || undefined,
+        }));
+
+      const numeroDiexHistorico =
+        novosItens.length > 0
+          ? [...historicoExistente, ...novosItens]
+          : historicoExistente;
+
+      const patchPedidoSubsidios = {
+        ...pedidoAtual,
+        situacaoFluxo: "FINALIZADO",
+        numeroDiexHistorico,
+        ...(numeroDocEfetivo
+          ? { numeroDocumentoDU: numeroDocEfetivo, numeroDiex: numeroDocEfetivo }
+          : {}),
+      };
+      // -----------------------------------------
 
       await updateDoc(processoRef, {
         status: "concluido",
         descricao,
         finalizado: true,
-        "pedidoSubsidios.situacaoFluxo": "FINALIZADO",
+        pedidoSubsidios: patchPedidoSubsidios,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
         ultimaAcaoFluxo: {
           tipo: "DU",
-          criadoEm: new Date().toISOString(),
+          criadoEm: agoraISO,
           criadoPorNome: autorMilitar,
           previousDoc,
         },
       });
+
       await registrarHistorico(descricao);
       toast.success("Processo finalizado com sucesso.");
       onOpenChange(false);

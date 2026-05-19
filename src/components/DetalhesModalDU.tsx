@@ -156,17 +156,31 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     }
   };
 
+  // Abre o picker nativo do <input type="date"|"datetime-local"> de forma
+  // confiável dentro do Dialog (alguns navegadores não disparam ao clique).
+  const abrirPickerNativo = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+    if (typeof el.showPicker === "function") {
+      try { el.showPicker(); } catch { /* alguns browsers exigem gesto direto */ }
+    }
+  };
+
   const handleSalvarDocs = async () => {
     try {
       setSavingDocs(true);
 
       // Normaliza o histórico: descarta itens vazios e converte dataEnvio para ISO.
+      // Mantém `prazo` apenas quando preenchido — evita gravar string vazia.
       const historicoLimpo = historicoEdit
-        .map((h) => ({
-          numero: h.numero.trim(),
-          dataEnvio: dateTimeLocalParaIso(h.dataEnvio),
-          prazo: h.prazo,
-        }))
+        .map((h) => {
+          const numero = h.numero.trim();
+          const dataEnvioIso = dateTimeLocalParaIso(h.dataEnvio.trim());
+          const prazoTrim = h.prazo.trim();
+          const item: { numero: string; dataEnvio?: string; prazo?: string } = { numero };
+          if (dataEnvioIso) item.dataEnvio = dataEnvioIso;
+          if (prazoTrim) item.prazo = prazoTrim;
+          return item;
+        })
         .filter((h) => h.numero.length > 0);
 
       const ultimoEnviado =
@@ -431,7 +445,9 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                                       type="datetime-local"
                                       value={item.dataEnvio}
                                       onChange={(e) => handleHistoricoChange(idx, "dataEnvio", e.target.value)}
-                                      className="h-8 text-xs mt-0.5"
+                                      onClick={abrirPickerNativo}
+                                      onFocus={abrirPickerNativo}
+                                      className="h-8 text-xs mt-0.5 cursor-pointer"
                                     />
                                   </div>
                                   <div>
@@ -440,7 +456,9 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                                       type="date"
                                       value={item.prazo}
                                       onChange={(e) => handleHistoricoChange(idx, "prazo", e.target.value)}
-                                      className="h-8 text-xs mt-0.5"
+                                      onClick={abrirPickerNativo}
+                                      onFocus={abrirPickerNativo}
+                                      className="h-8 text-xs mt-0.5 cursor-pointer"
                                     />
                                   </div>
                                 </div>
@@ -540,9 +558,11 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data de Recebimento</label>
                               <Input
                                 type="datetime-local"
-                                value={docRecebidoDataEdit ? docRecebidoDataEdit.slice(0, 16) : ""}
-                                onChange={(e) => setDocRecebidoDataEdit(e.target.value)}
-                                className="h-8 text-xs mt-0.5"
+                                value={isoParaDateTimeLocal(docRecebidoDataEdit)}
+                                onChange={(e) => setDocRecebidoDataEdit(dateTimeLocalParaIso(e.target.value))}
+                                onClick={abrirPickerNativo}
+                                onFocus={abrirPickerNativo}
+                                className="h-8 text-xs mt-0.5 cursor-pointer"
                               />
                             </div>
                           </div>
