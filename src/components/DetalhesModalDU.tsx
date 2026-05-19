@@ -14,6 +14,7 @@ import {
   Pencil,
   Save,
   X,
+  Plus,
   ArrowUpRight,
   ArrowDownLeft,
   type LucideIcon,
@@ -40,8 +41,51 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
   const [prazoRespostaEdit, setPrazoRespostaEdit] = useState("");
   const [editandoDocs, setEditandoDocs] = useState(false);
   const [savingDocs, setSavingDocs] = useState(false);
-  const [docEnviadoEdit, setDocEnviadoEdit] = useState("");
+  const [historicoEdit, setHistoricoEdit] = useState<
+    Array<{ numero: string; dataEnvio: string; prazo: string }>
+  >([]);
   const [docRecebidoEdit, setDocRecebidoEdit] = useState("");
+
+  // Converte ISO completo (ex.: 2026-05-19T13:45:00.000Z) para o formato
+  // exigido por <input type="datetime-local"> (YYYY-MM-DDTHH:MM, hora local).
+  const isoParaDateTimeLocal = (iso: string): string => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) {
+      // Pode já estar no formato local; devolve os 16 primeiros caracteres.
+      return iso.length >= 16 ? iso.slice(0, 16) : "";
+    }
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    );
+  };
+
+  const dateTimeLocalParaIso = (valor: string): string => {
+    if (!valor) return "";
+    const d = new Date(valor);
+    if (Number.isNaN(d.getTime())) return valor;
+    return d.toISOString();
+  };
+
+  // Mapeia o histórico do Firestore (strings legadas OU objetos) para o
+  // formato uniforme usado no editor.
+  const mapearHistoricoParaForm = (
+    raw: Array<string | { numero?: string; dataEnvio?: string; prazo?: string; nomeDocumento?: string }> | undefined,
+  ): Array<{ numero: string; dataEnvio: string; prazo: string }> => {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((doc) => {
+      if (typeof doc === "string") {
+        return { numero: doc, dataEnvio: "", prazo: "" };
+      }
+      return {
+        numero: doc?.numero || doc?.nomeDocumento || "",
+        dataEnvio: isoParaDateTimeLocal(doc?.dataEnvio || ""),
+        prazo: doc?.prazo || "",
+      };
+    });
+  };
 
   useEffect(() => {
     if (!open || !processo) return;
@@ -50,12 +94,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     setPrazoRespostaEdit(processo.pedidoSubsidios?.prazoResposta || "");
     setEditandoPrazosDU(false);
 
-    setDocEnviadoEdit(
-      processo.pedidoSubsidios?.numeroOficioExterno
-      || processo.pedidoSubsidios?.numeroDocumentoDU
-      || processo.pedidoSubsidios?.numeroDiex
-      || "",
-    );
+    setHistoricoEdit(mapearHistoricoParaForm(processo.pedidoSubsidios?.numeroDiexHistorico));
     setDocRecebidoEdit(
       processo.respostaDU?.numeroOficioExterno
       || processo.respostaDU?.numeroDiex
@@ -117,13 +156,24 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
   const handleSalvarDocs = async () => {
     try {
       setSavingDocs(true);
-      const enviado = docEnviadoEdit.trim();
+
+      // Normaliza o histórico: descarta itens vazios e converte dataEnvio para ISO.
+      const historicoLimpo = historicoEdit
+        .map((h) => ({
+          numero: h.numero.trim(),
+          dataEnvio: dateTimeLocalParaIso(h.dataEnvio),
+          prazo: h.prazo,
+        }))
+        .filter((h) => h.numero.length > 0);
+
+      const ultimoEnviado =
+        historicoLimpo.length > 0 ? historicoLimpo[historicoLimpo.length - 1].numero : "";
       let recebido = docRecebidoEdit.trim();
 
-      if (enviado && recebido && enviado === recebido) {
+      if (ultimoEnviado && recebido && ultimoEnviado === recebido) {
         const confirmar = typeof window !== "undefined"
           ? window.confirm(
-              "O número informado em 'Recebido' é igual ao 'Enviado'. "
+              "O número informado em 'Recebido' é igual ao último 'Enviado'. "
                 + "Um DIEx da Assessoria não pode ser também um recebimento da Unidade. "
                 + "Deseja limpar o campo 'Recebido'?",
             )
@@ -138,8 +188,9 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
 
       const processoRef = doc(db, "processos", processo.id);
       await updateDoc(processoRef, sanitizarPatch({
-        "pedidoSubsidios.numeroDocumentoDU": enviado,
-        "pedidoSubsidios.numeroDiex": enviado,
+        "pedidoSubsidios.numeroDocumentoDU": ultimoEnviado,
+        "pedidoSubsidios.numeroDiex": ultimoEnviado,
+        "pedidoSubsidios.numeroDiexHistorico": historicoLimpo,
         "respostaDU.numeroDiex": recebido,
         atualizadoEm: new Date().toISOString(),
       }));
@@ -152,6 +203,22 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
       setSavingDocs(false);
     }
   };
+
+  const handleHistoricoChange = (
+    index: number,
+    campo: "numero" | "dataEnvio" | "prazo",
+    valor: string,
+  ) => {
+    setHistoricoEdit((atual) => {
+      const novo = [...atual];
+      novo[index] = { ...novo[index], [campo]: valor };
+      return novo;
+    });
+  };
+  const adicionarItemHistorico = () =>
+    setHistoricoEdit((atual) => [...atual, { numero: "", dataEnvio: "", prazo: "" }]);
+  const removerItemHistorico = (index: number) =>
+    setHistoricoEdit((atual) => atual.filter((_, i) => i !== index));
 
   const pedido = processo.pedidoSubsidios;
   const respostaDU = processo.respostaDU;
@@ -262,11 +329,8 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                         variant="outline"
                         onClick={() => {
                           setEditandoDocs(false);
-                          setDocEnviadoEdit(
-                            processo.pedidoSubsidios?.numeroOficioExterno
-                            || processo.pedidoSubsidios?.numeroDocumentoDU
-                            || processo.pedidoSubsidios?.numeroDiex
-                            || "",
+                          setHistoricoEdit(
+                            mapearHistoricoParaForm(processo.pedidoSubsidios?.numeroDiexHistorico),
                           );
                           setDocRecebidoEdit(
                             processo.respostaDU?.numeroOficioExterno
@@ -292,36 +356,159 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
               </div>
 
               {(() => {
-                // Mapeia o histórico completo de envios (array de documentos)
+                // Histórico completo de envios (array de Nº DIEx). Ordem do array =
+                // ordem cronológica de envio (mais antigo primeiro).
                 const historicoEnviado = pedido?.numeroDiexHistorico || [];
                 const docRecebido =
                   respostaDU?.numeroOficioExterno ||
                   respostaDU?.numeroDiex ||
                   respostaDU?.numeroOficio ||
                   "";
+                const prazoRespostaDoc = pedido?.prazoResposta;
+                const diasResposta = prazoRespostaDoc ? diasRestantes(prazoRespostaDoc) : null;
+                const respondido = !!docRecebido;
+
+                const rotuloPorIndice = (idx: number, total: number) => {
+                  if (idx === 0) return "Pedido Original";
+                  return `${idx}ª Reiteração`;
+                  // (total apenas para futuras evoluções; mantido por simetria)
+                  void total;
+                };
 
                 return (
                   <>
-                    <div className="flex items-start gap-3">
-                      <ArrowUpRight className="w-4 h-4 text-sky-500 mt-0.5" />
-                      <div className="flex-1">
-                        <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Enviados (Histórico)</div>
-                        {editandoDocs ? (
-                          <Input value={docEnviadoEdit} onChange={(e) => setDocEnviadoEdit(e.target.value)} placeholder="Nº DIEx enviado" className="mt-1 h-8 text-sm" />
-                        ) : (
-                          <ul className="list-disc pl-4 mt-1 space-y-1">
-                            {historicoEnviado.length > 0 ? (
-                              historicoEnviado.map((doc, idx) => (
-                                <li key={idx} className="text-sm text-slate-800 font-medium">{doc}</li>
-                              ))
-                            ) : (
-                              <li className="text-sm text-slate-400 italic">Pendente</li>
-                            )}
-                          </ul>
-                        )}
+                    {/* ENVIADOS — um card por documento do histórico */}
+                    <div>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
+                        <ArrowUpRight className="w-4 h-4 text-sky-500" />
+                        Enviados (Histórico)
                       </div>
+
+                      {editandoDocs ? (
+                        <div className="space-y-3 mt-2">
+                          {historicoEdit.length === 0 && (
+                            <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                              Nenhum documento cadastrado. Clique em “Adicionar Documento”.
+                            </div>
+                          )}
+                          {historicoEdit.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="p-3 border border-slate-200 bg-slate-50 rounded-lg relative shadow-sm"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => removerItemHistorico(idx)}
+                                className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors"
+                                title="Remover documento"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              <div className="space-y-2.5 pr-6">
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número DIEx</label>
+                                  <Input
+                                    value={item.numero}
+                                    onChange={(e) => handleHistoricoChange(idx, "numero", e.target.value)}
+                                    placeholder="Ex: DIEx nº 123..."
+                                    className="h-8 text-xs mt-0.5"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data de Envio</label>
+                                    <Input
+                                      type="datetime-local"
+                                      value={item.dataEnvio}
+                                      onChange={(e) => handleHistoricoChange(idx, "dataEnvio", e.target.value)}
+                                      className="h-8 text-xs mt-0.5"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Prazo do Doc</label>
+                                    <Input
+                                      type="date"
+                                      value={item.prazo}
+                                      onChange={(e) => handleHistoricoChange(idx, "prazo", e.target.value)}
+                                      className="h-8 text-xs mt-0.5"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={adicionarItemHistorico}
+                            className="w-full text-xs h-8 border-dashed border-slate-300 text-slate-500 hover:text-slate-800"
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Documento
+                          </Button>
+                        </div>
+                      ) : historicoEnviado.length > 0 ? (
+                        <div className="space-y-2">
+                          {historicoEnviado.map((doc, idx) => {
+                            const ehUltimo = idx === historicoEnviado.length - 1;
+                            const vencido =
+                              ehUltimo && !respondido && diasResposta !== null && diasResposta < 0;
+                            const corBorda = vencido
+                              ? "border-red-200 bg-red-50"
+                              : "border-slate-200 bg-white";
+
+                            // Suporte a entradas legadas (string) e ao novo
+                            // formato estruturado { numero, dataEnvio, prazo }.
+                            const ehObjeto = typeof doc === "object" && doc !== null;
+                            const numeroDoc = ehObjeto
+                              ? (doc.numero || doc.nomeDocumento || "Documento sem número")
+                              : doc;
+                            const dataEnvio = ehObjeto ? doc.dataEnvio : undefined;
+                            const prazoDoc = ehObjeto && doc.prazo ? doc.prazo : prazoRespostaDoc;
+
+                            return (
+                              <div
+                                key={`${numeroDoc}-${idx}`}
+                                className={`rounded-xl border ${corBorda} shadow-sm p-3 hover:border-sky-300 transition-colors`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <ArrowUpRight className="w-4 h-4 text-sky-600 mt-1 shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-semibold text-slate-800 break-words">
+                                      {numeroDoc}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                                      Enviado em: {dataEnvio ? formatarData(dataEnvio) : "—"}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs">
+                                  <span className="text-slate-500">Prazo:</span>
+                                  <span
+                                    className={`font-medium ${
+                                      vencido
+                                        ? "text-red-600"
+                                        : ehUltimo && !respondido && diasResposta !== null && diasResposta <= 5
+                                          ? "text-orange-600"
+                                          : "text-slate-700"
+                                    }`}
+                                  >
+                                    {prazoDoc ? formatarData(prazoDoc) : "—"}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                          Nenhum documento enviado.
+                        </div>
+                      )}
                     </div>
 
+                    {/* RECEBIDO */}
                     <div className="flex items-start gap-3 mt-4">
                       <ArrowDownLeft className="w-4 h-4 text-sky-500 mt-0.5" />
                       <div className="flex-1">
@@ -417,39 +604,6 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
               })}
             </div>
           </div>
-
-          {/* Debug e Renderização de Pedido de Subsídios */}
-          {(() => {
-            const pedido = processo.pedidoSubsidios;
-
-            // Log de depuração (abra o console F12 para verificar)
-            console.log("DetalhesModalDU: Processo ID", processo.id, "Pedido:", pedido);
-
-            if (!pedido || Object.keys(pedido).length === 0) {
-              return (
-                <div className="p-4 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
-                  Nenhum pedido de subsídios vinculado a este processo.
-                </div>
-              );
-            }
-
-            return (
-              <>
-                <Separator />
-                <div>
-                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">
-                    {(pedido.reiteracoes ?? 0) > 0 ? `Pedido de Subsídios (${pedido.reiteracoes}ª Reiteração)` : "Pedido de Subsídios"}
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-slate-50 border border-slate-200 rounded-lg p-4">
-                    <InfoRow icon={Mail} label="DIEx / Documento" value={pedido.numeroOficioExterno || pedido.numeroDocumentoDU || pedido.numeroDiex || "Pendente"} />
-                    <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(pedido.assinaturaChefiaEm || pedido.solicitadoEm)} />
-                    <InfoRow icon={Clock} label="Prazo de Resposta" value={pedido.dataPrazo ? formatarData(pedido.dataPrazo) : pedido.prazoResposta ? formatarData(pedido.prazoResposta) : "—"} />
-                    {processo.status !== "concluido" && <InfoRow icon={AlertCircle} label="Situação" value={badgeSituacaoDU} />}
-                  </div>
-                </div>
-              </>
-            );
-          })()}
 
           {processo.observacoes && (
             <>

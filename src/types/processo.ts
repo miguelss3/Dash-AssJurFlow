@@ -93,7 +93,12 @@ export interface PedidoSubsidios {
   numeroRecebido?: string;
   numeroDocFinal?: string;
   dataPrazo?: string;
-  numeroDiexHistorico?: string[];
+  // V2.5 — Histórico de documentos enviados.
+  // Aceita strings (formato legado) e objetos estruturados (novos envios).
+  numeroDiexHistorico?: Array<
+    | string
+    | { numero: string; dataEnvio: string; prazo?: string; nomeDocumento?: string }
+  >;
   prazoResposta?: string;
   observacoes?: string;
   // V2.4 — Composição de documentos externos (CHEM/Cmt).

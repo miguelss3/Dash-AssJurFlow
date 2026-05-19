@@ -249,10 +249,14 @@ export function AcoesDUModalNovo({
         extras?.descricaoOverride
         || `Fluxo DU atualizado para ${LABEL_SITUACAO[proximaSituacao]}.`;
 
-      // V2.3 — Histórico imutável de DIEx/Ofícios. Usa Set p/ deduplicar e
-      // garante que um novo número nunca apague os anteriores.
-      const historicoExistente = Array.isArray(pedidoAtual?.numeroDiexHistorico)
-        ? (pedidoAtual.numeroDiexHistorico as string[])
+      // V2.5 — Histórico imutável de DIEx/Ofícios. Cada novo envio é gravado
+      // como objeto { numero, dataEnvio, prazo } para permitir exibir a data
+      // exata de envio. Entradas legadas (string) são preservadas como estão.
+      type HistoricoItem =
+        | string
+        | { numero: string; dataEnvio: string; prazo?: string };
+      const historicoExistente: HistoricoItem[] = Array.isArray(pedidoAtual?.numeroDiexHistorico)
+        ? (pedidoAtual.numeroDiexHistorico as HistoricoItem[])
         : [];
       // V2.4 — Acumula no histórico todos os números gerados nesta transição:
       // o genérico (DIEx Simplificado/legado) + DIEx externo + Ofício externo.
@@ -261,9 +265,22 @@ export function AcoesDUModalNovo({
         numeroDiexExternoEfetivo,
         numeroOficioExternoEfetivo,
       ].filter((s) => s && s.trim().length > 0);
-      const numeroDiexHistorico =
-        novosNumeros.length > 0
-          ? Array.from(new Set([...historicoExistente, ...novosNumeros]))
+      // Dedup por nº já presente no histórico (string ou objeto.numero).
+      const numerosExistentes = new Set(
+        historicoExistente.map((item) =>
+          typeof item === "string" ? item : item?.numero,
+        ).filter(Boolean),
+      );
+      const novosItens: HistoricoItem[] = novosNumeros
+        .filter((n) => !numerosExistentes.has(n))
+        .map((n) => ({
+          numero: n,
+          dataEnvio: agoraISO,
+          prazo: prazoEfetivo || undefined,
+        }));
+      const numeroDiexHistorico: HistoricoItem[] =
+        novosItens.length > 0
+          ? [...historicoExistente, ...novosItens]
           : historicoExistente;
 
       // V2.3 — Contador de reiterações preservado entre transições.
