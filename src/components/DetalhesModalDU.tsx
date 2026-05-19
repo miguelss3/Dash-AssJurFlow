@@ -44,7 +44,8 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
   const [historicoEdit, setHistoricoEdit] = useState<
     Array<{ numero: string; dataEnvio: string; prazo: string }>
   >([]);
-  const [docRecebidoEdit, setDocRecebidoEdit] = useState("");
+  const [docRecebidoNumeroEdit, setDocRecebidoNumeroEdit] = useState("");
+  const [docRecebidoDataEdit, setDocRecebidoDataEdit] = useState("");
 
   // Converte ISO completo (ex.: 2026-05-19T13:45:00.000Z) para o formato
   // exigido por <input type="datetime-local"> (YYYY-MM-DDTHH:MM, hora local).
@@ -95,12 +96,14 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     setEditandoPrazosDU(false);
 
     setHistoricoEdit(mapearHistoricoParaForm(processo.pedidoSubsidios?.numeroDiexHistorico));
-    setDocRecebidoEdit(
+    const resolvedRecebido =
       processo.respostaDU?.numeroOficioExterno
       || processo.respostaDU?.numeroDiex
       || processo.respostaDU?.numeroOficio
-      || "",
-    );
+      || processo.pedidoSubsidios?.numeroRecebido
+      || "";
+    setDocRecebidoNumeroEdit(resolvedRecebido);
+    setDocRecebidoDataEdit(processo.respostaDU?.registradoEm || "");
     setEditandoDocs(false);
   }, [open, processo]);
 
@@ -168,7 +171,8 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
 
       const ultimoEnviado =
         historicoLimpo.length > 0 ? historicoLimpo[historicoLimpo.length - 1].numero : "";
-      let recebido = docRecebidoEdit.trim();
+      let recebido = docRecebidoNumeroEdit.trim();
+      const recebidoData = docRecebidoDataEdit.trim();
 
       if (ultimoEnviado && recebido && ultimoEnviado === recebido) {
         const confirmar = typeof window !== "undefined"
@@ -183,7 +187,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
           return;
         }
         recebido = "";
-        setDocRecebidoEdit("");
+        setDocRecebidoNumeroEdit("");
       }
 
       const processoRef = doc(db, "processos", processo.id);
@@ -192,6 +196,9 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
         "pedidoSubsidios.numeroDiex": ultimoEnviado,
         "pedidoSubsidios.numeroDiexHistorico": historicoLimpo,
         "respostaDU.numeroDiex": recebido,
+        "respostaDU.numeroOficioExterno": recebido,
+        "pedidoSubsidios.numeroRecebido": recebido,
+        "respostaDU.registradoEm": recebido ? (recebidoData || null) : null,
         atualizadoEm: new Date().toISOString(),
       }));
       setEditandoDocs(false);
@@ -332,12 +339,14 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                           setHistoricoEdit(
                             mapearHistoricoParaForm(processo.pedidoSubsidios?.numeroDiexHistorico),
                           );
-                          setDocRecebidoEdit(
+                          setDocRecebidoNumeroEdit(
                             processo.respostaDU?.numeroOficioExterno
                             || processo.respostaDU?.numeroDiex
                             || processo.respostaDU?.numeroOficio
+                            || processo.pedidoSubsidios?.numeroRecebido
                             || "",
                           );
+                          setDocRecebidoDataEdit(processo.respostaDU?.registradoEm || "");
                         }}
                         disabled={savingDocs}
                       >
@@ -363,6 +372,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                   respostaDU?.numeroOficioExterno ||
                   respostaDU?.numeroDiex ||
                   respostaDU?.numeroOficio ||
+                  pedido?.numeroRecebido ||
                   "";
                 const prazoRespostaDoc = pedido?.prazoResposta;
                 const diasResposta = prazoRespostaDoc ? diasRestantes(prazoRespostaDoc) : null;
@@ -509,18 +519,55 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                     </div>
 
                     {/* RECEBIDO */}
-                    <div className="flex items-start gap-3 mt-4">
-                      <ArrowDownLeft className="w-4 h-4 text-sky-500 mt-0.5" />
-                      <div className="flex-1">
-                        <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Recebido</div>
-                        {editandoDocs ? (
-                          <Input value={docRecebidoEdit} onChange={(e) => setDocRecebidoEdit(e.target.value)} placeholder="Nº DIEx recebido" className="mt-1 h-8 text-sm" />
-                        ) : (
-                          <div className={`text-sm mt-0.5 ${docRecebido ? "text-slate-800 font-medium" : "text-slate-400 italic"}`}>
-                            {docRecebido || "Pendente"}
-                          </div>
-                        )}
+                    <div className="mt-4">
+                      <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
+                        <ArrowDownLeft className="w-4 h-4 text-sky-500" />
+                        Recebido
                       </div>
+                      {editandoDocs ? (
+                        <div className="p-3 border border-slate-200 bg-slate-50 rounded-lg relative shadow-sm">
+                          <div className="space-y-2.5">
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número do Documento Recebido</label>
+                              <Input
+                                value={docRecebidoNumeroEdit}
+                                onChange={(e) => setDocRecebidoNumeroEdit(e.target.value)}
+                                placeholder="Nº do DIEx, Ofício ou documento de retorno"
+                                className="h-8 text-xs mt-0.5"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data de Recebimento</label>
+                              <Input
+                                type="datetime-local"
+                                value={docRecebidoDataEdit ? docRecebidoDataEdit.slice(0, 16) : ""}
+                                onChange={(e) => setDocRecebidoDataEdit(e.target.value)}
+                                className="h-8 text-xs mt-0.5"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        docRecebido ? (
+                          <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-3 hover:border-sky-300 transition-colors">
+                            <div className="flex items-start gap-3">
+                              <ArrowDownLeft className="w-4 h-4 text-sky-600 mt-1 shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-semibold text-slate-800 break-words">
+                                  {docRecebido}
+                                </div>
+                                <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                                  Recebido em: {processo.respostaDU?.registradoEm ? formatarDataHoraSegura(processo.respostaDU.registradoEm) : "—"}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                            Pendente
+                          </div>
+                        )
+                      )}
                     </div>
                   </>
                 );
