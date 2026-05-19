@@ -162,7 +162,6 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       return [
         { id: "andamento", scope: "DU", label: "No Prazo", order: 1, enabled: true },
         { id: "atraso", scope: "DU", label: "Vencidos", order: 2, enabled: true },
-        { id: "concluidos", scope: "DU", label: "Finalizados", order: 3, enabled: true },
       ];
     }
 
@@ -254,12 +253,13 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     return isProcessoAtivo;
   };
 
-  const processosDaAbaAtiva = (() => {
+  const getListaParaAba = (tabId: string): Processo[] => {
     if (!vistaAssessor) {
-      if (abaAtiva === "portaria_assinada") return processosPortariaAssinada;
-      if (abaAtiva === "andamento") return processosAtivosOrdenados;
-      if (abaAtiva === "atraso") return processosAtrasadosOrdenados;
-      return processosConcluidos;
+      if (tabId === "portaria_assinada") return processosPortariaAssinada;
+      if (tabId === "andamento") return processosAtivosOrdenados;
+      if (tabId === "atraso") return processosAtrasadosOrdenados;
+      if (tabId === "concluidos") return processosConcluidos;
+      return [];
     }
 
     const universo = [
@@ -268,19 +268,25 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       ...processosPortariaAssinada,
       ...processosConcluidos,
     ];
-    
+
     const dedup = new Map<string, Processo>();
     for (const p of universo) {
       if (p && p.id && !dedup.has(p.id)) dedup.set(p.id, p);
     }
     const lista = Array.from(dedup.values());
 
-    if (abaAtiva === "concluidos") {
-      return lista.filter((p) => ehConcluidoPA(p) && String(p.responsavel || "").trim() === String(responsavel || "").trim());
+    if (tabId === "concluidos") {
+      return lista.filter(
+        (p) =>
+          ehConcluidoPA(p) &&
+          String(p.responsavel || "").trim() === String(responsavel || "").trim(),
+      );
     }
 
     return lista.filter(isNaMesaDoAssessorPA);
-  })();
+  };
+
+  const processosDaAbaAtiva = getListaParaAba(abaAtiva);
 
   const CardComponente = tipo === "DU" ? CardDU : CardPA;
 
@@ -304,24 +310,8 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
 
         <div className="rounded-xl bg-muted p-1 gap-1 grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, abasConfiguradas.length)}, minmax(0, 1fr))` }}>
           {abasConfiguradas.map((tab) => {
-            const count = vistaAssessor
-              ? (() => {
-                  const universo = [...processos, ...processosAtrasados, ...processosPortariaAssinada, ...processosConcluidos];
-                  const dedup = Array.from(new Map(universo.filter(p => p?.id).map(p => [p.id, p])).values());
-                  if (tab.id === "concluidos") {
-                    return dedup.filter(p => ehConcluidoPA(p) && String(p.responsavel || "").trim() === String(responsavel || "").trim()).length;
-                  }
-                  return dedup.filter(isNaMesaDoAssessorPA).length;
-                })()
-              : (() => {
-                  // Regra de segurança: se a aba não deve existir, o count é 0
-                  if (responsavel.toLowerCase().includes("aguardando") && tab.id !== "andamento") return 0;
-
-                  if (tab.id === "andamento") return processos.length;
-                  if (tab.id === "portaria_assinada") return processosPortariaAssinada.length;
-                  if (tab.id === "atraso") return processosAtrasados.length;
-                  return processosConcluidos.length;
-                })();
+            // Conta exatamente o que será renderizado quando essa aba estiver ativa.
+            const count = getListaParaAba(tab.id).length;
 
             return (
               <button
