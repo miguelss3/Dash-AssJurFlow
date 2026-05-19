@@ -418,22 +418,38 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
             </div>
           </div>
 
-          {pedido && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">
-                  {(pedido.reiteracoes ?? 0) > 0 ? `Pedido de Subsídios (${pedido.reiteracoes}ª Reiteração)` : "Pedido de Subsídios"}
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-slate-50 border border-slate-200 rounded-lg p-4">
-                  <InfoRow icon={Mail} label="DIEx / Documento" value={pedido.numeroOficioExterno || pedido.numeroDocumentoDU || pedido.numeroDiex || "Pendente"} />
-                  <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(dataPedidoDU)} />
-                  <InfoRow icon={Clock} label="Prazo de Resposta" value={pedido.dataPrazo ? formatarData(pedido.dataPrazo) : pedido.prazoResposta ? formatarData(pedido.prazoResposta) : "—"} />
-                  {processo.status !== "concluido" && <InfoRow icon={AlertCircle} label="Situação" value={badgeSituacaoDU} />}
+          {/* Debug e Renderização de Pedido de Subsídios */}
+          {(() => {
+            const pedido = processo.pedidoSubsidios;
+
+            // Log de depuração (abra o console F12 para verificar)
+            console.log("DetalhesModalDU: Processo ID", processo.id, "Pedido:", pedido);
+
+            if (!pedido || Object.keys(pedido).length === 0) {
+              return (
+                <div className="p-4 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                  Nenhum pedido de subsídios vinculado a este processo.
                 </div>
-              </div>
-            </>
-          )}
+              );
+            }
+
+            return (
+              <>
+                <Separator />
+                <div>
+                  <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">
+                    {(pedido.reiteracoes ?? 0) > 0 ? `Pedido de Subsídios (${pedido.reiteracoes}ª Reiteração)` : "Pedido de Subsídios"}
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-slate-50 border border-slate-200 rounded-lg p-4">
+                    <InfoRow icon={Mail} label="DIEx / Documento" value={pedido.numeroOficioExterno || pedido.numeroDocumentoDU || pedido.numeroDiex || "Pendente"} />
+                    <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(pedido.assinaturaChefiaEm || pedido.solicitadoEm)} />
+                    <InfoRow icon={Clock} label="Prazo de Resposta" value={pedido.dataPrazo ? formatarData(pedido.dataPrazo) : pedido.prazoResposta ? formatarData(pedido.prazoResposta) : "—"} />
+                    {processo.status !== "concluido" && <InfoRow icon={AlertCircle} label="Situação" value={badgeSituacaoDU} />}
+                  </div>
+                </div>
+              </>
+            );
+          })()}
 
           {processo.observacoes && (
             <>
