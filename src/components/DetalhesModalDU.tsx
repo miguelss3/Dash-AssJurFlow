@@ -287,39 +287,46 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
               </div>
 
               {(() => {
-                const docEnviado =
-                  pedido?.numeroOficioExterno
-                  || pedido?.numeroDocumentoDU
-                  || pedido?.numeroDiex
-                  || "";
+                // Mapeia o histórico completo de envios (array de documentos)
+                const historicoEnviado = pedido?.numeroDiexHistorico || [];
                 const docRecebido =
-                  respostaDU?.numeroOficioExterno
-                  || respostaDU?.numeroDiex
-                  || respostaDU?.numeroOficio
-                  || "";
+                  respostaDU?.numeroOficioExterno ||
+                  respostaDU?.numeroDiex ||
+                  respostaDU?.numeroOficio ||
+                  "";
 
                 return (
                   <>
                     <div className="flex items-start gap-3">
                       <ArrowUpRight className="w-4 h-4 text-sky-500 mt-0.5" />
                       <div className="flex-1">
-                        <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Enviado</div>
+                        <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Enviados (Histórico)</div>
                         {editandoDocs ? (
                           <Input value={docEnviadoEdit} onChange={(e) => setDocEnviadoEdit(e.target.value)} placeholder="Nº DIEx enviado" className="mt-1 h-8 text-sm" />
                         ) : (
-                          <div className={`text-sm mt-0.5 ${docEnviado ? "text-slate-800 font-medium" : "text-slate-400 italic"}`}>{docEnviado || "Pendente"}</div>
+                          <ul className="list-disc pl-4 mt-1 space-y-1">
+                            {historicoEnviado.length > 0 ? (
+                              historicoEnviado.map((doc, idx) => (
+                                <li key={idx} className="text-sm text-slate-800 font-medium">{doc}</li>
+                              ))
+                            ) : (
+                              <li className="text-sm text-slate-400 italic">Pendente</li>
+                            )}
+                          </ul>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-3">
+                    <div className="flex items-start gap-3 mt-4">
                       <ArrowDownLeft className="w-4 h-4 text-sky-500 mt-0.5" />
                       <div className="flex-1">
                         <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Recebido</div>
                         {editandoDocs ? (
                           <Input value={docRecebidoEdit} onChange={(e) => setDocRecebidoEdit(e.target.value)} placeholder="Nº DIEx recebido" className="mt-1 h-8 text-sm" />
                         ) : (
-                          <div className={`text-sm mt-0.5 ${docRecebido ? "text-slate-800 font-medium" : "text-slate-400 italic"}`}>{docRecebido || "Pendente"}</div>
+                          <div className={`text-sm mt-0.5 ${docRecebido ? "text-slate-800 font-medium" : "text-slate-400 italic"}`}>
+                            {docRecebido || "Pendente"}
+                          </div>
                         )}
                       </div>
                     </div>
