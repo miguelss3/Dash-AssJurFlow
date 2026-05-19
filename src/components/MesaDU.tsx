@@ -225,7 +225,12 @@ export function MesaDU({
       isAguardandoAssinaturaPorId.set(p.id, aguardandoAssinatura);
 
       const pendenciaChefia =
-        SITUACOES_PENDENCIA_CHEFIA.has(situacaoFluxoPedido)
+        (SITUACOES_PENDENCIA_CHEFIA.has(situacaoFluxoPedido)
+          // CHEFIA_DILIGENCIA/CHEFIA_DEFESA sem responsavel = estado inválido; tratar como distribuição
+          && !(
+            (situacaoFluxoPedido === "CHEFIA_DILIGENCIA" || situacaoFluxoPedido === "CHEFIA_DEFESA")
+            && !String(p.responsavel || "").trim()
+          ))
         || statusNorm.includes("aguardando chem");
       isPendenciaChefiaPorId.set(p.id, pendenciaChefia);
 

@@ -19,7 +19,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { formatarData, diasRestantes } from "@/lib/prazo";
-import { getBadgeSituacaoDU } from "@/lib/utils";
+import { getBadgeSituacaoDUContextual } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
@@ -155,6 +155,11 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
 
   const pedido = processo.pedidoSubsidios;
   const respostaDU = processo.respostaDU;
+  const badgeSituacaoDU = getBadgeSituacaoDUContextual({
+    situacaoFluxo: pedido?.situacaoFluxo,
+    status: processo.status,
+    responsavel: processo.responsavel,
+  });
 
   const dataPedidoDU = (() => {
     if (!pedido) return undefined;
@@ -223,7 +228,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                 <Badge variant="destructive" className="gap-1"><AlertCircle className="w-3 h-3" /> Mandado de Segurança</Badge>
               )}
               {processo.status !== "concluido" && (
-                <Badge variant="outline" className="bg-sky-50 text-sky-800 border-sky-200">{getBadgeSituacaoDU(pedido?.situacaoFluxo)}</Badge>
+                <Badge variant="outline" className="bg-sky-50 text-sky-800 border-sky-200">{badgeSituacaoDU}</Badge>
               )}
               {(pedido?.reiteracoes ?? 0) > 0 && (
                 <Badge variant="outline" className="bg-orange-100 text-orange-900 border-orange-300 font-semibold">{pedido?.reiteracoes}ª Reiteração</Badge>
@@ -424,7 +429,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                   <InfoRow icon={Mail} label="DIEx / Documento" value={pedido.numeroOficioExterno || pedido.numeroDocumentoDU || pedido.numeroDiex || "Pendente"} />
                   <InfoRow icon={Calendar} label="Data do Pedido" value={formatarDataHoraSegura(dataPedidoDU)} />
                   <InfoRow icon={Clock} label="Prazo de Resposta" value={pedido.dataPrazo ? formatarData(pedido.dataPrazo) : pedido.prazoResposta ? formatarData(pedido.prazoResposta) : "—"} />
-                  {processo.status !== "concluido" && <InfoRow icon={AlertCircle} label="Situação" value={getBadgeSituacaoDU(pedido.situacaoFluxo)} />}
+                  {processo.status !== "concluido" && <InfoRow icon={AlertCircle} label="Situação" value={badgeSituacaoDU} />}
                 </div>
               </div>
             </>
