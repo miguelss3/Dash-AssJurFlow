@@ -121,6 +121,13 @@ export function AcoesPAModalV4({
         const sit = getSituacaoInicial(data);
         setSituacaoAtualState(sit);
         setParte(((data?.cliente as string | undefined) || "").toString());
+
+        // --- ADIÇÃO: AUTO-PREENCHIMENTO DA DATA DE CIENTE ---
+        // Se o processo estiver aguardando entrega, preenche com hoje.
+        if (sit === "AGUARDANDO_ENTREGA") {
+          setDataCiente(new Date().toISOString().split('T')[0]);
+        }
+        // ----------------------------------------------------
       } catch (error) {
         console.error("Erro ao carregar fluxo PA:", error);
         toast.error("Não foi possível carregar o fluxo do processo.");
