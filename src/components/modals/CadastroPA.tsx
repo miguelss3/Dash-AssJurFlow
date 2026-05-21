@@ -5,10 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
-import { AlertCircle } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
 import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc, query, where, getDocs } from "firebase/firestore";
@@ -132,13 +128,8 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
   const [tipoPA, setTipoPA] = useState("");
   // V4.7: campo legado `fluxoIPM` removido. Todo PA novo nasce na fase
   // FAZENDO_PORTARIA do motor V4 (situacaoFluxoPA).
-  const [anoLegado, setAnoLegado] = useState("");
   const [postoEncarregado, setPostoEncarregado] = useState("");
   const [nomeEncarregado, setNomeEncarregado] = useState("");
-  const [mudouEncarregado, setMudouEncarregado] = useState(false);
-  const [postoEncarregadoAtual, setPostoEncarregadoAtual] = useState("");
-  const [nomeEncarregadoAtual, setNomeEncarregadoAtual] = useState("");
-  const [novaPortaria, setNovaPortaria] = useState("");
   const [assuntoSindicancia, setAssuntoSindicancia] = useState("");
   const [especificidadesSindicancia, setEspecificidadesSindicancia] = useState("");
   const [omPresidenteConselho, setOmPresidenteConselho] = useState("");
@@ -147,8 +138,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
 
   const [loading, setLoading] = useState(false);
 
-  const anosLegado = Array.from({ length: 4 }, (_, idx) => new Date().getFullYear() - 4 + idx);
-
   const resetForm = () => {
     setNumeroProcesso("");
     setParte("");
@@ -156,13 +145,8 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
     setDataEntrada(new Date().toISOString().split("T")[0]);
     setObservacoes("");
     setTipoPA("");
-    setAnoLegado("");
     setPostoEncarregado("");
     setNomeEncarregado("");
-    setMudouEncarregado(false);
-    setPostoEncarregadoAtual("");
-    setNomeEncarregadoAtual("");
-    setNovaPortaria("");
     setAssuntoSindicancia("");
     setEspecificidadesSindicancia("");
     setOmPresidenteConselho("");
@@ -331,9 +315,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
 
     const isSindicanciaPA = tipoPA === "Sindicância";
     const isConselhoPASelecionado = isConselhoPA(tipoPA);
-    // V4.7: diligência/legado não existem mais como fluxo paralelo no cadastro.
-    const isDiligenciaPA = false;
-    const isSindicanciaAntiga = false;
 
     if (isSindicanciaPA && !assuntoSindicancia) {
       toast.error("Selecione o assunto da Sindicância.");
@@ -341,22 +322,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
     }
     if (isSindicanciaPA && !especificidadesSindicancia.trim()) {
       toast.error("Preencha as especificidades do assunto da Sindicância.");
-      return;
-    }
-    if (isDiligenciaPA && !postoEncarregado) {
-      toast.error("Informe o encarregado da 1ª portaria para a diligência.");
-      return;
-    }
-    if (isDiligenciaPA && mudouEncarregado && !postoEncarregadoAtual) {
-      toast.error("Informe o encarregado atual quando houver mudança.");
-      return;
-    }
-    if (isDiligenciaPA && mudouEncarregado && !novaPortaria.trim()) {
-      toast.error("Informe a nova portaria quando houver mudança de encarregado.");
-      return;
-    }
-    if (isSindicanciaAntiga && !anoLegado) {
-      toast.error("Selecione o ano da Sindicância Antiga.");
       return;
     }
     if (isConselhoPASelecionado && !postoEncarregado) {
@@ -414,18 +379,16 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
         ? `${assuntoSindicancia.trim()}${especificidadesSindicancia.trim() ? ` - ${especificidadesSindicancia.trim()}` : ""}`
         : assunto.trim();
 
-      const valorBasePortaria = isSindicanciaAntiga && anoLegado ? `${numeroProcesso}/${anoLegado}` : numeroProcesso;
       const primeiraPortariaFormatada = usaPortariaPA(tipoPA)
-        ? formatarPortaria(valorBasePortaria)
+        ? formatarPortaria(numeroProcesso)
         : numeroProcesso;
-      const numeroFinal = (mudouEncarregado && novaPortaria) ? formatarPortaria(novaPortaria) : primeiraPortariaFormatada;
 
       // Verificação de duplicidade PA
-      if (numeroFinal.trim()) {
+      if (primeiraPortariaFormatada.trim()) {
         const q = query(
           collection(db, "processos"),
           where("setor", "==", "PA"),
-          where("numeroProcesso", "==", numeroFinal.trim())
+          where("numeroProcesso", "==", primeiraPortariaFormatada.trim())
         );
         const querySnapshot = await getDocs(q);
 
@@ -437,24 +400,21 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
         });
 
         if (isDuplicate) {
-          toast.error(`Já existe um processo cadastrado com o número ${numeroFinal.trim()}.`);
+          toast.error(`Já existe um processo cadastrado com o número ${primeiraPortariaFormatada.trim()}.`);
           setLoading(false);
           return;
         }
       }
 
       const encarregadoPrimeiro = `${postoEncarregado} ${nomeEncarregado}`.trim() || null;
-      const encarregadoAtualInformado = `${postoEncarregadoAtual} ${nomeEncarregadoAtual}`.trim() || null;
       const encarregadoPresidente = `${postoEncarregado} ${nomeEncarregado}`.trim() || null;
-      const encarregadoFinal = isConselhoPASelecionado
-        ? encarregadoPresidente
-        : ((isDiligenciaPA && mudouEncarregado) ? encarregadoAtualInformado : encarregadoPrimeiro);
+      const encarregadoFinal = isConselhoPASelecionado ? encarregadoPresidente : encarregadoPrimeiro;
 
       // V4.7: payload sanitizado. Removidos campos legados (status, fluxoIPM,
       // emDiligencia, aguardandoAssinaturaCmt). O motor V4 (situacaoFluxoPA)
       // é injetado apenas na criação; updates não tocam no estado do fluxo.
       const dados: Record<string, unknown> = {
-        numeroProcesso: numeroFinal.trim(),
+        numeroProcesso: primeiraPortariaFormatada.trim(),
         parte: parte.trim(),
         assunto: assuntoFinal,
         dataEntrada,
@@ -495,13 +455,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
       if (isSindicanciaPA) {
         dados.assuntoSindicancia = assuntoSindicancia;
         dados.especificidadesAssunto = especificidadesSindicancia;
-      }
-
-      if (isDiligenciaPA) {
-        dados.primeiraPortaria = primeiraPortariaFormatada;
-        dados.primeiroEncarregado = encarregadoPrimeiro;
-        dados.mudouEncarregadoDiligencia = mudouEncarregado ? "Sim" : "Não";
-        if (mudouEncarregado) dados.novaPortariaDiligencia = numeroFinal;
       }
 
       if (isConselhoPASelecionado) {
@@ -552,6 +505,10 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
         if (prazoCalculado) {
           dados.prazoFatal = prazoCalculado;
           dados.finalPrazo = prazoCalculado;
+          // Override manual: como o cadastro recalcula explicitamente com base nas
+          // prorrogações editadas, gravamos o override para impedir que o useProcessos
+          // resete o valor a partir de tipoPA + diasIniciais.
+          dados.prazoFatalOverride = prazoCalculado;
         }
       }
 
@@ -640,9 +597,7 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
           });
         }
 
-        toast.success(
-          isSindicanciaAntiga ? "Sindicância antiga cadastrada no acervo!" : "PA Cadastrado e distribuído para a sua mesa!",
-        );
+        toast.success("PA Cadastrado e distribuído para a sua mesa!");
       }
 
       onOpenChange(false);
@@ -662,8 +617,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
   // V5.3: bloco UI dependente de `fluxoIPM` removido (campo legado).
   const mostrarEncarregado = aceitaDiligencia(tipoPA);
   const mostrarPresidenteConselho = isConselhoPA(tipoPA);
-  const mostrarAnoLegado = false;
-  const mostrarMudancaEncarregado = false;
   const mostrarAssuntoSindicancia = tipoPA === "Sindicância";
 
   return (
@@ -692,22 +645,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
           </div>
 
           {/* V4.7: bloco "Fluxo de Sindicância" removido (campo legado fluxoIPM). */}
-
-          {mostrarAnoLegado && (
-            <div className="space-y-2">
-              <Label htmlFor="anoLegado">Ano da Sindicância Antiga *</Label>
-              <Select value={anoLegado} onValueChange={setAnoLegado}>
-                <SelectTrigger id="anoLegado">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {anosLegado.map((ano) => (
-                    <SelectItem key={ano} value={String(ano)}>{ano}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -798,41 +735,6 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
                 <Label htmlFor="omPresidenteConselho">OM do Presidente *</Label>
                 <Input id="omPresidenteConselho" value={omPresidenteConselho} onChange={(e) => setOmPresidenteConselho(e.target.value)} />
               </div>
-            </div>
-          )}
-
-          {mostrarMudancaEncarregado && (
-            <div className="space-y-4 p-4 border rounded-lg bg-amber-50">
-              <div className="flex items-center space-x-2">
-                <Checkbox id="mudouEncarregado" checked={mudouEncarregado} onCheckedChange={(checked) => setMudouEncarregado(checked as boolean)} />
-                <Label htmlFor="mudouEncarregado" className="font-normal cursor-pointer">Houve mudança de encarregado?</Label>
-              </div>
-
-              {mudouEncarregado && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="postoEncarregadoAtual">Posto Atual *</Label>
-                      <Select value={postoEncarregadoAtual} onValueChange={setPostoEncarregadoAtual}>
-                        <SelectTrigger id="postoEncarregadoAtual"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                        <SelectContent>
-                          {POSTOS_ENCARREGADO.map((posto) => (
-                            <SelectItem key={posto} value={posto}>{posto}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="nomeEncarregadoAtual">Nome Atual *</Label>
-                      <Input id="nomeEncarregadoAtual" value={nomeEncarregadoAtual} onChange={(e) => setNomeEncarregadoAtual(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="novaPortaria">Nova Portaria *</Label>
-                    <Input id="novaPortaria" value={novaPortaria} onChange={(e) => setNovaPortaria(e.target.value)} />
-                  </div>
-                </>
-              )}
             </div>
           )}
 

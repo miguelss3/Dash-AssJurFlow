@@ -317,12 +317,14 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
               const dataInicioPrazo = toIsoString(procData.dataInicioPrazo) || procData.dataInicioPrazo;
               const descricaoUltimoMovimento = normalizarTextoHistoricoPrazoPA(descricaoUltimoMovimentoOriginal, dataInicioPrazo);
               const prorrogacoes = Array.isArray(procData.prorrogacoes) ? procData.prorrogacoes : undefined;
-              const prazoFinalPA = calcularPrazoFinalPA({
+              const prazoFinalPACalculado = calcularPrazoFinalPA({
                 tipoPA: procData.tipoPA,
                 dataInicioPrazo,
                 dataAssinatura,
                 prorrogacoes,
               }, siteSettings);
+              // Override manual (editado pelo assessor) tem precedência sobre o cálculo automático.
+              const prazoFinalPA = procData.prazoFatalOverride || prazoFinalPACalculado;
               const prazoFatalProcesso = setorCanonico === "PA"
                 ? (prazoFinalPA || procData.prazoFatal || procData.finalPrazo)
                 : (procData.prazoFatalDU || procData.prazoFatal || procData.finalPrazo);

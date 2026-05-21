@@ -1,15 +1,24 @@
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Processo } from "@/types/processo";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Calendar,
   User,
   FileText,
   Clock,
   CheckCircle2,
+  Pencil,
+  Save,
+  X,
   type LucideIcon,
 } from "lucide-react";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { toast } from "sonner";
 import { calcularFaixasProrrogacaoPA, diasRestantes, formatarData } from "@/lib/prazo";
 import { getBadgeSituacaoPA } from "@/lib/utils";
 
@@ -20,7 +29,45 @@ interface DetalhesModalPAProps {
 }
 
 export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalPAProps) {
+  const [editandoPrazosPA, setEditandoPrazosPA] = useState(false);
+  const [savingPrazosPA, setSavingPrazosPA] = useState(false);
+  const [dataEntradaEdit, setDataEntradaEdit] = useState("");
+  const [inicioPrazoEdit, setInicioPrazoEdit] = useState("");
+  const [prazoFatalEdit, setPrazoFatalEdit] = useState("");
+
+  useEffect(() => {
+    if (!open || !processo) return;
+    setDataEntradaEdit(processo.dataEntrada || "");
+    setInicioPrazoEdit(processo.dataInicioPrazo || "");
+    setPrazoFatalEdit(processo.prazoFatal || "");
+    setEditandoPrazosPA(false);
+  }, [open, processo]);
+
   if (!processo) return null;
+
+  const handleSalvarPrazosPA = async () => {
+    try {
+      setSavingPrazosPA(true);
+      const processoRef = doc(db, "processos", processo.id);
+      await updateDoc(processoRef, {
+        dataEntrada: dataEntradaEdit || null,
+        dataInicioPrazo: inicioPrazoEdit || null,
+        prazoFatal: prazoFatalEdit || null,
+        finalPrazo: prazoFatalEdit || null,
+        // Override manual: o hook useProcessos recalcula prazoFatal a partir de
+        // dataInicioPrazo + tipoPA. Sem este campo, a edição livre seria ignorada.
+        prazoFatalOverride: prazoFatalEdit || null,
+        atualizadoEm: new Date().toISOString(),
+      });
+      setEditandoPrazosPA(false);
+      toast.success("Prazos do PA atualizados com sucesso.");
+    } catch (error) {
+      console.error("Erro ao atualizar prazos PA:", error);
+      toast.error("Não foi possível salvar os prazos.");
+    } finally {
+      setSavingPrazosPA(false);
+    }
+  };
 
   const prorrogacoesPA = calcularFaixasProrrogacaoPA({
     tipoPA: processo.tipoPA,
@@ -131,7 +178,55 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
             </div>
 
             <div className="space-y-4">
-              <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
+                <div className="flex items-center gap-2">
+                  {editandoPrazosPA ? (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setEditandoPrazosPA(false);
+                          setDataEntradaEdit(processo.dataEntrada || "");
+                          setInicioPrazoEdit(processo.dataInicioPrazo || "");
+                          setPrazoFatalEdit(processo.prazoFatal || "");
+                        }}
+                        disabled={savingPrazosPA}
+                      >
+                        <X className="w-3.5 h-3.5 mr-1" /> Cancelar
+                      </Button>
+                      <Button type="button" size="sm" onClick={handleSalvarPrazosPA} disabled={savingPrazosPA}>
+                        <Save className="w-3.5 h-3.5 mr-1" /> {savingPrazosPA ? "Salvando..." : "Salvar"}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button type="button" size="sm" variant="outline" onClick={() => setEditandoPrazosPA(true)}>
+                      <Pencil className="w-3.5 h-3.5 mr-1" /> Editar prazos
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {editandoPrazosPA && (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Data de Entrada</label>
+                      <Input type="date" value={dataEntradaEdit} onChange={(e) => setDataEntradaEdit(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Início do Prazo</label>
+                      <Input type="date" value={inicioPrazoEdit} onChange={(e) => setInicioPrazoEdit(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Prazo Fatal / Solução</label>
+                      <Input type="date" value={prazoFatalEdit} onChange={(e) => setPrazoFatalEdit(e.target.value)} />
+                    </div>
+                  </div>
+                </div>
+              )}
               <InfoRow icon={Calendar} label="Data de Entrada" value={processo.dataEntrada ? formatarData(processo.dataEntrada) : undefined} />
               <InfoRow icon={Calendar} label={emPrazoSolucao ? "Início do Prazo da Solução" : "Início do Prazo"} value={processo.dataInicioPrazo ? formatarData(processo.dataInicioPrazo) : undefined} />
               <InfoRow icon={Clock} label={emPrazoSolucao ? "Prazo da Solução (10 dias)" : "Prazo Fatal"} value={processo.prazoFatal ? formatarData(processo.prazoFatal) : undefined} />

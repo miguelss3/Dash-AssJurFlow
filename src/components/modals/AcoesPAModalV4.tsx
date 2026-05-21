@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { addDoc, arrayUnion, collection, doc, getDoc, Timestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { formatarData } from "@/lib/prazo";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -100,6 +101,11 @@ export function AcoesPAModalV4({
   const [docProrrogacao, setDocProrrogacao] = useState<string>("");
   const [prazoFatalAtual, setPrazoFatalAtual] = useState<string>("");
   const [dataInicioPrazoAtual, setDataInicioPrazoAtual] = useState<string>("");
+
+  // V9.2 — Recebimento manual de autos (fase COM_ENCARREGADO).
+  const [isRecebendoAutos, setIsRecebendoAutos] = useState<boolean>(false);
+  const [dataRecebimentoAutos, setDataRecebimentoAutos] = useState<string>("");
+  const [prazoSolucaoSugerido, setPrazoSolucaoSugerido] = useState<string>("");
 
   // ---------------- Carga ----------------
   useEffect(() => {
@@ -222,6 +228,9 @@ export function AcoesPAModalV4({
       await updateDoc(processoRef, {
         prazoFatal: novoPrazoISO,
         finalPrazo: novoPrazoISO,
+        // Override manual: impede que useProcessos recalcule o prazo a partir de
+        // tipoPA + dataInicioPrazo, ignorando a prorática adicionada.
+        prazoFatalOverride: novoPrazoISO,
         prorrogacoes: arrayUnion(novaProrrogacao),
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
@@ -420,6 +429,67 @@ export function AcoesPAModalV4({
                   </button>
                 </div>
               </div>
+            ) : isRecebendoAutos ? (
+              <div className="space-y-3 rounded-lg border border-indigo-300 bg-indigo-50 p-4 mt-4">
+                <h5 className="text-sm font-semibold text-indigo-900">Confirmar Recebimento dos Autos</h5>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-indigo-800">Data do Recebimento</Label>
+                    <Input
+                      type="date"
+                      value={dataRecebimentoAutos}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setDataRecebimentoAutos(val);
+                        if (val) setPrazoSolucaoSugerido(somarDiasISO(val, 10));
+                      }}
+                      className="border-indigo-200"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-indigo-800">Prazo da Solução (Fatal)</Label>
+                    <Input
+                      type="date"
+                      value={prazoSolucaoSugerido}
+                      onChange={(e) => setPrazoSolucaoSugerido(e.target.value)}
+                      className="border-indigo-200"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    type="button"
+                    disabled={salvando || !dataRecebimentoAutos || !prazoSolucaoSugerido}
+                    className={PRIMARY_BTN}
+                    onClick={() => {
+                      void avancarFluxo(
+                        "FAZENDO_SOLUCAO",
+                        {
+                          dataInicioPrazo: dataRecebimentoAutos,
+                          prazoFatal: prazoSolucaoSugerido,
+                          finalPrazo: prazoSolucaoSugerido,
+                          // Override manual: o assessor definiu explicitamente os prazos no formulário;
+                          // useProcessos respeita prazoFatalOverride em vez de recalcular.
+                          prazoFatalOverride: prazoSolucaoSugerido,
+                          status: "andamento",
+                          descricao: `Sindicância recebida em ${formatarData(dataRecebimentoAutos)}. Prazo para solução ajustado para ${formatarData(prazoSolucaoSugerido)}.`,
+                        },
+                        `Autos recebidos em ${formatarData(dataRecebimentoAutos)}. Prazo para solução ajustado para ${formatarData(prazoSolucaoSugerido)}.`,
+                      );
+                    }}
+                  >
+                    Confirmar e Iniciar Solução
+                  </button>
+                  <button
+                    type="button"
+                    className={SECONDARY_BTN}
+                    disabled={salvando}
+                    onClick={() => setIsRecebendoAutos(false)}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="space-y-2">
                 <button
@@ -436,19 +506,9 @@ export function AcoesPAModalV4({
                   className={PRIMARY_BTN}
                   onClick={() => {
                     const hoje = new Date().toISOString().slice(0, 10);
-                    const prazoSolucao = somarDiasISO(hoje, 10);
-
-                    void avancarFluxo(
-                      "FAZENDO_SOLUCAO",
-                      {
-                        dataInicioPrazo: hoje,
-                        prazoFatal: prazoSolucao,
-                        finalPrazo: prazoSolucao,
-                        status: "andamento",
-                        descricao: "Sindicância entregue pelo encarregado. Iniciado prazo de 10 dias para confecção da solução.",
-                      },
-                      "Sindicância entregue pelo encarregado. Iniciado prazo de 10 dias para confecção da solução.",
-                    );
+                    setDataRecebimentoAutos(hoje);
+                    setPrazoSolucaoSugerido(somarDiasISO(hoje, 10));
+                    setIsRecebendoAutos(true);
                   }}
                 >
                   Receber Autos Concluídos
