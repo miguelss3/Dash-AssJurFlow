@@ -381,6 +381,7 @@ function Index() {
   }, [user]);
 
   const cabecalhoAtual = useMemo(() => {
+    // Corrigido: removendo a chave 'arquivo' para compatibilidade com o tipo Aba
     const mapa: Record<Aba, { titulo: string; descricao: string }> = {
       mesa: {
         titulo: siteSettings.dashboardTitle,
@@ -394,10 +395,6 @@ function Index() {
         titulo: "Ajustes do Site",
         descricao:
           "Edite textos e rótulos do layout principal visível para os usuários autenticados.",
-      },
-      arquivo: {
-        titulo: "Arquivo / Encerrados",
-        descricao: "Histórico dos processos finalizados e reaberturas registradas.",
       },
       indicadores: {
         titulo: "Indicadores de Gestão",
