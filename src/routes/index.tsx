@@ -144,7 +144,7 @@ export const Route = createFileRoute("/")({
   },
 });
 
-type Aba = "mesa" | "prazos" | "ajustes" | "arquivo" | "indicadores" | "equipe";
+type Aba = "mesa" | "prazos" | "ajustes" | "indicadores" | "equipe";
 type FiltroTipo = "todos" | "DU" | "PA";
 
 type NotificacaoItem = {
@@ -1101,6 +1101,7 @@ function Index() {
 
   const navSec: { id: Aba; label: string; icon: typeof LayoutGrid }[] = [
     { id: "prazos", label: "Controle de Prazos", icon: Calendar },
+    { id: "equipe", label: "Gestão da Equipe", icon: Users },
     ...(ehAdmin ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
   ];
 
@@ -1110,22 +1111,19 @@ function Index() {
   // Aba "Arquivo / Encerrados" é específica de processos finalizados (gestão PA)
   const tabsCompletas: { id: Aba; label: string }[] = [
     { id: "mesa", label: "Mesa de Trabalho" },
-    { id: "prazos", label: "Controle de Prazos" },
-    { id: "ajustes", label: "Ajustes do Site" },
     { id: "indicadores", label: "Indicadores de Gestão" },
-    { id: "equipe", label: "Gestão da Equipe" },
   ];
 
   const tabsAssessor: { id: Aba; label: string }[] = [
     { id: "mesa", label: "Mesa de Trabalho" },
-    { id: "prazos", label: "Controle de Prazos" },
     { id: "indicadores", label: "Indicadores de Gestão" },
   ];
 
   const tabs = ehAdmin ? tabsCompletas : tabsAssessor;
 
   useEffect(() => {
-    if (!tabs.some((t) => t.id === aba)) {
+    // Permite aba 'prazos' e 'ajustes' mesmo que não estejam em tabs
+    if (aba !== "prazos" && aba !== "ajustes" && !tabs.some((t) => t.id === aba)) {
       setAba("mesa");
     }
   }, [tabs, aba]);
@@ -1215,6 +1213,7 @@ function Index() {
                       ? "bg-[oklch(0.6_0.16_230)] text-white font-bold shadow-lg"
                       : "text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                   }`}
+                  data-testid={`sidebar-nav-${item.id}`}
                 >
                   <Icon className="h-4.5 w-4.5 shrink-0" />
                   <span className="flex-1 text-left">{item.label}</span>
@@ -1510,17 +1509,6 @@ function Index() {
             </Suspense>
           )}
 
-          {aba === "arquivo" && (
-            <EmptyTab
-              icon={FolderArchive}
-              title="Arquivo / Encerrados"
-              description="Histórico de processos finalizados e arquivados."
-              processos={processos.filter((p) => p.status === "concluido")}
-              onEdit={handleEdit}
-              onDelete={handleRemover}
-              onMove={handleMoverStatus}
-            />
-          )}
 
           {aba === "indicadores" && (
             <Suspense fallback={<TabLoading label="Carregando indicadores..." />}>

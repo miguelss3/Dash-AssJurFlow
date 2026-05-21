@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
 import { COLUNAS } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
+import { useProcessosStats } from "@/hooks/useProcessosStats";
 import { Button } from "@/components/ui/button";
 import {
   exportIndicadoresGeraisPdf,
@@ -71,6 +72,9 @@ function normalizarChaveAssunto(value: string) {
 
 export function Estatisticas({ processos }: Props) {
   const indicadoresPrintRef = useRef<HTMLDivElement | null>(null);
+  // V9.8 — Fonte ÚNICA de verdade: counts históricos vindos do servidor,
+  // separados por setor. Garante convergência com o Dashboard.
+  const statsServidor = useProcessosStats();
 
   const handleExportEstatisticas = async () => {
     if (!indicadoresPrintRef.current) {
@@ -196,9 +200,18 @@ export function Estatisticas({ processos }: Props) {
     }));
   }, [processos]);
 
-  const total = processos.length;
-  const concluidos = processos.filter((p) => p.status === "concluido").length;
-  const ativos = total - concluidos;
+  // V9.8 — Totais alinhados com o Dashboard:
+  //   total_setor = ativos_setor (snapshot local) + concluídos_setor (servidor)
+  // O array local `processos` está limitado a "ativos + últimos 50 concluídos",
+  // então contar diretamente nele subestima quando o histórico > 50.
+  const setorDe = (p: Processo) => (p.setor || p.tipo || "").toString().toUpperCase();
+  const ativosDU = processos.filter((p) => p.status !== "concluido" && setorDe(p) === "DU").length;
+  const ativosPA = processos.filter((p) => p.status !== "concluido" && setorDe(p) === "PA").length;
+  const totalDU = ativosDU + statsServidor.totalConcluidosDU;
+  const totalPA = ativosPA + statsServidor.totalConcluidosPA;
+  const total = totalDU + totalPA;
+  const concluidos = statsServidor.totalConcluidos;
+  const ativos = ativosDU + ativosPA;
   const vencidos = processos.filter(
     (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
   ).length;
@@ -228,9 +241,6 @@ export function Estatisticas({ processos }: Props) {
     (p) => p.status === "concluido" && noMesAtual(p.atualizadoEm || p.criadoEm),
   ).length;
   const resolutividadeMes = cadastradosMes > 0 ? Math.round((finalizadosMes / cadastradosMes) * 100) : 0;
-
-  const totalDU = processos.filter((p) => p.tipo === "DU").length;
-  const totalPA = processos.filter((p) => p.tipo === "PA").length;
 
   const taxaSucesso = total ? Math.round((concluidos / total) * 100) : 0;
   const topResp = dadosResponsavel[0];
@@ -277,9 +287,9 @@ export function Estatisticas({ processos }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
         <KpiHero
           icon={CheckCircle2}
-          label="Taxa de conclusão (safra recente)"
+          label="Taxa de conclusão"
           value={`${taxaSucesso}%`}
-          sub={`${concluidos} de ${total} processos (últimos 50 concluídos + ativos)`}
+          sub={`${concluidos} de ${total} processos (histórico total)`}
           tone="success"
         />
         <KpiHero
@@ -365,10 +375,10 @@ export function Estatisticas({ processos }: Props) {
 
               <div>
                 <div className="flex items-end gap-2 leading-none">
-                  <span className="text-4xl sm:text-5xl font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
+                  <span className="text-3xl sm:text-4xl font-bold text-[oklch(0.78_0.18_145)] mb-1">{taxaSucesso}%</span>
+                  <span className="text-lg font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
                     {concluidos}
                   </span>
-                  <span className="text-2xl font-bold text-[oklch(0.78_0.18_145)] mb-1">{taxaSucesso}%</span>
                 </div>
                 <p className="text-lg sm:text-xl text-white/85 mt-3">Finalizados</p>
                 <p className="text-base text-white/60 mt-0.5">{taxaSucesso}% do total cadastrado</p>

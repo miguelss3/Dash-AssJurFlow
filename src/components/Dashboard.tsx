@@ -10,15 +10,8 @@ import {
   BarChart2,
   Loader2,
 } from "lucide-react";
-import {
-  collection,
-  getCountFromServer,
-  query,
-  where,
-  type QueryConstraint,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useAuth, isAdmin } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { useProcessosStats } from "@/hooks/useProcessosStats";
 import type { Processo, FiltroPrazo } from "@/types/processo";
 import { statusPrazo, toDateLocal } from "@/lib/prazo";
 
@@ -57,6 +50,8 @@ interface CachedMetrics {
   totalGeral: number;
   ativosDU: number;
   ativosPA: number;
+  totalDU: number;
+  totalPA: number;
   acervoAtivo: number;
   vencidos: number;
   hoje: number;
@@ -76,10 +71,6 @@ function ehDoMesAtual(value: unknown, ref: Date): boolean {
 
 export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos = false }: Props) {
   const { user } = useAuth();
-  const ehAdmin = isAdmin(user);
-  const setorUsuario = String(user?.setor || "").trim().toUpperCase();
-  const escopoSetor =
-    !ehAdmin && (setorUsuario === "DU" || setorUsuario === "PA") ? setorUsuario : null;
 
   // V2.14 — Cache SWR: hidrata métricas da última sessão instantaneamente.
   const [cachedMetrics, setCachedMetrics] = useState<CachedMetrics | null>(() => {
@@ -150,9 +141,9 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
   );
 
   // ---------- Estatísticas SERVIDOR (finalizados = status:concluido) ----------
-  // Como o useProcessos agora também carrega os ÚLTIMOS 50 finalizados no cliente,
-  // poderíamos contar localmente — mas o limite de 50 é propositadamente baixo,
-  // então continuamos batendo no servidor para o total HISTÓRICO real.
+  // V9.8 — Usa o hook compartilhado `useProcessosStats` (fonte ÚNICA de verdade)
+  // para que Dashboard e Indicadores de Gestão exibam EXATAMENTE os mesmos números.
+  const statsServidor = useProcessosStats();
   const [stats, setStats] = useState<ServerStats>(STATS_INICIAIS);
   // Tarefa 3: Fallback de resiliência. Se o servidor demorar mais de 3s para responder
   // às contagens, liberamos a UI mesmo assim — melhor mostrar dados parciais (ainda sem
@@ -172,40 +163,20 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     if (!user) return;
     let cancelado = false;
 
-    const carregar = async () => {
-      const processosRef = collection(db, "processos");
-
-      // Escopo por setor (admin → DU+PA; usuário comum → seu setor)
-      const escopoBase: QueryConstraint[] = escopoSetor
-        ? [where("setor", "==", escopoSetor)]
-        : ehAdmin
-          ? [where("setor", "in", ["DU", "PA"])]
-          : [];
-
-      // ---------- Contagem TOTAL de finalizados (status == concluido) ----------
-      let totalConcluidos = 0;
-      try {
-        const qConcluidos = query(
-          processosRef,
-          ...escopoBase,
-          where("status", "==", "concluido"),
-        );
-        const snap = await getCountFromServer(qConcluidos);
-        totalConcluidos = snap.data().count;
-      } catch (err) {
-        console.error("Dashboard: falha ao contar finalizados (status==concluido):", err);
-      }
-
-      // ---------- Finalizações do mês (derivada do cache local de finalizados) ----------
-      // O useProcessos já baixou os últimos 50 finalizados ordenados por
-      // `atualizadoEm desc`, que cobre confortavelmente o mês corrente.
+    const carregar = () => {
+      // V9.8 — Total de concluídos vem do hook compartilhado (não duplicar query).
+      // Finalizações do mês permanecem locais (derivadas dos últimos 50 do snapshot).
       const finalizadosMes = processos.reduce((acc, p) => {
         if (p.status !== "concluido") return acc;
         return acc + (ehDoMesAtual(p.atualizadoEm, mesRef) ? 1 : 0);
       }, 0);
 
       if (cancelado) return;
-      setStats({ totalConcluidos, finalizadosMes, carregando: false });
+      setStats({
+        totalConcluidos: statsServidor.totalConcluidos,
+        finalizadosMes,
+        carregando: statsServidor.carregando,
+      });
     };
 
     carregar();
@@ -213,13 +184,20 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     return () => {
       cancelado = true;
     };
-  }, [user, ehAdmin, escopoSetor, mesRef, processos]);
+  }, [user, mesRef, processos, statsServidor.totalConcluidos, statsServidor.carregando]);
 
-  // ---------- Derivados (Agora usando a prop 'processos' como fonte única de verdade) ----------
+  // ---------- Derivados ----------
+  // V9.8 — Fonte ÚNICA de verdade (hook useProcessosStats):
+  //  - Concluídos: counts REAIS do servidor por setor (DU/PA).
+  //  - Ativos: array local (snapshot em tempo real, completo).
+  //  - Totais por setor: ativos_setor + concluidos_setor(servidor).
+  // Assim os badges do banner do Dashboard batem EXATAMENTE com os Indicadores.
   const { finalizadosMes } = stats;
 
-  const totalConcluidosLocal = processos.filter(p => p.status === "concluido").length;
-  const totalGeralLocal = processos.length;
+  const totalConcluidosLocal = statsServidor.totalConcluidos;
+  const totalDU = ativosDU + statsServidor.totalConcluidosDU;
+  const totalPA = ativosPA + statsServidor.totalConcluidosPA;
+  const totalGeralLocal = totalDU + totalPA;
 
   const taxaConclusao = totalGeralLocal > 0 ? Math.round((totalConcluidosLocal / totalGeralLocal) * 100) : 0;
   const resolutividadeMes = criadosMes > 0 ? Math.round((finalizadosMes / criadosMes) * 100) : 0;
@@ -244,6 +222,8 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
       totalGeral,
       ativosDU,
       ativosPA,
+      totalDU,
+      totalPA,
       acervoAtivo,
       vencidos,
       hoje,
@@ -265,6 +245,8 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     totalGeral,
     ativosDU,
     ativosPA,
+    totalDU,
+    totalPA,
     acervoAtivo,
     vencidos,
     hoje,
@@ -281,6 +263,9 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
   const displayTotalGeral = totalGeralLocal;
   const displayAtivosDU = dadosAtivosProntos ? ativosDU : (cachedMetrics?.ativosDU ?? 0);
   const displayAtivosPA = dadosAtivosProntos ? ativosPA : (cachedMetrics?.ativosPA ?? 0);
+  // V9.8 — TOTAIS por setor (ativos + concluídos do servidor), exibidos nos badges.
+  const displayTotalDU = dadosProntos ? totalDU : (cachedMetrics?.totalDU ?? 0);
+  const displayTotalPA = dadosProntos ? totalPA : (cachedMetrics?.totalPA ?? 0);
   const displayAcervoAtivo = dadosAtivosProntos ? acervoAtivo : (cachedMetrics?.acervoAtivo ?? 0);
   const displayVencidos = dadosAtivosProntos ? vencidos : (cachedMetrics?.vencidos ?? 0);
   const displayHoje = dadosAtivosProntos ? hoje : (cachedMetrics?.hoje ?? 0);
@@ -312,44 +297,44 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
       {/* === HERO BANNER: Acervo Processual === */}
       <div className="grid lg:grid-cols-3 gap-4">
         {/* Índice Mensal (esquerdo) */}
-        <div className="rounded-2xl bg-card border border-border p-5 shadow-card flex flex-col gap-4">
+        <div className="rounded-2xl bg-card border border-border p-3 shadow-card flex flex-col gap-2.5">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 rounded-lg bg-[oklch(0.6_0.16_230_/_0.12)] items-center justify-center shrink-0">
-              <BarChart2 className="h-4 w-4 text-[oklch(0.55_0.17_230)]" />
+            <span className="inline-flex h-6 w-6 rounded-md bg-[oklch(0.6_0.16_230_/_0.12)] items-center justify-center shrink-0">
+              <BarChart2 className="h-3 w-3 text-[oklch(0.55_0.17_230)]" />
             </span>
             <div className="min-w-0">
-              <p className="text-[10px] uppercase tracking-wider font-bold text-foreground leading-tight">
+              <p className="text-[9px] uppercase tracking-wider font-bold text-foreground leading-tight">
                 Índice Mensal{updatingBadge}
               </p>
-              <p className="text-[10px] text-muted-foreground capitalize leading-tight">
+              <p className="text-[9px] text-muted-foreground capitalize leading-tight">
                 {mesNome}
               </p>
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground font-medium">Cadastrados</span>
-              <span className="text-sm font-bold tabular-nums text-foreground">
+              <span className="text-[11px] text-muted-foreground font-medium">Cadastrados</span>
+              <span className="text-xs font-bold tabular-nums text-foreground">
                 {mostrarPlaceholderAtivos ? placeholder : displayCriadosMes}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground font-medium">Finalizados</span>
-              <span className="text-sm font-bold tabular-nums text-[var(--deadline-safe)]">
+              <span className="text-[11px] text-muted-foreground font-medium">Finalizados</span>
+              <span className="text-xs font-bold tabular-nums text-[var(--deadline-safe)]">
                 {mostrarPlaceholderHistorico ? placeholder : displayFinalizadosMes}
               </span>
             </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-muted-foreground font-medium">Resolutividade</span>
-              <span className="text-xs font-bold tabular-nums text-foreground">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] text-muted-foreground font-medium">Resolutividade</span>
+              <span className="text-[11px] font-bold tabular-nums text-foreground">
                 {mostrarPlaceholderCombinado ? placeholder : `${displayResolutividadeMes}%`}
               </span>
             </div>
-            <div className="h-2 rounded-full bg-muted overflow-hidden">
+            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-[oklch(0.6_0.16_230)] to-[oklch(0.78_0.18_145)] transition-all"
                 style={{ width: `${displayResolutividadeMes}%` }}
@@ -358,55 +343,41 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
           </div>
         </div>
 
-        {/* Acervo Processual (direito — destaque) */}
-        <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-[oklch(0.22_0.05_258)] to-[oklch(0.32_0.1_245)] text-white p-6 shadow-elegant relative overflow-hidden">
-          <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
+        {/* Acervo Processual — JSX espelhado de Indicadores de Gestão (Estatisticas.tsx)
+            para garantir paridade visual e numérica entre as duas telas. */}
+        <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-[oklch(0.22_0.05_258)] to-[oklch(0.32_0.1_245)] text-white p-3.5 sm:p-4 shadow-elegant relative overflow-hidden">
+          <div className="absolute -top-20 -right-20 h-48 w-48 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
+
           <div className="relative">
-            <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-[oklch(0.78_0.18_145)] flex items-center gap-1.5 mb-5">
-              <Inbox className="h-3 w-3" />
-              Acervo Processual{updatingBadge}
+            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[oklch(0.78_0.18_145)] mb-2.5">
+              Acervo Processual
             </p>
 
-            <div className="grid grid-cols-2 gap-6">
-              {/* Cadastrados (Histórico Total) */}
+            <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <div className="text-5xl font-bold font-display tabular-nums leading-none">
-                  {mostrarPlaceholderHistorico ? placeholder : displayTotalGeral}
-                </div>
-                <p className="text-sm text-white/70 mt-2">Processos cadastrados</p>
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
-                    DU: {mostrarPlaceholderAtivos ? "…" : displayAtivosDU}
-                  </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
-                    PA: {mostrarPlaceholderAtivos ? "…" : displayAtivosPA}
-                  </span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-white/10 text-white/80">
-                    Ativos: {mostrarPlaceholderAtivos ? "…" : displayAcervoAtivo}
-                  </span>
+                <div className="text-3xl sm:text-4xl font-bold font-display tabular-nums leading-none">{totalGeralLocal}</div>
+                <p className="text-sm sm:text-base text-white/85 mt-1.5">Processos cadastrados</p>
+                <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">DU: {totalDU}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">PA: {totalPA}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">Ativos: {acervoAtivo}</span>
                 </div>
               </div>
 
-              {/* Finalizados (Histórico Total) */}
               <div>
                 <div className="flex items-end gap-2 leading-none">
-                  <div className="text-5xl font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
-                    {mostrarPlaceholderCombinado ? placeholder : `${displayTaxaConclusao}%`}
-                  </div>
-                  <div className="mb-1 text-base font-bold text-[oklch(0.78_0.18_145)] opacity-80 whitespace-nowrap">
-                    {mostrarPlaceholderHistorico ? "…" : `- ${displayTotalConcluidos} Finalizados`}
-                  </div>
+                  <span className="text-2xl sm:text-3xl font-bold text-[oklch(0.78_0.18_145)] mb-0.5">{taxaConclusao}%</span>
+                  <span className="text-lg font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
+                    {totalConcluidosLocal}
+                  </span>
                 </div>
-                <p className="text-sm text-white/70 mt-2">Índice de Resolução</p>
-                <p className="text-xs text-white/50 mt-0.5">
-                  {mostrarPlaceholderCombinado
-                    ? "sincronizando com servidor…"
-                    : "do total do acervo cadastrado"}
-                </p>
-                <div className="mt-3 h-1.5 rounded-full bg-white/15 overflow-hidden">
+                <p className="text-sm sm:text-base text-white/85 mt-1.5">Finalizados</p>
+                <p className="text-xs text-white/60 mt-0.5">{taxaConclusao}% do total cadastrado</p>
+
+                <div className="mt-2 h-1.5 rounded-full bg-white/15 overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-[oklch(0.78_0.18_145)] transition-all"
-                    style={{ width: `${displayTaxaConclusao}%` }}
+                    className="h-full rounded-full bg-[oklch(0.78_0.18_145)]"
+                    style={{ width: `${taxaConclusao}%` }}
                   />
                 </div>
               </div>
