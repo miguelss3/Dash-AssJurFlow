@@ -16,11 +16,12 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { calcularFaixasProrrogacaoPA, diasRestantes, formatarData } from "@/lib/prazo";
 import { getBadgeSituacaoPA } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface DetalhesModalPAProps {
   open: boolean;
@@ -29,6 +30,9 @@ interface DetalhesModalPAProps {
 }
 
 export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalPAProps) {
+  const { user } = useAuth();
+  const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
+  const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
   const [editandoPrazosPA, setEditandoPrazosPA] = useState(false);
   const [savingPrazosPA, setSavingPrazosPA] = useState(false);
   const [dataEntradaEdit, setDataEntradaEdit] = useState("");
@@ -49,16 +53,54 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
     try {
       setSavingPrazosPA(true);
       const processoRef = doc(db, "processos", processo.id);
+
+      // V9.6 — Log de auditoria no chat: qualquer alteração de data deve ser
+      // registrada como mensagem no histórico do processo, com autor e timestamp.
+      const alteracoes: string[] = [];
+      const novaDataEntrada = dataEntradaEdit || null;
+      const novoInicioPrazo = inicioPrazoEdit || null;
+      const novoPrazoFatal = prazoFatalEdit || null;
+      if ((processo.dataEntrada || null) !== novaDataEntrada) {
+        alteracoes.push(
+          `Data de Entrada: ${processo.dataEntrada ? formatarData(processo.dataEntrada) : "—"} → ${novaDataEntrada ? formatarData(novaDataEntrada) : "—"}`,
+        );
+      }
+      if ((processo.dataInicioPrazo || null) !== novoInicioPrazo) {
+        alteracoes.push(
+          `Início do Prazo: ${processo.dataInicioPrazo ? formatarData(processo.dataInicioPrazo) : "—"} → ${novoInicioPrazo ? formatarData(novoInicioPrazo) : "—"}`,
+        );
+      }
+      if ((processo.prazoFatal || null) !== novoPrazoFatal) {
+        alteracoes.push(
+          `Prazo Fatal: ${processo.prazoFatal ? formatarData(processo.prazoFatal) : "—"} → ${novoPrazoFatal ? formatarData(novoPrazoFatal) : "—"}`,
+        );
+      }
+
       await updateDoc(processoRef, {
-        dataEntrada: dataEntradaEdit || null,
-        dataInicioPrazo: inicioPrazoEdit || null,
-        prazoFatal: prazoFatalEdit || null,
-        finalPrazo: prazoFatalEdit || null,
+        dataEntrada: novaDataEntrada,
+        dataInicioPrazo: novoInicioPrazo,
+        prazoFatal: novoPrazoFatal,
+        finalPrazo: novoPrazoFatal,
         // Override manual: o hook useProcessos recalcula prazoFatal a partir de
         // dataInicioPrazo + tipoPA. Sem este campo, a edição livre seria ignorada.
-        prazoFatalOverride: prazoFatalEdit || null,
+        prazoFatalOverride: novoPrazoFatal,
         atualizadoEm: new Date().toISOString(),
+        atualizadoPorNome: autorMilitar,
       });
+
+      if (alteracoes.length > 0) {
+        try {
+          await addDoc(collection(db, `processos/${processo.id}/historico`), {
+            autor: autorMilitar,
+            autorId: user?.uid || "sistema",
+            texto: `Alteração de datas — ${alteracoes.join(" | ")}`,
+            timestamp: new Date().toISOString(),
+          });
+        } catch (logError) {
+          console.warn("Não foi possível registrar log de alteração de datas no chat:", logError);
+        }
+      }
+
       setEditandoPrazosPA(false);
       toast.success("Prazos do PA atualizados com sucesso.");
     } catch (error) {
@@ -227,10 +269,25 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                   </div>
                 </div>
               )}
-              <InfoRow icon={Calendar} label="Data de Entrada" value={processo.dataEntrada ? formatarData(processo.dataEntrada) : undefined} />
               <InfoRow icon={Calendar} label={emPrazoSolucao ? "Início do Prazo da Solução" : "Início do Prazo"} value={processo.dataInicioPrazo ? formatarData(processo.dataInicioPrazo) : undefined} />
-              <InfoRow icon={Clock} label={emPrazoSolucao ? "Prazo da Solução (10 dias)" : "Prazo Fatal"} value={processo.prazoFatal ? formatarData(processo.prazoFatal) : undefined} />
-              <InfoRow icon={Clock} label="Prazo Final" value={processo.finalPrazo ? formatarData(processo.finalPrazo) : undefined} />
+              {/* V9.6 — Prazo Fatal: sempre exibido. */}
+              <div className="flex items-start gap-3">
+                <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Prazo Fatal</div>
+                  <div className="text-sm text-slate-800 mt-0.5">{processo.prazoFatal ? formatarData(processo.prazoFatal) : "—"}</div>
+                </div>
+              </div>
+              {/* V9.6 — Prazo Solução: permanece em "—" até que o encarregado entregue os autos (fase FAZENDO_SOLUCAO/ASSINANDO_SOLUCAO). */}
+              <div className="flex items-start gap-3">
+                <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Prazo Solução</div>
+                  <div className="text-sm text-slate-800 mt-0.5">
+                    {emPrazoSolucao && processo.prazoFatal ? formatarData(processo.prazoFatal) : "—"}
+                  </div>
+                </div>
+              </div>
               {emPrazoSolucao && (
                 <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
                   <div className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">Prazo da Solução (Mesa do Assessor)</div>
