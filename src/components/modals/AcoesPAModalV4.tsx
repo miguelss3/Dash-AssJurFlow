@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { addDoc, arrayUnion, collection, doc, getDoc, Timestamp, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, Timestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { formatarData } from "@/lib/prazo";
 import { toast } from "sonner";
@@ -76,6 +76,10 @@ interface AcoesPAModalV4Props {
   // V4 ignora `siteSettings` (não utiliza configurações dinâmicas de fluxo).
   siteSettings?: SiteSettings;
   onSuccess?: () => void;
+  // V9.5 — Solicitação de prorrogação delega 100% ao modal de edição (CadastroPA).
+  // Quando o assessor clica em "Solicitar Prorrogação de Prazo", este modal é
+  // fechado e o pai abre o CadastroPA com o processo carregado.
+  onSolicitarEdicao?: () => void;
 }
 
 export function AcoesPAModalV4({
@@ -84,6 +88,7 @@ export function AcoesPAModalV4({
   processoId,
   numeroProcesso,
   onSuccess,
+  onSolicitarEdicao,
 }: AcoesPAModalV4Props) {
   const { user } = useAuth();
   const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
@@ -95,17 +100,12 @@ export function AcoesPAModalV4({
   const [parte, setParte] = useState<string>("");
   const [situacaoAtualState, setSituacaoAtualState] = useState<SituacaoFluxoPA>("FAZENDO_PORTARIA");
 
-  // V4.5 — Estado da prorrogação de prazo (fase COM_ENCARREGADO).
-  const [isProrrogando, setIsProrrogando] = useState<boolean>(false);
-  const [diasProrrogacao, setDiasProrrogacao] = useState<number>(20);
-  const [docProrrogacao, setDocProrrogacao] = useState<string>("");
-  const [prazoFatalAtual, setPrazoFatalAtual] = useState<string>("");
-  const [dataInicioPrazoAtual, setDataInicioPrazoAtual] = useState<string>("");
-
   // V9.2 — Recebimento manual de autos (fase COM_ENCARREGADO).
+  // Sugestão de 10 dias é aplicada apenas no momento de abrir o formulário;
+  // depois disso o assessor edita livremente ambas as datas, sem recálculo silencioso.
   const [isRecebendoAutos, setIsRecebendoAutos] = useState<boolean>(false);
-  const [dataRecebimentoAutos, setDataRecebimentoAutos] = useState<string>("");
-  const [prazoSolucaoSugerido, setPrazoSolucaoSugerido] = useState<string>("");
+  const [dataRecebimento, setDataRecebimento] = useState<string>("");
+  const [dataFatal, setDataFatal] = useState<string>("");
 
   // ---------------- Carga ----------------
   useEffect(() => {
@@ -121,13 +121,6 @@ export function AcoesPAModalV4({
         const sit = getSituacaoInicial(data);
         setSituacaoAtualState(sit);
         setParte(((data?.cliente as string | undefined) || "").toString());
-        // V4.5 — Captura prazos atuais para o motor de prorrogação.
-        setPrazoFatalAtual(
-          ((data?.prazoFatal as string | undefined)
-            || (data?.finalPrazo as string | undefined)
-            || "").toString(),
-        );
-        setDataInicioPrazoAtual(((data?.dataInicioPrazo as string | undefined) || "").toString());
       } catch (error) {
         console.error("Erro ao carregar fluxo PA:", error);
         toast.error("Não foi possível carregar o fluxo do processo.");
@@ -189,73 +182,11 @@ export function AcoesPAModalV4({
     }
   };
 
-  // ---------------- V4.5 — Motor de Prorrogação ----------------
-  // Soma `diasProrrogacao` ao prazo fatal corrente (prazoFatal → finalPrazo →
-  // dataInicioPrazo → hoje, nessa ordem) e grava o novo prazo nos dois campos
-  // de raiz (prazoFatal/finalPrazo) usados pelo Kanban e pelo Calendário.
-  // Mantém histórico imutável via arrayUnion em `prorrogacoes`.
-  const handleProrrogar = async () => {
-    if (!processoId || !user) return;
-    const dias = Number(diasProrrogacao);
-    if (!Number.isFinite(dias) || dias <= 0) {
-      toast.error("Informe um número válido de dias.");
-      return;
-    }
-    const docNumero = docProrrogacao.trim();
-    if (!docNumero) {
-      toast.error("Informe o documento de referência da prorrogação.");
-      return;
-    }
-    setSalvando(true);
-    try {
-      const baseStr = prazoFatalAtual || dataInicioPrazoAtual || "";
-      const base = baseStr ? new Date(baseStr) : new Date();
-      if (Number.isNaN(base.getTime())) {
-        toast.error("Não foi possível ler o prazo atual do processo.");
-        return;
-      }
-      base.setDate(base.getDate() + dias);
-      const novoPrazoISO = base.toISOString().slice(0, 10);
-
-      const novaProrrogacao = {
-        dias,
-        doc: docNumero,
-        por: autorMilitar,
-        em: new Date().toISOString(),
-      };
-
-      const processoRef = doc(db, "processos", processoId);
-      await updateDoc(processoRef, {
-        prazoFatal: novoPrazoISO,
-        finalPrazo: novoPrazoISO,
-        // Override manual: impede que useProcessos recalcule o prazo a partir de
-        // tipoPA + dataInicioPrazo, ignorando a prorática adicionada.
-        prazoFatalOverride: novoPrazoISO,
-        prorrogacoes: arrayUnion(novaProrrogacao),
-        atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: autorMilitar,
-      });
-      const msg = `Prazo prorrogado em +${dias} dias. Doc: ${docNumero}`;
-      await addDoc(collection(db, `processos/${processoId}/historico`), {
-        autor: autorMilitar,
-        autorId: user.uid || "sistema",
-        texto: msg,
-        timestamp: new Date().toISOString(),
-      });
-
-      toast.success("Prazo prorrogado com sucesso.");
-      setPrazoFatalAtual(novoPrazoISO);
-      setIsProrrogando(false);
-      setDocProrrogacao("");
-      setDiasProrrogacao(20);
-      if (onSuccess) onSuccess();
-    } catch (error) {
-      console.error("Erro ao prorrogar prazo PA:", error);
-      toast.error("Não foi possível prorrogar o prazo.");
-    } finally {
-      setSalvando(false);
-    }
-  };
+  // V9.5 — Toda a lógica de datas/prazos foi removida deste modal. A prorrogação
+  // de prazo é tratada exclusivamente pelo modal de edição (CadastroPA), que
+  // possui o painel completo de prazos e prorrogações. O único fluxo manual de
+  // datas que permanece aqui é "Receber Autos Concluídos" (encerramento da
+  // sindicância pelo Encarregado).
 
   // V4.0.1 — Classes utilitárias clonadas do AcoesDUModalNovo para garantir
   // identidade visual única entre os fluxos DU e PA.
@@ -362,74 +293,10 @@ export function AcoesPAModalV4({
           <div className={FORM_CONTAINER}>
             <h4 className="text-sm font-semibold text-slate-800 mb-1">Sindicância em curso</h4>
             <p className="text-xs text-slate-600 mb-4">
-              Autos com o Encarregado. Receba as conclusões ou prorrogue o prazo, se necessário.
+              Autos com o Encarregado. Receba as conclusões ou solicite prorrogação de prazo (abre o modal de edição do processo).
             </p>
-            {(prazoFatalAtual || dataInicioPrazoAtual) && (
-              <div className="mb-4 grid grid-cols-2 gap-3 text-xs text-slate-700">
-                {dataInicioPrazoAtual && (
-                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                    <div className="text-[10px] font-bold uppercase text-slate-500">Início do Prazo</div>
-                    <div>{dataInicioPrazoAtual}</div>
-                  </div>
-                )}
-                {prazoFatalAtual && (
-                  <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
-                    <div className="text-[10px] font-bold uppercase text-slate-500">Prazo Fatal Atual</div>
-                    <div>{prazoFatalAtual}</div>
-                  </div>
-                )}
-              </div>
-            )}
 
-            {isProrrogando ? (
-              <div className="space-y-3 rounded-lg border border-slate-300 bg-white p-4">
-                <h5 className="text-sm font-semibold text-slate-800">Prorrogação de Prazo</h5>
-                <div>
-                  <Label htmlFor="prorr-dias" className="text-slate-700">Dias</Label>
-                  <Input
-                    id="prorr-dias"
-                    type="number"
-                    min={1}
-                    value={diasProrrogacao}
-                    onChange={(e) => setDiasProrrogacao(Number(e.target.value))}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="prorr-doc" className="text-slate-700">
-                    Documento (Ex: Nota nº 123/2026)
-                  </Label>
-                  <Input
-                    id="prorr-doc"
-                    type="text"
-                    value={docProrrogacao}
-                    onChange={(e) => setDocProrrogacao(e.target.value)}
-                    placeholder="Nota nº ___/____"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    disabled={salvando || !docProrrogacao.trim() || !diasProrrogacao}
-                    className={PRIMARY_BTN}
-                    onClick={() => void handleProrrogar()}
-                  >
-                    Confirmar Prorrogação
-                  </button>
-                  <button
-                    type="button"
-                    className={SECONDARY_BTN}
-                    disabled={salvando}
-                    onClick={() => {
-                      setIsProrrogando(false);
-                      setDocProrrogacao("");
-                      setDiasProrrogacao(20);
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            ) : isRecebendoAutos ? (
+            {isRecebendoAutos ? (
               <div className="space-y-3 rounded-lg border border-indigo-300 bg-indigo-50 p-4 mt-4">
                 <h5 className="text-sm font-semibold text-indigo-900">Confirmar Recebimento dos Autos</h5>
                 <div className="grid grid-cols-2 gap-3">
@@ -437,12 +304,8 @@ export function AcoesPAModalV4({
                     <Label className="text-indigo-800">Data do Recebimento</Label>
                     <Input
                       type="date"
-                      value={dataRecebimentoAutos}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setDataRecebimentoAutos(val);
-                        if (val) setPrazoSolucaoSugerido(somarDiasISO(val, 10));
-                      }}
+                      value={dataRecebimento}
+                      onChange={(e) => setDataRecebimento(e.target.value)}
                       className="border-indigo-200"
                     />
                   </div>
@@ -450,8 +313,8 @@ export function AcoesPAModalV4({
                     <Label className="text-indigo-800">Prazo da Solução (Fatal)</Label>
                     <Input
                       type="date"
-                      value={prazoSolucaoSugerido}
-                      onChange={(e) => setPrazoSolucaoSugerido(e.target.value)}
+                      value={dataFatal}
+                      onChange={(e) => setDataFatal(e.target.value)}
                       className="border-indigo-200"
                     />
                   </div>
@@ -459,26 +322,27 @@ export function AcoesPAModalV4({
                 <div className="flex gap-2 mt-2">
                   <button
                     type="button"
-                    disabled={salvando || !dataRecebimentoAutos || !prazoSolucaoSugerido}
+                    disabled={salvando || !dataRecebimento || !dataFatal}
                     className={PRIMARY_BTN}
                     onClick={() => {
                       void avancarFluxo(
                         "FAZENDO_SOLUCAO",
                         {
-                          dataInicioPrazo: dataRecebimentoAutos,
-                          prazoFatal: prazoSolucaoSugerido,
-                          finalPrazo: prazoSolucaoSugerido,
+                          dataInicioPrazo: dataRecebimento,
+                          prazoFatal: dataFatal,
+                          finalPrazo: dataFatal,
                           // Override manual: o assessor definiu explicitamente os prazos no formulário;
                           // useProcessos respeita prazoFatalOverride em vez de recalcular.
-                          prazoFatalOverride: prazoSolucaoSugerido,
+                          prazoFatalOverride: dataFatal,
                           status: "andamento",
-                          descricao: `Sindicância recebida em ${formatarData(dataRecebimentoAutos)}. Prazo para solução ajustado para ${formatarData(prazoSolucaoSugerido)}.`,
+                          descricao: `Sindicância recebida em ${formatarData(dataRecebimento)}. Prazo para solução ajustado para ${formatarData(dataFatal)}.`,
                         },
-                        `Autos recebidos em ${formatarData(dataRecebimentoAutos)}. Prazo para solução ajustado para ${formatarData(prazoSolucaoSugerido)}.`,
+                        `Autos recebidos em ${formatarData(dataRecebimento)}. Prazo para solução ajustado para ${formatarData(dataFatal)}.`,
                       );
+                      setIsRecebendoAutos(false);
                     }}
                   >
-                    Confirmar e Iniciar Solução
+                    Confirmar Prazos
                   </button>
                   <button
                     type="button"
@@ -496,7 +360,13 @@ export function AcoesPAModalV4({
                   type="button"
                   className={SECONDARY_BTN}
                   disabled={salvando}
-                  onClick={() => setIsProrrogando(true)}
+                  onClick={() => {
+                    // V9.5 — Delega 100% ao modal de edição (CadastroPA), que possui
+                    // o painel completo de prazos e prorrogações. Fecha este modal e
+                    // sinaliza o pai para abrir a edição do processo.
+                    onOpenChange(false);
+                    onSolicitarEdicao?.();
+                  }}
                 >
                   Solicitar Prorrogação de Prazo
                 </button>
@@ -506,8 +376,9 @@ export function AcoesPAModalV4({
                   className={PRIMARY_BTN}
                   onClick={() => {
                     const hoje = new Date().toISOString().slice(0, 10);
-                    setDataRecebimentoAutos(hoje);
-                    setPrazoSolucaoSugerido(somarDiasISO(hoje, 10));
+                    setDataRecebimento(hoje);
+                    // Sugestão inicial de 10 dias — o assessor pode alterar livremente antes de confirmar.
+                    setDataFatal(somarDiasISO(hoje, 10));
                     setIsRecebendoAutos(true);
                   }}
                 >

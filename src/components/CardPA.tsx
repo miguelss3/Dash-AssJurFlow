@@ -408,7 +408,7 @@ const CardPAComponent = ({
           if (variante === "CONSELHO") {
             return <AcoesConselhoModalV4 open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />;
           }
-          return <AcoesPAModalV4 open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} />;
+          return <AcoesPAModalV4 open={modalAcoesPA} onOpenChange={setModalAcoesPA} processoId={p.id} numeroProcesso={p.numero} siteSettings={siteSettings} onSuccess={() => {}} onSolicitarEdicao={() => onEdit?.(p)} />;
         })()}
       </Suspense>
 

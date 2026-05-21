@@ -73,6 +73,26 @@ export function ehConselhoPA(tipoPA: string | undefined | null): boolean {
   return tipoPA === "Conselho de Disciplina" || tipoPA === "Conselho de Justificação";
 }
 
+// ---------------------------------------------------------------------------
+// V9.4 — Contrato de Integridade de Prazos (PA)
+// Hierarquia oficial de leitura do prazo fatal para Processos Administrativos:
+//   1º  prazoFatalOverride  (definido manualmente pelo assessor/cadastro)
+//   2º  prazoFatal          (valor corrente — pode ter sido calculado por motor)
+//   3º  finalPrazo          (campo legado, mantido por compatibilidade)
+// Toda UI/cálculo que precise do prazo efetivo de um PA DEVE usar este helper
+// em vez de ler o campo bruto, garantindo que ediç ões manuais não sejam
+// silenciosamente sobrescritas por recálculos automáticos.
+// ---------------------------------------------------------------------------
+export function prazoEfetivoPA(processo: {
+  prazoFatalOverride?: unknown;
+  prazoFatal?: unknown;
+  finalPrazo?: unknown;
+} | null | undefined): unknown {
+  if (!processo) return null;
+  return processo.prazoFatalOverride || processo.prazoFatal || processo.finalPrazo || null;
+}
+
+
 function obterConfiguracaoPrazosProcessuais(
   configuracao?: Partial<ProcessualDeadlineSettings> | null,
 ): ProcessualDeadlineSettings {

@@ -265,6 +265,9 @@ export function AcoesConselhoModalV4({
                       dataInicioPrazo,
                       prazoFatal,
                       finalPrazo: prazoFatal,
+                      // V9.4 — Contrato de Integridade de Prazos: grava override para impedir
+                      // que useProcessos sobrescreva o prazo definido neste ponto de fluxo.
+                      prazoFatalOverride: prazoFatal,
                     },
                     `Portaria assinada em ${dataAssinatura}. Prazo iniciado em ${dataInicioPrazo} (fatal ${prazoFatal}).`,
                   );
@@ -438,6 +441,9 @@ export function AcoesConselhoModalV4({
                     {
                       prazoFatal: novoPrazoFatal,
                       finalPrazo: novoPrazoFatal,
+                      // V9.4 — Contrato de Integridade de Prazos: grava override para impedir
+                      // recálculo automático em useProcessos.
+                      prazoFatalOverride: novoPrazoFatal,
                       prorrogacoes: arrayUnion(registroProrrogacao),
                       pendenciaProrrogacao: null,
                     },
