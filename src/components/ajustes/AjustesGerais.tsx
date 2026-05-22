@@ -5,11 +5,12 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
 
+import { SiteSettings } from "@/types/siteSettings";
 interface AjustesGeraisProps {
   form: any;
   openGeral: boolean;
   setOpenGeral: (open: boolean) => void;
-  updateField: (field: string, value: any) => void;
+  updateField: (field: keyof SiteSettings, value: any) => void;
 }
 
 function AjustesGerais({ form, openGeral, setOpenGeral, updateField }: AjustesGeraisProps) {
