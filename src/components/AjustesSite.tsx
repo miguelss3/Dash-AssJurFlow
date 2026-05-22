@@ -1,17 +1,21 @@
+
+
+// Erro: Não é possível localizar o módulo 'react'.
+// Para corrigir, execute: npm install react
+// Certifique-se de que o pacote 'react' está instalado em node_modules.
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ArrowRight,
-  ChevronDown,
-  GripVertical,
-  MonitorCog,
-  Plus,
-  RotateCcw,
-  Save,
-  Settings2,
-  Trash2,
-  Type,
-  Workflow,
-} from "lucide-react";
+// import {
+//   ArrowRight,
+//   ChevronDown,
+//   GripVertical,
+//   MonitorCog,
+//   Plus,
+//   RotateCcw,
+//   Save,
+//   Trash2,
+//   Type,
+//   Workflow,
+// } from "lucide-react";
 import { toast } from "sonner";
 import { collection, deleteField, doc, getDocs, query, where, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -69,6 +73,7 @@ import {
   type SiteSettings,
 } from "@/types/siteSettings";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ArrowRight, ChevronDown, GripVertical, MonitorCog, Plus, RotateCcw, Save, Settings2, Trash2, Type, Workflow } from "lucide-react";
 
 interface SortableAssuntoRowProps {
   id: string;
