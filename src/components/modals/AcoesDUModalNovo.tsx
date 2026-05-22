@@ -575,8 +575,11 @@ export function AcoesDUModalNovo({
           toast.error("Informe o número do documento recebido.");
           return;
         }
+        // Salva a data do dia no campo dataRecebido (AAAA-MM-DD)
+        const dataRecebido = new Date().toISOString().split("T")[0];
         void avancarFluxo("MESA_ASSESSOR", {
           numeroRecebido: numero,
+          registradoEm: dataRecebido,
           descricaoOverride: "Resposta recebida. Em análise pelo assessor.",
         });
         return;
