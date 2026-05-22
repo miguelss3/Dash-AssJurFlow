@@ -1,42 +1,40 @@
 import React from "react";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "../ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, Type, MonitorCog, Settings2 } from "lucide-react";
-import { Input } from "../ui/input";
-import { Textarea } from "../ui/textarea";
-import { Label } from "../ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import type { SiteSettings } from "@/types/siteSettings";
 
-import { SiteSettings } from "@/types/siteSettings";
 interface AjustesGeraisProps {
-  form: any;
+  form: SiteSettings;
   openGeral: boolean;
   setOpenGeral: (open: boolean) => void;
   updateField: (field: keyof SiteSettings, value: any) => void;
 }
 
-function AjustesGerais({ form, openGeral, setOpenGeral, updateField }: AjustesGeraisProps) {
+export function AjustesGerais({ form, openGeral, setOpenGeral, updateField }: AjustesGeraisProps) {
   return (
     <Collapsible open={openGeral} onOpenChange={setOpenGeral}>
       <div className="rounded-2xl border border-border bg-background/40 p-4">
         <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
           <div>
             <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
-              <Type className="h-4 w-4 text-[var(--tipo-pa)]" />
+              <Type className="h-4 w-4 text-slate-500" />
               Setor Geral
             </h4>
             <p className="mt-1 text-xs text-muted-foreground">
               Branding, cabeçalho e textos institucionais do sistema.
             </p>
           </div>
-          <ChevronDown
-            className={`h-4 w-4 text-muted-foreground transition-transform ${openGeral ? "rotate-180" : ""}`}
-          />
+          <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openGeral ? "rotate-180" : ""}`} />
         </CollapsibleTrigger>
 
         <CollapsibleContent className="pt-4">
           <section className="space-y-4">
             <div>
               <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
-                <Type className="h-4 w-4 text-[var(--tipo-pa)]" />
+                <Type className="h-4 w-4 text-slate-500" />
                 Branding da Sidebar
               </h4>
             </div>
@@ -67,7 +65,7 @@ function AjustesGerais({ form, openGeral, setOpenGeral, updateField }: AjustesGe
           <section className="space-y-4 border-t border-border pt-5 mt-5">
             <div>
               <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
-                <MonitorCog className="h-4 w-4 text-[var(--tipo-pa)]" />
+                <MonitorCog className="h-4 w-4 text-slate-500" />
                 Cabeçalho Principal
               </h4>
             </div>
@@ -97,7 +95,7 @@ function AjustesGerais({ form, openGeral, setOpenGeral, updateField }: AjustesGe
           <section className="space-y-4 border-t border-border pt-5 mt-5">
             <div>
               <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
-                <Settings2 className="h-4 w-4 text-[var(--tipo-pa)]" />
+                <Settings2 className="h-4 w-4 text-slate-500" />
                 Ação e Rodapé
               </h4>
             </div>
@@ -128,5 +126,3 @@ function AjustesGerais({ form, openGeral, setOpenGeral, updateField }: AjustesGe
     </Collapsible>
   );
 }
-
-export default AjustesGerais;
