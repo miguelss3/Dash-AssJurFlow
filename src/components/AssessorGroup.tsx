@@ -6,6 +6,7 @@ import type { SiteSettings } from "@/types/siteSettings";
 import { useDroppable } from "@dnd-kit/core";
 import { useEffect, useMemo, useState } from "react";
 
+
 interface Props {
   responsavel: string;
   tipo: TipoProcesso;

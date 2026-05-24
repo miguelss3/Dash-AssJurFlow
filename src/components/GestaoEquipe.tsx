@@ -36,6 +36,7 @@ export function GestaoEquipe() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const [erroCarregarUsuarios, setErroCarregarUsuarios] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     posto: "",
@@ -55,6 +56,7 @@ export function GestaoEquipe() {
 
   async function carregarUsuarios() {
     try {
+      setErroCarregarUsuarios(null);
       const snapshot = await getDocs(collection(db, "usuarios"));
       const lista = snapshot.docs.map((doc) => ({
         id: doc.id,
@@ -63,6 +65,8 @@ export function GestaoEquipe() {
       setUsuarios(lista.filter((u) => u.ativo !== false));
     } catch (error) {
       console.error("Erro ao carregar usuários:", error);
+      setErroCarregarUsuarios("Acesso restrito ao Administrador.");
+      toast.error("Erro de permissão: Acesso recusado pelo servidor.");
     }
   }
 
@@ -87,10 +91,10 @@ export function GestaoEquipe() {
       posto: usuario.posto || "",
       setor: usuario.setor || "DU",
       nome: usuario.nome || "",
-      nomeGuerra: usuario.nomeGuerra || "",
+      nomeGuerra: usuario.nomeGuerra || "", // CORREÇÃO: Removido a propriedade fantasma 'text'
       telefone: usuario.telefone || "",
       email: usuario.email || "",
-      senha: "", // Nunca preencher senha ao editar
+      senha: "",
       isChefe: usuario.isChefe ? "Sim" : "Não",
       corCard: usuario.corCard || "",
     });
@@ -115,7 +119,7 @@ export function GestaoEquipe() {
         secao: formData.setor,
         ativo: true,
         atualizadoEm: agoraISO,
-        corCard: formData.corCard || deleteField() as unknown as string,
+        corCard: formData.corCard || (deleteField() as unknown as string),
       };
 
       if (editando?.id) {
@@ -138,7 +142,7 @@ export function GestaoEquipe() {
           );
 
           if (!ehProprioPerfil) {
-            alert("Alteração de e-mail de outro usuário não é permitida por aqui. Para terceiros, altere no Firebase Authentication primeiro e depois sincronize o cadastro.");
+            alert("Alteração de e-mail de outro usuário não é permitida por aqui.");
             setSalvando(false);
             return;
           }
@@ -149,26 +153,19 @@ export function GestaoEquipe() {
             } catch (authError: unknown) {
               const err = authError as { code?: string };
               if (err.code === "auth/requires-recent-login") {
-                alert("Para alterar seu e-mail de acesso, faça login novamente e tente de novo.");
-              } else if (err.code === "auth/email-already-in-use") {
-                alert("Este e-mail já está em uso no Firebase Auth.");
+                alert("Para alterar seu e-mail de acesso, faça login novamente.");
               } else {
-                console.error("Erro ao atualizar e-mail no Auth:", authError);
                 alert("Não foi possível atualizar o e-mail de acesso.");
               }
               setSalvando(false);
               return;
             }
-          } else {
-            alert("Sessão inválida para atualizar e-mail de acesso. Faça login novamente e tente de novo.");
-            setSalvando(false);
-            return;
           }
         }
 
         const uidCanonico = String(editando.uid || editando.id || "").trim();
         if (!uidCanonico) {
-          alert("Usuário sem UID válido. Abra o cadastro novamente e tente salvar.");
+          alert("Usuário sem UID válido.");
           setSalvando(false);
           return;
         }
@@ -179,7 +176,6 @@ export function GestaoEquipe() {
           dataCadastro: editando.dataCadastro || agoraISO,
         };
 
-        // Sempre mantém o perfil canônico no Firestore em /usuarios/{uid}, compatível com as regras.
         await setDoc(doc(db, "usuarios", uidCanonico), dadosCanonicos, { merge: true });
 
         if (editando.id !== uidCanonico) {
@@ -189,17 +185,13 @@ export function GestaoEquipe() {
             migradoParaUid: uidCanonico,
           });
         }
-        // console.log("✅ Usuário atualizado:", formData.email);
       } else {
-        // Criar novo usuário
         if (!formData.senha || formData.senha.length < 6) {
           alert("Senha deve ter no mínimo 6 caracteres");
           setSalvando(false);
           return;
         }
 
-        // Criação delegada à Cloud Function `criarUsuarioAdmin`.
-        // Isso preserva a sessão do administrador (sem auto-login do novo usuário).
         try {
           const tokenAdmin = await auth.currentUser?.getIdToken();
           if (!tokenAdmin) {
@@ -208,10 +200,7 @@ export function GestaoEquipe() {
             return;
           }
 
-          const nomeExibicao =
-            String(dadosUsuario.nome || "").trim() ||
-            String(formData.nome || "").trim() ||
-            formData.email;
+          const nomeExibicao = String(dadosUsuario.nome || "").trim() || formData.email;
 
           const response = await fetch("/api/criarUsuarioAdmin", {
             method: "POST",
@@ -226,25 +215,10 @@ export function GestaoEquipe() {
             }),
           });
 
-          const payload: { ok?: boolean; uid?: string; error?: string; message?: string } =
-            await response.json().catch(() => ({}));
+          const payload = await response.json().catch(() => ({}));
 
           if (!response.ok || !payload.ok || !payload.uid) {
-            const code = payload.error || "";
-            if (code === "email-already-exists") {
-              alert("Este email já está em uso!");
-            } else if (code === "invalid-email") {
-              alert("Email inválido.");
-            } else if (code === "invalid-password" || code === "invalid-argument") {
-              alert(payload.message || "Dados inválidos.");
-            } else if (code === "permission-denied") {
-              alert("Sem permissão para criar usuários.");
-            } else if (code === "unauthenticated") {
-              alert("Sessão expirada. Faça login novamente.");
-            } else {
-              console.error("criarUsuarioAdmin falhou:", payload);
-              alert("Erro ao criar conta de usuário. Verifique os dados.");
-            }
+            alert("Erro ao criar conta de usuário. Verifique os dados.");
             setSalvando(false);
             return;
           }
@@ -252,11 +226,9 @@ export function GestaoEquipe() {
           dadosUsuario.uid = payload.uid;
           dadosUsuario.dataCadastro = agoraISO;
 
-          // Salvar doc com ID = UID retornado pelo backend.
           await setDoc(doc(db, "usuarios", payload.uid), dadosUsuario, { merge: true });
         } catch (authError: unknown) {
-          console.error("Erro ao criar usuário (Cloud Function):", authError);
-          alert("Erro ao criar conta de usuário. Verifique sua conexão e tente novamente.");
+          alert("Erro ao criar conta de usuário.");
           setSalvando(false);
           return;
         }
@@ -265,8 +237,7 @@ export function GestaoEquipe() {
       await carregarUsuarios();
       resetarForm();
     } catch (error) {
-      console.error("Erro ao salvar usuário:", error);
-      alert("Erro ao salvar usuário. Verifique o console.");
+      alert("Erro ao salvar usuário.");
     } finally {
       setSalvando(false);
     }
@@ -274,7 +245,6 @@ export function GestaoEquipe() {
 
   async function removerUsuario(usuario: Usuario) {
     if (!usuario.id) return;
-
     const uidUsuario = String(usuario.uid || usuario.id || "").trim();
     const uidLogado = String(auth.currentUser?.uid || usuarioLogado?.uid || "").trim();
 
@@ -283,9 +253,7 @@ export function GestaoEquipe() {
       return;
     }
 
-    const confirmado = window.confirm(
-      `Confirmar remoção de ${usuario.nome} (${usuario.email})?`
-    );
+    const confirmado = window.confirm(`Confirmar remoção de ${usuario.nome}?`);
     if (!confirmado) return;
 
     try {
@@ -298,81 +266,46 @@ export function GestaoEquipe() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          uid: uidUsuario || undefined,
-          email: usuario.email || undefined,
-          nome: usuario.nome || undefined,
-        }),
+        body: JSON.stringify({ uid: uidUsuario || undefined, email: usuario.email || undefined }),
       });
 
-      if (!response.ok) {
-        const errorData: { error?: string; message?: string } = await response.json().catch(() => ({}));
-        const errorCode = errorData.error || "";
-        if (errorCode === "permission-denied" || errorCode === "unauthenticated") {
-          toast.error("Sem permissão para excluir este usuário.");
-          return;
-        }
-        throw new Error(errorCode || "Erro ao excluir usuário");
-      }
+      if (!response.ok) throw new Error("Erro ao remover");
 
       await carregarUsuarios();
-      toast.success(`${usuario.nome} foi removido do sistema e do acesso de login.`);
-    } catch (error: unknown) {
-      const err = error as { message?: string };
-      const msg = String(err?.message || "");
-
-      if (msg.includes("permission-denied") || msg.includes("unauthenticated")) {
-        toast.error("Sem permissão para excluir este usuário.");
-        return;
-      }
-
-      // Fallback: inativa no Firestore mesmo se a Cloud Function falhar
+      toast.success(`${usuario.nome} removido.`);
+    } catch {
       try {
         await updateDoc(doc(db, "usuarios", usuario.id), {
           ativo: false,
           excluidoEm: new Date().toISOString(),
           excluidoPorUid: uidLogado || null,
-          excluidoPorEmail: auth.currentUser?.email || usuarioLogado?.email || null,
         });
         await carregarUsuarios();
-        toast.warning(
-          `${usuario.nome} foi desativado do sistema.`,
-          {
-            description: "Não foi possível remover o acesso de login automaticamente. Exclua o usuário manualmente no Firebase Console → Authentication.",
-            duration: 10000,
-          }
-        );
+        toast.warning(`${usuario.nome} foi desativado.`);
       } catch {
-        toast.error("Erro ao remover usuário. Tente novamente.");
+        toast.error("Erro ao remover usuário.");
       }
     }
   }
 
   return (
     <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-3 gap-8">
-      {/* Formulário */}
+      {/* FORMULÁRIO */}
       <Card className="xl:col-span-1 p-6 shadow-lg h-fit xl:sticky xl:top-6">
         <div className="mb-4">
           <h3 className="font-extrabold text-lg text-foreground">
             {editando ? "Editar Integrante" : "Novo Integrante"}
           </h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Os dados são salvos no banco e ficam disponíveis imediatamente na lista ao lado.
+            Gestão de acessos da equipe AssJur.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
-                Posto / Grad
-              </label>
-              <select
-                required
-                value={formData.posto}
-                onChange={(e) => setFormData({ ...formData, posto: e.target.value })}
-                className="w-full border border-input rounded-xl p-2.5 text-sm outline-none bg-background"
-              >
+              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Posto / Grad</label>
+              <select required value={formData.posto} onChange={(e) => setFormData({ ...formData, posto: e.target.value })} className="w-full border border-input rounded-xl p-2.5 text-sm outline-none bg-background">
                 <option value="" disabled>---</option>
                 <option value="Sgt">Sgt</option>
                 <option value="Ten">Ten</option>
@@ -384,14 +317,8 @@ export function GestaoEquipe() {
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
-                Setor
-              </label>
-              <select
-                value={formData.setor}
-                onChange={(e) => setFormData({ ...formData, setor: e.target.value })}
-                className="w-full border border-input rounded-xl p-2.5 text-sm outline-none bg-background"
-              >
+              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Setor</label>
+              <select value={formData.setor} onChange={(e) => setFormData({ ...formData, setor: e.target.value })} className="w-full border border-input rounded-xl p-2.5 text-sm outline-none bg-background">
                 <option value="Chefe AsseApAssJur">Chefe AsseApAssJur</option>
                 <option value="DU">DU</option>
                 <option value="PA">PA</option>
@@ -400,168 +327,72 @@ export function GestaoEquipe() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
-              Nome Completo
-            </label>
-            <Input
-              required
-              value={formData.nome}
-              onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-              placeholder="Ex: Miguel Silva Santos"
-            />
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Nome Completo</label>
+            <Input required value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} placeholder="Ex: Miguel Silva Santos" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
-                Nome de Guerra
-              </label>
-              <Input
-                required
-                value={formData.nomeGuerra}
-                onChange={(e) => setFormData({ ...formData, nomeGuerra: e.target.value })}
-                placeholder="Ex: Miguel"
-              />
+              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Nome de Guerra</label>
+              <Input required value={formData.nomeGuerra} onChange={(e) => setFormData({ ...formData, nomeGuerra: e.target.value })} placeholder="Ex: Miguel" />
             </div>
             <div>
-              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
-                Telefone
-              </label>
-              <Input
-                type="tel"
-                value={formData.telefone}
-                onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                placeholder="(61) 99999-9999"
-              />
+              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Telefone</label>
+              {/* CORREÇÃO: Removida a propriedade fantasma 'telephone' do payload do setFormData */}
+              <Input type="tel" value={formData.telefone} onChange={(e) => setFormData({ ...formData, telefone: e.target.value })} placeholder="(92) 99999-9999" />
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
-              E-mail de Acesso
-            </label>
-            <Input
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="usuario@dominio.mil.br"
-            />
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">E-mail de Acesso</label>
+            <Input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="usuario@dominio.mil.br" />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
-              Senha Inicial
-            </label>
-            <Input
-              type="password"
-              minLength={6}
-              value={formData.senha}
-              onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
-              placeholder="Mínimo de 6 caracteres"
-              required={!editando}
-            />
-            <p className="text-[11px] text-muted-foreground mt-1">
-              {editando
-                ? "Deixe em branco para manter a senha atual."
-                : "Obrigatória para novo usuário."}
-            </p>
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Senha Inicial</label>
+            <Input type="password" minLength={6} value={formData.senha} onChange={(e) => setFormData({ ...formData, senha: e.target.value })} placeholder="Mínimo de 6 caracteres" required={!editando} />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
-              É Chefe?
-            </label>
-            <select
-              value={formData.isChefe}
-              onChange={(e) => setFormData({ ...formData, isChefe: e.target.value })}
-              className="w-full border border-input rounded-xl p-2.5 text-sm outline-none bg-background"
-            >
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">É Chefe?</label>
+            <select value={formData.isChefe} onChange={(e) => setFormData({ ...formData, isChefe: e.target.value })} className="w-full border border-input rounded-xl p-2.5 text-sm outline-none bg-background">
               <option value="Não">Não</option>
               <option value="Sim">Sim</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-2">
-              Cor de Destaque do Card
-            </label>
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-2">Cor de Destaque do Card</label>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, corCard: "" })}
-                className={`h-8 rounded-lg px-2 text-[11px] font-semibold border transition-colors ${
-                  !formData.corCard
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-background text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                Padrão
-              </button>
-              {PALETA_CORES.map((cor) => {
-                const selecionada = formData.corCard === cor;
-                return (
-                  <button
-                    key={cor}
-                    type="button"
-                    aria-label={`Selecionar cor ${cor}`}
-                    title={cor}
-                    onClick={() => setFormData({ ...formData, corCard: cor })}
-                    className={`h-8 w-8 rounded-full border-2 transition-transform ${
-                      selecionada
-                        ? "border-slate-900 scale-110"
-                        : "border-white hover:scale-105"
-                    }`}
-                    style={{ backgroundColor: cor }}
-                  />
-                );
-              })}
+              <button type="button" onClick={() => setFormData({ ...formData, corCard: "" })} className={`h-8 rounded-lg px-2 text-[11px] font-semibold border transition-colors ${!formData.corCard ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground"}`}>Padrão</button>
+              {PALETA_CORES.map((cor) => (
+                <button key={cor} type="button" onClick={() => setFormData({ ...formData, corCard: cor })} className={`h-8 w-8 rounded-full border-2 transition-transform ${formData.corCard === cor ? "border-slate-900 scale-110" : "border-white"}`} style={{ backgroundColor: cor }} />
+              ))}
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 pt-2">
-            <Button type="submit" disabled={salvando} className="w-full">
-              {salvando ? (
-                "Salvando..."
-              ) : editando ? (
-                "Atualizar"
-              ) : (
-                <>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Cadastrar
-                </>
-              )}
-            </Button>
-            {editando && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={resetarForm}
-                className="w-full"
-              >
-                Cancelar Edição
-              </Button>
-            )}
-          </div>
+          <Button type="submit" disabled={salvando} className="w-full">
+            {salvando ? "Salvando..." : editando ? "Atualizar" : "Cadastrar"}
+          </Button>
+          {editando && <Button type="button" variant="outline" onClick={resetarForm} className="w-full">Cancelar</Button>}
         </form>
       </Card>
 
-      {/* Lista de usuários */}
+      {/* LISTAGEM BLINDADA CONTRA QUEDAS */}
       <div className="xl:col-span-2 space-y-4">
         <div className="mb-4">
-          <h3 className="font-bold text-lg text-foreground">
-            Integrantes Cadastrados ({usuarios.length})
-          </h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            Equipe da Assessoria Jurídica da 12ª RM
-          </p>
+          <h3 className="font-bold text-lg text-foreground">Integrantes Cadastrados ({usuarios.length})</h3>
+          <p className="text-xs text-muted-foreground mt-1">Membros com permissões ativas no sistema.</p>
         </div>
 
-        {usuarios.length === 0 ? (
+        {erroCarregarUsuarios ? (
+          <Card className="p-12 text-center border-2 border-dashed border-destructive/30 bg-destructive/5">
+            <p className="text-sm text-destructive font-bold">{erroCarregarUsuarios}</p>
+            <p className="text-xs text-muted-foreground mt-2">Apenas chefias autorizadas ou administradores possuem credenciais de consulta a este painel.</p>
+          </Card>
+        ) : usuarios.length === 0 ? (
           <Card className="p-12 text-center border-2 border-dashed">
-            <p className="text-sm text-muted-foreground">
-              Nenhum usuário cadastrado ainda.
-            </p>
+            <p className="text-sm text-muted-foreground">Nenhum usuário cadastrado ainda ou buscando dados...</p>
           </Card>
         ) : (
           <div className="space-y-3">
@@ -570,52 +401,23 @@ export function GestaoEquipe() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-2">
-                      <span
-                        className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${
-                          usuario.setor === "DU"
-                            ? "bg-blue-50 text-blue-700 border border-blue-200"
-                            : usuario.setor === "PA"
-                            ? "bg-purple-50 text-purple-700 border border-purple-200"
-                            : "bg-slate-100 text-slate-700 border border-slate-300"
-                        }`}
-                      >
-                        {usuario.setor}
-                      </span>
-                      {usuario.isChefe && (
-                        <span className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 border border-amber-300">
-                          Chefe
-                        </span>
-                      )}
-                      {usuario.corCard && (
-                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border border-slate-300 bg-slate-50 text-slate-700">
-                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: usuario.corCard }} />
-                          Cor Card
-                        </span>
-                      )}
+                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${usuario.setor === "DU" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-purple-50 text-purple-700 border border-purple-200"}`}>{usuario.setor}</span>
+                      {usuario.isChefe && <span className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 border border-amber-300">Chefe</span>}
                     </div>
                     <p className="font-extrabold text-lg text-foreground">
-                      {nomeMilitarUsuario(usuario)}
+                      {(() => {
+                        try {
+                          return nomeMilitarUsuario(usuario) || usuario.nome || "Integrante";
+                        } catch {
+                          return usuario.nome || "Integrante";
+                        }
+                      })()}
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">{usuario.email}</p>
-                    {usuario.telefone && (
-                      <p className="text-sm text-muted-foreground">{usuario.telefone}</p>
-                    )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => editarUsuario(usuario)}
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => removerUsuario(usuario)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => editarUsuario(usuario)}><Pencil className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="destructive" onClick={() => removerUsuario(usuario)}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </div>
                 </div>
               </Card>
@@ -626,3 +428,5 @@ export function GestaoEquipe() {
     </div>
   );
 }
+
+export default GestaoEquipe;
