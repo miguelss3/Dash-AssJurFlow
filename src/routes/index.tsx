@@ -1119,8 +1119,8 @@ function Index() {
   const tabs = ehAdmin ? tabsCompletas : tabsAssessor;
 
   useEffect(() => {
-    // Permite aba 'prazos' e 'ajustes' mesmo que não estejam em tabs
-    if (aba !== "prazos" && aba !== "ajustes" && !tabs.some((t) => t.id === aba)) {
+    // Permite aba 'prazos', 'ajustes' e 'equipe' mesmo que não estejam em tabs
+    if (aba !== "prazos" && aba !== "ajustes" && aba !== "equipe" && !tabs.some((t) => t.id === aba)) {
       setAba("mesa");
     }
   }, [tabs, aba]);
