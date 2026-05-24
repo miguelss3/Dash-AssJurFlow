@@ -1,10 +1,10 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Settings2, Save, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-// Elementos canônicos de controle do dnd-kit mapeados na raiz
+// Elementos canônicos de controle do dnd-kit na raiz
 import { DndContext, DragOverlay, closestCenter, useSensor, useSensors, PointerSensor, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import type { SiteSettings, PAInProgressColumnId, ColumnTabId } from "@/types/siteSettings";
 import { DEFAULT_SITE_SETTINGS } from "@/types/siteSettings";
 
-// Subcomponentes modulares da pasta ajustes
+// Importações dos subcomponentes modulares da pasta ajustes
 import { AjustesGerais } from "./ajustes/AjustesGerais";
 import AjustesDU from "./ajustes/AjustesDU";
 import AjustesPA from "./ajustes/AjustesPA";
@@ -38,10 +38,8 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [openPAAbas, setOpenPAAbas] = useState(false);
   const [openPAFluxo, setOpenPAFluxo] = useState(false);
   const [openDUAssuntos, setOpenDUAssuntos] = useState(false);
-  const [openDUOrigens, setOpenDUOrigens] = useState(false);
-  const [openDUSecoes, setOpenDUSecoes] = useState(false);
 
-  // Estados dos inputs e manipuladores de Drag
+  // Estados dos formulários de entrada e dados do Dnd
   const [novoAssuntoPA, setNovoAssuntoPA] = useState("");
   const [novoAssuntoDU, setNovoAssuntoDU] = useState("");
   const [selectedPAPreviewColumnId, setSelectedPAPreviewColumnId] = useState<PAInProgressColumnId>("sindicancia");
@@ -52,11 +50,10 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   
   const [dragAssuntoPAId, setDragAssuntoPAId] = useState<string | null>(null);
   const [dragAssuntoDUId, setDragAssuntoDUId] = useState<string | null>(null);
-  const [previewTab, setPreviewTab] = useState<"PA" | "DU">("PA");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
-  // Processamento e mapeamento estável de arrays e IDs do dnd-kit
+  // IDs e mapeamento estável de arrays para os Contexts do Dnd-Kit
   const assuntoPAIds = useMemo(() => (form.assuntosPASindicancia || []).map((_, index) => `pa-${index}`), [form.assuntosPASindicancia]);
   const assuntoDUIds = useMemo(() => (form.assuntosDUPrincipais || []).map((_, index) => `du-${index}`), [form.assuntosDUPrincipais]);
 
@@ -77,6 +74,9 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     return { acao: form.paFlowActions[selectedFlowActionIndex], index: selectedFlowActionIndex };
   }, [form.paFlowActions, selectedFlowActionIndex]);
 
+  useEffect(() => { setForm(settings); }, [settings]);
+
+  // --- HANDLERS DE MUTACÃO E ATUALIZAÇÃO ---
   const updateField = (field: keyof SiteSettings, value: any) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -96,6 +96,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const addAssuntoPA = () => {
     const texto = novoAssuntoPA.trim();
     if (!texto) return;
+    if (form.assuntosPASindicancia.includes(texto)) { toast.error("Este assunto já existe."); return; }
     setForm((prev) => ({ ...prev, assuntosPASindicancia: [...prev.assuntosPASindicancia, texto] }));
     setNovoAssuntoPA("");
   };
@@ -126,6 +127,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const addAssuntoDU = () => {
     const texto = novoAssuntoDU.trim();
     if (!texto) return;
+    if (form.assuntosDUPrincipais.includes(texto)) { toast.error("Este assunto já existe."); return; }
     setForm((prev) => ({ ...prev, assuntosDUPrincipais: [...prev.assuntosDUPrincipais, texto] }));
     setNovoAssuntoDU("");
   };
@@ -155,7 +157,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
       URL.revokeObjectURL(url);
       toast.success("Backup local gerado com sucesso!");
     } catch {
-      toast.error("Erro ao gerar backup local.");
+      toast.error("Erro ao processar a exportação de dados.");
     } finally {
       setGerandoBackup(false);
     }
@@ -186,7 +188,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
 
   return (
     <div className="space-y-6">
-      {/* BANNER DO HEAD */}
+      {/* BANNER INICIAL */}
       <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-start gap-3">
           <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-900 text-white">
@@ -199,8 +201,10 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
         </div>
       </div>
 
+      {/* DUAS COLUNAS PRINCIPAIS */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <div className="space-y-6 rounded-3xl border border-border bg-card p-5 shadow-sm">
+          {/* BOTÃO DE BACKUP LOCAL */}
           <div className="rounded-2xl border border-border bg-card p-6 mb-4">
             <Button type="button" variant="outline" onClick={handleBackupLocal} disabled={gerandoBackup || saving || loading}>
               {gerandoBackup ? "Gerando arquivo..." : "💾 Baixar Backup Local (JSON)"}
@@ -209,18 +213,16 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
 
           <AjustesGerais form={form} openGeral={openGeral} setOpenGeral={setOpenGeral} updateField={updateField} />
 
+          {/* SETOR DEFESA DA UNIÃO — Propriedades exatas mapeadas com a interface */}
           <AjustesDU
             form={form} openDU={openDU} setOpenDU={setOpenDU} openDUAssuntos={openDUAssuntos} setOpenDUAssuntos={setOpenDUAssuntos}
             assuntoDUIds={assuntoDUIds} addAssuntoDU={addAssuntoDU} updateAssuntoDU={updateAssuntoDU} removeAssuntoDU={removeAssuntoDU} 
             dragAssuntoDUId={dragAssuntoDUId} dragAssuntoDULabel={dragAssuntoDULabel}
             handleDragStartDU={handleDragStartDU} handleDragCancelDU={handleDragCancelDU} handleDragEndDU={handleDragEndDU}
-            DndContext={DndContext} SortableContext={SortableContext} DragOverlay={DragOverlay} sensors={sensors} closestCenter={closestCenter}
-            verticalListSortingStrategy={verticalListSortingStrategy} SortableAssuntoRow={SortableAssuntoRow} AssuntoDragPreview={AssuntoDragPreview}
-            novoAssuntoDU={novoAssuntoDU} setNovoAssuntoDU={setNovoAssuntoDU}
-            origemDUIds={[]} secoesDUIds={[]} openDUOrigens={false} setOpenDUOrigens={() => {}} openDUSecoes={false} setOpenDUSecoes={() => {}}
-            addOrigemDUDocumento={() => {}} updateOrigemDUDocumento={() => {}} removeOrigemDUDocumento={() => {}} addSecaoDU={() => {}} updateSecaoDU={() => {}} removeSecaoDU={() => {}}
+            sensors={sensors} novoAssuntoDU={novoAssuntoDU} setNovoAssuntoDU={setNovoAssuntoDU}
           />
 
+          {/* SETOR PROCESSO ADMINISTRATIVO — Propriedades limpas e tipadas com precisão */}
           <AjustesPA
             form={form} openPA={openPA} setOpenPA={setOpenPA} openPAAssuntos={openPAAssuntos} setOpenPAAssuntos={setOpenPAAssuntos}
             openPAPrazos={openPAPrazos} setOpenPAPrazos={setOpenPAPrazos} openPAAbas={openPAAbas} setOpenPAAbas={setOpenPAAbas}
@@ -228,18 +230,18 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
             selectedPAPreviewColumnId={selectedPAPreviewColumnId} setSelectedPAPreviewColumnId={setSelectedPAPreviewColumnId}
             selectedPAPreviewTabId={selectedPAPreviewTabId} setSelectedPAPreviewTabId={setSelectedPAPreviewTabId}
             assuntoPAIds={assuntoPAIds} novoAssuntoPA={novoAssuntoPA} setNovoAssuntoPA={setNovoAssuntoPA} addAssuntoPA={addAssuntoPA}
-            updateAssuntoPA={updateAssuntoPA} removeAssuntoPA = {removeAssuntoPA} updateField={updateField}
+            updateAssuntoPA={updateAssuntoPA} removeAssuntoPA={removeAssuntoPA} updateField={updateField}
             paPreviewColumns={form.paEmAndamentoColumns || []} paPreviewTabs={form.columnTabs || []}
             paFlowVisual={{ padrao: [], conselho: [] }} handlePAFlowDragEnd={() => {}} selectedFlowActionIndex={selectedFlowActionIndex}
             setSelectedFlowActionIndex={setSelectedFlowActionIndex} selectedFlowAction={selectedFlowAction} selectedFlowEditorRef={selectedFlowEditorRef}
-            dragAssuntoPAId={dragAssuntoPAId} dragAssuntoPALabel={dragAssuntoPALabel} handlePAFileDragStart={handleDragStartPA}
-            handleDragCancelPA={handleDragCancelPA} handleDragEndPA={handleDragEndPA}
+            dragAssuntoPAId={dragAssuntoPAId} dragAssuntoPALabel={dragAssuntoPALabel} 
+            handleDragStartPA={handleDragStartPA} handleDragCancelPA={handleDragCancelPA} handleDragEndPA={handleDragEndPA}
             DndContext={DndContext} SortableContext={SortableContext} DragOverlay={DragOverlay} sensors={sensors} closestCenter={closestCenter}
             verticalListSortingStrategy={verticalListSortingStrategy} SortableAssuntoRow={SortableAssuntoRow} AssuntoDragPreview={AssuntoDragPreview}
-            SortableFlowActionCard={SortableFlowActionCard} paColumnTabs={[]} paEmAndamentoColumnsOrdenadas={[]} paFlowEditGroups={{ padrao: [], conselho: [], todos: [] }}
-            handleDragStartPA={handleDragStartPA}
+            SortableFlowActionCard={SortableFlowActionCard}
           />
 
+          {/* BOTÕES DE SALVAMENTO MESTRE */}
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-5">
             <Button type="button" variant="outline" onClick={() => setForm(DEFAULT_SITE_SETTINGS)} disabled={saving || loading}>
               <RotateCcw className="mr-2 h-4 w-4" /> Restaurar Padrões
@@ -250,7 +252,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
           </div>
         </div>
 
-        {/* COLUNA LATERAL - PREVIA */}
+        {/* COLUNA LATERAL - SIMULADOR DE TELA (PREVIEW) */}
         <div className="space-y-4 rounded-3xl border border-border bg-card p-5 shadow-sm sticky top-4 self-start">
           <div>
             <h4 className="text-sm font-bold uppercase tracking-wide text-slate-700">Pré-visualização</h4>
@@ -273,3 +275,5 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     </div>
   );
 }
+
+export default AjustesSite;
