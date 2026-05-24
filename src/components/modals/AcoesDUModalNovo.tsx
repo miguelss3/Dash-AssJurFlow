@@ -237,6 +237,7 @@ export function AcoesDUModalNovo({
       numeroDiex?: string;
       numeroSaida?: string;
       prazoResposta?: string;
+      dataRecebido?: string;
     },
   ) => {
     if (!processoId || !user) return;
@@ -331,6 +332,7 @@ export function AcoesDUModalNovo({
             : numeroDocEfetivo || (pedidoAtual?.numeroDiex as string) || "",
         numeroDiexHistorico,
         numeroRecebido: numeroRecebidoEfetivo,
+        dataRecebido: extras?.dataRecebido !== undefined ? extras.dataRecebido : (pedidoAtual?.dataRecebido || null),
         possuiPrazoDU: possuiPrazoEfetivo,
         // V2.4 — Composição de documentos externos persistida no pedido.
         incluiDiexExterno: incluiDiexEfetivo,
