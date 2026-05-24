@@ -5,6 +5,20 @@ import { Lock, Send } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
+
+// --- Função utilitária para sanitizar objetos recursivamente (undefined → null) ---
+const sanitizar = (valor: unknown): unknown => {
+  if (valor === undefined) return null;
+  if (Array.isArray(valor)) return valor.map(sanitizar);
+  if (valor && typeof valor === "object" && !(valor instanceof Date)) {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(valor as Record<string, unknown>)) {
+      out[k] = sanitizar(v);
+    }
+    return out;
+  }
+  return valor;
+};
 import {
   AcaoPrincipal,
   AssinaturaDestino,
@@ -431,7 +445,7 @@ export function AcoesDUModalNovo({
         .map((n) => ({
           numero: n,
           dataEnvio: agoraISO,
-          prazo: dataPrazo.trim() || undefined,
+          prazo: dataPrazo.trim() || null,
         }));
 
       const numeroDiexHistorico =
@@ -442,27 +456,27 @@ export function AcoesDUModalNovo({
       const patchPedidoSubsidios = {
         ...pedidoAtual,
         situacaoFluxo: "FINALIZADO",
-        numeroDiexHistorico,
-        ...(numeroDocEfetivo
-          ? { numeroDocumentoDU: numeroDocEfetivo, numeroDiex: numeroDocEfetivo }
-          : {}),
+        numeroDiexHistorico: numeroDiexHistorico ?? [],
+        numeroDocumentoDU: numeroDocEfetivo || null,
+        numeroDiex: numeroDocEfetivo || null,
       };
-      // -----------------------------------------
 
-      await updateDoc(processoRef, {
+      // Sanitização defensiva para todos os campos do updateDoc
+      const payload = {
         status: "concluido",
-        descricao,
+        descricao: descricao || "Processo finalizado pela chefia.",
         finalizado: true,
         pedidoSubsidios: patchPedidoSubsidios,
         atualizadoEm: Timestamp.now(),
-        atualizadoPorNome: autorMilitar,
+        atualizadoPorNome: autorMilitar || "Sistema",
         ultimaAcaoFluxo: {
           tipo: "DU",
-          criadoEm: agoraISO,
-          criadoPorNome: autorMilitar,
-          previousDoc,
+          criadoEm: agoraISO || new Date().toISOString(),
+          criadoPorNome: autorMilitar || "Sistema",
+          previousDoc: previousDoc || null,
         },
-      });
+      };
+      await updateDoc(processoRef, sanitizar(payload) as Record<string, unknown>);
 
       await registrarHistorico(descricao);
       toast.success("Processo finalizado com sucesso.");
@@ -579,7 +593,7 @@ export function AcoesDUModalNovo({
         const dataRecebido = new Date().toISOString().split("T")[0];
         void avancarFluxo("MESA_ASSESSOR", {
           numeroRecebido: numero,
-          registradoEm: dataRecebido,
+          dataRecebido,
           descricaoOverride: "Resposta recebida. Em análise pelo assessor.",
         });
         return;

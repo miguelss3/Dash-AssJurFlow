@@ -80,6 +80,7 @@ const CardDUComponent = ({
   const p = processo || pAntigo!;
   const { user } = useAuth();
   const marcarComoLido = () => onMarcarComoLido?.(p.id);
+  // CORREÇÃO: garantir uso de 'corDestaque' (com 'a')
   const fundoDestaque = /^#([0-9a-fA-F]{6})$/.test(corDestaque || "") ? `${corDestaque}14` : undefined;
 
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
@@ -426,6 +427,7 @@ export const CardDU = memo(CardDUComponent, (prevProps, nextProps) => {
   const psPrev = pPrev.pedidoSubsidios;
   const psNext = nextProps.processo?.pedidoSubsidios ?? nextProps.p?.pedidoSubsidios;
 
+  // CORREÇÃO: Força o card a pintar a cor assim que ela carregar
   return (
     pPrev.id === pNext.id
     && pPrev.status === pNext.status
@@ -437,6 +439,7 @@ export const CardDU = memo(CardDUComponent, (prevProps, nextProps) => {
     && pPrev.processoReaberto === pNext.processoReaberto
     && pPrev.isMS === pNext.isMS
     && pPrev.atualizadoEm === pNext.atualizadoEm
+    && prevProps.corDestaque === nextProps.corDestaque // CORREÇÃO: Força o card a pintar a cor assim que ela carregar
     && (psPrev?.situacaoFluxo ?? null) === (psNext?.situacaoFluxo ?? null)
     && (psPrev?.reiteracoes ?? null) === (psNext?.reiteracoes ?? null)
   );

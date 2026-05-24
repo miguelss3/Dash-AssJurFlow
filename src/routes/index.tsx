@@ -342,37 +342,7 @@ function Index() {
     });
   }, [processos, filtro, busca, filtroTipo, setorUsuario, ehAdmin]);
 
-  // LOG DE AUDITORIA
-  useEffect(() => {
-    if (!loadingProcessos) {
-      const concluidosTotal = processos.filter(p => p.status === 'concluido').length;
-      const totalDashboard = processosParaDashboard.filter(p => p.status === 'concluido').length;
-      const totalFiltrados = filtrados.filter(p => p.status === 'concluido').length;
-
-      console.table({
-        "Fonte de Dados": ["Global (Snapshot)", "Para Dashboard", "Para Kanban (Filtrados)"],
-        "Qtd Concluidos": [concluidosTotal, totalDashboard, totalFiltrados]
-      });
-    }
-  }, [processos, processosParaDashboard, filtrados, loadingProcessos]);
-
-  useEffect(() => {
-    if (!loadingProcessos) {
-      // 1. Verificar Duplicidade de ID
-      const ids = processos.map(p => p.id);
-      const duplicados = ids.filter((id, index) => ids.indexOf(id) !== index);
-
-      // 2. Verificar processos que chegam no Kanban mas são filtrados
-      const idsNoKanban = filtrados.map(p => p.id);
-      const ocultos = processos.filter(p => !idsNoKanban.includes(p.id));
-
-      console.group("Relatório de Auditoria de Dados");
-      console.log("Total no banco:", processos.length);
-      console.log("IDs duplicados encontrados:", duplicados);
-      console.log("IDs ocultos do Kanban:", ocultos.map(o => `${o.numero} (ID: ${o.id})`));
-      console.groupEnd();
-    }
-  }, [processos, filtrados, loadingProcessos]);
+  // ...existing code...
 
   const nomeMilitarAtual = useMemo(() => {
     if (!user) return "Sistema";
@@ -771,9 +741,11 @@ function Index() {
   };
 
   const handleAdd = (status: StatusProcesso) => {
-    setEditing(null);
-    setDefaultStatus(status);
-    setDialogOpen(true);
+    startTransition(() => {
+      setEditing(null);
+      setDefaultStatus(status);
+      setDialogOpen(true);
+    });
   };
 
   const handleNovoLancamentoCalendario = (payload: {
@@ -1650,10 +1622,10 @@ function Index() {
                 <Input
                   id="perfil-senha"
                   type="password"
+                  autoComplete="new-password"
                   value={perfilSenha}
                   onChange={(e) => setPerfilSenha(e.target.value)}
                   placeholder="Deixe em branco para manter"
-                  autoComplete="new-password"
                 />
               </div>
               <div className="space-y-2">
@@ -1661,10 +1633,10 @@ function Index() {
                 <Input
                   id="perfil-senha-2"
                   type="password"
+                  autoComplete="new-password"
                   value={perfilSenhaConfirmacao}
                   onChange={(e) => setPerfilSenhaConfirmacao(e.target.value)}
                   placeholder="Repita a nova senha"
-                  autoComplete="new-password"
                 />
               </div>
             </div>

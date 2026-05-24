@@ -350,7 +350,7 @@ export function GestaoEquipe() {
 
           <div>
             <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Senha Inicial</label>
-            <Input type="password" minLength={6} value={formData.senha} onChange={(e) => setFormData({ ...formData, senha: e.target.value })} placeholder="Mínimo de 6 caracteres" required={!editando} />
+            <Input type="password" autoComplete="current-password" minLength={6} value={formData.senha} onChange={(e) => setFormData({ ...formData, senha: e.target.value })} placeholder="Mínimo de 6 caracteres" required={!editando} />
           </div>
 
           <div>
@@ -403,6 +403,13 @@ export function GestaoEquipe() {
                     <div className="flex items-center gap-2 flex-wrap mb-2">
                       <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${usuario.setor === "DU" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-purple-50 text-purple-700 border border-purple-200"}`}>{usuario.setor}</span>
                       {usuario.isChefe && <span className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 border border-amber-300">Chefe</span>}
+                      {/* RESTAURAÇÃO: Renderiza novamente a bolinha com a cor do assessor */}
+                      {usuario.corCard && (
+                        <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border border-slate-300 bg-slate-50 text-slate-700">
+                          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: usuario.corCard }} />
+                          Cor Card
+                        </span>
+                      )}
                     </div>
                     <p className="font-extrabold text-lg text-foreground">
                       {(() => {

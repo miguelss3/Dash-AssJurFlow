@@ -202,6 +202,7 @@ function LoginPage() {
                   <Input
                     id="login-senha"
                     type="password"
+                    autoComplete="current-password"
                     value={senha}
                     onChange={(e) => setSenha(e.target.value)}
                     placeholder="••••••••"
