@@ -665,7 +665,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
   // -------------------------------------------------------------------
   // V3.5 — Robô Vigia do Kanban DU.
   // Varre processos DU em AGUARDANDO_RESPOSTA cujo prazo já venceu por
-  // mais de 1 dia de tolerância e os devolve automaticamente à mesa do
+  // mais de 2 dias de tolerância e os devolve automaticamente à mesa do
   // assessor, limpando número/prazo e incrementando o contador de
   // reiterações. Usa dot notation no updateDoc para não sobrescrever os
   // demais campos de `pedidoSubsidios`.
@@ -698,7 +698,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         const dataPrazo = new Date(`${prazoStr}T00:00:00`);
         if (Number.isNaN(dataPrazo.getTime())) continue;
         const dataLimite = new Date(dataPrazo);
-        dataLimite.setDate(dataLimite.getDate() + 1);
+        dataLimite.setDate(dataLimite.getDate() + 2);
 
         if (hoje > dataLimite) {
           try {
