@@ -38,10 +38,14 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [openPAAbas, setOpenPAAbas] = useState(false);
   const [openPAFluxo, setOpenPAFluxo] = useState(false);
   const [openDUAssuntos, setOpenDUAssuntos] = useState(false);
+  const [openDUOrigens, setOpenDUOrigens] = useState(false);
+  const [openDUSecoes, setOpenDUSecoes] = useState(false);
 
   // Estados dos formulários de entrada e dados do Dnd
   const [novoAssuntoPA, setNovoAssuntoPA] = useState("");
   const [novoAssuntoDU, setNovoAssuntoDU] = useState("");
+  const [novoOrigemDU, setNovoOrigemDU] = useState("");
+  const [novoSecaoDU, setNovoSecaoDU] = useState("");
   const [selectedPAPreviewColumnId, setSelectedPAPreviewColumnId] = useState<PAInProgressColumnId>("sindicancia");
   const [selectedPAPreviewTabId, setSelectedPAPreviewTabId] = useState<ColumnTabId>("andamento");
   const [modoPAAvancado, setModoPAAvancado] = useState(false);
@@ -50,12 +54,16 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   
   const [dragAssuntoPAId, setDragAssuntoPAId] = useState<string | null>(null);
   const [dragAssuntoDUId, setDragAssuntoDUId] = useState<string | null>(null);
+  const [dragOrigemDUId, setDragOrigemDUId] = useState<string | null>(null);
+  const [dragSecaoDUId, setDragSecaoDUId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   // IDs e mapeamento estável de arrays para os Contexts do Dnd-Kit
   const assuntoPAIds = useMemo(() => (form.assuntosPASindicancia || []).map((_, index) => `pa-${index}`), [form.assuntosPASindicancia]);
   const assuntoDUIds = useMemo(() => (form.assuntosDUPrincipais || []).map((_, index) => `du-${index}`), [form.assuntosDUPrincipais]);
+  const origemDUIds = useMemo(() => (form.origensDUDocumentos || []).map((_, index) => `ori-${index}`), [form.origensDUDocumentos]);
+  const secaoDUIds = useMemo(() => (form.secoesDU || []).map((_, index) => `sec-${index}`), [form.secoesDU]);
 
   const dragAssuntoPALabel = useMemo(() => {
     if (!dragAssuntoPAId) return "";
@@ -68,6 +76,18 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     const index = Number(dragAssuntoDUId.replace("du-", ""));
     return form.assuntosDUPrincipais[index] || "";
   }, [dragAssuntoDUId, form.assuntosDUPrincipais]);
+
+  const dragOrigemDULabel = useMemo(() => {
+    if (!dragOrigemDUId) return "";
+    const index = Number(dragOrigemDUId.replace("ori-", ""));
+    return (form.origensDUDocumentos || [])[index] || "";
+  }, [dragOrigemDUId, form.origensDUDocumentos]);
+
+  const dragSecaoDULabel = useMemo(() => {
+    if (!dragSecaoDUId) return "";
+    const index = Number(dragSecaoDUId.replace("sec-", ""));
+    return (form.secoesDU || [])[index] || "";
+  }, [dragSecaoDUId, form.secoesDU]);
 
   const selectedFlowAction = useMemo(() => {
     if (selectedFlowActionIndex === null || !form.paFlowActions) return null;
@@ -143,6 +163,54 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
     setDragAssuntoDUId(null);
   };
 
+  const updateOrigemDU = (index: number, value: string) => {
+    setForm((prev) => { const lista = [...(prev.origensDUDocumentos || [])]; lista[index] = value; return { ...prev, origensDUDocumentos: lista }; });
+  };
+  const removeOrigemDU = (index: number) => {
+    setForm((prev) => ({ ...prev, origensDUDocumentos: (prev.origensDUDocumentos || []).filter((_, i) => i !== index) }));
+  };
+  const addOrigemDU = () => {
+    const texto = novoOrigemDU.trim();
+    if (!texto) return;
+    if ((form.origensDUDocumentos || []).includes(texto)) { toast.error("Esta origem já existe."); return; }
+    setForm((prev) => ({ ...prev, origensDUDocumentos: [...(prev.origensDUDocumentos || []), texto] }));
+    setNovoOrigemDU("");
+  };
+  const handleDragStartOrigemDU = (event: DragStartEvent) => setDragOrigemDUId(String(event.active.id));
+  const handleDragCancelOrigemDU = () => setDragOrigemDUId(null);
+  const handleDragEndOrigemDU = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) { setDragOrigemDUId(null); return; }
+    const oldIndex = Number(String(active.id).replace("ori-", ""));
+    const newIndex = Number(String(over.id).replace("ori-", ""));
+    setForm((prev) => ({ ...prev, origensDUDocumentos: arrayMove(prev.origensDUDocumentos || [], oldIndex, newIndex) }));
+    setDragOrigemDUId(null);
+  };
+
+  const updateSecaoDU = (index: number, value: string) => {
+    setForm((prev) => { const lista = [...(prev.secoesDU || [])]; lista[index] = value; return { ...prev, secoesDU: lista }; });
+  };
+  const removeSecaoDU = (index: number) => {
+    setForm((prev) => ({ ...prev, secoesDU: (prev.secoesDU || []).filter((_, i) => i !== index) }));
+  };
+  const addSecaoDU = () => {
+    const texto = novoSecaoDU.trim();
+    if (!texto) return;
+    if ((form.secoesDU || []).includes(texto)) { toast.error("Esta seção já existe."); return; }
+    setForm((prev) => ({ ...prev, secoesDU: [...(prev.secoesDU || []), texto] }));
+    setNovoSecaoDU("");
+  };
+  const handleDragStartSecaoDU = (event: DragStartEvent) => setDragSecaoDUId(String(event.active.id));
+  const handleDragCancelSecaoDU = () => setDragSecaoDUId(null);
+  const handleDragEndSecaoDU = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) { setDragSecaoDUId(null); return; }
+    const oldIndex = Number(String(active.id).replace("sec-", ""));
+    const newIndex = Number(String(over.id).replace("sec-", ""));
+    setForm((prev) => ({ ...prev, secoesDU: arrayMove(prev.secoesDU || [], oldIndex, newIndex) }));
+    setDragSecaoDUId(null);
+  };
+
   const handleBackupLocal = async () => {
     try {
       setGerandoBackup(true);
@@ -216,10 +284,20 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
           {/* SETOR DEFESA DA UNIÃO — Propriedades exatas mapeadas com a interface */}
           <AjustesDU
             form={form} openDU={openDU} setOpenDU={setOpenDU} openDUAssuntos={openDUAssuntos} setOpenDUAssuntos={setOpenDUAssuntos}
-            assuntoDUIds={assuntoDUIds} addAssuntoDU={addAssuntoDU} updateAssuntoDU={updateAssuntoDU} removeAssuntoDU={removeAssuntoDU} 
+            assuntoDUIds={assuntoDUIds} addAssuntoDU={addAssuntoDU} updateAssuntoDU={updateAssuntoDU} removeAssuntoDU={removeAssuntoDU}
             dragAssuntoDUId={dragAssuntoDUId} dragAssuntoDULabel={dragAssuntoDULabel}
             handleDragStartDU={handleDragStartDU} handleDragCancelDU={handleDragCancelDU} handleDragEndDU={handleDragEndDU}
             sensors={sensors} novoAssuntoDU={novoAssuntoDU} setNovoAssuntoDU={setNovoAssuntoDU}
+            openDUOrigens={openDUOrigens} setOpenDUOrigens={setOpenDUOrigens}
+            origemDUIds={origemDUIds} novoOrigemDU={novoOrigemDU} setNovoOrigemDU={setNovoOrigemDU}
+            addOrigemDU={addOrigemDU} updateOrigemDU={updateOrigemDU} removeOrigemDU={removeOrigemDU}
+            dragOrigemDUId={dragOrigemDUId} dragOrigemDULabel={dragOrigemDULabel}
+            handleDragStartOrigemDU={handleDragStartOrigemDU} handleDragCancelOrigemDU={handleDragCancelOrigemDU} handleDragEndOrigemDU={handleDragEndOrigemDU}
+            openDUSecoes={openDUSecoes} setOpenDUSecoes={setOpenDUSecoes}
+            secaoDUIds={secaoDUIds} novoSecaoDU={novoSecaoDU} setNovoSecaoDU={setNovoSecaoDU}
+            addSecaoDU={addSecaoDU} updateSecaoDU={updateSecaoDU} removeSecaoDU={removeSecaoDU}
+            dragSecaoDUId={dragSecaoDUId} dragSecaoDULabel={dragSecaoDULabel}
+            handleDragStartSecaoDU={handleDragStartSecaoDU} handleDragCancelSecaoDU={handleDragCancelSecaoDU} handleDragEndSecaoDU={handleDragEndSecaoDU}
           />
 
           {/* SETOR PROCESSO ADMINISTRATIVO — Propriedades limpas e tipadas com precisão */}
