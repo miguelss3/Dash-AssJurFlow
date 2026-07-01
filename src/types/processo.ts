@@ -112,6 +112,7 @@ export interface PedidoSubsidios {
   assinaturaChefiaEm?: string;
   assinaturaChemEm?: string;
   reiteracoes?: number;
+  dataRecebido?: string;
 }
 
 export interface RespostaDU {

@@ -103,7 +103,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
       || processo.pedidoSubsidios?.numeroRecebido
       || "";
     setDocRecebidoNumeroEdit(resolvedRecebido);
-    setDocRecebidoDataEdit(processo.respostaDU?.registradoEm || "");
+    setDocRecebidoDataEdit(processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "");
     setEditandoDocs(false);
   }, [open, processo]);
 
@@ -360,7 +360,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                             || processo.pedidoSubsidios?.numeroRecebido
                             || "",
                           );
-                          setDocRecebidoDataEdit(processo.respostaDU?.registradoEm || "");
+                          setDocRecebidoDataEdit(processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "");
                         }}
                         disabled={savingDocs}
                       >
@@ -577,7 +577,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                                   {docRecebido}
                                 </div>
                                 <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                                  Recebido em: {processo.respostaDU?.registradoEm ? formatarDataHoraSegura(processo.respostaDU.registradoEm) : "—"}
+                                  Recebido em: {processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido ? formatarDataHoraSegura(processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido) : "—"}
                                 </div>
                               </div>
                             </div>

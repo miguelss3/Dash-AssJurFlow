@@ -7,16 +7,13 @@ import {
   Plus,
   Search,
   LayoutGrid,
-  BarChart3,
   Bell,
   Menu,
   X,
   Settings,
   LogOut,
   Calendar,
-  FolderArchive,
   Users,
-  ListFilter,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1660,64 +1657,6 @@ function TabLoading({ label }: { label: string }) {
   return (
     <div className="rounded-2xl bg-card border border-border p-6 text-sm text-muted-foreground">
       {label}
-    </div>
-  );
-}
-
-function EmptyTab({
-  icon: Icon,
-  title,
-  description,
-  processos,
-  onEdit,
-  onDelete,
-  onMove,
-}: {
-  icon: typeof LayoutGrid;
-  title: string;
-  description: string;
-  processos?: Processo[];
-  onEdit?: (p: Processo) => void;
-  onDelete?: (id: string) => void;
-  onMove?: (id: string, status: StatusProcesso) => void;
-}) {
-  if (processos && processos.length > 0 && onEdit && onDelete && onMove) {
-    return (
-      <div className="space-y-4">
-        <div className="rounded-2xl bg-card border border-border p-5">
-          <div className="flex items-center gap-3 mb-1">
-            <span className="inline-flex h-10 w-10 rounded-xl bg-accent/40 items-center justify-center">
-              <Icon className="h-5 w-5 text-accent-foreground" />
-            </span>
-            <div>
-              <h3 className="font-bold text-lg text-foreground font-display">{title}</h3>
-              <p className="text-xs text-muted-foreground">{description}</p>
-            </div>
-          </div>
-        </div>
-        <Suspense fallback={<TabLoading label="Carregando quadro de processos..." />}>
-          <KanbanBoard
-            processos={processos}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onMove={onMove}
-            onAdd={() => {}}
-          />
-        </Suspense>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-3xl bg-card border-2 border-dashed border-border p-12 text-center">
-      <span className="inline-flex h-14 w-14 rounded-2xl bg-accent/40 items-center justify-center mb-4">
-        <Icon className="h-6 w-6 text-accent-foreground" />
-      </span>
-      <h3 className="font-bold text-xl text-foreground font-display mb-2">{title}</h3>
-      <p className="text-sm text-muted-foreground max-w-md mx-auto">{description}</p>
-      <p className="text-xs text-muted-foreground/60 mt-4 italic">
-        Em desenvolvimento — disponível em breve.
-      </p>
     </div>
   );
 }
