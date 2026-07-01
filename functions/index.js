@@ -8,6 +8,23 @@ const auth = admin.auth();
 
 const ADMIN_EMAILS = new Set(["miguelss3@yahoo.com.br"]);
 
+const ALLOWED_ORIGINS = new Set([
+  "https://assjur-flow-12rm.web.app",
+  "https://assjur-flow-12rm.firebaseapp.com",
+  "https://assjurflow.app.br",
+  "http://localhost:5173",
+]);
+
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin || "";
+  if (ALLOWED_ORIGINS.has(origin)) {
+    res.set("Access-Control-Allow-Origin", origin);
+  }
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Vary", "Origin");
+}
+
 function normalizeText(value) {
   return String(value || "").trim().toUpperCase();
 }
@@ -109,9 +126,7 @@ async function resolveTargetUser(data) {
 }
 
 exports.deleteUserAccount = functions.region("us-central1").https.onRequest(async (req, res) => {
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  setCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
     res.status(204).send("");
@@ -247,9 +262,7 @@ exports.deleteUserAccount = functions.region("us-central1").https.onRequest(asyn
 });
 
 exports.criarUsuarioAdmin = functions.region("us-central1").https.onRequest(async (req, res) => {
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  setCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
     res.status(204).send("");
