@@ -113,6 +113,7 @@ export interface PedidoSubsidios {
   assinaturaChemEm?: string;
   reiteracoes?: number;
   dataRecebido?: string;
+  historicoRecebidos?: Array<{ numero: string; dataRecebimento: string }>;
 }
 
 export interface RespostaDU {

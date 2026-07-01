@@ -44,8 +44,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
   const [historicoEdit, setHistoricoEdit] = useState<
     Array<{ numero: string; dataEnvio: string; prazo: string }>
   >([]);
-  const [docRecebidoNumeroEdit, setDocRecebidoNumeroEdit] = useState("");
-  const [docRecebidoDataEdit, setDocRecebidoDataEdit] = useState("");
+  const [recebidosEdit, setRecebidosEdit] = useState<Array<{ numero: string; dataRecebimento: string }>>([]);
 
   // Converte ISO completo (ex.: 2026-05-19T13:45:00.000Z) para o formato
   // exigido por <input type="datetime-local"> (YYYY-MM-DDTHH:MM, hora local).
@@ -96,14 +95,22 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     setEditandoPrazosDU(false);
 
     setHistoricoEdit(mapearHistoricoParaForm(processo.pedidoSubsidios?.numeroDiexHistorico));
-    const resolvedRecebido =
-      processo.respostaDU?.numeroOficioExterno
-      || processo.respostaDU?.numeroDiex
-      || processo.respostaDU?.numeroOficio
-      || processo.pedidoSubsidios?.numeroRecebido
-      || "";
-    setDocRecebidoNumeroEdit(resolvedRecebido);
-    setDocRecebidoDataEdit(processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "");
+
+    // Inicializa lista de recebidos: usa historicoRecebidos se existir,
+    // caso contrário migra o campo legado para um array de 1 item.
+    const historicoRec = processo.pedidoSubsidios?.historicoRecebidos;
+    if (Array.isArray(historicoRec) && historicoRec.length > 0) {
+      setRecebidosEdit(historicoRec.map((r) => ({ numero: r.numero || "", dataRecebimento: r.dataRecebimento || "" })));
+    } else {
+      const numLegado =
+        processo.respostaDU?.numeroOficioExterno
+        || processo.respostaDU?.numeroDiex
+        || processo.respostaDU?.numeroOficio
+        || processo.pedidoSubsidios?.numeroRecebido
+        || "";
+      const dataLegado = processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "";
+      setRecebidosEdit(numLegado ? [{ numero: numLegado, dataRecebimento: dataLegado }] : []);
+    }
     setEditandoDocs(false);
   }, [open, processo]);
 
@@ -185,8 +192,19 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
 
       const ultimoEnviado =
         historicoLimpo.length > 0 ? historicoLimpo[historicoLimpo.length - 1].numero : "";
-      let recebido = docRecebidoNumeroEdit.trim();
-      const recebidoData = docRecebidoDataEdit.trim();
+
+      // Limpa e valida a lista de recebidos
+      const recebidosLimpos = recebidosEdit
+        .map((r) => ({
+          numero: r.numero.trim(),
+          dataRecebimento: r.dataRecebimento.trim(),
+        }))
+        .filter((r) => r.numero.length > 0);
+
+      // Mantém o primeiro item como campo legado para compatibilidade
+      const primarioRecebido = recebidosLimpos[0] ?? { numero: "", dataRecebimento: "" };
+      let recebido = primarioRecebido.numero;
+      const recebidoData = primarioRecebido.dataRecebimento;
 
       if (ultimoEnviado && recebido && ultimoEnviado === recebido) {
         const confirmar = typeof window !== "undefined"
@@ -201,7 +219,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
           return;
         }
         recebido = "";
-        setDocRecebidoNumeroEdit("");
+        setRecebidosEdit([]);
       }
 
       const processoRef = doc(db, "processos", processo.id);
@@ -209,6 +227,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
         "pedidoSubsidios.numeroDocumentoDU": ultimoEnviado,
         "pedidoSubsidios.numeroDiex": ultimoEnviado,
         "pedidoSubsidios.numeroDiexHistorico": historicoLimpo,
+        "pedidoSubsidios.historicoRecebidos": recebidosLimpos.length > 0 ? recebidosLimpos : null,
         "respostaDU.numeroDiex": recebido,
         "respostaDU.numeroOficioExterno": recebido,
         "pedidoSubsidios.numeroRecebido": recebido,
@@ -353,14 +372,20 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                           setHistoricoEdit(
                             mapearHistoricoParaForm(processo.pedidoSubsidios?.numeroDiexHistorico),
                           );
-                          setDocRecebidoNumeroEdit(
-                            processo.respostaDU?.numeroOficioExterno
-                            || processo.respostaDU?.numeroDiex
-                            || processo.respostaDU?.numeroOficio
-                            || processo.pedidoSubsidios?.numeroRecebido
-                            || "",
-                          );
-                          setDocRecebidoDataEdit(processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "");
+                          // Reinicializa lista de recebidos (mesma lógica do useEffect)
+                          const historicoRec = processo.pedidoSubsidios?.historicoRecebidos;
+                          if (Array.isArray(historicoRec) && historicoRec.length > 0) {
+                            setRecebidosEdit(historicoRec.map((r) => ({ numero: r.numero || "", dataRecebimento: r.dataRecebimento || "" })));
+                          } else {
+                            const numLegado =
+                              processo.respostaDU?.numeroOficioExterno
+                              || processo.respostaDU?.numeroDiex
+                              || processo.respostaDU?.numeroOficio
+                              || processo.pedidoSubsidios?.numeroRecebido
+                              || "";
+                            const dataLegado = processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "";
+                            setRecebidosEdit(numLegado ? [{ numero: numLegado, dataRecebimento: dataLegado }] : []);
+                          }
                         }}
                         disabled={savingDocs}
                       >
@@ -505,24 +530,13 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                                     <div className="text-sm font-semibold text-slate-800 break-words">
                                       {numeroDoc}
                                     </div>
-                                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                                      Enviado em: {dataEnvio ? formatarData(dataEnvio) : "—"}
-                                    </div>
                                   </div>
                                 </div>
 
                                 <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs">
-                                  <span className="text-slate-500">Prazo:</span>
-                                  <span
-                                    className={`font-medium ${
-                                      vencido
-                                        ? "text-red-600"
-                                        : ehUltimo && !respondido && diasResposta !== null && diasResposta <= 5
-                                          ? "text-orange-600"
-                                          : "text-slate-700"
-                                    }`}
-                                  >
-                                    {prazoDoc ? formatarData(prazoDoc) : "—"}
+                                  <span className="text-slate-500">Enviado em:</span>
+                                  <span className="font-medium text-slate-700">
+                                    {dataEnvio ? formatarDataHoraSegura(dataEnvio) : "—"}
                                   </span>
                                 </div>
                               </div>
@@ -540,54 +554,96 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                     <div className="mt-4">
                       <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
                         <ArrowDownLeft className="w-4 h-4 text-sky-500" />
-                        Recebido
+                        Recebidos (Histórico)
                       </div>
                       {editandoDocs ? (
-                        <div className="p-3 border border-slate-200 bg-slate-50 rounded-lg relative shadow-sm">
-                          <div className="space-y-2.5">
-                            <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número do Documento Recebido</label>
-                              <Input
-                                value={docRecebidoNumeroEdit}
-                                onChange={(e) => setDocRecebidoNumeroEdit(e.target.value)}
-                                placeholder="Nº do DIEx, Ofício ou documento de retorno"
-                                className="h-8 text-xs mt-0.5"
-                              />
+                        <div className="space-y-3 mt-2">
+                          {recebidosEdit.length === 0 && (
+                            <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                              Nenhum documento recebido. Clique em "Adicionar Recebido".
                             </div>
-                            <div>
-                              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data de Recebimento</label>
-                              <Input
-                                type="datetime-local"
-                                value={isoParaDateTimeLocal(docRecebidoDataEdit)}
-                                onChange={(e) => setDocRecebidoDataEdit(dateTimeLocalParaIso(e.target.value))}
-                                onClick={abrirPickerNativo}
-                                onFocus={abrirPickerNativo}
-                                className="h-8 text-xs mt-0.5 cursor-pointer"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        docRecebido ? (
-                          <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-3 hover:border-sky-300 transition-colors">
-                            <div className="flex items-start gap-3">
-                              <ArrowDownLeft className="w-4 h-4 text-sky-600 mt-1 shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-semibold text-slate-800 break-words">
-                                  {docRecebido}
+                          )}
+                          {recebidosEdit.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="p-3 border border-slate-200 bg-slate-50 rounded-lg relative shadow-sm"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => setRecebidosEdit((prev) => prev.filter((_, i) => i !== idx))}
+                                className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors"
+                                title="Remover documento recebido"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              <div className="space-y-2.5 pr-6">
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número do Documento Recebido</label>
+                                  <Input
+                                    value={item.numero}
+                                    onChange={(e) => setRecebidosEdit((prev) => prev.map((r, i) => i === idx ? { ...r, numero: e.target.value } : r))}
+                                    placeholder="Nº do DIEx, Ofício ou documento de retorno"
+                                    className="h-8 text-xs mt-0.5"
+                                  />
                                 </div>
-                                <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                                  Recebido em: {processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido ? formatarDataHoraSegura(processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido) : "—"}
+                                <div>
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data de Recebimento</label>
+                                  <Input
+                                    type="datetime-local"
+                                    value={isoParaDateTimeLocal(item.dataRecebimento)}
+                                    onChange={(e) => setRecebidosEdit((prev) => prev.map((r, i) => i === idx ? { ...r, dataRecebimento: dateTimeLocalParaIso(e.target.value) } : r))}
+                                    onClick={abrirPickerNativo}
+                                    onFocus={abrirPickerNativo}
+                                    className="h-8 text-xs mt-0.5 cursor-pointer"
+                                  />
                                 </div>
                               </div>
                             </div>
+                          ))}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setRecebidosEdit((prev) => [...prev, { numero: "", dataRecebimento: "" }])}
+                            className="w-full text-xs h-8 border-dashed border-slate-300 text-slate-500 hover:text-slate-800"
+                          >
+                            <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Recebido
+                          </Button>
+                        </div>
+                      ) : (() => {
+                        // Lista de exibição: prioriza historicoRecebidos, fallback ao campo legado
+                        const listaRecebidos: Array<{ numero: string; dataRecebimento: string }> =
+                          Array.isArray(processo.pedidoSubsidios?.historicoRecebidos) && processo.pedidoSubsidios!.historicoRecebidos!.length > 0
+                            ? processo.pedidoSubsidios!.historicoRecebidos!
+                            : (docRecebido ? [{ numero: docRecebido, dataRecebimento: processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "" }] : []);
+
+                        return listaRecebidos.length > 0 ? (
+                          <div className="space-y-2">
+                            {listaRecebidos.map((rec, idx) => (
+                              <div
+                                key={`${rec.numero}-${idx}`}
+                                className="rounded-xl border border-slate-200 bg-white shadow-sm p-3 hover:border-sky-300 transition-colors"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <ArrowDownLeft className="w-4 h-4 text-sky-600 mt-1 shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm font-semibold text-slate-800 break-words">
+                                      {rec.numero}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
+                                      Recebido em: {rec.dataRecebimento ? formatarDataHoraSegura(rec.dataRecebimento) : "—"}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         ) : (
                           <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
                             Pendente
                           </div>
-                        )
-                      )}
+                        );
+                      })()}
                     </div>
                   </>
                 );
