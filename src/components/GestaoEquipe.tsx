@@ -269,7 +269,11 @@ export function GestaoEquipe() {
         body: JSON.stringify({ uid: uidUsuario || undefined, email: usuario.email || undefined }),
       });
 
-      if (!response.ok) throw new Error("Erro ao remover");
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        console.error("deleteUserAccount error:", response.status, errorBody);
+        throw new Error(errorBody.message || `Erro ${response.status} ao remover`);
+      }
 
       await carregarUsuarios();
       toast.success(`${usuario.nome} removido.`);

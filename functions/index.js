@@ -201,40 +201,34 @@ exports.deleteUserAccount = functions.region("us-central1").https.onRequest(asyn
     try {
       await auth.deleteUser(uid);
     } catch (e) {
-      console.error("auth.deleteUser failed:", e.message);
+      const code = String(e && e.code ? e.code : "");
+      console.error("auth.deleteUser failed:", code, e.message);
+      if (code === "auth/user-not-found") {
+        res.status(404).json({ error: "user-not-found", message: "Usuário não encontrado no Authentication (pode já ter sido removido)." });
+        return;
+      }
       res.status(500).json({ error: "internal", message: "Erro ao deletar usuário do Authentication: " + e.message });
       return;
     }
 
-    const agoraISO = new Date().toISOString();
-    const batch = db.batch();
+    // Limpeza do Firestore — erros aqui não revertem a exclusão do Auth.
+    try {
+      const agoraISO = new Date().toISOString();
+      const batch = db.batch();
 
-    const perfilCanonicoRef = db.collection("usuarios").doc(uid);
-    batch.set(perfilCanonicoRef, {
-      ativo: false,
-      authRemovido: true,
-      authRemovidoEm: agoraISO,
-      authRemovidoPorUid: callerUid,
-      authRemovidoPorEmail: callerEmail,
-      uid,
-      email: String(userRecord.email || (data && data.email) || "").trim().toLowerCase() || null,
-    }, { merge: true });
-
-    const docsPorUid = await db.collection("usuarios").where("uid", "==", uid).get();
-    docsPorUid.docs.forEach((docSnap) => {
-      batch.set(docSnap.ref, {
+      const perfilCanonicoRef = db.collection("usuarios").doc(uid);
+      batch.set(perfilCanonicoRef, {
         ativo: false,
         authRemovido: true,
         authRemovidoEm: agoraISO,
         authRemovidoPorUid: callerUid,
         authRemovidoPorEmail: callerEmail,
+        uid,
+        email: String(userRecord.email || (data && data.email) || "").trim().toLowerCase() || null,
       }, { merge: true });
-    });
 
-    const emailAlvo = String(userRecord.email || (data && data.email) || "").trim().toLowerCase();
-    if (emailAlvo) {
-      const docsPorEmail = await db.collection("usuarios").where("email", "==", emailAlvo).get();
-      docsPorEmail.docs.forEach((docSnap) => {
+      const docsPorUid = await db.collection("usuarios").where("uid", "==", uid).get();
+      docsPorUid.docs.forEach((docSnap) => {
         batch.set(docSnap.ref, {
           ativo: false,
           authRemovido: true,
@@ -243,12 +237,24 @@ exports.deleteUserAccount = functions.region("us-central1").https.onRequest(asyn
           authRemovidoPorEmail: callerEmail,
         }, { merge: true });
       });
-    }
 
-    try {
+      const emailAlvo = String(userRecord.email || (data && data.email) || "").trim().toLowerCase();
+      if (emailAlvo) {
+        const docsPorEmail = await db.collection("usuarios").where("email", "==", emailAlvo).get();
+        docsPorEmail.docs.forEach((docSnap) => {
+          batch.set(docSnap.ref, {
+            ativo: false,
+            authRemovido: true,
+            authRemovidoEm: agoraISO,
+            authRemovidoPorUid: callerUid,
+            authRemovidoPorEmail: callerEmail,
+          }, { merge: true });
+        });
+      }
+
       await batch.commit();
-    } catch (e) {
-      console.error("Firestore batch error (auth já removido):", e.message);
+    } catch (firestoreErr) {
+      console.error("Firestore cleanup error (auth já removido):", firestoreErr.message);
     }
 
     res.json({ ok: true, uid });

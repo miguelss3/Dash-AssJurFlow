@@ -26,6 +26,11 @@
         "region": "us-central1"
       },
       {
+        "source": "/api/criarUsuarioAdmin",
+        "function": "criarUsuarioAdmin",
+        "region": "us-central1"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }
