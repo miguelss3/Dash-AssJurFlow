@@ -369,3 +369,126 @@ exports.criarUsuarioAdmin = functions.region("us-central1").https.onRequest(asyn
     }
   }
 });
+
+// ──────────────────────────────────────────────────────────────────────────────
+// geminiChat — Assistente IA via Google Gemini 1.5 Flash
+// Chave da API lida de variável de ambiente GEMINI_KEY (functions/.env)
+// Rate limit: 20 perguntas por usuário por dia (Firestore: ia_usage/{uid})
+// ──────────────────────────────────────────────────────────────────────────────
+exports.geminiChat = functions.region("us-central1").https.onRequest(async (req, res) => {
+  setCorsHeaders(req, res);
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "method-not-allowed" });
+    return;
+  }
+
+  try {
+    // Autenticação
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) {
+      res.status(401).json({ error: "unauthenticated", message: "Usuário não autenticado." });
+      return;
+    }
+
+    let decodedToken;
+    try {
+      decodedToken = await auth.verifyIdToken(token);
+    } catch (e) {
+      res.status(401).json({ error: "unauthenticated", message: "Token inválido." });
+      return;
+    }
+
+    const uid = decodedToken.uid;
+
+    // Rate limiting: 20 perguntas por dia por usuário
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const rateLimitRef = db.collection("ia_usage").doc(uid);
+    const rateLimitDoc = await rateLimitRef.get();
+
+    if (rateLimitDoc.exists) {
+      const rlData = rateLimitDoc.data();
+      if (rlData.date === today && rlData.count >= 20) {
+        res.status(429).json({
+          error: "rate-limited",
+          message: "Limite diário de 20 perguntas atingido. Tente novamente amanhã.",
+        });
+        return;
+      }
+      if (rlData.date === today) {
+        await rateLimitRef.update({ count: admin.firestore.FieldValue.increment(1) });
+      } else {
+        await rateLimitRef.set({ date: today, count: 1 });
+      }
+    } else {
+      await rateLimitRef.set({ date: today, count: 1 });
+    }
+
+    // Parse do body
+    let body = req.body || {};
+    if (Buffer.isBuffer(body)) {
+      try { body = JSON.parse(body.toString()); } catch { body = {}; }
+    }
+    if (typeof body === "string") {
+      try { body = JSON.parse(body); } catch { body = {}; }
+    }
+
+    const message = String(body.message || "").trim().slice(0, 1000);
+    const context = String(body.context || "").trim().slice(0, 2000);
+
+    if (!message) {
+      res.status(400).json({ error: "invalid-argument", message: "Mensagem não pode ser vazia." });
+      return;
+    }
+
+    const geminiKey = process.env.GEMINI_KEY;
+    if (!geminiKey) {
+      res.status(503).json({ error: "service-unavailable", message: "Assistente IA não configurado." });
+      return;
+    }
+
+    const prompt = `Você é um assistente jurídico do sistema AssJur Flow, que auxilia a Assessoria Jurídica da 12ª Região Militar do Brasil na gestão de processos administrativos militares. Responda de forma concisa, profissional e objetiva em português brasileiro. Baseie suas respostas no contexto fornecido. Quando não tiver informação suficiente, diga claramente.
+
+Contexto atual do sistema:
+${context}
+
+Pergunta: ${message}`;
+
+    const geminiRes = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.4, maxOutputTokens: 512 },
+        }),
+      }
+    );
+
+    if (!geminiRes.ok) {
+      const errBody = await geminiRes.text();
+      console.error("Gemini API error:", geminiRes.status, errBody);
+      res.status(502).json({ error: "upstream-error", message: "Erro ao consultar a IA. Tente novamente em instantes." });
+      return;
+    }
+
+    const geminiData = await geminiRes.json();
+    const reply =
+      geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "Não foi possível gerar uma resposta.";
+
+    res.json({ ok: true, reply });
+  } catch (e) {
+    console.error("geminiChat unhandled error:", e.message, e.stack);
+    if (!res.headersSent) {
+      res.status(500).json({ error: "internal", message: e.message || "Erro interno." });
+    }
+  }
+});

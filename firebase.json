@@ -31,6 +31,11 @@
         "region": "us-central1"
       },
       {
+        "source": "/api/geminiChat",
+        "function": "geminiChat",
+        "region": "us-central1"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

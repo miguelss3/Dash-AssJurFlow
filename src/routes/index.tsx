@@ -29,6 +29,7 @@ import { useProcessos } from "@/hooks/useProcessos";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Dashboard } from "@/components/Dashboard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
+import { IAChatBox } from "@/components/IAChatBox";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
 import type { SiteSettings } from "@/types/siteSettings";
 import { statusPrazo } from "@/lib/prazo";
@@ -1124,6 +1125,8 @@ function Index() {
                   </div>
                 )}
               </div>
+
+              <IAChatBox processos={processosParaDashboard} />
 
               <Dashboard
                 processos={processosParaDashboard}
