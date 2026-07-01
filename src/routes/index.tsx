@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, useTransition } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SoldierAvatar } from "@/components/SoldierAvatar";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
@@ -7,7 +7,6 @@ import {
   Plus,
   Search,
   LayoutGrid,
-  Bell,
   Menu,
   X,
   Settings,
@@ -144,13 +143,6 @@ export const Route = createFileRoute("/")({
 type Aba = "mesa" | "prazos" | "ajustes" | "indicadores" | "equipe";
 type FiltroTipo = "todos" | "DU" | "PA";
 
-type NotificacaoItem = {
-  id: string;
-  titulo: string;
-  texto: string;
-  momentoISO: string;
-};
-
 function normalizarSetor(valor: unknown): "DU" | "PA" | "" {
   const txt = String(valor ?? "")
     .normalize("NFD")
@@ -170,18 +162,6 @@ function normalizarTexto(valor: unknown): string {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
-}
-
-function formatarDataHora(valorISO: string): string {
-  const dt = new Date(valorISO);
-  if (Number.isNaN(dt.getTime())) return "data indisponivel";
-  return dt.toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function processoTimestampMs(p: Processo | undefined): number {
@@ -216,13 +196,9 @@ function Index() {
   const [perfilTelefone, setPerfilTelefone] = useState("");
   const [perfilSenha, setPerfilSenha] = useState("");
   const [perfilSenhaConfirmacao, setPerfilSenhaConfirmacao] = useState("");
-  const [notificacoesOpen, setNotificacoesOpen] = useState(false);
-  const [ultimoAcessoNotificacoes, setUltimoAcessoNotificacoes] = useState<number>(0);
-  const [notificacoesCalendario, setNotificacoesCalendario] = useState<NotificacaoItem[]>([]);
   const [processosLidos, setProcessosLidos] = useState<Record<string, number>>({});
   const [processoAcaoSelecionado, setProcessoAcaoSelecionado] = useState<Processo | null>(null);
   const [processoAcaoOpen, setProcessoAcaoOpen] = useState(false);
-  const notificacoesRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (ready && !user) navigate({ to: "/login" });
@@ -239,24 +215,6 @@ function Index() {
       || (usuarioLegado.secao as string | undefined)
       || (usuarioLegado.cargo as string | undefined),
   );
-
-  const isPendenteChefia = (p: Processo) => {
-    const situacaoFluxo = p.pedidoSubsidios?.situacaoFluxo || "";
-    const statusNorm = (p.status || "").toString().toLowerCase();
-    return (
-      [
-        "aguardando_assinatura_secao",
-        "aguardando_aprovacao_externa",
-        "enviado_admin",
-        "assinado_externo",
-        "CHEFIA_DILIGENCIA",
-        "CHEFIA_DEFESA",
-        "AGUARDANDO_RESPOSTA",
-      ].includes(situacaoFluxo) ||
-      statusNorm.includes("aguardando assinatura") ||
-      statusNorm.includes("aguardando conferencia da chefia")
-    );
-  };
 
   // Todos operam na Visão do Setor
   useEffect(() => {
@@ -376,60 +334,10 @@ function Index() {
     return mapa[aba] || mapa.mesa;
   }, [aba, siteSettings.dashboardDescription, siteSettings.dashboardTitle]);
 
-  const chaveNotificacoes = useMemo(
-    () => (user?.uid ? `assjur:notificacoes:lastSeen:${user.uid}` : ""),
-    [user?.uid],
-  );
-
-  const chaveNotificacoesCalendario = useMemo(
-    () => (user?.uid ? `assjur:notificacoes:calendario:${user.uid}` : ""),
-    [user?.uid],
-  );
-
   const chaveProcessosLidos = useMemo(
     () => (user?.uid ? `assjur:processos:lidos:${user.uid}` : ""),
     [user?.uid],
   );
-
-  useEffect(() => {
-    if (!chaveNotificacoes) {
-      setUltimoAcessoNotificacoes(0);
-      return;
-    }
-
-    try {
-      const raw = window.localStorage.getItem(chaveNotificacoes);
-      if (raw) {
-        const valor = Number(raw);
-        setUltimoAcessoNotificacoes(Number.isFinite(valor) ? valor : Date.now());
-      } else {
-        const agora = Date.now();
-        window.localStorage.setItem(chaveNotificacoes, String(agora));
-        setUltimoAcessoNotificacoes(agora);
-      }
-    } catch {
-      setUltimoAcessoNotificacoes(Date.now());
-    }
-  }, [chaveNotificacoes]);
-
-  useEffect(() => {
-    if (!chaveNotificacoesCalendario) {
-      setNotificacoesCalendario([]);
-      return;
-    }
-
-    try {
-      const raw = window.localStorage.getItem(chaveNotificacoesCalendario);
-      if (!raw) {
-        setNotificacoesCalendario([]);
-        return;
-      }
-      const parsed = JSON.parse(raw) as NotificacaoItem[];
-      setNotificacoesCalendario(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setNotificacoesCalendario([]);
-    }
-  }, [chaveNotificacoesCalendario]);
 
   useEffect(() => {
     if (!chaveProcessosLidos) {
@@ -479,97 +387,6 @@ function Index() {
     });
   };
 
-  const notificacoesAssessor = useMemo(() => {
-    if (ehAdmin || !user) return [] as NotificacaoItem[];
-
-    const candidatos = [
-      nomeMilitarAtual,
-      `${user.posto || ""} ${user.nome || ""}`.trim(),
-      user.nome,
-      user.nomeGuerra,
-      user.email?.split("@")[0],
-    ]
-      .map((v) => normalizarTexto(v))
-      .filter((v) => v.length >= 3);
-
-    const pertenceAoAssessor = (p: Processo) => {
-      const respNorm = normalizarTexto(p.responsavel);
-      if (!respNorm) return false;
-      return candidatos.some((c) => respNorm.includes(c) || c.includes(respNorm));
-    };
-
-    return processos
-      .filter(pertenceAoAssessor)
-      .map((p) => ({
-        id: p.id,
-        titulo: `Processo ${p.numero}`,
-        texto: p.descricao || "Movimentacao atualizada.",
-        momentoISO: p.atualizadoEm || p.criadoEm,
-      }))
-      .filter((n) => !Number.isNaN(new Date(n.momentoISO).getTime()))
-      .sort((a, b) => new Date(b.momentoISO).getTime() - new Date(a.momentoISO).getTime())
-      .slice(0, 20);
-  }, [processos, ehAdmin, user, nomeMilitarAtual]);
-
-  const notificacoesChefia = useMemo(() => {
-    if (!ehAdmin) return [] as NotificacaoItem[];
-
-    return processos
-      .filter((p) => p.status !== "concluido" && isPendenteChefia(p))
-      .map((p) => ({
-        id: p.id,
-        titulo: `Processo ${p.numero}`,
-        texto: p.descricao || "Processo pendente de validacao da chefia.",
-        momentoISO: p.atualizadoEm || p.criadoEm,
-      }))
-      .sort((a, b) => new Date(b.momentoISO).getTime() - new Date(a.momentoISO).getTime())
-      .slice(0, 20);
-  }, [processos, ehAdmin]);
-
-  const notificacoesBase = ehAdmin ? notificacoesChefia : notificacoesAssessor;
-
-  const listaNotificacoes = useMemo(() => {
-    return [...notificacoesBase, ...notificacoesCalendario]
-      .sort((a, b) => new Date(b.momentoISO).getTime() - new Date(a.momentoISO).getTime())
-      .slice(0, 30);
-  }, [notificacoesBase, notificacoesCalendario]);
-
-  const contadorSino = useMemo(() => {
-    return listaNotificacoes.filter(
-      (n) => new Date(n.momentoISO).getTime() > ultimoAcessoNotificacoes,
-    ).length;
-  }, [listaNotificacoes, ultimoAcessoNotificacoes]);
-
-  const abrirFecharNotificacoes = () => {
-    const abrindo = !notificacoesOpen;
-    setNotificacoesOpen(abrindo);
-
-    if (abrindo && chaveNotificacoes) {
-      const agora = Date.now();
-      setUltimoAcessoNotificacoes(agora);
-      try {
-        window.localStorage.setItem(chaveNotificacoes, String(agora));
-      } catch {
-        // sem persistencia, segue apenas em memoria
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (!notificacoesOpen) return;
-
-    const onPointerDown = (event: MouseEvent) => {
-      const alvo = event.target as Node | null;
-      if (!notificacoesRef.current || !alvo) return;
-      if (!notificacoesRef.current.contains(alvo)) {
-        setNotificacoesOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [notificacoesOpen]);
-
   const handleEdit = (p: Processo) => {
     setEditing(p);
     setDialogOpen(true);
@@ -578,22 +395,6 @@ function Index() {
   const abrirModalAcaoProcesso = (processo: Processo) => {
     setProcessoAcaoSelecionado(processo);
     setProcessoAcaoOpen(true);
-  };
-
-  const handleClickNotificacao = (n: NotificacaoItem) => {
-    const processo = processos.find((p) => p.id === n.id);
-    setNotificacoesOpen(false);
-
-    if (!processo) {
-      if (n.id.startsWith("cal-")) {
-        setAba("prazos");
-      }
-      return;
-    }
-
-    marcarProcessoComoLido(processo.id);
-    setAba("mesa");
-    abrirModalAcaoProcesso(processo);
   };
 
   useEffect(() => {
@@ -742,34 +543,6 @@ function Index() {
       setEditing(null);
       setDefaultStatus(status);
       setDialogOpen(true);
-    });
-  };
-
-  const handleNovoLancamentoCalendario = (payload: {
-    id: string;
-    titulo: string;
-    descricao?: string;
-    criadoEm: string;
-  }) => {
-    if (!chaveNotificacoesCalendario) return;
-
-    const item: NotificacaoItem = {
-      id: `cal-${payload.id}`,
-      titulo: "Novo lançamento no calendário",
-      texto: payload.descricao?.trim()
-        ? `${payload.titulo} - ${payload.descricao}`
-        : payload.titulo,
-      momentoISO: payload.criadoEm,
-    };
-
-    setNotificacoesCalendario((prev) => {
-      const next = [item, ...prev].slice(0, 40);
-      try {
-        window.localStorage.setItem(chaveNotificacoesCalendario, JSON.stringify(next));
-      } catch {
-        // sem persistencia local
-      }
-      return next;
     });
   };
 
@@ -1259,64 +1032,6 @@ function Index() {
             </div>
 
             <div className="flex items-center gap-2 ml-auto shrink-0">
-              <div className="relative" ref={notificacoesRef}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={abrirFecharNotificacoes}
-                  className="relative h-10 w-10 rounded-full bg-card border border-border hover:bg-muted"
-                  aria-label="Abrir notificacoes"
-                >
-                  <Bell className="h-4 w-4 text-foreground" />
-                  {contadorSino > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center ring-2 ring-card">
-                      {contadorSino}
-                    </span>
-                  )}
-                </Button>
-
-                {notificacoesOpen && (
-                  <div className="absolute right-0 mt-2 w-[340px] max-w-[90vw] rounded-2xl border border-border bg-card shadow-2xl z-50 overflow-hidden">
-                    <div className="px-4 py-3 border-b border-border bg-muted/40">
-                      <p className="text-sm font-bold text-foreground">Notificacoes</p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {ehAdmin
-                          ? "Pendencias da chefia"
-                          : "Ultimas movimentacoes novas dos seus processos"}
-                      </p>
-                    </div>
-
-                    <div className="max-h-80 overflow-y-auto">
-                      {listaNotificacoes.length === 0 ? (
-                        <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-                          Nenhuma notificacao no momento.
-                        </div>
-                      ) : (
-                        <ul className="divide-y divide-border">
-                          {listaNotificacoes.map((n) => (
-                            <li key={n.id}>
-                              <button
-                                type="button"
-                                onClick={() => handleClickNotificacao(n)}
-                                className="w-full text-left px-4 py-3 hover:bg-muted/60 transition-colors"
-                              >
-                                <p className="text-xs font-semibold text-foreground">{n.titulo}</p>
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                  {n.texto}
-                                </p>
-                                <p className="text-[11px] text-muted-foreground/80 mt-1">
-                                  {formatarDataHora(n.momentoISO)}
-                                </p>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <Button
                 onClick={() => handleAdd("novo")}
                 className="h-10 rounded-xl bg-primary text-primary-foreground hover:bg-primary-glow font-semibold px-4 shadow-md"
@@ -1460,7 +1175,6 @@ function Index() {
                 processos={processosParaDashboard}
                 usuario={usuario}
                 ehAdmin={ehAdmin}
-                onNovoLancamento={handleNovoLancamentoCalendario}
               />
             </Suspense>
           )}

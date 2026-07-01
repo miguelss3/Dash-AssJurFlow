@@ -113,26 +113,49 @@ export function Estatisticas({ processos }: Props) {
   );
 
   const dadosPrazos = useMemo(() => {
-    const ativos = processos.filter((p) => p.status !== "concluido");
+    const duAtivos = processos.filter(
+      (p) => p.status !== "concluido" && (p.setor || p.tipo || "").toString().toUpperCase() === "DU",
+    );
     return [
       {
         name: "Vencidos",
-        value: ativos.filter((p) => statusPrazo(p.prazo) === "overdue").length,
+        value: duAtivos.filter(
+          (p) =>
+            statusPrazo(p.prazoFatal) === "overdue" ||
+            statusPrazo(p.pedidoSubsidios?.prazoResposta) === "overdue",
+        ).length,
         fill: "oklch(0.58 0.22 25)",
       },
       {
         name: "Hoje",
-        value: ativos.filter((p) => statusPrazo(p.prazo) === "today").length,
+        value: duAtivos.filter((p) => {
+          const sFatal = statusPrazo(p.prazoFatal);
+          const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
+          if (sFatal === "overdue" || sResp === "overdue") return false;
+          return sFatal === "today" || sResp === "today";
+        }).length,
         fill: "oklch(0.7 0.17 50)",
       },
       {
         name: "Em breve",
-        value: ativos.filter((p) => statusPrazo(p.prazo) === "soon").length,
+        value: duAtivos.filter((p) => {
+          const sFatal = statusPrazo(p.prazoFatal);
+          const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
+          if (sFatal === "overdue" || sResp === "overdue") return false;
+          return sFatal === "soon" || sResp === "soon";
+        }).length,
         fill: "oklch(0.78 0.16 90)",
       },
       {
         name: "Em dia",
-        value: ativos.filter((p) => statusPrazo(p.prazo) === "safe").length,
+        value: duAtivos.filter((p) => {
+          const sFatal = statusPrazo(p.prazoFatal);
+          const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
+          return (
+            (sFatal === "safe" || !sFatal) &&
+            (sResp === "safe" || !sResp)
+          );
+        }).length,
         fill: "oklch(0.6 0.15 155)",
       },
     ];
@@ -212,16 +235,28 @@ export function Estatisticas({ processos }: Props) {
   const total = totalDU + totalPA;
   const concluidos = statsServidor.totalConcluidos;
   const ativos = ativosDU + ativosPA;
-  const vencidos = processos.filter(
-    (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "overdue",
+
+  // KPIs de prazo: mesma lógica do Dashboard — apenas DU ativos,
+  // campos prazoFatal + pedidoSubsidios.prazoResposta, vencidos excluídos de "hoje".
+  const processosDUAtivos = processos.filter(
+    (p) => p.status !== "concluido" && setorDe(p) === "DU",
+  );
+  const vencidos = processosDUAtivos.filter(
+    (p) =>
+      statusPrazo(p.prazoFatal) === "overdue" ||
+      statusPrazo(p.pedidoSubsidios?.prazoResposta) === "overdue",
   ).length;
-  const hoje = processos.filter(
-    (p) => p.status !== "concluido" && statusPrazo(p.prazo) === "today",
-  ).length;
-  const proximos7 = processos.filter((p) => {
-    if (p.status === "concluido") return false;
-    const s = statusPrazo(p.prazo);
-    return s === "today" || s === "soon";
+  const hoje = processosDUAtivos.filter((p) => {
+    const sFatal = statusPrazo(p.prazoFatal);
+    const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
+    if (sFatal === "overdue" || sResp === "overdue") return false;
+    return sFatal === "today" || sResp === "today";
+  }).length;
+  const proximos7 = processosDUAtivos.filter((p) => {
+    const sFatal = statusPrazo(p.prazoFatal);
+    const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
+    if (sFatal === "overdue" || sResp === "overdue") return false;
+    return sFatal === "today" || sFatal === "soon" || sResp === "today" || sResp === "soon";
   }).length;
 
   const now = new Date();

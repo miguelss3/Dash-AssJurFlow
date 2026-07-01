@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
@@ -495,13 +495,12 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="observacoes" className="uppercase text-xs font-semibold">Observações / Informações Iniciais</Label>
-            <Textarea
-              id="observacoes"
+            <Label className="uppercase text-xs font-semibold">Observações / Informações Iniciais</Label>
+            <RichTextEditor
               value={observacoes}
-              onChange={(e) => setObservacoes(e.target.value)}
+              onChange={setObservacoes}
               placeholder="Detalhe aqui o caso específico do assunto DU selecionado..."
-              rows={3}
+              minRows={3}
             />
           </div>
 

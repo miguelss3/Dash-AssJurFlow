@@ -733,7 +733,16 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
               <Separator />
               <div>
                 <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-3">Observações</h4>
-                <div className="text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 p-4 rounded-lg border border-slate-200">{processo.observacoes}</div>
+                <div
+                  className="text-sm text-slate-600 bg-slate-50 p-4 rounded-lg border border-slate-200 leading-relaxed
+                    [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-1
+                    [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-1
+                    [&_b]:font-bold [&_strong]:font-bold
+                    [&_i]:italic [&_em]:italic
+                    [&_u]:underline [&_s]:line-through"
+                  // eslint-disable-next-line react/no-danger
+                  dangerouslySetInnerHTML={{ __html: processo.observacoes }}
+                />
               </div>
             </>
           )}

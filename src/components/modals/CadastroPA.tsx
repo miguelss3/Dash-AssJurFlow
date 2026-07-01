@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
 import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc, query, where, getDocs } from "firebase/firestore";
@@ -794,8 +794,12 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="observacoes" className="uppercase text-xs font-semibold">Observações / Informações Iniciais</Label>
-            <Textarea id="observacoes" value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={3} />
+            <Label className="uppercase text-xs font-semibold">Observações / Informações Iniciais</Label>
+            <RichTextEditor
+              value={observacoes}
+              onChange={setObservacoes}
+              minRows={3}
+            />
           </div>
 
           <DialogFooter>
