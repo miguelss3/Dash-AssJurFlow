@@ -1,3 +1,4 @@
+import DOMPurify from "dompurify";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Processo } from "@/types/processo";
 import { Badge } from "@/components/ui/badge";
@@ -741,7 +742,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                     [&_i]:italic [&_em]:italic
                     [&_u]:underline [&_s]:line-through"
                   // eslint-disable-next-line react/no-danger
-                  dangerouslySetInnerHTML={{ __html: processo.observacoes }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(processo.observacoes ?? "") }}
                 />
               </div>
             </>

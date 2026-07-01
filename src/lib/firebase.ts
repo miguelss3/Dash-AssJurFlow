@@ -3,16 +3,14 @@ import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 
-// Configuração extraída do seu arquivo original
 const firebaseConfig = {
-  apiKey: "AIzaSyB2Pk4plzDbRJSrQdaIAu7P4fOPpvefAG0",
-  authDomain: "assjur-flow-12rm.firebaseapp.com",
-  projectId: "assjur-flow-12rm",
-  storageBucket: "assjur-flow-12rm.firebasestorage.app",
-  messagingSenderId: "441416018941",
-  appId: "1:441416018941:web:fc57211a142956f7854794",
-  measurementId: "G-YZCJ6KRDPQ"
-
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY as string,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN as string,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID as string,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET as string,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID as string,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID as string,
 };
 
 // Inicializa o Firebase
