@@ -22,12 +22,23 @@ const sanitizar = (valor: unknown): unknown => {
 import {
   AcaoPrincipal,
   AssinaturaDestino,
+  DOC_INPUT_CLASS,
+  DOC_LABEL_CLASS,
   LABEL_ACAO,
   LABEL_ASSINATURA_DESTINO,
   LABEL_SITUACAO,
   SituacaoFluxoDU,
   normalizeSituacao,
 } from "./AcoesDUModalNovo/shared";
+
+// Data civil de hoje (fuso local), no formato YYYY-MM-DD. Evita o bug de
+// fuso horário de `new Date().toISOString()` (que usa UTC e pode "recuar"
+// um dia em fusos negativos como o do Brasil).
+function dataCivilAtual(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
 import { FormularioDespacho } from "./AcoesDUModalNovo/FormularioDespacho";
 import { MesaChefia } from "./AcoesDUModalNovo/MesaChefia";
 import { VigiliaSPED } from "./AcoesDUModalNovo/VigiliaSPED";
@@ -79,6 +90,14 @@ export function AcoesDUModalNovo({
   // Usada pelo banner de Reiteração no FormularioDespacho.
   const [numeroAnterior, setNumeroAnterior] = useState<string>("");
   const [prazoAnterior, setPrazoAnterior] = useState<string>("");
+  // V3.6 — Registro de resposta tardia: cobre o caso em que o Robô Vigia já
+  // devolveu o processo à mesa do assessor (3 dias de tolerância vencidos)
+  // mas a resposta da Unidade chega depois disso. Não altera o fluxo, só
+  // registra o documento na lista de Recebidos.
+  const [tardioAberto, setTardioAberto] = useState(false);
+  const [numeroRecebidoTardio, setNumeroRecebidoTardio] = useState("");
+  const [dataRecebidoTardio, setDataRecebidoTardio] = useState("");
+  const [salvandoTardio, setSalvandoTardio] = useState(false);
 
   // ---------------- Carga ----------------
   const carregarFluxo = async () => {
@@ -194,6 +213,9 @@ export function AcoesDUModalNovo({
   useEffect(() => {
     if (!open) return;
     carregarFluxo();
+    setTardioAberto(false);
+    setNumeroRecebidoTardio("");
+    setDataRecebidoTardio("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, processoId]);
 
@@ -638,6 +660,68 @@ export function AcoesDUModalNovo({
     });
   };
 
+  // V3.6 — Registra uma resposta que chegou depois do Robô Vigia já ter
+  // devolvido o processo à mesa do assessor (3 dias de tolerância vencidos).
+  // Só adiciona o documento à lista de Recebidos e ao histórico — não mexe
+  // no fluxo, que já está em MESA_ASSESSOR.
+  const handleRegistrarRespostaTardia = async () => {
+    const numero = numeroRecebidoTardio.trim();
+    if (!numero) {
+      toast.error("Informe o número do documento recebido.");
+      return;
+    }
+    if (!processoId || !user) return;
+
+    setSalvandoTardio(true);
+    try {
+      const processoRef = doc(db, "processos", processoId);
+      const snap = await getDoc(processoRef);
+      const dataAtual = (snap.exists() ? snap.data() : {}) as Record<string, unknown>;
+      const pedidoAtual = (dataAtual?.pedidoSubsidios as Record<string, unknown>) || {};
+      const historicoRecebidosAtual = Array.isArray(pedidoAtual?.historicoRecebidos)
+        ? (pedidoAtual.historicoRecebidos as Array<{ numero?: string; dataRecebimento?: string }>)
+        : [];
+
+      const jaExiste = historicoRecebidosAtual.some(
+        (r) => (r?.numero || "").trim().toLowerCase() === numero.toLowerCase(),
+      );
+      if (jaExiste) {
+        toast.error(`O documento "${numero}" já está registrado como recebido.`);
+        setSalvandoTardio(false);
+        return;
+      }
+
+      const dataRecebimento = (dataRecebidoTardio || dataCivilAtual()).trim();
+      const novoHistoricoRecebidos = [
+        ...historicoRecebidosAtual,
+        { numero, dataRecebimento },
+      ];
+      const descricao = `Resposta tardia (fora do prazo) registrada manualmente: ${numero}.`;
+
+      await updateDoc(processoRef, sanitizar({
+        "pedidoSubsidios.historicoRecebidos": novoHistoricoRecebidos,
+        "pedidoSubsidios.numeroRecebido": numero,
+        descricao,
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+      }) as Record<string, unknown>);
+
+      await registrarHistorico(descricao);
+
+      toast.success("Resposta tardia registrada com sucesso.");
+      setNumeroRecebido(numero);
+      setNumeroRecebidoTardio("");
+      setDataRecebidoTardio("");
+      setTardioAberto(false);
+      if (onSuccess) onSuccess();
+    } catch (error) {
+      console.error("Erro ao registrar resposta tardia:", error);
+      toast.error("Não foi possível registrar a resposta tardia.");
+    } finally {
+      setSalvandoTardio(false);
+    }
+  };
+
   // V2.7 — Validação de bloqueio do botão universal por fase.
   const despachoBloqueado = useMemo(() => {
     switch (situacaoFluxo) {
@@ -848,6 +932,75 @@ export function AcoesDUModalNovo({
               >
                 Reiterar Pedido (Devolver à Chefia)
               </button>
+            )}
+
+            {/* V3.6 — Resgate de resposta tardia: o Robô Vigia já devolveu o
+                 processo à mesa do assessor (3 dias de tolerância vencidos),
+                 mas a resposta da Unidade chegou depois disso. Permite
+                 registrar o recebimento sem precisar reabrir o fluxo. */}
+            {situacaoFluxo === "MESA_ASSESSOR" && (
+              <div className="rounded-xl border border-teal-300 bg-teal-50/60 p-3">
+                {!tardioAberto ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDataRecebidoTardio(dataCivilAtual());
+                      setTardioAberto(true);
+                    }}
+                    className="w-full py-2.5 rounded-lg text-sm font-bold bg-white border border-teal-400 text-teal-800 hover:bg-teal-100"
+                  >
+                    Registrar Resposta Recebida (Fora do Prazo)
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-[11px] text-teal-900">
+                      Use quando a resposta da Unidade chegar depois do processo já
+                      ter voltado automaticamente para a sua mesa.
+                    </p>
+                    <div>
+                      <label className={DOC_LABEL_CLASS}>Número do Documento Recebido</label>
+                      <input
+                        type="text"
+                        value={numeroRecebidoTardio}
+                        onChange={(e) => setNumeroRecebidoTardio(e.target.value)}
+                        placeholder="Ex: Ofício 321/2026"
+                        className={DOC_INPUT_CLASS}
+                      />
+                    </div>
+                    <div>
+                      <label className={DOC_LABEL_CLASS}>Data de Recebimento</label>
+                      <input
+                        type="date"
+                        value={dataRecebidoTardio}
+                        onChange={(e) => setDataRecebidoTardio(e.target.value)}
+                        className={DOC_INPUT_CLASS}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTardioAberto(false);
+                          setNumeroRecebidoTardio("");
+                          setDataRecebidoTardio("");
+                        }}
+                        disabled={salvandoTardio}
+                        className="flex-1 py-2 rounded-lg text-xs font-bold bg-white border border-slate-300 text-slate-600 hover:bg-slate-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleRegistrarRespostaTardia()}
+                        disabled={salvandoTardio || !numeroRecebidoTardio.trim()}
+                        className="flex-1 py-2 rounded-lg text-xs font-bold bg-teal-700 text-white hover:bg-teal-800 disabled:opacity-50"
+                      >
+                        {salvandoTardio ? "Salvando..." : "Confirmar Recebimento"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* 3. Encerramento — contorno vermelho, sempre disponível. */}

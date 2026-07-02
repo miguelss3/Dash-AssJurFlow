@@ -34,20 +34,25 @@ interface DetalhesModalDUProps {
   processo: Processo | null;
 }
 
-// Converte ISO completo (ex.: 2026-05-19T13:45:00.000Z) para o formato
-// exigido por <input type="datetime-local"> (YYYY-MM-DDTHH:MM, hora local).
-function isoParaDateTimeLocal(iso: string): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) {
-    // Pode já estar no formato local; devolve os 16 primeiros caracteres.
-    return iso.length >= 16 ? iso.slice(0, 16) : "";
-  }
+// Extrai a data civil (YYYY-MM-DD) de um valor salvo, seja ele já uma data
+// "pura" (sem hora) ou um timestamp ISO completo. Nunca interpreta uma data
+// sem fuso como UTC — isso é o que causava o dia/hora errados na tela (ex.:
+// "2026-07-02" virando "01/07/2026, 20:00" ao passar por new Date()).
+function dataSomente(valor?: string | null): string {
+  if (!valor) return "";
+  const soData = valor.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (soData) return valor;
+  const d = new Date(valor);
+  if (Number.isNaN(d.getTime())) return valor.length >= 10 ? valor.slice(0, 10) : "";
   const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
-  );
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Data civil de hoje (fuso local), no formato YYYY-MM-DD.
+function dataCivilAtual(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 // Mapeia o histórico do Firestore (strings legadas OU objetos) para o
@@ -62,7 +67,7 @@ function mapearHistoricoParaForm(
     }
     return {
       numero: doc?.numero || doc?.nomeDocumento || "",
-      dataEnvio: isoParaDateTimeLocal(doc?.dataEnvio || ""),
+      dataEnvio: dataSomente(doc?.dataEnvio || ""),
       prazo: doc?.prazo || "",
     };
   });
@@ -81,13 +86,6 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
   >([]);
   const [recebidosEdit, setRecebidosEdit] = useState<Array<{ numero: string; dataRecebimento: string }>>([]);
 
-  const dateTimeLocalParaIso = (valor: string): string => {
-    if (!valor) return "";
-    const d = new Date(valor);
-    if (Number.isNaN(d.getTime())) return valor;
-    return d.toISOString();
-  };
-
   useEffect(() => {
     if (!open || !processo) return;
     setPrazoInternoEdit(processo.prazo || "");
@@ -101,7 +99,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     // caso contrário migra o campo legado para um array de 1 item.
     const historicoRec = processo.pedidoSubsidios?.historicoRecebidos;
     if (Array.isArray(historicoRec) && historicoRec.length > 0) {
-      setRecebidosEdit(historicoRec.map((r) => ({ numero: r.numero || "", dataRecebimento: r.dataRecebimento || "" })));
+      setRecebidosEdit(historicoRec.map((r) => ({ numero: r.numero || "", dataRecebimento: dataSomente(r.dataRecebimento) })));
     } else {
       const numLegado =
         processo.respostaDU?.numeroOficioExterno
@@ -110,7 +108,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
         || processo.pedidoSubsidios?.numeroRecebido
         || "";
       const dataLegado = processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "";
-      setRecebidosEdit(numLegado ? [{ numero: numLegado, dataRecebimento: dataLegado }] : []);
+      setRecebidosEdit(numLegado ? [{ numero: numLegado, dataRecebimento: dataSomente(dataLegado) }] : []);
     }
     setEditandoDocs(false);
   }, [open, processo]);
@@ -127,21 +125,13 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     return out as T;
   };
 
-  const formatarDataHoraSegura = (valor?: string | null) => {
-    if (!valor) return "—";
-    try {
-      const data = new Date(valor);
-      if (Number.isNaN(data.getTime())) return "—";
-      return data.toLocaleString("pt-BR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    } catch {
-      return "—";
-    }
+  // Exibe só a data (sem hora) e nunca interpreta a data como UTC — evita o
+  // dia "recuar" um a menos quando o fuso local é negativo (ex.: Brasília).
+  const formatarDataCivil = (valor?: string | null) => {
+    const ymd = dataSomente(valor);
+    if (!ymd) return "—";
+    const [ano, mes, dia] = ymd.split("-");
+    return `${dia}/${mes}/${ano.slice(2)}`;
   };
 
   const handleSalvarPrazosDU = async () => {
@@ -177,19 +167,35 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     try {
       setSavingDocs(true);
 
-      // Normaliza o histórico: descarta itens vazios e converte dataEnvio para ISO.
+      // Normaliza o histórico: descarta itens vazios. dataEnvio já é uma data
+      // civil (YYYY-MM-DD), sem conversão para ISO — evita o bug de fuso
+      // horário que fazia a data/hora aparecerem erradas na tela.
       // Mantém `prazo` apenas quando preenchido — evita gravar string vazia.
       const historicoLimpo = historicoEdit
         .map((h) => {
           const numero = h.numero.trim();
-          const dataEnvioIso = dateTimeLocalParaIso(h.dataEnvio.trim());
+          const dataEnvioSomente = dataSomente(h.dataEnvio.trim());
           const prazoTrim = h.prazo.trim();
           const item: { numero: string; dataEnvio?: string; prazo?: string } = { numero };
-          if (dataEnvioIso) item.dataEnvio = dataEnvioIso;
+          if (dataEnvioSomente) item.dataEnvio = dataEnvioSomente;
           if (prazoTrim) item.prazo = prazoTrim;
           return item;
         })
         .filter((h) => h.numero.length > 0);
+
+      // Bloqueia duplicidade dentro da lista de Enviados do próprio card.
+      const vistosEnvio = new Set<string>();
+      const duplicadoEnvio = historicoLimpo.find((h) => {
+        const chave = h.numero.toLowerCase();
+        if (vistosEnvio.has(chave)) return true;
+        vistosEnvio.add(chave);
+        return false;
+      });
+      if (duplicadoEnvio) {
+        toast.error(`O documento "${duplicadoEnvio.numero}" já está na lista de Enviados. Remova a repetição antes de salvar.`);
+        setSavingDocs(false);
+        return;
+      }
 
       const ultimoEnviado =
         historicoLimpo.length > 0 ? historicoLimpo[historicoLimpo.length - 1].numero : "";
@@ -198,9 +204,23 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
       const recebidosLimpos = recebidosEdit
         .map((r) => ({
           numero: r.numero.trim(),
-          dataRecebimento: r.dataRecebimento.trim(),
+          dataRecebimento: dataSomente(r.dataRecebimento.trim()),
         }))
         .filter((r) => r.numero.length > 0);
+
+      // Bloqueia duplicidade dentro da lista de Recebidos do próprio card.
+      const vistosRecebido = new Set<string>();
+      const duplicadoRecebido = recebidosLimpos.find((r) => {
+        const chave = r.numero.toLowerCase();
+        if (vistosRecebido.has(chave)) return true;
+        vistosRecebido.add(chave);
+        return false;
+      });
+      if (duplicadoRecebido) {
+        toast.error(`O documento "${duplicadoRecebido.numero}" já está na lista de Recebidos. Remova a repetição antes de salvar.`);
+        setSavingDocs(false);
+        return;
+      }
 
       // Mantém o primeiro item como campo legado para compatibilidade
       const primarioRecebido = recebidosLimpos[0] ?? { numero: "", dataRecebimento: "" };
@@ -257,7 +277,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     });
   };
   const adicionarItemHistorico = () =>
-    setHistoricoEdit((atual) => [...atual, { numero: "", dataEnvio: "", prazo: "" }]);
+    setHistoricoEdit((atual) => [...atual, { numero: "", dataEnvio: dataCivilAtual(), prazo: "" }]);
   const removerItemHistorico = (index: number) =>
     setHistoricoEdit((atual) => atual.filter((_, i) => i !== index));
 
@@ -376,7 +396,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                           // Reinicializa lista de recebidos (mesma lógica do useEffect)
                           const historicoRec = processo.pedidoSubsidios?.historicoRecebidos;
                           if (Array.isArray(historicoRec) && historicoRec.length > 0) {
-                            setRecebidosEdit(historicoRec.map((r) => ({ numero: r.numero || "", dataRecebimento: r.dataRecebimento || "" })));
+                            setRecebidosEdit(historicoRec.map((r) => ({ numero: r.numero || "", dataRecebimento: dataSomente(r.dataRecebimento) })));
                           } else {
                             const numLegado =
                               processo.respostaDU?.numeroOficioExterno
@@ -385,7 +405,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                               || processo.pedidoSubsidios?.numeroRecebido
                               || "";
                             const dataLegado = processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "";
-                            setRecebidosEdit(numLegado ? [{ numero: numLegado, dataRecebimento: dataLegado }] : []);
+                            setRecebidosEdit(numLegado ? [{ numero: numLegado, dataRecebimento: dataSomente(dataLegado) }] : []);
                           }
                         }}
                         disabled={savingDocs}
@@ -468,7 +488,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                                   <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data de Envio</label>
                                     <Input
-                                      type="datetime-local"
+                                      type="date"
                                       value={item.dataEnvio}
                                       onChange={(e) => handleHistoricoChange(idx, "dataEnvio", e.target.value)}
                                       onClick={abrirPickerNativo}
@@ -537,7 +557,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                                 <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs">
                                   <span className="text-slate-500">Enviado em:</span>
                                   <span className="font-medium text-slate-700">
-                                    {dataEnvio ? formatarDataHoraSegura(dataEnvio) : "—"}
+                                    {formatarDataCivil(dataEnvio)}
                                   </span>
                                 </div>
                               </div>
@@ -590,9 +610,9 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                                 <div>
                                   <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data de Recebimento</label>
                                   <Input
-                                    type="datetime-local"
-                                    value={isoParaDateTimeLocal(item.dataRecebimento)}
-                                    onChange={(e) => setRecebidosEdit((prev) => prev.map((r, i) => i === idx ? { ...r, dataRecebimento: dateTimeLocalParaIso(e.target.value) } : r))}
+                                    type="date"
+                                    value={item.dataRecebimento}
+                                    onChange={(e) => setRecebidosEdit((prev) => prev.map((r, i) => i === idx ? { ...r, dataRecebimento: e.target.value } : r))}
                                     onClick={abrirPickerNativo}
                                     onFocus={abrirPickerNativo}
                                     className="h-8 text-xs mt-0.5 cursor-pointer"
@@ -605,7 +625,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => setRecebidosEdit((prev) => [...prev, { numero: "", dataRecebimento: "" }])}
+                            onClick={() => setRecebidosEdit((prev) => [...prev, { numero: "", dataRecebimento: dataCivilAtual() }])}
                             className="w-full text-xs h-8 border-dashed border-slate-300 text-slate-500 hover:text-slate-800"
                           >
                             <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Recebido
@@ -631,10 +651,14 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                                     <div className="text-sm font-semibold text-slate-800 break-words">
                                       {rec.numero}
                                     </div>
-                                    <div className="text-[11px] text-slate-500 mt-0.5 font-medium">
-                                      Recebido em: {rec.dataRecebimento ? formatarDataHoraSegura(rec.dataRecebimento) : "—"}
-                                    </div>
                                   </div>
+                                </div>
+
+                                <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 text-xs">
+                                  <span className="text-slate-500">Recebido em:</span>
+                                  <span className="font-medium text-slate-700">
+                                    {formatarDataCivil(rec.dataRecebimento)}
+                                  </span>
                                 </div>
                               </div>
                             ))}
