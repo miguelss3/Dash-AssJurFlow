@@ -5,6 +5,7 @@ import { DEFAULT_COLUMN_TABS, DEFAULT_PA_EM_ANDAMENTO_COLUMNS, normalizarPAEmAnd
 import type { SiteSettings } from "@/types/siteSettings";
 import { useDroppable } from "@dnd-kit/core";
 import { useEffect, useMemo, useState } from "react";
+import { diasRestantes } from "@/lib/prazo";
 
 
 interface Props {
@@ -93,16 +94,14 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
   void labelSindicanciaPA;
   const mostrarAbaPortariaAssinada = tipo === "PA" && !vistaAssessor;
 
-  const processosAtivosOrdenados = useMemo(() => {
-    if (tipo !== "PA") return processos;
-
+  const ordenarPorPrazo = (lista: Processo[]): Processo[] => {
     const toTime = (valor?: string) => {
       if (!valor) return Number.POSITIVE_INFINITY;
       const data = new Date(`${valor.slice(0, 10)}T00:00:00`).getTime();
       return Number.isNaN(data) ? Number.POSITIVE_INFINITY : data;
     };
 
-    return [...processos].sort((a, b) => {
+    return [...lista].sort((a, b) => {
       const prazoA = toTime(a.prazoFatal || a.finalPrazo);
       const prazoB = toTime(b.prazoFatal || b.finalPrazo);
 
@@ -114,23 +113,16 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
 
       return (a.numero || "").localeCompare(b.numero || "");
     });
+  };
+
+  const processosAtivosOrdenados = useMemo(() => {
+    if (tipo !== "PA") return processos;
+    return ordenarPorPrazo(processos);
   }, [processos, tipo]);
 
   const processosAtrasadosOrdenados = useMemo(() => {
     if (tipo !== "PA") return processosAtrasados;
-
-    const toTime = (valor?: string) => {
-      if (!valor) return Number.POSITIVE_INFINITY;
-      const data = new Date(`${valor.slice(0, 10)}T00:00:00`).getTime();
-      return Number.isNaN(data) ? Number.POSITIVE_INFINITY : data;
-    };
-
-    return [...processosAtrasados].sort((a, b) => {
-      const prazoA = toTime(a.prazoFatal || a.finalPrazo);
-      const prazoB = toTime(b.prazoFatal || b.finalPrazo);
-      if (prazoA !== prazoB) return prazoA - prazoB;
-      return (a.numero || "").localeCompare(b.numero || "");
-    });
+    return ordenarPorPrazo(processosAtrasados);
   }, [processosAtrasados, tipo]);
 
   const processosDaAba = aba === "portaria_assinada"
@@ -152,10 +144,11 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     }
 
     if (vistaAssessor) {
-      // V5.3 — Mesa do Assessor: apenas "Em Andamento" e "Concluídos".
+      // Mesa do Assessor: "Em Andamento", "Atrasado" e "Concluídos".
       return [
         { id: "andamento", scope: "PA", label: "Em Andamento", order: 1, enabled: true },
-        { id: "concluidos", scope: "PA", label: "Concluídos", order: 2, enabled: true },
+        { id: "atraso", scope: "PA", label: "Atrasado", order: 2, enabled: true },
+        { id: "concluidos", scope: "PA", label: "Concluídos", order: 3, enabled: true },
       ];
     }
 
@@ -254,6 +247,11 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     return isProcessoAtivo;
   };
 
+  const isProcessoAtrasadoPA = (processo: Processo) => {
+    const prazoBase = processo.prazoFatal || processo.finalPrazo;
+    return !!prazoBase && diasRestantes(prazoBase) < 0;
+  };
+
   const getListaParaAba = (tabId: string): Processo[] => {
     if (!vistaAssessor) {
       if (tabId === "portaria_assinada") return processosPortariaAssinada;
@@ -284,7 +282,11 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       );
     }
 
-    return lista.filter(isNaMesaDoAssessorPA);
+    if (tabId === "atraso") {
+      return ordenarPorPrazo(lista.filter((p) => isNaMesaDoAssessorPA(p) && isProcessoAtrasadoPA(p)));
+    }
+
+    return ordenarPorPrazo(lista.filter((p) => isNaMesaDoAssessorPA(p) && !isProcessoAtrasadoPA(p)));
   };
 
   const processosDaAbaAtiva = getListaParaAba(abaAtiva);

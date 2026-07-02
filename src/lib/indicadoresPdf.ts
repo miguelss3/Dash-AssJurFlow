@@ -40,6 +40,15 @@ function isAtrasado(p: Processo) {
   return p.status !== "concluido" && statusPrazo(prazoReferencia(p)) === "overdue";
 }
 
+// Um atraso em PA acontece em uma de duas fases: o Encarregado ainda não
+// concluiu a instrução (ou pediu prorrogação), ou o processo já passou para
+// o Assessor, que está atrasando a confecção/assinatura da solução.
+function motivoAtraso(p: Processo): "Assessor (Solucao)" | "Encarregado" {
+  const sitPA = String(p.situacaoFluxoPA || "").trim().toUpperCase();
+  const emFaseAssessorSolucao = sitPA === "FAZENDO_SOLUCAO" || sitPA === "ASSINANDO_SOLUCAO";
+  return emFaseAssessorSolucao ? "Assessor (Solucao)" : "Encarregado";
+}
+
 function diasParaOrdenacao(p: Processo) {
   const prazo = prazoReferencia(p);
   if (!prazo) return Number.POSITIVE_INFINITY;
@@ -214,6 +223,8 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
     .filter((p) => p.status !== "concluido" && isAtrasado(p))
     .sort((a, b) => diasParaOrdenacao(a) - diasParaOrdenacao(b));
   const totalAtivas = emCurso.length + atrasadas.length;
+  const atrasadasEncarregado = atrasadas.filter((p) => motivoAtraso(p) === "Encarregado").length;
+  const atrasadasAssessor = atrasadas.filter((p) => motivoAtraso(p) === "Assessor (Solucao)").length;
 
   const doc = buildBasePdf(titulo, subtitulo);
 
@@ -224,6 +235,8 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
       ["Total mapeado", String(base.length)],
       ["Em curso", String(emCurso.length)],
       ["Atrasadas", String(atrasadas.length)],
+      ["  - Atraso com o Encarregado (nao concluiu / prorrogacao)", String(atrasadasEncarregado)],
+      ["  - Atraso com o Assessor (confeccao da solucao)", String(atrasadasAssessor)],
       [
         "Taxa de atraso",
         totalAtivas > 0 ? `${Math.round((atrasadas.length / totalAtivas) * 100)}%` : "0%",
@@ -253,8 +266,24 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
       p.responsavel || "-",
       formatDate(p.criadoEm || p.dataEntrada),
       formatDate(prazoReferencia(p)),
+      motivoAtraso(p),
     ];
   });
+
+  // `atrasadas` já vem ordenada do mais atrasado para o menos atrasado
+  // (diasParaOrdenacao ascendente = mais dias negativos primeiro).
+  const atrasadasAssessorRows = atrasadas
+    .filter((p) => motivoAtraso(p) === "Assessor (Solucao)")
+    .map((p) => {
+      const dias = diasParaOrdenacao(p);
+      return [
+        p.numero || "-",
+        p.interessado || p.cliente || "-",
+        p.responsavel || "-",
+        formatDate(prazoReferencia(p)),
+        Number.isFinite(dias) ? String(Math.abs(dias)) : "-",
+      ];
+    });
 
   const firstTableY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable
     ?.finalY
@@ -287,13 +316,35 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
 
   autoTable(doc, {
     startY: secondTableY + 2,
-    head: [["Processo", "Interessado", "Encarregado", "Responsavel", "Entrada", "Prazo"]],
+    head: [["Processo", "Interessado", "Encarregado", "Responsavel", "Entrada", "Prazo", "Atraso por"]],
     body: atrasadasRows.length > 0
       ? atrasadasRows
-      : [["-", "-", "-", "-", "-", "Sem registros em atraso"]],
+      : [["-", "-", "-", "-", "-", "-", "Sem registros em atraso"]],
     theme: "striped",
     styles: { fontSize: 9, cellPadding: 2 },
     headStyles: { fillColor: [176, 55, 55] },
+  });
+
+  const thirdTableY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable
+    ?.finalY
+    ? (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
+    : secondTableY + 50;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Atrasados com Assessor (Confecção da solução)", 14, thirdTableY);
+
+  autoTable(doc, {
+    startY: thirdTableY + 2,
+    head: [["Processo", "Interessado", "Responsavel", "Prazo", "Dias em atraso"]],
+    body: atrasadasAssessorRows.length > 0
+      ? atrasadasAssessorRows
+      : [["-", "-", "-", "-", "Sem registros"]],
+    theme: "striped",
+    styles: { fontSize: 9, cellPadding: 2 },
+    headStyles: { fillColor: [245, 200, 30], textColor: [40, 40, 40] },
+    bodyStyles: { fillColor: [255, 249, 219] },
+    alternateRowStyles: { fillColor: [255, 244, 189] },
   });
 
   doc.save(tipo === "sindicancia" ? "indicadores-sindicancias.pdf" : "indicadores-ipm.pdf");
