@@ -384,7 +384,15 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
         ? formatarPortaria(numeroProcesso)
         : numeroProcesso;
 
-      // Verificação de duplicidade PA
+      const encarregadoPrimeiro = `${postoEncarregado} ${nomeEncarregado}`.trim() || null;
+      const encarregadoPresidente = `${postoEncarregado} ${nomeEncarregado}`.trim() || null;
+      const encarregadoFinal = isConselhoPASelecionado ? encarregadoPresidente : encarregadoPrimeiro;
+
+      // Verificação de duplicidade PA: só é duplicidade se portaria, parte e
+      // responsável (encarregado / presidente do conselho) coincidirem. Uma mesma
+      // portaria pode originar mais de um processo (partes/responsáveis distintos),
+      // então checar apenas o número da portaria travava edições legítimas
+      // (ex.: trocar o posto do encarregado de um Conselho já cadastrado).
       if (primeiraPortariaFormatada.trim()) {
         const q = query(
           collection(db, "processos"),
@@ -393,23 +401,28 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
         );
         const querySnapshot = await getDocs(q);
 
+        const parteNormalizada = parte.trim().toLowerCase();
+        const encarregadoNormalizado = (encarregadoFinal || "").trim().toLowerCase();
+
         let isDuplicate = false;
         querySnapshot.forEach((docSnap) => {
-          if (!processo?.id || docSnap.id !== processo.id) {
+          if (processo?.id && docSnap.id === processo.id) return;
+
+          const outro = docSnap.data() as Record<string, unknown>;
+          const outraParte = String(outro.parte || "").trim().toLowerCase();
+          const outroEncarregado = String(outro.encarregado || "").trim().toLowerCase();
+
+          if (outraParte === parteNormalizada && outroEncarregado === encarregadoNormalizado) {
             isDuplicate = true;
           }
         });
 
         if (isDuplicate) {
-          toast.error(`Já existe um processo cadastrado com o número ${primeiraPortariaFormatada.trim()}.`);
+          toast.error(`Já existe um processo cadastrado com a portaria ${primeiraPortariaFormatada.trim()}, mesma parte e mesmo responsável.`);
           setLoading(false);
           return;
         }
       }
-
-      const encarregadoPrimeiro = `${postoEncarregado} ${nomeEncarregado}`.trim() || null;
-      const encarregadoPresidente = `${postoEncarregado} ${nomeEncarregado}`.trim() || null;
-      const encarregadoFinal = isConselhoPASelecionado ? encarregadoPresidente : encarregadoPrimeiro;
 
       // V4.7: payload sanitizado. Removidos campos legados (status, fluxoIPM,
       // emDiligencia, aguardandoAssinaturaCmt). O motor V4 (situacaoFluxoPA)
