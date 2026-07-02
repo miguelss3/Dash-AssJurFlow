@@ -1,6 +1,7 @@
 import js from "@eslint/js";
 import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
 import globals from "globals";
+import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
@@ -15,6 +16,7 @@ export default tseslint.config(
       globals: globals.browser,
     },
     plugins: {
+      react,
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
     },
@@ -22,6 +24,9 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Exige revisão explícita (via eslint-disable justificado) de todo uso de
+      // dangerouslySetInnerHTML — protege contra HTML não sanitizado no futuro.
+      "react/no-danger": "warn",
     },
   },
   eslintPluginPrettier,

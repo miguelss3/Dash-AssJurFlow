@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
 import { AssessorGroup } from "./AssessorGroup";
 import { ChefeGroup } from "./ChefeGroup";
@@ -36,6 +36,16 @@ interface Props {
   siteSettings?: SiteSettings;
   busca?: string;
 }
+
+// V5.2 — Classificação universal das abas PA para todos os motores.
+const PORTARIA_LEGADA = new Set([
+  "AGUARDANDO_PRAZO",
+  "AGUARDANDO_ENTREGA",
+  "AGUARDANDO_CHEFIA",
+  "AGUARDANDO_CHEFIA_SOLUCAO",
+  "C_MEMORIA",
+  "C_PORTARIA",
+]);
 
 export function MesaPA({
   processos,
@@ -181,16 +191,6 @@ export function MesaPA({
     setActiveProcesso(null);
   };
 
-  // V5.2 — Classificação universal das abas PA para todos os motores.
-  const PORTARIA_LEGADA = new Set([
-    "AGUARDANDO_PRAZO",
-    "AGUARDANDO_ENTREGA",
-    "AGUARDANDO_CHEFIA",
-    "AGUARDANDO_CHEFIA_SOLUCAO",
-    "C_MEMORIA",
-    "C_PORTARIA",
-  ]);
-
   const normalizarSituacao = (valor: unknown) =>
     String(valor || "")
       .trim()
@@ -200,7 +200,7 @@ export function MesaPA({
       .replace(/[^A-Z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
 
-  const classificarPA = (p: Processo, tipoNorm: string): { emAndamento: string | null; portaria: string | null; atrasado: boolean } => {
+  const classificarPA = useCallback((p: Processo, tipoNorm: string): { emAndamento: string | null; portaria: string | null; atrasado: boolean } => {
     const situacaoFluxo = normalizarSituacao(p.situacaoFluxo);
     const situacaoPA = normalizarSituacao(p.situacaoFluxoPA);
     const situacaoConselho = normalizarSituacao(p.situacaoFluxoConselho);
@@ -262,7 +262,7 @@ export function MesaPA({
     }
 
     return { emAndamento, portaria: null, atrasado };
-  };
+  }, [paColunaLabelPorId]);
 
   const grupos = useMemo(() => {
     // V6.2 — Blindagem contra documentos legados: usar ambos os campos para
@@ -445,7 +445,7 @@ export function MesaPA({
       });
 
     return assessoresOrdenados;
-  }, [processosEfetivos, paColunaLabelPorId, paColunaLabels, paColunaLabelSet, assessores]);
+  }, [processosEfetivos, paColunaLabels, paColunaLabelSet, assessores, classificarPA]);
 
   if (grupos.length === 0) {
     return (

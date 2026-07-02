@@ -187,7 +187,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       .sort((a, b) => a.order - b.order);
 
     return lista.length > 0 ? lista : fallback;
-  }, [isAguardandoRespostaDU, mostrarAbaPortariaAssinada, siteSettings?.columnTabs, tipo, vistaAssessor]);
+  }, [isAguardandoRespostaDU, mostrarAbaPortariaAssinada, responsavel, siteSettings?.columnTabs, tipo, vistaAssessor]);
 
   const abaAtiva = useMemo(() => {
     const existe = abasConfiguradas.some((item) => item.id === aba);

@@ -34,6 +34,40 @@ interface DetalhesModalDUProps {
   processo: Processo | null;
 }
 
+// Converte ISO completo (ex.: 2026-05-19T13:45:00.000Z) para o formato
+// exigido por <input type="datetime-local"> (YYYY-MM-DDTHH:MM, hora local).
+function isoParaDateTimeLocal(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    // Pode já estar no formato local; devolve os 16 primeiros caracteres.
+    return iso.length >= 16 ? iso.slice(0, 16) : "";
+  }
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+// Mapeia o histórico do Firestore (strings legadas OU objetos) para o
+// formato uniforme usado no editor.
+function mapearHistoricoParaForm(
+  raw: Array<string | { numero?: string; dataEnvio?: string; prazo?: string; nomeDocumento?: string }> | undefined,
+): Array<{ numero: string; dataEnvio: string; prazo: string }> {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((doc) => {
+    if (typeof doc === "string") {
+      return { numero: doc, dataEnvio: "", prazo: "" };
+    }
+    return {
+      numero: doc?.numero || doc?.nomeDocumento || "",
+      dataEnvio: isoParaDateTimeLocal(doc?.dataEnvio || ""),
+      prazo: doc?.prazo || "",
+    };
+  });
+}
+
 export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalDUProps) {
   const [editandoPrazosDU, setEditandoPrazosDU] = useState(false);
   const [savingPrazosDU, setSavingPrazosDU] = useState(false);
@@ -47,45 +81,11 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
   >([]);
   const [recebidosEdit, setRecebidosEdit] = useState<Array<{ numero: string; dataRecebimento: string }>>([]);
 
-  // Converte ISO completo (ex.: 2026-05-19T13:45:00.000Z) para o formato
-  // exigido por <input type="datetime-local"> (YYYY-MM-DDTHH:MM, hora local).
-  const isoParaDateTimeLocal = (iso: string): string => {
-    if (!iso) return "";
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) {
-      // Pode já estar no formato local; devolve os 16 primeiros caracteres.
-      return iso.length >= 16 ? iso.slice(0, 16) : "";
-    }
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return (
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
-    );
-  };
-
   const dateTimeLocalParaIso = (valor: string): string => {
     if (!valor) return "";
     const d = new Date(valor);
     if (Number.isNaN(d.getTime())) return valor;
     return d.toISOString();
-  };
-
-  // Mapeia o histórico do Firestore (strings legadas OU objetos) para o
-  // formato uniforme usado no editor.
-  const mapearHistoricoParaForm = (
-    raw: Array<string | { numero?: string; dataEnvio?: string; prazo?: string; nomeDocumento?: string }> | undefined,
-  ): Array<{ numero: string; dataEnvio: string; prazo: string }> => {
-    if (!Array.isArray(raw)) return [];
-    return raw.map((doc) => {
-      if (typeof doc === "string") {
-        return { numero: doc, dataEnvio: "", prazo: "" };
-      }
-      return {
-        numero: doc?.numero || doc?.nomeDocumento || "",
-        dataEnvio: isoParaDateTimeLocal(doc?.dataEnvio || ""),
-        prazo: doc?.prazo || "",
-      };
-    });
   };
 
   useEffect(() => {

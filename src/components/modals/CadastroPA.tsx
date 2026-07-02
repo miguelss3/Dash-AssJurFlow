@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -219,7 +219,7 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
     }
   }, [open, processo]);
 
-  const recalcularProrrogacoesComBase = (inicioPrazoBase: string, itens: ProrrogacaoEditavel[]) => {
+  const recalcularProrrogacoesComBase = useCallback((inicioPrazoBase: string, itens: ProrrogacaoEditavel[]) => {
     const dataBase = toDataCivil(inicioPrazoBase);
     if (!dataBase || itens.length === 0) return itens;
 
@@ -240,13 +240,13 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
       inicio: faixas[index]?.inicio ?? item.inicio,
       fim: faixas[index]?.fim ?? item.fim,
     }));
-  };
+  }, [tipoPA, processo?.dataAssinatura]);
 
   useEffect(() => {
     if (!processo?.id) return;
     if (!toDataCivil(dataInicioPrazoPA)) return;
     setProrrogacoesEditaveis((atual) => recalcularProrrogacoesComBase(dataInicioPrazoPA, atual));
-  }, [dataInicioPrazoPA, processo?.id, tipoPA]);
+  }, [dataInicioPrazoPA, processo?.id, tipoPA, recalcularProrrogacoesComBase]);
 
   const atualizarProrrogacao = (index: number, campo: "doc" | "dias" | "inicio" | "fim", valor: string) => {
     setProrrogacoesEditaveis((atual) => {
