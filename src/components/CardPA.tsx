@@ -97,7 +97,7 @@ const CardPAComponent = ({
   const p = processo || pAntigo!;
   const { user } = useAuth();
   const marcarComoLido = () => onMarcarComoLido?.(p.id);
-  const fundoDestaque = /^#([0-9a-fA-F]{6})$/.test(corDestaque || "") ? `${corDestaque}14` : undefined;
+  const fundoDestaque = /^#([0-9a-fA-F]{6})$/.test(corDestaque || "") ? `${corDestaque}33` : undefined;
 
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
     id: p.id,
@@ -474,6 +474,12 @@ const CardPAComponent = ({
 export const CardPA = memo(CardPAComponent, (prevProps, nextProps) => {
   if (prevProps.isDragging !== nextProps.isDragging) return false;
   if (prevProps.naoLido !== nextProps.naoLido) return false;
+  // Precisa vir ANTES do atalho "pPrev === pNext" abaixo: a cor do assessor
+  // é carregada de forma assíncrona (getDocs separado) e não faz parte do
+  // objeto `processo`, então o objeto pode continuar o mesmo entre renders
+  // enquanto só o corDestaque muda de undefined -> cor real. Sem essa
+  // checagem, o card fica sem cor até algo mais forçar um re-render real.
+  if (prevProps.corDestaque !== nextProps.corDestaque) return false;
 
   const pPrev = prevProps.processo || prevProps.p;
   const pNext = nextProps.processo || nextProps.p;

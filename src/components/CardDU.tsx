@@ -81,7 +81,7 @@ const CardDUComponent = ({
   const { user } = useAuth();
   const marcarComoLido = () => onMarcarComoLido?.(p.id);
   // CORREÇÃO: garantir uso de 'corDestaque' (com 'a')
-  const fundoDestaque = /^#([0-9a-fA-F]{6})$/.test(corDestaque || "") ? `${corDestaque}14` : undefined;
+  const fundoDestaque = /^#([0-9a-fA-F]{6})$/.test(corDestaque || "") ? `${corDestaque}33` : undefined;
 
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
     id: p.id,
@@ -417,6 +417,13 @@ const CardDUComponent = ({
 export const CardDU = memo(CardDUComponent, (prevProps, nextProps) => {
   if (prevProps.isDragging !== nextProps.isDragging) return false;
   if (prevProps.naoLido !== nextProps.naoLido) return false;
+  // Precisa vir ANTES do atalho "pPrev === pNext" abaixo: a cor do assessor
+  // é carregada de forma assíncrona (getDocs separado) e não faz parte do
+  // objeto `processo`, então o objeto pode continuar o mesmo entre renders
+  // enquanto só o corDestaque muda de undefined -> cor real. Se essa
+  // comparação ficasse depois do atalho, o card ficava sem cor até algo
+  // mais (ex.: clicar, mudando `naoLido`) forçar um re-render de verdade.
+  if (prevProps.corDestaque !== nextProps.corDestaque) return false;
 
   const pPrev = prevProps.processo || prevProps.p;
   const pNext = nextProps.processo || nextProps.p;
@@ -427,7 +434,6 @@ export const CardDU = memo(CardDUComponent, (prevProps, nextProps) => {
   const psPrev = pPrev.pedidoSubsidios;
   const psNext = nextProps.processo?.pedidoSubsidios ?? nextProps.p?.pedidoSubsidios;
 
-  // CORREÇÃO: Força o card a pintar a cor assim que ela carregar
   return (
     pPrev.id === pNext.id
     && pPrev.status === pNext.status
@@ -439,7 +445,6 @@ export const CardDU = memo(CardDUComponent, (prevProps, nextProps) => {
     && pPrev.processoReaberto === pNext.processoReaberto
     && pPrev.isMS === pNext.isMS
     && pPrev.atualizadoEm === pNext.atualizadoEm
-    && prevProps.corDestaque === nextProps.corDestaque // CORREÇÃO: Força o card a pintar a cor assim que ela carregar
     && (psPrev?.situacaoFluxo ?? null) === (psNext?.situacaoFluxo ?? null)
     && (psPrev?.reiteracoes ?? null) === (psNext?.reiteracoes ?? null)
   );

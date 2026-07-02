@@ -11,17 +11,38 @@ import { useAuth, type AuthUser } from "@/hooks/useAuth";
 import { nomeMilitarUsuario } from "@/lib/userProfiles";
 
 const PALETA_CORES = [
-  "#ef4444",
-  "#f97316",
-  "#eab308",
-  "#84cc16",
-  "#10b981",
-  "#06b6d4",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ec4899",
-  "#64748b",
+  "#b91c1c",
+  "#c2410c",
+  "#FFD400",
+  "#4d7c0f",
+  "#047857",
+  "#0e7490",
+  "#1d4ed8",
+  "#a21caf",
+  "#be185d",
+  "#334155",
 ];
+
+// Paleta(s) anterior(es). Usada para migrar automaticamente os assessores
+// que já tinham escolhido uma cor antes dos ajustes de contraste — sem
+// isso, quem já tinha cor definida continuaria vendo o tom antigo até
+// reabrir e reselecionar manualmente. Inclui a paleta original (mais clara)
+// e a intermediária (roxo/violeta muito parecido com o azul), ambas
+// convergindo para a paleta atual.
+const PALETA_CORES_ANTIGA: Record<string, string> = {
+  "#ef4444": "#b91c1c",
+  "#f97316": "#c2410c",
+  "#eab308": "#FFD400",
+  "#a16207": "#FFD400", // amarelo intermediário, escuro/amarronzado demais
+  "#84cc16": "#4d7c0f",
+  "#10b981": "#047857",
+  "#06b6d4": "#0e7490",
+  "#3b82f6": "#1d4ed8",
+  "#8b5cf6": "#a21caf",
+  "#6d28d9": "#a21caf", // roxo intermediário, muito parecido com o azul
+  "#ec4899": "#be185d",
+  "#64748b": "#334155",
+};
 
 interface Usuario extends AuthUser {
   id?: string;
@@ -62,6 +83,26 @@ export function GestaoEquipe() {
         id: doc.id,
         ...doc.data(),
       })) as Usuario[];
+
+      // Migra silenciosamente quem ainda está com uma cor da paleta antiga
+      // (mais clara) para o tom mais forte equivalente, preservando a cor
+      // de cada assessor.
+      const paraMigrar = lista.filter((u) => u.corCard && PALETA_CORES_ANTIGA[u.corCard]);
+      if (paraMigrar.length > 0) {
+        await Promise.all(
+          paraMigrar.map(async (u) => {
+            const corNova = PALETA_CORES_ANTIGA[u.corCard as string];
+            u.corCard = corNova;
+            if (!u.id) return;
+            try {
+              await updateDoc(doc(db, "usuarios", u.id), { corCard: corNova });
+            } catch (err) {
+              console.error(`Erro ao migrar cor do usuário ${u.id}:`, err);
+            }
+          }),
+        );
+      }
+
       setUsuarios(lista.filter((u) => u.ativo !== false));
     } catch (error) {
       console.error("Erro ao carregar usuários:", error);
