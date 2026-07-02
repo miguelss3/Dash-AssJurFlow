@@ -371,7 +371,7 @@ exports.criarUsuarioAdmin = functions.region("us-central1").https.onRequest(asyn
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// geminiChat — Assistente IA via Google Gemini 1.5 Flash
+// geminiChat — Assistente IA via Google Gemini 2.5 Flash
 // Chave da API lida de variável de ambiente GEMINI_KEY (functions/.env)
 // Rate limit: 20 perguntas por usuário por dia (Firestore: ia_usage/{uid})
 // ──────────────────────────────────────────────────────────────────────────────
@@ -460,26 +460,48 @@ ${context}
 
 Pergunta: ${message}`;
 
-    const geminiRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 512 },
-        }),
-      }
-    );
-
-    if (!geminiRes.ok) {
-      const errBody = await geminiRes.text();
-      console.error("Gemini API error:", geminiRes.status, errBody);
-      res.status(502).json({ error: "upstream-error", message: "Erro ao consultar a IA. Tente novamente em instantes." });
+    let geminiRes;
+    try {
+      geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.4, maxOutputTokens: 512 },
+          }),
+        }
+      );
+    } catch (fetchErr) {
+      console.error("Gemini fetch network error:", fetchErr.message);
+      res.status(502).json({ error: "network-error", message: "Erro de rede ao conectar com a IA. Verifique a configuração." });
       return;
     }
 
-    const geminiData = await geminiRes.json();
+    const geminiBodyText = await geminiRes.text();
+
+    if (!geminiRes.ok) {
+      console.error("Gemini API error:", geminiRes.status, geminiBodyText);
+      let userMsg = "Erro ao consultar a IA. Tente novamente em instantes.";
+      try {
+        const errJson = JSON.parse(geminiBodyText);
+        const apiMsg = errJson?.error?.message;
+        if (apiMsg) userMsg = `Gemini: ${apiMsg}`;
+      } catch { /* ignora */ }
+      res.status(502).json({ error: "upstream-error", message: userMsg });
+      return;
+    }
+
+    let geminiData;
+    try {
+      geminiData = JSON.parse(geminiBodyText);
+    } catch (parseErr) {
+      console.error("Gemini response parse error:", parseErr.message, geminiBodyText.slice(0, 200));
+      res.status(502).json({ error: "parse-error", message: "Resposta inesperada da IA." });
+      return;
+    }
+
     const reply =
       geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "Não foi possível gerar uma resposta.";

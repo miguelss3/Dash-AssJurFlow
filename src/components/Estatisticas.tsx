@@ -44,7 +44,7 @@ const TOOLTIP_STYLE = {
   backgroundColor: "oklch(1 0 0)",
   border: "1px solid oklch(0.92 0.005 240)",
   borderRadius: 12,
-  fontSize: 12,
+  fontSize: 11,
   color: "oklch(0.22 0.03 255)",
   boxShadow: "0 8px 32px oklch(0.22 0.05 258 / 0.15)",
 } as const;
@@ -293,10 +293,10 @@ export function Estatisticas({ processos }: Props) {
       <div data-print-ignore="true" className="rounded-2xl border border-border bg-card p-4 shadow-card">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-sm font-bold uppercase tracking-wide text-slate-700">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
               Relatórios em PDF
             </h3>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-[11px] text-muted-foreground">
               Exporte os indicadores gerais, sindicâncias e IPM em documentos prontos para
               impressão.
             </p>
@@ -359,12 +359,12 @@ export function Estatisticas({ processos }: Props) {
               <TrendingUp className="h-5 w-5 text-[oklch(0.55_0.17_230)]" />
             </span>
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-foreground">Índice Mensal</p>
-              <p className="text-sm text-muted-foreground capitalize">{mesNome}</p>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-foreground">Índice Mensal</p>
+              <p className="text-xs text-muted-foreground capitalize">{mesNome}</p>
             </div>
           </div>
 
-          <div className="mt-6 space-y-2.5 text-base">
+          <div className="mt-6 space-y-2.5 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Cadastrados</span>
               <span className="font-bold tabular-nums">{cadastradosMes}</span>
@@ -393,15 +393,15 @@ export function Estatisticas({ processos }: Props) {
           <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
 
           <div className="relative">
-            <p className="text-[11px] uppercase tracking-[0.2em] font-bold text-[oklch(0.78_0.18_145)] mb-4">
+            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[oklch(0.78_0.18_145)] mb-4">
               Acervo Processual
             </p>
 
             <div className="grid sm:grid-cols-2 gap-6">
               <div>
-                <div className="text-4xl sm:text-5xl font-bold font-display tabular-nums leading-none">{total}</div>
-                <p className="text-lg sm:text-xl text-white/85 mt-3">Processos cadastrados</p>
-                <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                <div className="text-3xl sm:text-4xl font-bold font-display tabular-nums leading-none">{total}</div>
+                <p className="text-sm sm:text-base text-white/85 mt-3">Processos cadastrados</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
                   <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">DU: {totalDU}</span>
                   <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">PA: {totalPA}</span>
                   <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">Ativos: {ativos}</span>
@@ -410,13 +410,13 @@ export function Estatisticas({ processos }: Props) {
 
               <div>
                 <div className="flex items-end gap-2 leading-none">
-                  <span className="text-3xl sm:text-4xl font-bold text-[oklch(0.78_0.18_145)] mb-1">{taxaSucesso}%</span>
-                  <span className="text-lg font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
+                  <span className="text-2xl sm:text-3xl font-bold text-[oklch(0.78_0.18_145)] mb-1">{taxaSucesso}%</span>
+                  <span className="text-base font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
                     {concluidos}
                   </span>
                 </div>
-                <p className="text-lg sm:text-xl text-white/85 mt-3">Finalizados</p>
-                <p className="text-base text-white/60 mt-0.5">{taxaSucesso}% do total cadastrado</p>
+                <p className="text-sm sm:text-base text-white/85 mt-3">Finalizados</p>
+                <p className="text-xs text-white/60 mt-0.5">{taxaSucesso}% do total cadastrado</p>
 
                 <div className="mt-4 h-2.5 rounded-full bg-white/15 overflow-hidden">
                   <div
@@ -457,7 +457,7 @@ export function Estatisticas({ processos }: Props) {
               <Legend
                 verticalAlign="bottom"
                 iconType="circle"
-                wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                wrapperStyle={{ fontSize: 10, paddingTop: 8 }}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -473,12 +473,12 @@ export function Estatisticas({ processos }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                tick={{ fontSize: 10, fill: AXIS_COLOR }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                tick={{ fontSize: 10, fill: AXIS_COLOR }}
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
@@ -510,7 +510,7 @@ export function Estatisticas({ processos }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
               <XAxis
                 type="number"
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                tick={{ fontSize: 10, fill: AXIS_COLOR }}
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
@@ -518,13 +518,13 @@ export function Estatisticas({ processos }: Props) {
               <YAxis
                 type="category"
                 dataKey="name"
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                tick={{ fontSize: 10, fill: AXIS_COLOR }}
                 axisLine={false}
                 tickLine={false}
                 width={110}
               />
               <Tooltip cursor={{ fill: "oklch(0.95 0 0 / 0.5)" }} contentStyle={TOOLTIP_STYLE} />
-              <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" />
+              <Legend wrapperStyle={{ fontSize: 10 }} iconType="circle" />
               <Bar dataKey="ativos" stackId="a" fill={ACCENT} name="Ativos" />
               <Bar
                 dataKey="concluidos"
@@ -553,12 +553,12 @@ export function Estatisticas({ processos }: Props) {
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: 10, fill: AXIS_COLOR }}
+                tick={{ fontSize: 9, fill: AXIS_COLOR }}
                 axisLine={false}
                 tickLine={false}
               />
               <YAxis
-                tick={{ fontSize: 11, fill: AXIS_COLOR }}
+                tick={{ fontSize: 10, fill: AXIS_COLOR }}
                 axisLine={false}
                 tickLine={false}
                 allowDecimals={false}
@@ -583,7 +583,7 @@ export function Estatisticas({ processos }: Props) {
         icon={TrendingUp}
       >
         {dadosTipoAcao.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">Sem dados.</p>
+          <p className="text-xs text-muted-foreground py-8 text-center">Sem dados.</p>
         ) : (
           <div className="space-y-3.5 py-2">
             {dadosTipoAcao.map((d, i) => {
@@ -591,7 +591,7 @@ export function Estatisticas({ processos }: Props) {
               const pct = (d.value / max) * 100;
               return (
                 <div key={d.name}>
-                  <div className="flex items-center justify-between text-xs mb-1.5">
+                  <div className="flex items-center justify-between text-[11px] mb-1.5">
                     <span className="font-semibold text-foreground truncate pr-2">{d.name}</span>
                     <span className="tabular-nums text-muted-foreground shrink-0 font-bold">
                       {d.value}
@@ -656,19 +656,19 @@ function KpiHero({
       <div
         className={`font-bold tracking-tight font-display ${
           accent ? "text-accent-foreground" : "text-foreground"
-        } ${isText ? "text-lg sm:text-xl truncate" : "text-2xl sm:text-3xl tabular-nums"}`}
+        } ${isText ? "text-base sm:text-lg truncate" : "text-xl sm:text-2xl tabular-nums"}`}
       >
         {value}
       </div>
       <p
-        className={`text-sm font-bold mt-1 ${
+        className={`text-xs font-bold mt-1 ${
           accent ? "text-accent-foreground" : "text-foreground"
         }`}
       >
         {label}
       </p>
       <p
-        className={`text-[11px] mt-0.5 ${
+        className={`text-[10px] mt-0.5 ${
           accent ? "text-accent-foreground/70" : "text-muted-foreground"
         }`}
       >
@@ -693,13 +693,13 @@ function ChartCard({
     <div className="rounded-3xl border border-border bg-card p-5 shadow-card animate-fade-in-up">
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h3 className="font-bold text-foreground text-base flex items-center gap-2 font-display">
+          <h3 className="font-bold text-foreground text-sm flex items-center gap-2 font-display">
             <span className="inline-flex h-7 w-7 rounded-lg bg-accent/30 items-center justify-center">
               <Icon className="h-4 w-4 text-accent-foreground" />
             </span>
             {title}
           </h3>
-          <p className="text-xs text-muted-foreground mt-1 ml-9">{subtitle}</p>
+          <p className="text-[11px] text-muted-foreground mt-1 ml-9">{subtitle}</p>
         </div>
       </div>
       {children}

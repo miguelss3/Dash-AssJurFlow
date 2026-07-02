@@ -207,7 +207,6 @@ function LoginPage() {
                     onChange={(e) => setSenha(e.target.value)}
                     placeholder="••••••••"
                     className="h-11 pl-9 rounded-xl"
-                    autoComplete="current-password"
                     disabled={loading}
                   />
                 </div>

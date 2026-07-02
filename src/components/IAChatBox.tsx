@@ -100,8 +100,17 @@ export function IAChatBox({ processos }: Props) {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Erro ao consultar IA.");
+      const text = await res.text();
+      if (!text) throw new Error(`Servidor não respondeu (HTTP ${res.status}). Tente novamente.`);
+
+      let data: Record<string, unknown>;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(`Resposta inválida do servidor (HTTP ${res.status}).`);
+      }
+
+      if (!res.ok) throw new Error((data.message as string) || "Erro ao consultar IA.");
       setResponse(data.reply as string);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro desconhecido.");

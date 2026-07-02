@@ -38,27 +38,6 @@ const STATS_INICIAIS: ServerStats = {
   carregando: true,
 };
 
-// V2.14 — Stale-While-Revalidate: cache local das métricas para evitar
-// "flash de zeros" e números dessincronizados no carregamento inicial.
-const CACHE_KEY = "assjur_dashboard_metrics";
-
-interface CachedMetrics {
-  criadosMes: number;
-  finalizadosMes: number;
-  resolutividadeMes: number;
-  totalConcluidos: number;
-  totalGeral: number;
-  ativosDU: number;
-  ativosPA: number;
-  totalDU: number;
-  totalPA: number;
-  acervoAtivo: number;
-  vencidos: number;
-  hoje: number;
-  semana: number;
-  taxaConclusao: number;
-}
-
 /**
  * Verifica se uma data (Timestamp do Firestore OU String ISO) pertence ao mesmo
  * mês/ano de uma data de referência. Usa fuso LOCAL (correto para Manaus/Brasil).
@@ -71,16 +50,6 @@ function ehDoMesAtual(value: unknown, ref: Date): boolean {
 
 export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos = false }: Props) {
   const { user } = useAuth();
-
-  // V2.14 — Cache SWR: hidrata métricas da última sessão instantaneamente.
-  const [cachedMetrics, setCachedMetrics] = useState<CachedMetrics | null>(() => {
-    try {
-      const saved = localStorage.getItem(CACHE_KEY);
-      return saved ? (JSON.parse(saved) as CachedMetrics) : null;
-    } catch {
-      return null;
-    }
-  });
 
   // O array `processos` agora vem HÍBRIDO do useProcessos: ATIVOS + Últimos 50
   // FINALIZADOS (para a aba "Finalizados" do Kanban). Separamos aqui.
@@ -211,86 +180,33 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
   const totalConcluidos = totalConcluidosLocal;
   const totalGeral = totalGeralLocal;
 
-  // V2.14 — Persiste métricas no localStorage assim que tudo confirma do servidor.
-  useEffect(() => {
-    if (!dadosProntos) return;
-    const currentMetrics: CachedMetrics = {
-      criadosMes,
-      finalizadosMes,
-      resolutividadeMes,
-      totalConcluidos,
-      totalGeral,
-      ativosDU,
-      ativosPA,
-      totalDU,
-      totalPA,
-      acervoAtivo,
-      vencidos,
-      hoje,
-      semana,
-      taxaConclusao,
-    };
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify(currentMetrics));
-    } catch {
-      // localStorage cheio ou indisponível — segue sem cache.
-    }
-    setCachedMetrics(currentMetrics);
-  }, [
-    dadosProntos,
-    criadosMes,
-    finalizadosMes,
-    resolutividadeMes,
-    totalConcluidos,
-    totalGeral,
-    ativosDU,
-    ativosPA,
-    totalDU,
-    totalPA,
-    acervoAtivo,
-    vencidos,
-    hoje,
-    semana,
-    taxaConclusao,
-  ]);
-
-  // V2.14 — Valores de exibição: dados frescos quando prontos, senão cache.
-  const displayCriadosMes = dadosAtivosProntos ? criadosMes : (cachedMetrics?.criadosMes ?? 0);
-  const displayFinalizadosMes = dadosHistoricosProntos ? finalizadosMes : (cachedMetrics?.finalizadosMes ?? 0);
-  // Totais agora derivam diretamente da prop `processos` (fonte única de verdade).
+  // Valores de exibição: só existem quando os dados batem de verdade — enquanto
+  // não estiverem prontos, a UI mostra o spinner (ver mostrarPlaceholder* abaixo)
+  // em vez de arriscar exibir um número parcial/desatualizado.
+  const displayCriadosMes = criadosMes;
+  const displayFinalizadosMes = finalizadosMes;
   const displayResolutividadeMes = resolutividadeMes;
   const displayTotalConcluidos = totalConcluidosLocal;
   const displayTotalGeral = totalGeralLocal;
-  const displayAtivosDU = dadosAtivosProntos ? ativosDU : (cachedMetrics?.ativosDU ?? 0);
-  const displayAtivosPA = dadosAtivosProntos ? ativosPA : (cachedMetrics?.ativosPA ?? 0);
-  // V9.8 — TOTAIS por setor (ativos + concluídos do servidor), exibidos nos badges.
-  const displayTotalDU = dadosProntos ? totalDU : (cachedMetrics?.totalDU ?? 0);
-  const displayTotalPA = dadosProntos ? totalPA : (cachedMetrics?.totalPA ?? 0);
-  const displayAcervoAtivo = dadosAtivosProntos ? acervoAtivo : (cachedMetrics?.acervoAtivo ?? 0);
-  const displayVencidos = dadosAtivosProntos ? vencidos : (cachedMetrics?.vencidos ?? 0);
-  const displayHoje = dadosAtivosProntos ? hoje : (cachedMetrics?.hoje ?? 0);
-  const displaySemana = dadosAtivosProntos ? semana : (cachedMetrics?.semana ?? 0);
+  const displayAtivosDU = ativosDU;
+  const displayAtivosPA = ativosPA;
+  const displayTotalDU = totalDU;
+  const displayTotalPA = totalPA;
+  const displayAcervoAtivo = acervoAtivo;
+  const displayVencidos = vencidos;
+  const displayHoje = hoje;
+  const displaySemana = semana;
   const displayTaxaConclusao = taxaConclusao;
 
-  // V2.14 — Atualizando: cache disponível mas servidor ainda confirmando.
-  const isUpdating = !dadosProntos && cachedMetrics !== null;
-  // Mostra placeholder/spinner SÓ na primeira sessão do usuário (sem cache).
-  const mostrarPlaceholderAtivos = !dadosAtivosProntos && !cachedMetrics;
-  const mostrarPlaceholderHistorico = !dadosHistoricosProntos && !cachedMetrics;
-  const mostrarPlaceholderCombinado = !dadosProntos && !cachedMetrics;
+  // Mostra o spinner enquanto os hooks assíncronos (processos ativos + contagem
+  // do servidor) não tiverem os dois confirmado — nunca exibe número parcial.
+  const mostrarPlaceholderAtivos = !dadosAtivosProntos;
+  const mostrarPlaceholderHistorico = !dadosHistoricosProntos;
+  const mostrarPlaceholderCombinado = !dadosProntos;
 
-  /** Placeholder visual usado apenas na PRIMEIRA carga (sem cache). */
   const placeholder = (
     <Loader2 className="inline-block h-[0.7em] w-[0.7em] animate-spin opacity-60 align-middle" />
   );
-
-  /** Badge sutil "Atualizando…" exibido nos cabeçalhos enquanto o servidor confirma. */
-  const updatingBadge = isUpdating ? (
-    <span className="inline-flex items-center gap-1 ml-2 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-      <Loader2 className="h-2.5 w-2.5 animate-spin" />
-      Atualizando…
-    </span>
-  ) : null;
 
   return (
     <div className="space-y-4">
@@ -304,7 +220,7 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
             </span>
             <div className="min-w-0">
               <p className="text-[9px] uppercase tracking-wider font-bold text-foreground leading-tight">
-                Índice Mensal{updatingBadge}
+                Índice Mensal
               </p>
               <p className="text-[9px] text-muted-foreground capitalize leading-tight">
                 {mesNome}
@@ -355,29 +271,29 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
 
             <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <div className="text-3xl sm:text-4xl font-bold font-display tabular-nums leading-none">{totalGeralLocal}</div>
+                <div className="text-3xl sm:text-4xl font-bold font-display tabular-nums leading-none">{mostrarPlaceholderCombinado ? placeholder : displayTotalGeral}</div>
                 <p className="text-sm sm:text-base text-white/85 mt-1.5">Processos cadastrados</p>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">DU: {totalDU}</span>
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">PA: {totalPA}</span>
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">Ativos: {acervoAtivo}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">DU: {displayTotalDU}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">PA: {displayTotalPA}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">Ativos: {displayAcervoAtivo}</span>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-end gap-2 leading-none">
-                  <span className="text-2xl sm:text-3xl font-bold text-[oklch(0.78_0.18_145)] mb-0.5">{taxaConclusao}%</span>
+                  <span className="text-2xl sm:text-3xl font-bold text-[oklch(0.78_0.18_145)] mb-0.5">{mostrarPlaceholderCombinado ? placeholder : `${displayTaxaConclusao}%`}</span>
                   <span className="text-lg font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
-                    {totalConcluidosLocal}
+                    {mostrarPlaceholderCombinado ? placeholder : displayTotalConcluidos}
                   </span>
                 </div>
                 <p className="text-sm sm:text-base text-white/85 mt-1.5">Finalizados</p>
-                <p className="text-xs text-white/60 mt-0.5">{taxaConclusao}% do total cadastrado</p>
+                <p className="text-xs text-white/60 mt-0.5">{displayTaxaConclusao}% do total cadastrado</p>
 
                 <div className="mt-2 h-1.5 rounded-full bg-white/15 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-[oklch(0.78_0.18_145)]"
-                    style={{ width: `${taxaConclusao}%` }}
+                    style={{ width: `${displayTaxaConclusao}%` }}
                   />
                 </div>
               </div>

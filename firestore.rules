@@ -37,7 +37,8 @@ service cloud.firestore {
         userProfileByUid().isChefe == 'sim' ||
         userProfileByUid().isChefe == 'Sim' ||
         userProfileByUid().cargo == 'Admin Universal' ||
-        userProfileByUid().setor == 'CHEFE ASSEAPASSJUR'
+        userProfileByUid().setor == 'CHEFE ASSEAPASSJUR' ||
+        userProfileByUid().setor == 'Chefe AsseApAssJur'
       );
     }
 

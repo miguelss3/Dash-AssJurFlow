@@ -17,6 +17,11 @@ export default defineConfig({
 				changeOrigin: true,
 				rewrite: () => "/criarUsuarioAdmin",
 			},
+			"/api/geminiChat": {
+				target: "https://us-central1-assjur-flow-12rm.cloudfunctions.net",
+				changeOrigin: true,
+				rewrite: () => "/geminiChat",
+			},
 		},
 	},
 	plugins: [

@@ -35,6 +35,9 @@ import type { SiteSettings } from "@/types/siteSettings";
 import { statusPrazo } from "@/lib/prazo";
 import { toast } from "sonner";
 
+// Desligado temporariamente: créditos da API Gemini esgotados (ver functions/index.js geminiChat).
+const IA_CHAT_HABILITADA = false;
+
 const KanbanBoard = lazy(() =>
   import("@/components/KanbanBoard").then((m) => ({ default: m.KanbanBoard })),
 );
@@ -1082,6 +1085,8 @@ function Index() {
                 <div className="relative flex-1 min-w-[240px]">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="busca-processos"
+                    name="busca-processos"
                     value={busca}
                     onChange={(e) => setBusca(e.target.value)}
                     placeholder="Buscar processo, parte, assunto..."
@@ -1126,7 +1131,7 @@ function Index() {
                 )}
               </div>
 
-              <IAChatBox processos={processosParaDashboard} />
+              {IA_CHAT_HABILITADA && <IAChatBox processos={processosParaDashboard} />}
 
               <Dashboard
                 processos={processosParaDashboard}
