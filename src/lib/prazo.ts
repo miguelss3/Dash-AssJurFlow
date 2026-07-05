@@ -389,3 +389,13 @@ export function classesPrazo(status: StatusPrazo): {
       };
   }
 }
+
+/**
+ * Mês/ano de referência para o mês corrente, na data local do sistema.
+ * Isolada como função nomeada (em vez de `new Date()` inline) para poder
+ * ser usada como inicializador "lazy" do useState (`useState(mesAtualLocal)`)
+ * e para ser testável isoladamente — ver src/lib/prazo.test.mjs.
+ */
+export function mesAtualLocal(): Date {
+  return new Date();
+}

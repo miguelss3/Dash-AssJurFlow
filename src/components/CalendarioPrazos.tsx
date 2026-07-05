@@ -49,7 +49,7 @@ import {
   type EventoCalendario,
   type TipoEvento,
 } from "@/hooks/useEventosCalendario";
-import { statusPrazo } from "@/lib/prazo";
+import { statusPrazo, mesAtualLocal } from "@/lib/prazo";
 import { DetalhesModalPA } from "@/components/DetalhesModalPA";
 import { DetalhesModalDU } from "@/components/DetalhesModalDU";
 import { toast } from "sonner";
@@ -110,7 +110,9 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
   const postoUsuario = usuario?.posto ?? "";
   const nomeUsuario = usuario?.nome ?? "";
   const { eventos, criar, remover } = useEventosCalendario(setorUsuario, ehAdmin);
-  const [mesRef, setMesRef] = useState(new Date());
+  // Inicializador "lazy": React só chama mesAtualLocal() UMA VEZ, no mount,
+  // em vez de construir um `new Date()` (descartado) a cada re-render.
+  const [mesRef, setMesRef] = useState(mesAtualLocal);
   const [diaSelecionado, setDiaSelecionado] = useState<Date | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [processoSelecionado, setProcessoSelecionado] = useState<Processo | null>(null);
@@ -255,7 +257,7 @@ export function CalendarioPrazos({ processos, usuario, ehAdmin = false, onNovoLa
           <Button
             variant="outline"
             className="h-9 rounded-lg text-xs font-bold"
-            onClick={() => setMesRef(new Date())}
+            onClick={() => setMesRef(mesAtualLocal())}
           >
             Hoje
           </Button>
