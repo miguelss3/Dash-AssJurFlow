@@ -182,6 +182,22 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       // snapshots subsequentes automaticamente quando o servidor confirmar,
       // então não precisamos bloquear a UI esperando `fromCache=false`.
 
+      // ---------- Gate de "pronto": só libera `carregando=false` quando os
+      // DOIS listeners (ativos + concluídos) já emitiram pelo menos uma vez
+      // (sucesso OU erro). Antes disso, `combinarCaches()` pode devolver só
+      // um dos dois lados (ex.: só concluídos, com ativos ainda vazio) e o
+      // Dashboard renderizaria números derivados (total, DU/PA, Ativos: 0,
+      // % de resolutividade) incorretos por 1-2s até o outro listener chegar.
+      // Com o gate, o consumidor (Dashboard) mantém o placeholder até os
+      // dois arrays estarem realmente completos. Atualizações em tempo real
+      // POSTERIORES (processo mudando de status já com a tela carregada) não
+      // são afetadas: o gate só atua na primeira carga, nunca volta a `true`.
+      let ativosRecebido = false;
+      let concluidosRecebido = false;
+      const atualizarCarregando = () => {
+        if (ativosRecebido && concluidosRecebido) setCarregando(false);
+      };
+
       // ARQUITETURA HÍBRIDA: o snapshot principal traz só ATIVOS (performance);
       // um segundo listener traz os ÚLTIMOS 50 concluídos para popular a aba
       // "Concluídos" do Kanban sem inflar memória.
@@ -475,7 +491,8 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
           mesclarProcessosAutorizados();
           // V2.13 — Optimistic UI: libera a tela imediatamente, mesmo com
           // snapshot do cache local. O servidor confirmará em segundo plano.
-          setCarregando(false);
+          ativosRecebido = true;
+          atualizarCarregando();
         },
         (err) => {
           console.error(
@@ -493,8 +510,10 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
               { duration: Infinity, id: "firestore-index-ativos" },
             );
           }          setErro("Erro ao carregar processos");
-          // Mesmo em erro, liberamos o gate para evitar UI travada em "…".
-          setCarregando(false);
+          // Mesmo em erro, liberamos o gate (junto com o outro listener) para
+          // evitar UI travada indefinidamente em "…".
+          ativosRecebido = true;
+          atualizarCarregando();
         }
       );
 
@@ -535,7 +554,8 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
           processosCacheConcluidos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
           mesclarProcessosAutorizados();
           // V2.13 — Optimistic UI: libera a tela imediatamente.
-          setCarregando(false);
+          concluidosRecebido = true;
+          atualizarCarregando();
         },
         (err) => {
           console.error(
@@ -555,9 +575,10 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
           // Não seta erro global: a UI dos ativos continua funcionando.
           processosCacheConcluidos = [];
           mesclarProcessosAutorizados();
-          // Libera o gate — sem este listener, concluídos históricos virão pelo
-          // getCountFromServer do Dashboard de qualquer forma.
-          setCarregando(false);
+          // Libera o gate (junto com o outro listener) — sem este listener,
+          // concluídos históricos virão pelo getCountFromServer do Dashboard.
+          concluidosRecebido = true;
+          atualizarCarregando();
         }
       );
     }); // fecha onAuthStateChanged

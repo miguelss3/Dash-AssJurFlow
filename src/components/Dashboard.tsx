@@ -292,9 +292,9 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
                 <div className="text-3xl sm:text-4xl font-bold font-display tabular-nums leading-none">{mostrarPlaceholderCombinado ? placeholder : displayTotalGeral}</div>
                 <p className="text-sm sm:text-base text-white/85 mt-1.5">Processos cadastrados</p>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">DU: {displayTotalDU}</span>
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">PA: {displayTotalPA}</span>
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">Ativos: {displayAcervoAtivo}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">DU: {mostrarPlaceholderCombinado ? placeholder : displayTotalDU}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">PA: {mostrarPlaceholderCombinado ? placeholder : displayTotalPA}</span>
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold">Ativos: {mostrarPlaceholderAtivos ? placeholder : displayAcervoAtivo}</span>
                 </div>
               </div>
 
@@ -306,7 +306,9 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
                   </span>
                 </div>
                 <p className="text-sm sm:text-base text-white/85 mt-1.5">Finalizados</p>
-                <p className="text-xs text-white/60 mt-0.5">{displayTaxaConclusao}% do total cadastrado</p>
+                <p className="text-xs text-white/60 mt-0.5">
+                  {mostrarPlaceholderCombinado ? placeholder : `${displayTaxaConclusao}% do total cadastrado`}
+                </p>
 
                 <div className="mt-2 h-1.5 rounded-full bg-white/15 overflow-hidden">
                   <div
