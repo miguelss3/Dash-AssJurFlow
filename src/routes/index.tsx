@@ -1206,7 +1206,11 @@ function Index() {
 
           {aba === "indicadores" && (
             <Suspense fallback={<TabLoading label="Carregando indicadores..." />}>
-              <Estatisticas processos={processosParaDashboard} statsServidor={statsServidor} />
+              <Estatisticas
+                processos={processosParaDashboard}
+                loadingProcessos={loadingProcessos}
+                statsServidor={statsServidor}
+              />
             </Suspense>
           )}
 

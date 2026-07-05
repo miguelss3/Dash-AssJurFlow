@@ -97,7 +97,7 @@ function LoginPage() {
       <div className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-[oklch(0.6_0.16_230)]/10 blur-3xl" />
 
       {/* Lado esquerdo — branding */}
-      <div className="hidden lg:flex flex-col justify-between w-1/2 p-12 relative z-10 text-white">
+      <div className="hidden lg:flex flex-col justify-between w-1/2 pt-12 pr-12 pb-12 pl-20 relative z-10 text-white">
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-2xl bg-[oklch(0.88_0.18_130)] flex items-center justify-center shadow-glow">
             <Shield className="h-6 w-6 text-[oklch(0.22_0.05_258)]" />
@@ -142,9 +142,7 @@ function LoginPage() {
           </div>
         </div>
 
-        <p className="text-xs text-white/40">
-          &copy; {new Date().getFullYear()} Maj Cav Miguel &mdash; AssJur Flow &middot; 12ª Região Militar. Todos os direitos reservados.
-        </p>
+        <div />
       </div>
 
       {/* Lado direito — formulário */}
@@ -236,7 +234,7 @@ function LoginPage() {
           </div>
 
           <p className="text-center text-xs text-white/50 mt-6">
-            Sistema homologado &middot; Uso institucional &middot; v3.2
+            Sistema homologado &middot; Uso institucional &middot; v3.9
           </p>
           <p className="text-center text-[11px] text-white/30 mt-1">
             &copy; {new Date().getFullYear()} Maj Cav Miguel &mdash; AssJur Flow &middot; 12ª Região Militar

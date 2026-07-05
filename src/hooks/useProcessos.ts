@@ -10,8 +10,6 @@ import {
   doc,
   getDocs,
   writeBatch,
-  orderBy,
-  limit,
   Timestamp,
   type Query,
 } from "firebase/firestore";
@@ -86,16 +84,19 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
 
   useEffect(() => {
     let unsubProcessos: (() => void) | null = null;
-    let unsubConcluidos: (() => void) | null = null;
+    let gateTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
-    // Aguarda o Firebase Auth resolver o estado de autenticação antes de inscrever os listeners
+    // Aguarda o Firebase Auth resolver o estado de autenticação antes de inscrever o listener
     const unsubAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      // Cancela listeners anteriores se existirem
+      // Cancela listener anterior se existir
       if (unsubProcessos) { unsubProcessos(); unsubProcessos = null; }
-      if (unsubConcluidos) { unsubConcluidos(); unsubConcluidos = null; }
       if (mergeTimerRef.current) {
         clearTimeout(mergeTimerRef.current);
         mergeTimerRef.current = null;
+      }
+      if (gateTimeoutId) {
+        clearTimeout(gateTimeoutId);
+        gateTimeoutId = null;
       }
 
       if (!firebaseUser) {
@@ -124,11 +125,12 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       );
 
       // ---------- RECUPERA\u00c7\u00c3O DE EMERG\u00caNCIA: processos "fantasmas" ----------
-      // Os listeners principais usam `where("ativo","==",true|false)`, que NUNCA
-      // retorna documentos sem o campo `ativo`. Processos antigos (ou criados
-      // durante a janela em que o cadastro n\u00e3o injetava a flag) ficam invis\u00edveis.
-      // Aqui, apenas um admin varre a cole\u00e7\u00e3o, identifica os "\u00f3rf\u00e3os" e
-      // injeta `ativo` derivado do status (`concluido` -> false; sen\u00e3o true).
+      // A query \u00fanica abaixo n\u00e3o filtra por `ativo`, ent\u00e3o documentos sem
+      // esse campo j\u00e1 aparecem normalmente. Esta rotina existe s\u00f3 por higiene
+      // de dados: outras telas/relat\u00f3rios ainda podem depender do campo
+      // `ativo` estar presente e coerente com o status. Aqui, apenas um admin
+      // varre a cole\u00e7\u00e3o, identifica os "\u00f3rf\u00e3os" (sem o campo) e injeta `ativo`
+      // derivado do status (`concluido` -> false; sen\u00e3o true).
       // \u00c9 uma rotina ONE-SHOT por sess\u00e3o (sentinela de m\u00f3dulo).
       if (ehAdmin && !recuperacaoFantasmasExecutada) {
         recuperacaoFantasmasExecutada = true;
@@ -172,57 +174,33 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         })();
       }
 
+      // ---------- Fonte única: um só onSnapshot traz TODOS os processos do
+      // escopo do usuário (ativos + concluídos), sem filtro por `ativo` na
+      // query. Antes, dois listeners independentes (ativos + últimos 50
+      // concluídos) alimentavam o mesmo array `processos`, e mesmo depois de
+      // corrigir quando cada um marcava "recebido" (esperando
+      // `!fromCache`), o GATE de prontidão podia abrir antes do merge
+      // (debounced separadamente) terminar de aplicar os dados mais
+      // recentes — causando o flicker de números incorretos no card "Acervo
+      // Processual". Com uma ÚNICA fonte, `processos` e o gate são
+      // atualizados no MESMO passo de processamento (dentro do próprio
+      // debounce de merge, ver `mesclarProcessosAutorizados` abaixo) — não
+      // existe mais uma segunda fonte independente para dessincronizar.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let processosCacheAtivos: any[] = [];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let processosCacheConcluidos: any[] = [];
-
-      // V2.13 — Optimistic UI: liberamos o carregamento assim que QUALQUER
-      // snapshot chegar (cache local OU servidor). O Firestore já emite
-      // snapshots subsequentes automaticamente quando o servidor confirmar,
-      // então não precisamos bloquear a UI esperando `fromCache=false`.
-
-      // ---------- Gate de "pronto": só libera `carregando=false` quando os
-      // DOIS listeners (ativos + concluídos) já emitiram pelo menos uma vez
-      // (sucesso OU erro). Antes disso, `combinarCaches()` pode devolver só
-      // um dos dois lados (ex.: só concluídos, com ativos ainda vazio) e o
-      // Dashboard renderizaria números derivados (total, DU/PA, Ativos: 0,
-      // % de resolutividade) incorretos por 1-2s até o outro listener chegar.
-      // Com o gate, o consumidor (Dashboard) mantém o placeholder até os
-      // dois arrays estarem realmente completos. Atualizações em tempo real
-      // POSTERIORES (processo mudando de status já com a tela carregada) não
-      // são afetadas: o gate só atua na primeira carga, nunca volta a `true`.
-      let ativosRecebido = false;
-      let concluidosRecebido = false;
-      const atualizarCarregando = () => {
-        if (ativosRecebido && concluidosRecebido) setCarregando(false);
+      let docsAtuais: any[] = [];
+      let ultimoEraDoCache = true;
+      let gateAberto = false;
+      const abrirGate = () => {
+        if (gateAberto) return;
+        gateAberto = true;
+        setCarregando(false);
       };
 
-      // ARQUITETURA HÍBRIDA: o snapshot principal traz só ATIVOS (performance);
-      // um segundo listener traz os ÚLTIMOS 50 concluídos para popular a aba
-      // "Concluídos" do Kanban sem inflar memória.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const combinarCaches = (): any[] => {
-        if (processosCacheAtivos.length === 0) return processosCacheConcluidos;
-        if (processosCacheConcluidos.length === 0) return processosCacheAtivos;
-        // Dedup por id (defensivo: um doc não deve estar nos dois caches).
-        const vistos = new Set<string>();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const combinado: any[] = [];
-        for (const item of processosCacheAtivos) {
-          if (item?.id && !vistos.has(item.id)) {
-            vistos.add(item.id);
-            combinado.push(item);
-          }
-        }
-        for (const item of processosCacheConcluidos) {
-          if (item?.id && !vistos.has(item.id)) {
-            vistos.add(item.id);
-            combinado.push(item);
-          }
-        }
-        return combinado;
-      };
+      // Timeout de resiliência: se o cliente estiver offline ou o servidor
+      // demorar demais para confirmar, libera a UI com os melhores dados
+      // disponíveis (mesmo que ainda do cache) em vez de travar o
+      // carregamento indefinidamente.
+      gateTimeoutId = setTimeout(abrirGate, 8000);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const carregarResponsaveisLegado = async (processosAtuais: any[]) => {
@@ -274,7 +252,8 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
           mergeTimerRef.current = null;
 
           void (async () => {
-            const processosCache = combinarCaches();
+            const processosCache = docsAtuais;
+            const eraDoCacheNestePasso = ultimoEraDoCache;
             const responsaveisLegado = await carregarResponsaveisLegado(processosCache);
             const listaProcessos: Processo[] = [];
       
@@ -457,141 +436,75 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       
             setProcessos(listaProcessos);
             setErro(null);
+
+            // O gate só abre DEPOIS que `processos` já reflete os dados mais
+            // recentes — mesmo passo síncrono do merge, sem a janela de tempo
+            // que antes existia entre "carregando=false" e o array real.
+            if (!eraDoCacheNestePasso) {
+              abrirGate();
+            }
           })();
         }, 40);
       };
 
+      // ---------- Query ÚNICA: todos os processos do escopo do usuário ----------
+      // Sem filtro por `ativo` — o cliente separa ativos/concluídos ao
+      // consumir `processos` (ver Dashboard/Estatisticas/useAcervoProcessual).
+      // Como bônus, isso também elimina a necessidade dos índices compostos
+      // "setor + ativo" e "setor + ativo + atualizadoEm desc": os filtros
+      // abaixo são todos de campo único (in/==), que o Firestore já indexa
+      // automaticamente.
       const processosRef = collection(db, "processos");
       let qProcessos: Query;
 
       if (ehAdmin) {
-        qProcessos = query(
-          processosRef,
-          where("ativo", "==", true),
-          where("setor", "in", ["DU", "PA"]),
-        );
+        qProcessos = query(processosRef, where("setor", "in", ["DU", "PA"]));
       } else if (setorUsuario) {
-        qProcessos = query(
-          processosRef,
-          where("ativo", "==", true),
-          where("setor", "==", setorUsuario),
-        );
+        qProcessos = query(processosRef, where("setor", "==", setorUsuario));
       } else {
-        qProcessos = query(
-          processosRef,
-          where("ativo", "==", true),
-          where("userId", "==", firebaseUser.uid),
-        );
+        qProcessos = query(processosRef, where("userId", "==", firebaseUser.uid));
       }
 
       unsubProcessos = onSnapshot(
         qProcessos,
+        { includeMetadataChanges: true },
         (snapshot) => {
-          processosCacheAtivos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          docsAtuais = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          ultimoEraDoCache = snapshot.metadata.fromCache;
           mesclarProcessosAutorizados();
-          // V2.13 — Optimistic UI: libera a tela imediatamente, mesmo com
-          // snapshot do cache local. O servidor confirmará em segundo plano.
-          ativosRecebido = true;
-          atualizarCarregando();
         },
         (err) => {
           console.error(
-            "❌ Erro no listener de processos ATIVOS:" +
-              " Verifique se o índice composto do Firestore foi criado" +
-              " (setor + ativo). Abra o link sugerido no console do Firebase.",
-            err,
-          );          // Captura agressiva: o Firestore SDK loga o link de criação do índice
-          // como warning silencioso. Surfaceamos via toast persistente para o
-          // admin clicar no console e provisionar o índice imediatamente.
-          const codigo = (err as { code?: string })?.code;
-          if (codigo === "failed-precondition") {
-            toast.error(
-              "Índice do Firestore ausente (processos ativos). Abra o console do navegador (F12) e clique no link gerado pelo Firebase para criar o índice composto.",
-              { duration: Infinity, id: "firestore-index-ativos" },
-            );
-          }          setErro("Erro ao carregar processos");
-          // Mesmo em erro, liberamos o gate (junto com o outro listener) para
-          // evitar UI travada indefinidamente em "…".
-          ativosRecebido = true;
-          atualizarCarregando();
-        }
-      );
-
-      // ---------- Listener B: ÚLTIMOS 50 CONCLUÍDOS (para a aba "Concluídos" do Kanban) ----------
-      // Usa o mesmo escopo (admin / setor / userId) porém com `ativo == false` e ordenado
-      // por `atualizadoEm` desc + limit(50). Se o índice composto não existir, o erro é
-      // capturado e o app segue funcionando — basta abrir o link do Firebase no console.
-      let qConcluidos: Query;
-      if (ehAdmin) {
-        qConcluidos = query(
-          processosRef,
-          where("ativo", "==", false),
-          where("setor", "in", ["DU", "PA"]),
-          orderBy("atualizadoEm", "desc"),
-          limit(50),
-        );
-      } else if (setorUsuario) {
-        qConcluidos = query(
-          processosRef,
-          where("ativo", "==", false),
-          where("setor", "==", setorUsuario),
-          orderBy("atualizadoEm", "desc"),
-          limit(50),
-        );
-      } else {
-        qConcluidos = query(
-          processosRef,
-          where("ativo", "==", false),
-          where("userId", "==", firebaseUser.uid),
-          orderBy("atualizadoEm", "desc"),
-          limit(50),
-        );
-      }
-
-      unsubConcluidos = onSnapshot(
-        qConcluidos,
-        (snapshot) => {
-          processosCacheConcluidos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          mesclarProcessosAutorizados();
-          // V2.13 — Optimistic UI: libera a tela imediatamente.
-          concluidosRecebido = true;
-          atualizarCarregando();
-        },
-        (err) => {
-          console.error(
-            "❌ Erro no listener de processos CONCLUÍDOS:" +
-              " Verifique se o índice composto do Firestore foi criado" +
-              " (setor + ativo + atualizadoEm desc). Abra o link sugerido no console do Firebase." +
-              " A aba 'Concluídos' do Kanban pode ficar vazia até o índice ser provisionado.",
+            "❌ Erro no listener de processos:" +
+              " Verifique se as regras do Firestore permitem a leitura da coleção 'processos' para este usuário.",
             err,
           );
           const codigo = (err as { code?: string })?.code;
           if (codigo === "failed-precondition") {
             toast.error(
-              "Índice do Firestore ausente (processos concluídos). Abra o console do navegador (F12) e clique no link gerado pelo Firebase para criar o índice composto.",
-              { duration: Infinity, id: "firestore-index-concluidos" },
+              "Índice do Firestore ausente (processos). Abra o console do navegador (F12) e clique no link gerado pelo Firebase para criar o índice.",
+              { duration: Infinity, id: "firestore-index-processos" },
             );
           }
-          // Não seta erro global: a UI dos ativos continua funcionando.
-          processosCacheConcluidos = [];
-          mesclarProcessosAutorizados();
-          // Libera o gate (junto com o outro listener) — sem este listener,
-          // concluídos históricos virão pelo getCountFromServer do Dashboard.
-          concluidosRecebido = true;
-          atualizarCarregando();
+          setErro("Erro ao carregar processos");
+          // Mesmo em erro, liberamos o gate para evitar UI travada indefinidamente em "…".
+          abrirGate();
         }
       );
     }); // fecha onAuthStateChanged
 
-    // Cleanup: desinscreve de todos os listeners ao desmontar
+    // Cleanup: desinscreve do listener ao desmontar
     return () => {
       if (mergeTimerRef.current) {
         clearTimeout(mergeTimerRef.current);
         mergeTimerRef.current = null;
       }
+      if (gateTimeoutId) {
+        clearTimeout(gateTimeoutId);
+        gateTimeoutId = null;
+      }
       unsubAuth();
       if (unsubProcessos) unsubProcessos();
-      if (unsubConcluidos) unsubConcluidos();
     };
   }, [authUser, siteSettings]);
 
@@ -609,8 +522,9 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         criadoEm: new Date().toISOString(),
         userId: currentUser.uid,
         userEmail: currentUser.email || "",
-        // Flag de infraestrutura: todo novo processo nasce ATIVO
-        // (necessária para aparecer no listener filtrado por where("ativo","==",true)).
+        // Flag de infraestrutura: todo novo processo nasce ATIVO.
+        // Mantida por compatibilidade com relatórios/rotinas que ainda a
+        // consultam — a query do listener não filtra mais por este campo.
         ativo: true,
       } as Record<string, unknown>;
 

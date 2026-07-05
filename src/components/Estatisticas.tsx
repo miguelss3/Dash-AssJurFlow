@@ -14,12 +14,13 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { TrendingUp, Award, AlertTriangle, CheckCircle2, Clock, FileText, RefreshCw } from "lucide-react";
+import { TrendingUp, Award, AlertTriangle, CheckCircle2, Clock, FileText, RefreshCw, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
 import { COLUNAS } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
 import type { ProcessosStats } from "@/hooks/useProcessosStats";
+import { useAcervoProcessual } from "@/hooks/useAcervoProcessual";
 import { Button } from "@/components/ui/button";
 import {
   exportIndicadoresGeraisPdf,
@@ -30,6 +31,12 @@ import {
 
 interface Props {
   processos: Processo[];
+  /**
+   * Estado de sincronização do `useProcessos` com o servidor (mesmo sinal
+   * usado no Dashboard) — enquanto `true`, o array `processos` pode estar
+   * incompleto (ex.: só o listener de "concluídos" já respondeu).
+   */
+  loadingProcessos?: boolean;
   /**
    * Contagens históricas do servidor (mesma fonte usada no Dashboard, buscada
    * uma única vez em routes/index.tsx) — evita duplicar getCountFromServer.
@@ -75,7 +82,7 @@ function normalizarChaveAssunto(value: string) {
     .trim();
 }
 
-export function Estatisticas({ processos, statsServidor }: Props) {
+export function Estatisticas({ processos, loadingProcessos = false, statsServidor }: Props) {
   const indicadoresPrintRef = useRef<HTMLDivElement | null>(null);
 
   const handleExportEstatisticas = async () => {
@@ -225,18 +232,18 @@ export function Estatisticas({ processos, statsServidor }: Props) {
     }));
   }, [processos]);
 
-  // V9.8 — Totais alinhados com o Dashboard:
-  //   total_setor = ativos_setor (snapshot local) + concluídos_setor (servidor)
-  // O array local `processos` está limitado a "ativos + últimos 50 concluídos",
-  // então contar diretamente nele subestima quando o histórico > 50.
+  // V9.9 — Acervo Processual (total, DU, PA, Ativos, % de conclusão) e o gate
+  // de prontidão agora vêm do hook compartilhado com o Dashboard (ver
+  // useAcervoProcessual) — antes, essa lógica era duplicada aqui SEM o gate
+  // que espera o servidor confirmar os dados de "ativos", o que deixava este
+  // card exibir números incorretos por 1-2s no carregamento inicial.
+  const acervo = useAcervoProcessual(processos, loadingProcessos, statsServidor);
+  const { ativosDU, ativosPA, totalDU, totalPA, taxaConclusao: taxaSucesso } = acervo;
+  const total = acervo.totalGeral;
+  const concluidos = acervo.totalConcluidos;
+  const ativos = acervo.acervoAtivo;
+
   const setorDe = (p: Processo) => (p.setor || p.tipo || "").toString().toUpperCase();
-  const ativosDU = processos.filter((p) => p.status !== "concluido" && setorDe(p) === "DU").length;
-  const ativosPA = processos.filter((p) => p.status !== "concluido" && setorDe(p) === "PA").length;
-  const totalDU = ativosDU + statsServidor.totalConcluidosDU;
-  const totalPA = ativosPA + statsServidor.totalConcluidosPA;
-  const total = totalDU + totalPA;
-  const concluidos = statsServidor.totalConcluidos;
-  const ativos = ativosDU + ativosPA;
 
   // KPIs de prazo: mesma lógica do Dashboard — apenas DU ativos,
   // campos prazoFatal + pedidoSubsidios.prazoResposta, vencidos excluídos de "hoje".
@@ -279,8 +286,10 @@ export function Estatisticas({ processos, statsServidor }: Props) {
   ).length;
   const resolutividadeMes = cadastradosMes > 0 ? Math.round((finalizadosMes / cadastradosMes) * 100) : 0;
 
-  const taxaSucesso = total ? Math.round((concluidos / total) * 100) : 0;
   const topResp = dadosResponsavel[0];
+  const placeholder = (
+    <Loader2 className="inline-block h-[0.7em] w-[0.7em] animate-spin opacity-60 align-middle" />
+  );
 
   // AUDITORIA PROFUNDA DE IDs
   useEffect(() => {
@@ -325,14 +334,14 @@ export function Estatisticas({ processos, statsServidor }: Props) {
         <KpiHero
           icon={CheckCircle2}
           label="Taxa de conclusão"
-          value={`${taxaSucesso}%`}
-          sub={`${concluidos} de ${total} processos (histórico total)`}
+          value={acervo.prontos ? `${taxaSucesso}%` : placeholder}
+          sub={acervo.prontos ? `${concluidos} de ${total} processos (histórico total)` : "sincronizando…"}
           tone="success"
         />
         <KpiHero
           icon={Clock}
           label="Processos ativos"
-          value={ativos}
+          value={acervo.ativosProntos ? ativos : placeholder}
           sub="Em acompanhamento"
           tone="primary"
           accent
@@ -340,8 +349,8 @@ export function Estatisticas({ processos, statsServidor }: Props) {
         <KpiHero
           icon={AlertTriangle}
           label="Atrasados"
-          value={vencidos}
-          sub={vencidos > 0 ? "Necessitam atenção" : "Tudo em dia"}
+          value={acervo.ativosProntos ? vencidos : placeholder}
+          sub={!acervo.ativosProntos ? "sincronizando…" : vencidos > 0 ? "Necessitam atenção" : "Tudo em dia"}
           tone="danger"
         />
         <KpiHero
@@ -412,29 +421,35 @@ export function Estatisticas({ processos, statsServidor }: Props) {
 
             <div className="grid sm:grid-cols-2 gap-6">
               <div>
-                <div className="text-3xl sm:text-4xl font-bold font-display tabular-nums leading-none">{total}</div>
+                <div className="text-3xl sm:text-4xl font-bold font-display tabular-nums leading-none">
+                  {acervo.prontos ? total : placeholder}
+                </div>
                 <p className="text-sm sm:text-base text-white/85 mt-3">Processos cadastrados</p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">DU: {totalDU}</span>
-                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">PA: {totalPA}</span>
-                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">Ativos: {ativos}</span>
+                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">DU: {acervo.prontos ? totalDU : placeholder}</span>
+                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">PA: {acervo.prontos ? totalPA : placeholder}</span>
+                  <span className="rounded-full bg-white/10 px-3 py-1 font-semibold">Ativos: {acervo.ativosProntos ? ativos : placeholder}</span>
                 </div>
               </div>
 
               <div>
                 <div className="flex items-end gap-2 leading-none">
-                  <span className="text-2xl sm:text-3xl font-bold text-[oklch(0.78_0.18_145)] mb-1">{taxaSucesso}%</span>
+                  <span className="text-2xl sm:text-3xl font-bold text-[oklch(0.78_0.18_145)] mb-1">
+                    {acervo.prontos ? `${taxaSucesso}%` : placeholder}
+                  </span>
                   <span className="text-base font-bold font-display tabular-nums text-[oklch(0.78_0.18_145)]">
-                    {concluidos}
+                    {acervo.prontos ? concluidos : placeholder}
                   </span>
                 </div>
                 <p className="text-sm sm:text-base text-white/85 mt-3">Finalizados</p>
-                <p className="text-xs text-white/60 mt-0.5">{taxaSucesso}% do total cadastrado</p>
+                <p className="text-xs text-white/60 mt-0.5">
+                  {acervo.prontos ? `${taxaSucesso}% do total cadastrado` : placeholder}
+                </p>
 
                 <div className="mt-4 h-2.5 rounded-full bg-white/15 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-[oklch(0.78_0.18_145)]"
-                    style={{ width: `${taxaSucesso}%` }}
+                    style={{ width: `${acervo.prontos ? taxaSucesso : 0}%` }}
                   />
                 </div>
               </div>
@@ -640,7 +655,7 @@ function KpiHero({
 }: {
   icon: typeof TrendingUp;
   label: string;
-  value: string | number;
+  value: React.ReactNode;
   sub: string;
   tone: "primary" | "success" | "danger" | "info";
   isText?: boolean;

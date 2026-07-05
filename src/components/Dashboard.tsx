@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   AlertTriangle,
   Clock,
@@ -11,8 +11,8 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
 import type { ProcessosStats } from "@/hooks/useProcessosStats";
+import { useAcervoProcessual } from "@/hooks/useAcervoProcessual";
 import type { Processo, FiltroPrazo } from "@/types/processo";
 import { statusPrazo, toDateLocal } from "@/lib/prazo";
 
@@ -33,18 +33,6 @@ interface Props {
   statsServidor: ProcessosStats;
 }
 
-interface ServerStats {
-  totalConcluidos: number;
-  finalizadosMes: number;
-  carregando: boolean;
-}
-
-const STATS_INICIAIS: ServerStats = {
-  totalConcluidos: 0,
-  finalizadosMes: 0,
-  carregando: true,
-};
-
 /**
  * Verifica se uma data (Timestamp do Firestore OU String ISO) pertence ao mesmo
  * mês/ano de uma data de referência. Usa fuso LOCAL (correto para Manaus/Brasil).
@@ -56,8 +44,6 @@ function ehDoMesAtual(value: unknown, ref: Date): boolean {
 }
 
 export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos = false, statsServidor }: Props) {
-  const { user } = useAuth();
-
   // O array `processos` agora vem HÍBRIDO do useProcessos: ATIVOS + Últimos 50
   // FINALIZADOS (para a aba "Finalizados" do Kanban). Separamos aqui.
   const processosAtivos = useMemo(
@@ -88,15 +74,6 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     return sFatal === "today" || sFatal === "soon" || sResp === "today" || sResp === "soon";
   }).length;
 
-  // ---------- Contagem por setor a partir dos ATIVOS ----------
-  const ativosDU = processosAtivos.filter(
-    (p) => (p.setor || p.tipo || "").toString().toUpperCase() === "DU",
-  ).length;
-  const ativosPA = processosAtivos.filter(
-    (p) => (p.setor || p.tipo || "").toString().toUpperCase() === "PA",
-  ).length;
-  const acervoAtivo = processosAtivos.length;
-
   // ---------- Entradas no mês: deriva da prop unificada (Timestamp OU String ISO) ----------
   const mesRef = useMemo(() => new Date(), []);
   const criadosMes = useMemo(
@@ -111,81 +88,28 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     [processos, mesRef],
   );
 
+  const finalizadosMes = useMemo(
+    () =>
+      processos.reduce((acc, p) => {
+        if (p.status !== "concluido") return acc;
+        return acc + (ehDoMesAtual(p.atualizadoEm, mesRef) ? 1 : 0);
+      }, 0),
+    [processos, mesRef],
+  );
+
   const mesNome = useMemo(
     () => mesRef.toLocaleString("pt-BR", { month: "long", year: "numeric" }),
     [mesRef],
   );
 
-  // ---------- Estatísticas SERVIDOR (finalizados = status:concluido) ----------
-  // V9.8 — `statsServidor` chega via prop (fonte ÚNICA de verdade, buscada uma
-  // vez em routes/index.tsx) para que Dashboard e Indicadores de Gestão exibam
-  // EXATAMENTE os mesmos números sem duplicar as consultas ao servidor.
-  const [stats, setStats] = useState<ServerStats>(STATS_INICIAIS);
-  // Tarefa 3: Fallback de resiliência. Se o servidor demorar mais de 3s para responder
-  // às contagens, liberamos a UI mesmo assim — melhor mostrar dados parciais (ainda sem
-  // o totalConcluidos histórico) do que travar o usuário em "…" indefinidamente.
-  const [statsTimeout, setStatsTimeout] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    setStatsTimeout(false);
-    const id = setTimeout(() => {
-      setStatsTimeout(true);
-    }, 3000);
-    return () => clearTimeout(id);
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    let cancelado = false;
-
-    const carregar = () => {
-      // V9.8 — Total de concluídos vem do hook compartilhado (não duplicar query).
-      // Finalizações do mês permanecem locais (derivadas dos últimos 50 do snapshot).
-      const finalizadosMes = processos.reduce((acc, p) => {
-        if (p.status !== "concluido") return acc;
-        return acc + (ehDoMesAtual(p.atualizadoEm, mesRef) ? 1 : 0);
-      }, 0);
-
-      if (cancelado) return;
-      setStats({
-        totalConcluidos: statsServidor.totalConcluidos,
-        finalizadosMes,
-        carregando: statsServidor.carregando,
-      });
-    };
-
-    carregar();
-
-    return () => {
-      cancelado = true;
-    };
-  }, [user, mesRef, processos, statsServidor.totalConcluidos, statsServidor.carregando]);
-
-  // ---------- Derivados ----------
-  // V9.8 — Fonte ÚNICA de verdade (hook useProcessosStats):
-  //  - Concluídos: counts REAIS do servidor por setor (DU/PA).
-  //  - Ativos: array local (snapshot em tempo real, completo).
-  //  - Totais por setor: ativos_setor + concluidos_setor(servidor).
-  // Assim os badges do banner do Dashboard batem EXATAMENTE com os Indicadores.
-  const { finalizadosMes } = stats;
-
-  const totalConcluidosLocal = statsServidor.totalConcluidos;
-  const totalDU = ativosDU + statsServidor.totalConcluidosDU;
-  const totalPA = ativosPA + statsServidor.totalConcluidosPA;
-  const totalGeralLocal = totalDU + totalPA;
-
-  const taxaConclusao = totalGeralLocal > 0 ? Math.round((totalConcluidosLocal / totalGeralLocal) * 100) : 0;
   const resolutividadeMes = criadosMes > 0 ? Math.round((finalizadosMes / criadosMes) * 100) : 0;
 
-  // V2.13 — Optimistic UI: gates de carregamento mantidos apenas para placeholders/cache.
-  const dadosAtivosProntos = !loadingProcessos;
-  const dadosHistoricosProntos = !stats.carregando || statsTimeout;
-  const dadosProntos = dadosAtivosProntos && dadosHistoricosProntos;
-
-  // Aliases retrocompatíveis para o restante do componente.
-  const totalConcluidos = totalConcluidosLocal;
-  const totalGeral = totalGeralLocal;
+  // ---------- Acervo Processual (total, DU, PA, Ativos, % de conclusão) ----------
+  // V9.9 — Fonte única compartilhada com Estatisticas.tsx (ver useAcervoProcessual):
+  // antes desta extração, cada tela tinha seu próprio gate de prontidão, e só um
+  // dos dois havia sido corrigido para esperar o servidor confirmar os dados de
+  // "ativos" antes de liberar os números — o outro seguia exibindo o bug.
+  const acervo = useAcervoProcessual(processos, loadingProcessos, statsServidor);
 
   // Valores de exibição: só existem quando os dados batem de verdade — enquanto
   // não estiverem prontos, a UI mostra o spinner (ver mostrarPlaceholder* abaixo)
@@ -193,23 +117,21 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
   const displayCriadosMes = criadosMes;
   const displayFinalizadosMes = finalizadosMes;
   const displayResolutividadeMes = resolutividadeMes;
-  const displayTotalConcluidos = totalConcluidosLocal;
-  const displayTotalGeral = totalGeralLocal;
-  const displayAtivosDU = ativosDU;
-  const displayAtivosPA = ativosPA;
-  const displayTotalDU = totalDU;
-  const displayTotalPA = totalPA;
-  const displayAcervoAtivo = acervoAtivo;
+  const displayTotalConcluidos = acervo.totalConcluidos;
+  const displayTotalGeral = acervo.totalGeral;
+  const displayTotalDU = acervo.totalDU;
+  const displayTotalPA = acervo.totalPA;
+  const displayAcervoAtivo = acervo.acervoAtivo;
   const displayVencidos = vencidos;
   const displayHoje = hoje;
   const displaySemana = semana;
-  const displayTaxaConclusao = taxaConclusao;
+  const displayTaxaConclusao = acervo.taxaConclusao;
 
   // Mostra o spinner enquanto os hooks assíncronos (processos ativos + contagem
   // do servidor) não tiverem os dois confirmado — nunca exibe número parcial.
-  const mostrarPlaceholderAtivos = !dadosAtivosProntos;
-  const mostrarPlaceholderHistorico = !dadosHistoricosProntos;
-  const mostrarPlaceholderCombinado = !dadosProntos;
+  const mostrarPlaceholderAtivos = !acervo.ativosProntos;
+  const mostrarPlaceholderHistorico = !acervo.historicoProntos;
+  const mostrarPlaceholderCombinado = !acervo.prontos;
 
   const placeholder = (
     <Loader2 className="inline-block h-[0.7em] w-[0.7em] animate-spin opacity-60 align-middle" />
