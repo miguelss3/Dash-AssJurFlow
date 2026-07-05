@@ -131,10 +131,14 @@ export function isAdmin(user: AuthUser | null): boolean {
   return false;
 }
 
+// sessionStorage (não localStorage): o cache do perfil expira junto com a sessão
+// do navegador, alinhado à persistência do Firebase Auth (browserSessionPersistence
+// em src/lib/firebase.ts). Evita que dados pessoais (nome, e-mail, telefone, cargo)
+// fiquem retidos indefinidamente em disco.
 function readStored(): AuthUser | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
     return raw ? (JSON.parse(raw) as AuthUser) : null;
   } catch {
     return null;
@@ -194,7 +198,7 @@ export function useAuth() {
           userData.role = "ADMIN UNIVERSAL";
         }
 
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+        window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
         setUser(userData);
       } else {
         setUser(null);
@@ -233,14 +237,14 @@ export function useAuth() {
       userData.role = userData.cargo || userData.setor || "ADMIN UNIVERSAL";
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(userData));
     setUser(userData);
   }, []);
 
   const logout = useCallback(async () => {
     try {
       await signOut(auth);
-      window.localStorage.removeItem(STORAGE_KEY);
+      window.sessionStorage.removeItem(STORAGE_KEY);
       setUser(null);
       // console.log("✅ Logout realizado");
     } catch (error: any) {

@@ -9,9 +9,10 @@ import {
   Inbox,
   BarChart2,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useProcessosStats } from "@/hooks/useProcessosStats";
+import type { ProcessosStats } from "@/hooks/useProcessosStats";
 import type { Processo, FiltroPrazo } from "@/types/processo";
 import { statusPrazo, toDateLocal } from "@/lib/prazo";
 
@@ -24,6 +25,12 @@ interface Props {
    * Enquanto `true`, o array `processos` pode ser apenas o cache local (stale).
    */
   loadingProcessos?: boolean;
+  /**
+   * Contagens históricas do servidor (uma ÚNICA fonte, compartilhada com
+   * Estatisticas via routes/index.tsx) — evita duplicar as mesmas consultas
+   * getCountFromServer em cada tela.
+   */
+  statsServidor: ProcessosStats;
 }
 
 interface ServerStats {
@@ -48,7 +55,7 @@ function ehDoMesAtual(value: unknown, ref: Date): boolean {
   return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
 }
 
-export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos = false }: Props) {
+export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos = false, statsServidor }: Props) {
   const { user } = useAuth();
 
   // O array `processos` agora vem HÍBRIDO do useProcessos: ATIVOS + Últimos 50
@@ -110,9 +117,9 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
   );
 
   // ---------- Estatísticas SERVIDOR (finalizados = status:concluido) ----------
-  // V9.8 — Usa o hook compartilhado `useProcessosStats` (fonte ÚNICA de verdade)
-  // para que Dashboard e Indicadores de Gestão exibam EXATAMENTE os mesmos números.
-  const statsServidor = useProcessosStats();
+  // V9.8 — `statsServidor` chega via prop (fonte ÚNICA de verdade, buscada uma
+  // vez em routes/index.tsx) para que Dashboard e Indicadores de Gestão exibam
+  // EXATAMENTE os mesmos números sem duplicar as consultas ao servidor.
   const [stats, setStats] = useState<ServerStats>(STATS_INICIAIS);
   // Tarefa 3: Fallback de resiliência. Se o servidor demorar mais de 3s para responder
   // às contagens, liberamos a UI mesmo assim — melhor mostrar dados parciais (ainda sem
@@ -265,9 +272,20 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
           <div className="absolute -top-20 -right-20 h-48 w-48 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
 
           <div className="relative">
-            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[oklch(0.78_0.18_145)] mb-2.5">
-              Acervo Processual
-            </p>
+            <div className="flex items-center justify-between mb-2.5">
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[oklch(0.78_0.18_145)]">
+                Acervo Processual
+              </p>
+              <button
+                type="button"
+                onClick={() => statsServidor.refresh()}
+                disabled={statsServidor.carregando}
+                title="Atualizar contagens do servidor"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40"
+              >
+                <RefreshCw className={`h-3 w-3 ${statsServidor.carregando ? "animate-spin" : ""}`} />
+              </button>
+            </div>
 
             <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
               <div>

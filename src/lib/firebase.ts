@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserSessionPersistence } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 
 const firebaseConfig = {
@@ -20,5 +20,12 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const functions = getFunctions(app, "us-central1");
+
+// Sessão restrita à aba/janela do navegador: a persistência padrão do Firebase
+// (browserLocalPersistence) mantém o refresh token no IndexedDB indefinidamente,
+// até logout explícito — uma janela grande de exposição em caso de XSS.
+// Trocando para browserSessionPersistence, o token expira ao fechar o navegador,
+// sem exigir novo login a cada recarregamento da página durante o expediente.
+void setPersistence(auth, browserSessionPersistence);
 
 export default app;

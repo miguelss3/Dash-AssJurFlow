@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   collection,
   getCountFromServer,
@@ -24,20 +24,28 @@ import { useAuth, isAdmin } from "@/hooks/useAuth";
  *     total_DU = ativos_DU + concluidos_DU (servidor)
  *     total_PA = ativos_PA + concluidos_PA (servidor)
  *     total    = total_DU + total_PA
+ *
+ * Estes contadores são histórico "quase estático" (só mudam quando um
+ * processo é concluído) — não há necessidade de onSnapshot em tempo real.
+ * Em vez disso: uma consulta única ao montar + refresh automático a cada
+ * 60s + `refresh()` exposto para atualização manual (botão na UI).
  */
 export interface ProcessosStats {
   totalConcluidos: number;
   totalConcluidosDU: number;
   totalConcluidosPA: number;
   carregando: boolean;
+  refresh: () => void;
 }
 
-const STATS_INICIAIS: ProcessosStats = {
+const STATS_INICIAIS: Omit<ProcessosStats, "refresh"> = {
   totalConcluidos: 0,
   totalConcluidosDU: 0,
   totalConcluidosPA: 0,
   carregando: true,
 };
+
+const INTERVALO_REFRESH_MS = 60_000;
 
 export function useProcessosStats(): ProcessosStats {
   const { user } = useAuth();
@@ -46,7 +54,8 @@ export function useProcessosStats(): ProcessosStats {
   const escopoSetor =
     !ehAdmin && (setorUsuario === "DU" || setorUsuario === "PA") ? setorUsuario : null;
 
-  const [stats, setStats] = useState<ProcessosStats>(STATS_INICIAIS);
+  const [stats, setStats] = useState<Omit<ProcessosStats, "refresh">>(STATS_INICIAIS);
+  const carregarRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     if (!user) return;
@@ -113,12 +122,26 @@ export function useProcessosStats(): ProcessosStats {
       }
     };
 
+    carregarRef.current = carregar;
     void carregar();
+
+    // Refresh periódico: estes contadores não precisam de listener em tempo
+    // real (mudam pouco), mas também não devem ficar parados indefinidamente
+    // entre um mount e outro — um intervalo de 60s mantém o dado razoavelmente
+    // fresco sem manter uma conexão aberta.
+    const intervalId = setInterval(() => {
+      void carregar();
+    }, INTERVALO_REFRESH_MS);
 
     return () => {
       cancelado = true;
+      clearInterval(intervalId);
     };
   }, [user, ehAdmin, escopoSetor]);
 
-  return stats;
+  const refresh = useCallback(() => {
+    void carregarRef.current();
+  }, []);
+
+  return { ...stats, refresh };
 }

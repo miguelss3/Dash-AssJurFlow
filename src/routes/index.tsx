@@ -26,6 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useProcessos } from "@/hooks/useProcessos";
+import { useProcessosStats } from "@/hooks/useProcessosStats";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Dashboard } from "@/components/Dashboard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
@@ -183,6 +184,9 @@ function Index() {
     saveSettings: persistSiteSettings,
   } = useSiteSettings(ready && !!user);
   const { processos, carregando: loadingProcessos, criar, atualizar, remover } = useProcessos(siteSettings, user);
+  // Fonte única das contagens históricas do servidor — compartilhada entre
+  // Dashboard e Estatisticas para não duplicar as mesmas consultas getCountFromServer.
+  const statsServidor = useProcessosStats();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Processo | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<StatusProcesso>("novo");
@@ -508,8 +512,9 @@ function Index() {
       }
 
       // Mantém cache local alinhado para a UI após reload/sessão
+      // (sessionStorage: mesmo ciclo de vida do STORAGE_KEY em useAuth.ts)
       try {
-        const cachedRaw = window.localStorage.getItem("assjur:auth");
+        const cachedRaw = window.sessionStorage.getItem("assjur:auth");
         const cached = cachedRaw ? JSON.parse(cachedRaw) : {};
         const atualizado = {
           ...cached,
@@ -519,7 +524,7 @@ function Index() {
           email,
           telefone: telefone || undefined,
         };
-        window.localStorage.setItem("assjur:auth", JSON.stringify(atualizado));
+        window.sessionStorage.setItem("assjur:auth", JSON.stringify(atualizado));
       } catch {
         // sem cache local
       }
@@ -1138,6 +1143,7 @@ function Index() {
                 filtro={filtro}
                 onFiltroChange={(f) => startTransition(() => setFiltro(f))}
                 loadingProcessos={loadingProcessos}
+                statsServidor={statsServidor}
               />
 
               {filtro !== "todos" && (
@@ -1200,7 +1206,7 @@ function Index() {
 
           {aba === "indicadores" && (
             <Suspense fallback={<TabLoading label="Carregando indicadores..." />}>
-              <Estatisticas processos={processosParaDashboard} />
+              <Estatisticas processos={processosParaDashboard} statsServidor={statsServidor} />
             </Suspense>
           )}
 

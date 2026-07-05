@@ -14,12 +14,12 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { TrendingUp, Award, AlertTriangle, CheckCircle2, Clock, FileText } from "lucide-react";
+import { TrendingUp, Award, AlertTriangle, CheckCircle2, Clock, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
 import { COLUNAS } from "@/types/processo";
 import { statusPrazo } from "@/lib/prazo";
-import { useProcessosStats } from "@/hooks/useProcessosStats";
+import type { ProcessosStats } from "@/hooks/useProcessosStats";
 import { Button } from "@/components/ui/button";
 import {
   exportIndicadoresGeraisPdf,
@@ -30,6 +30,11 @@ import {
 
 interface Props {
   processos: Processo[];
+  /**
+   * Contagens históricas do servidor (mesma fonte usada no Dashboard, buscada
+   * uma única vez em routes/index.tsx) — evita duplicar getCountFromServer.
+   */
+  statsServidor: ProcessosStats;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -70,11 +75,8 @@ function normalizarChaveAssunto(value: string) {
     .trim();
 }
 
-export function Estatisticas({ processos }: Props) {
+export function Estatisticas({ processos, statsServidor }: Props) {
   const indicadoresPrintRef = useRef<HTMLDivElement | null>(null);
-  // V9.8 — Fonte ÚNICA de verdade: counts históricos vindos do servidor,
-  // separados por setor. Garante convergência com o Dashboard.
-  const statsServidor = useProcessosStats();
 
   const handleExportEstatisticas = async () => {
     if (!indicadoresPrintRef.current) {
@@ -393,9 +395,20 @@ export function Estatisticas({ processos }: Props) {
           <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
 
           <div className="relative">
-            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[oklch(0.78_0.18_145)] mb-4">
-              Acervo Processual
-            </p>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[oklch(0.78_0.18_145)]">
+                Acervo Processual
+              </p>
+              <button
+                type="button"
+                onClick={() => statsServidor.refresh()}
+                disabled={statsServidor.carregando}
+                title="Atualizar contagens do servidor"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-40"
+              >
+                <RefreshCw className={`h-3 w-3 ${statsServidor.carregando ? "animate-spin" : ""}`} />
+              </button>
+            </div>
 
             <div className="grid sm:grid-cols-2 gap-6">
               <div>
