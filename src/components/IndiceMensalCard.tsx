@@ -7,6 +7,12 @@ import { toDateLocal } from "@/lib/prazo";
 
 interface Props {
   processos: Processo[];
+  /**
+   * Setor cujos números (Cadastrados/Finalizados/Resolutividade) devem ser
+   * exibidos — a aba DU/PA selecionada (chefia) ou o setor do próprio
+   * usuário (assessor). Mantém consistência com o Dashboard principal.
+   */
+  setorAtivo: "DU" | "PA";
   loadingProcessos?: boolean;
   statsServidor: ProcessosStats;
 }
@@ -21,33 +27,42 @@ function ehDoMesAtual(value: unknown, ref: Date): boolean {
   return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
 }
 
+function ehDoSetor(p: Processo, setor: "DU" | "PA"): boolean {
+  return (p.setor || p.tipo || "").toString().toUpperCase() === setor;
+}
+
 /**
  * Card "Índice Mensal" — extraído do Dashboard para viver na sidebar
  * (logo acima do usuário), mantendo o mesmo layout de caixa branca e barra
  * de progressão da Resolutividade do mês.
  */
-export function IndiceMensalCard({ processos, loadingProcessos = false, statsServidor }: Props) {
+export function IndiceMensalCard({ processos, setorAtivo, loadingProcessos = false, statsServidor }: Props) {
   const mesRef = useMemo(() => new Date(), []);
+
+  const processosDoSetor = useMemo(
+    () => processos.filter((p) => ehDoSetor(p, setorAtivo)),
+    [processos, setorAtivo],
+  );
 
   const criadosMes = useMemo(
     () =>
-      processos.filter((p) => {
+      processosDoSetor.filter((p) => {
         // pode existir tanto `criadoEm` (novo) quanto `dataEntrada` (legado)
         return (
           ehDoMesAtual(p.criadoEm, mesRef) ||
           ehDoMesAtual((p as unknown as { dataEntrada?: unknown }).dataEntrada, mesRef)
         );
       }).length,
-    [processos, mesRef],
+    [processosDoSetor, mesRef],
   );
 
   const finalizadosMes = useMemo(
     () =>
-      processos.reduce((acc, p) => {
+      processosDoSetor.reduce((acc, p) => {
         if (p.status !== "concluido") return acc;
         return acc + (ehDoMesAtual(p.atualizadoEm, mesRef) ? 1 : 0);
       }, 0),
-    [processos, mesRef],
+    [processosDoSetor, mesRef],
   );
 
   const mesNome = useMemo(

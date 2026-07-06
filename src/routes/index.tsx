@@ -266,6 +266,14 @@ function Index() {
     });
   }, [processos, ehAdmin, setorUsuario]);
 
+  // Setor cujos indicadores (Vencidos, Entradas no mês, Resolutividade etc.)
+  // devem ser exibidos no Dashboard e no Índice Mensal: a aba DU/PA selecionada
+  // pela chefia, ou o próprio setor do assessor. `filtroTipo` já reflete isso
+  // (nunca fica em "todos" após os efeitos acima), com "DU" como fallback
+  // apenas no instante inicial antes desses efeitos rodarem.
+  const setorAtivoDashboard: "DU" | "PA" =
+    filtroTipo !== "todos" ? filtroTipo : (setorUsuario === "PA" ? "PA" : "DU");
+
   const filtrados = useMemo(() => {
     const buscaAtiva = busca.trim().length > 0;
     const q = buscaAtiva ? normalizarTexto(busca) : "";
@@ -1020,6 +1028,7 @@ function Index() {
           <div className="px-3 pb-2">
             <IndiceMensalCard
               processos={processosParaDashboard}
+              setorAtivo={setorAtivoDashboard}
               loadingProcessos={loadingProcessos}
               statsServidor={statsServidor}
             />
@@ -1191,6 +1200,7 @@ function Index() {
                 processos={processosParaDashboard}
                 filtro={filtro}
                 onFiltroChange={(f) => startTransition(() => setFiltro(f))}
+                setorAtivo={setorAtivoDashboard}
                 loadingProcessos={loadingProcessos}
                 statsServidor={statsServidor}
               />

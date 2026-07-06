@@ -19,6 +19,13 @@ interface Props {
   filtro: FiltroPrazo;
   onFiltroChange: (f: FiltroPrazo) => void;
   /**
+   * Setor cujos indicadores (Vencidos, Vencem Hoje, Entradas no mês,
+   * Finalizações, Resolutividade, Próximos 7 dias) devem ser exibidos —
+   * a aba DU/PA selecionada (chefia) ou o setor do próprio usuário
+   * (assessor). O Acervo Processual (hero) continua global/combinado.
+   */
+  setorAtivo: "DU" | "PA";
+  /**
    * Estado de sincronização do `useProcessos` com o servidor.
    * Enquanto `true`, o array `processos` pode ser apenas o cache local (stale).
    */
@@ -41,6 +48,21 @@ function ehDoMesAtual(value: unknown, ref: Date): boolean {
   return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
 }
 
+function ehDoSetor(p: Processo, setor: "DU" | "PA"): boolean {
+  return (p.setor || p.tipo || "").toString().toUpperCase() === setor;
+}
+
+/**
+ * Prazos relevantes para o cálculo de Vencidos/Vencem Hoje/Próximos 7 dias,
+ * por setor: DU usa prazoFatal + pedidoSubsidios.prazoResposta; PA usa
+ * prazoFatal + finalPrazo (campos legados/atuais do fluxo PA).
+ */
+function prazosRelevantes(p: Processo, setor: "DU" | "PA"): unknown[] {
+  return setor === "DU"
+    ? [p.prazoFatal, p.pedidoSubsidios?.prazoResposta]
+    : [p.prazoFatal, p.finalPrazo];
+}
+
 const KPI_TONES: Record<string, { bg: string; text: string }> = {
   blue: { bg: "bg-[oklch(0.6_0.16_230_/_0.12)]", text: "text-[oklch(0.55_0.17_230)]" },
   green: { bg: "bg-[var(--deadline-safe-bg)]", text: "text-[var(--deadline-safe)]" },
@@ -49,7 +71,7 @@ const KPI_TONES: Record<string, { bg: string; text: string }> = {
   red: { bg: "bg-[var(--deadline-overdue-bg)]", text: "text-[var(--deadline-overdue)]" },
 };
 
-export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos = false, statsServidor }: Props) {
+export function Dashboard({ processos, filtro, onFiltroChange, setorAtivo, loadingProcessos = false, statsServidor }: Props) {
   // O array `processos` agora vem HÍBRIDO do useProcessos: ATIVOS + Últimos 50
   // FINALIZADOS (para a aba "Finalizados" do Kanban). Separamos aqui.
   const processosAtivos = useMemo(
@@ -57,50 +79,52 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     [processos],
   );
 
-  // ---------- KPIs de PRAZO (client-side, EXCLUSIVO DU) ----------
+  // ---------- KPIs de PRAZO — restritos ao setor ativo (aba DU ou PA) ----------
   // statusPrazo aceita Timestamp do Firestore ou String ISO (ver lib/prazo).
   // Regra de precedencia: vencido nao entra em "hoje" nem em "semana".
-  // Cada card DU considera prazoFatal e pedidoSubsidios.prazoResposta.
-  const processosDUAtivos = processosAtivos.filter(
-    (p) => (p.setor || p.tipo || "").toString().toUpperCase() === "DU",
+  const processosSetorAtivos = useMemo(
+    () => processosAtivos.filter((p) => ehDoSetor(p, setorAtivo)),
+    [processosAtivos, setorAtivo],
   );
-  const vencidos = processosDUAtivos.filter((p) => {
-    return statusPrazo(p.prazoFatal) === "overdue" || statusPrazo(p.pedidoSubsidios?.prazoResposta) === "overdue";
+  const vencidos = processosSetorAtivos.filter((p) =>
+    prazosRelevantes(p, setorAtivo).some((prazo) => statusPrazo(prazo) === "overdue"),
+  ).length;
+  const hoje = processosSetorAtivos.filter((p) => {
+    const status = prazosRelevantes(p, setorAtivo).map((prazo) => statusPrazo(prazo));
+    if (status.some((s) => s === "overdue")) return false;
+    return status.some((s) => s === "today");
   }).length;
-  const hoje = processosDUAtivos.filter((p) => {
-    const sFatal = statusPrazo(p.prazoFatal);
-    const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
-    if (sFatal === "overdue" || sResp === "overdue") return false;
-    return sFatal === "today" || sResp === "today";
-  }).length;
-  const semana = processosDUAtivos.filter((p) => {
-    const sFatal = statusPrazo(p.prazoFatal);
-    const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
-    if (sFatal === "overdue" || sResp === "overdue") return false;
-    return sFatal === "today" || sFatal === "soon" || sResp === "today" || sResp === "soon";
+  const semana = processosSetorAtivos.filter((p) => {
+    const status = prazosRelevantes(p, setorAtivo).map((prazo) => statusPrazo(prazo));
+    if (status.some((s) => s === "overdue")) return false;
+    return status.some((s) => s === "today" || s === "soon");
   }).length;
 
-  // ---------- Entradas no mês: deriva da prop unificada (Timestamp OU String ISO) ----------
+  // ---------- Entradas no mês: restritas ao setor ativo (Timestamp OU String ISO) ----------
   const mesRef = useMemo(() => new Date(), []);
+  const processosDoSetor = useMemo(
+    () => processos.filter((p) => ehDoSetor(p, setorAtivo)),
+    [processos, setorAtivo],
+  );
   const criadosMes = useMemo(
     () =>
-      processos.filter((p) => {
+      processosDoSetor.filter((p) => {
         // pode existir tanto `criadoEm` (novo) quanto `dataEntrada` (legado)
         return (
           ehDoMesAtual(p.criadoEm, mesRef) ||
           ehDoMesAtual((p as unknown as { dataEntrada?: unknown }).dataEntrada, mesRef)
         );
       }).length,
-    [processos, mesRef],
+    [processosDoSetor, mesRef],
   );
 
   const finalizadosMes = useMemo(
     () =>
-      processos.reduce((acc, p) => {
+      processosDoSetor.reduce((acc, p) => {
         if (p.status !== "concluido") return acc;
         return acc + (ehDoMesAtual(p.atualizadoEm, mesRef) ? 1 : 0);
       }, 0),
-    [processos, mesRef],
+    [processosDoSetor, mesRef],
   );
 
   const resolutividadeMes = criadosMes > 0 ? Math.round((finalizadosMes / criadosMes) * 100) : 0;
@@ -219,7 +243,7 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
       </div>
 
       {/* === KPIs do mês === */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           label="Entradas no mês"
           value={mostrarPlaceholderAtivos ? placeholder : displayCriadosMes}
@@ -242,10 +266,6 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
           tone="purple"
           active={false}
         />
-      </div>
-
-      {/* === KPIs de prazo (clicáveis para filtrar) === */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <KpiCard
           label="Próximos 7 dias"
           value={mostrarPlaceholderAtivos ? placeholder : displaySemana}

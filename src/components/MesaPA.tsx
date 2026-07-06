@@ -476,13 +476,11 @@ export function MesaPA({
     );
   }
 
-  // Colunas fixas (Mesa do Chefe antes de Aguardando Distribuição) — mesmos
-  // moldes do DU: ficam na mesma linha das colunas de tipo (Sindicâncias/
-  // IPM/Conselhos), sempre à esquerda delas.
-  const colunasPAFixas = [
-    grupos.find((a) => a.nome === "MESA DO CHEFE"),
-    grupos.find((a) => a.nome === PA_COLUNA_AGUARDANDO_DISTRIBUICAO),
-  ].filter((a): a is (typeof grupos)[number] => Boolean(a));
+  // Mesa do Chefe abre a linha (antes das colunas de tipo); Aguardando
+  // Distribuição fecha a linha, exatamente como fica em DU (última coluna
+  // à direita).
+  const colunaPAMesaChefe = grupos.find((a) => a.nome === "MESA DO CHEFE");
+  const colunaPAAguardandoDistribuicao = grupos.find((a) => a.nome === PA_COLUNA_AGUARDANDO_DISTRIBUICAO);
 
   const colunasPAEmAndamento = grupos.filter((a) => paColunaLabelSet.has(a.nome));
   const colunasPAAssessores = grupos.filter(
@@ -510,48 +508,27 @@ export function MesaPA({
         </div>
         <div className="space-y-4">
           <div className="flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
-            {colunasPAFixas.map((a) =>
-              a.nome === "MESA DO CHEFE" ? (
-                <ChefeGroup
-                  key={`PA-chefe-${a.nome}`}
-                  responsavel={a.nome}
-                  tipo="PA"
-                  processos={[
-                    ...a.itensAtivos,
-                    ...a.itensAtrasados,
-                    ...a.itensConcluidos,
-                    ...a.itensPortariaAssinada,
-                  ]}
-                  ehAdmin={ehAdmin}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  onMove={onMove}
-                  onReativarProcesso={onReativarProcesso}
-                  siteSettings={siteSettings}
-                  unreadProcessIds={unreadProcessIds}
-                  onReadProcess={onReadProcess}
-                  mapaCoresAssessores={mapaCoresAssessores}
-                />
-              ) : (
-                <AssessorGroup
-                  key={`PA-fixa-${a.nome}`}
-                  responsavel={a.nome}
-                  tipo="PA"
-                  processos={a.itensAtivos}
-                  processosPortariaAssinada={a.itensPortariaAssinada}
-                  processosAtrasados={a.itensAtrasados}
-                  processosConcluidos={a.itensConcluidos}
-                  ehAdmin={ehAdmin}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                  onMove={onMove}
-                  onReativarProcesso={onReativarProcesso}
-                  siteSettings={siteSettings}
-                  unreadProcessIds={unreadProcessIds}
-                  onReadProcess={onReadProcess}
-                  mapaCoresAssessores={mapaCoresAssessores}
-                />
-              )
+            {colunaPAMesaChefe && (
+              <ChefeGroup
+                key={`PA-chefe-${colunaPAMesaChefe.nome}`}
+                responsavel={colunaPAMesaChefe.nome}
+                tipo="PA"
+                processos={[
+                  ...colunaPAMesaChefe.itensAtivos,
+                  ...colunaPAMesaChefe.itensAtrasados,
+                  ...colunaPAMesaChefe.itensConcluidos,
+                  ...colunaPAMesaChefe.itensPortariaAssinada,
+                ]}
+                ehAdmin={ehAdmin}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onMove={onMove}
+                onReativarProcesso={onReativarProcesso}
+                siteSettings={siteSettings}
+                unreadProcessIds={unreadProcessIds}
+                onReadProcess={onReadProcess}
+                mapaCoresAssessores={mapaCoresAssessores}
+              />
             )}
             {colunasPAEmAndamento.map((a) => (
               <AssessorGroup
@@ -573,6 +550,26 @@ export function MesaPA({
                 mapaCoresAssessores={mapaCoresAssessores}
               />
             ))}
+            {colunaPAAguardandoDistribuicao && (
+              <AssessorGroup
+                key={`PA-fixa-${colunaPAAguardandoDistribuicao.nome}`}
+                responsavel={colunaPAAguardandoDistribuicao.nome}
+                tipo="PA"
+                processos={colunaPAAguardandoDistribuicao.itensAtivos}
+                processosPortariaAssinada={colunaPAAguardandoDistribuicao.itensPortariaAssinada}
+                processosAtrasados={colunaPAAguardandoDistribuicao.itensAtrasados}
+                processosConcluidos={colunaPAAguardandoDistribuicao.itensConcluidos}
+                ehAdmin={ehAdmin}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onMove={onMove}
+                onReativarProcesso={onReativarProcesso}
+                siteSettings={siteSettings}
+                unreadProcessIds={unreadProcessIds}
+                onReadProcess={onReadProcess}
+                mapaCoresAssessores={mapaCoresAssessores}
+              />
+            )}
           </div>
           <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
             {colunasPAAssessores.map((a) => (
