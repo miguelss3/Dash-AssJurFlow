@@ -8,6 +8,9 @@ import {
   Inbox,
   Loader2,
   RefreshCw,
+  FileSearch,
+  ShieldAlert,
+  Gavel,
 } from "lucide-react";
 import type { ProcessosStats } from "@/hooks/useProcessosStats";
 import { useAcervoProcessual } from "@/hooks/useAcervoProcessual";
@@ -61,6 +64,29 @@ function prazosRelevantes(p: Processo, setor: "DU" | "PA"): unknown[] {
   return setor === "DU"
     ? [p.prazoFatal, p.pedidoSubsidios?.prazoResposta]
     : [p.prazoFatal, p.finalPrazo];
+}
+
+function ehAtivoPA(p: Processo): boolean {
+  const statusNorm = String(p.status || "").trim().toLowerCase();
+  return p.finalizado !== true && statusNorm !== "concluido" && statusNorm !== "concluído";
+}
+
+/** Mesma classificação de subtipo usada em MesaPA.tsx (Sindicância/IPM/Conselho). */
+function subtipoPA(p: Processo): "sindicancia" | "ipm" | "conselho" | null {
+  const t = (p.tipoPA || p.subtipo || "")
+    .toString()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+  if (t.includes("conselho")) return "conselho";
+  if (t.includes("ipm")) return "ipm";
+  if (t.includes("sindic")) return "sindicancia";
+  return null;
+}
+
+interface ContagemPA {
+  abertos: number;
+  atrasados: number;
 }
 
 const KPI_TONES: Record<string, { bg: string; text: string }> = {
@@ -127,7 +153,25 @@ export function Dashboard({ processos, filtro, onFiltroChange, setorAtivo, loadi
     [processosDoSetor, mesRef],
   );
 
-  const resolutividadeMes = criadosMes > 0 ? Math.round((finalizadosMes / criadosMes) * 100) : 0;
+  // ---------- Sindicâncias / IPM / Conselhos (exclusivo PA) ----------
+  const paSubtipoStats = useMemo(() => {
+    const base: Record<"sindicancia" | "ipm" | "conselho", ContagemPA> = {
+      sindicancia: { abertos: 0, atrasados: 0 },
+      ipm: { abertos: 0, atrasados: 0 },
+      conselho: { abertos: 0, atrasados: 0 },
+    };
+    if (setorAtivo !== "PA") return base;
+
+    processosDoSetor.filter(ehAtivoPA).forEach((p) => {
+      const tipo = subtipoPA(p);
+      if (!tipo) return;
+      const atrasado = statusPrazo(p.prazoFatal || p.finalPrazo) === "overdue";
+      if (atrasado) base[tipo].atrasados += 1;
+      else base[tipo].abertos += 1;
+    });
+
+    return base;
+  }, [processosDoSetor, setorAtivo]);
 
   // ---------- Acervo Processual (total, DU, PA, Ativos, % de conclusão) ----------
   // V9.9 — Fonte única compartilhada com Estatisticas.tsx (ver useAcervoProcessual):
@@ -136,12 +180,18 @@ export function Dashboard({ processos, filtro, onFiltroChange, setorAtivo, loadi
   // "ativos" antes de liberar os números — o outro seguia exibindo o bug.
   const acervo = useAcervoProcessual(processos, loadingProcessos, statsServidor);
 
+  // Índice de Resolutividade — GLOBAL do setor ativo (total histórico
+  // finalizados/cadastrados), não mais o recorte do mês corrente.
+  const totalConcluidosSetor = setorAtivo === "DU" ? statsServidor.totalConcluidosDU : statsServidor.totalConcluidosPA;
+  const totalSetor = setorAtivo === "DU" ? acervo.totalDU : acervo.totalPA;
+  const taxaConclusaoSetor = totalSetor > 0 ? Math.round((totalConcluidosSetor / totalSetor) * 100) : 0;
+
   // Valores de exibição: só existem quando os dados batem de verdade — enquanto
   // não estiverem prontos, a UI mostra o spinner (ver mostrarPlaceholder* abaixo)
   // em vez de arriscar exibir um número parcial/desatualizado.
   const displayCriadosMes = criadosMes;
   const displayFinalizadosMes = finalizadosMes;
-  const displayResolutividadeMes = resolutividadeMes;
+  const displayResolutividadeGlobal = taxaConclusaoSetor;
   const displayTotalConcluidos = acervo.totalConcluidos;
   const displayTotalGeral = acervo.totalGeral;
   const displayTotalDU = acervo.totalDU;
@@ -242,30 +292,60 @@ export function Dashboard({ processos, filtro, onFiltroChange, setorAtivo, loadi
         </div>
       </div>
 
-      {/* === KPIs do mês === */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KpiCard
-          label="Entradas no mês"
-          value={mostrarPlaceholderAtivos ? placeholder : displayCriadosMes}
-          icon={Inbox}
-          tone="blue"
-          active={false}
-          onClick={() => onFiltroChange("todos")}
-        />
-        <KpiCard
-          label="Finalizações no mês"
-          value={mostrarPlaceholderHistorico ? placeholder : displayFinalizadosMes}
-          icon={CheckCircle2}
-          tone="green"
-          active={false}
-        />
+      {/* === KPIs do mês / setor === */}
+      <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${setorAtivo === "PA" ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
+        {setorAtivo === "DU" ? (
+          <>
+            <KpiCard
+              label="Entradas no mês"
+              value={mostrarPlaceholderAtivos ? placeholder : displayCriadosMes}
+              icon={Inbox}
+              tone="blue"
+              active={false}
+              onClick={() => onFiltroChange("todos")}
+            />
+            <KpiCard
+              label="Finalizações no mês"
+              value={mostrarPlaceholderHistorico ? placeholder : displayFinalizadosMes}
+              icon={CheckCircle2}
+              tone="green"
+              active={false}
+            />
+          </>
+        ) : (
+          <>
+            <KpiDuplo
+              label="Sindicâncias"
+              abertos={mostrarPlaceholderAtivos ? placeholder : paSubtipoStats.sindicancia.abertos}
+              atrasados={mostrarPlaceholderAtivos ? placeholder : paSubtipoStats.sindicancia.atrasados}
+              icon={FileSearch}
+              tone="blue"
+            />
+            <KpiDuplo
+              label="Controle de IPM"
+              abertos={mostrarPlaceholderAtivos ? placeholder : paSubtipoStats.ipm.abertos}
+              atrasados={mostrarPlaceholderAtivos ? placeholder : paSubtipoStats.ipm.atrasados}
+              icon={ShieldAlert}
+              tone="green"
+            />
+          </>
+        )}
         <KpiCard
           label="Índice de Resolutividade"
-          value={mostrarPlaceholderCombinado ? placeholder : `${displayResolutividadeMes}%`}
+          value={mostrarPlaceholderCombinado ? placeholder : `${displayResolutividadeGlobal}%`}
           icon={TrendingUp}
           tone="purple"
           active={false}
         />
+        {setorAtivo === "PA" && (
+          <KpiDuplo
+            label="Conselhos"
+            abertos={mostrarPlaceholderAtivos ? placeholder : paSubtipoStats.conselho.abertos}
+            atrasados={mostrarPlaceholderAtivos ? placeholder : paSubtipoStats.conselho.atrasados}
+            icon={Gavel}
+            tone="amber"
+          />
+        )}
         <KpiCard
           label="Próximos 7 dias"
           value={mostrarPlaceholderAtivos ? placeholder : displaySemana}
@@ -376,5 +456,52 @@ function KpiMini({
         {value}
       </div>
     </Component>
+  );
+}
+
+/**
+ * Card com dois números lado a lado (Abertos / Atrasados) — usado para
+ * Sindicâncias, Controle de IPM e Conselhos (exclusivo PA).
+ */
+function KpiDuplo({
+  label,
+  abertos,
+  atrasados,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  abertos: ReactNode;
+  atrasados: ReactNode;
+  icon: typeof AlertTriangle;
+  tone: "blue" | "green" | "purple" | "amber" | "red";
+}) {
+  const t = KPI_TONES[tone];
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-card">
+      <div className="flex items-center gap-2 mb-2">
+        <span className={`inline-flex h-7 w-7 rounded-lg items-center justify-center ${t.bg}`}>
+          <Icon className={`h-3.5 w-3.5 ${t.text}`} />
+        </span>
+        <p className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">
+          {label}
+        </p>
+      </div>
+      <div className="flex items-end gap-4">
+        <div>
+          <div className={`text-2xl sm:text-3xl font-bold tabular-nums tracking-tight font-display ${t.text}`}>
+            {abertos}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Abertos</p>
+        </div>
+        <div>
+          <div className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight font-display text-[var(--deadline-overdue)]">
+            {atrasados}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Atrasados</p>
+        </div>
+      </div>
+    </div>
   );
 }
