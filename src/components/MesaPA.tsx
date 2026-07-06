@@ -37,6 +37,12 @@ interface Props {
   busca?: string;
 }
 
+// Coluna "Aguardando Distribuição" — mesmos moldes/características do DU:
+// processos sem responsável e sem pendência de chefia, aguardando a chefia
+// indicar um assessor. Diferente de "MESA DO CHEFE", que fica reservada para
+// pendências genuínas de chefia (assinatura/decisão).
+const PA_COLUNA_AGUARDANDO_DISTRIBUICAO = "📥 Aguardando Distribuicao";
+
 // V5.2 — Classificação universal das abas PA para todos os motores.
 const PORTARIA_LEGADA = new Set([
   "AGUARDANDO_PRAZO",
@@ -154,7 +160,14 @@ export function MesaPA({
     const responsavelAnterior = processoAtual?.responsavel || "";
 
     if (onRedistribuir) {
-      const responsavelFinal = novoResponsavel === "" ? "" : novoResponsavel;
+      // Soltar em "Aguardando Distribuição" ou "MESA DO CHEFE" limpa o responsável
+      // (mesmo comportamento do DU) — essas colunas não são nomes de assessor.
+      const responsavelFinal =
+        novoResponsavel === ""
+        || novoResponsavel === PA_COLUNA_AGUARDANDO_DISTRIBUICAO
+        || novoResponsavel === "MESA DO CHEFE"
+          ? ""
+          : novoResponsavel;
 
       const tipoPANorm = String(processoAtual?.tipoPA || processoAtual?.subtipo || "")
         .normalize("NFD")
@@ -318,6 +331,7 @@ export function MesaPA({
 
     paColunaLabels.forEach(garantirChave);
     garantirChave("MESA DO CHEFE");
+    garantirChave(PA_COLUNA_AGUARDANDO_DISTRIBUICAO);
     assessores.forEach((assessor) => {
       const nomeAssessor = String(assessor.nome || "").trim();
       if (nomeAssessor) garantirChave(nomeAssessor);
@@ -362,8 +376,9 @@ export function MesaPA({
 
       // V5.2 — Sem coluna do tipo (ex.: Investigação Preliminar): usa coluna do
       // assessor mas respeita a aba (Portaria Assinada / Em Atraso).
-      const responsavelNormalizado = String(p.responsavel || "").trim() || "MESA DO CHEFE";
-      garantirChave(responsavelNormalizado);
+      // Sem responsável: pendência genuína de chefia (assinatura/decisão) vai
+      // para MESA DO CHEFE; sem pendência de chefia vai para Aguardando
+      // Distribuição (mesmos moldes do DU — aguardando indicação de assessor).
       const situacaoIP = normalizarSituacao(p.situacaoFluxoIP);
       const situacaoPA = normalizarSituacao(p.situacaoFluxoPA);
       const situacaoConselho = normalizarSituacao(p.situacaoFluxoConselho);
@@ -372,6 +387,12 @@ export function MesaPA({
         || situacaoPA === "ASSINANDO_PORTARIA"
         || situacaoPA === "AGUARDANDO_ENTREGA"
         || situacaoConselho === "ASSINANDO_PORTARIA";
+
+      const responsavelBruto = String(p.responsavel || "").trim();
+      const responsavelNormalizado =
+        responsavelBruto || (portariaSemColuna ? "MESA DO CHEFE" : PA_COLUNA_AGUARDANDO_DISTRIBUICAO);
+      garantirChave(responsavelNormalizado);
+
       if (portariaSemColuna) {
         mapPortariaAssinada.get(responsavelNormalizado)!.push(p);
         return;
@@ -398,7 +419,7 @@ export function MesaPA({
         return;
       }
 
-      const responsavelNormalizado = String(p.responsavel || "").trim() || "MESA DO CHEFE";
+      const responsavelNormalizado = responsavelAssessor || PA_COLUNA_AGUARDANDO_DISTRIBUICAO;
       garantirChave(responsavelNormalizado);
       mapConcluidos.get(responsavelNormalizado)!.push(p);
     });
@@ -425,7 +446,7 @@ export function MesaPA({
         if (paColunaLabelSet.has(nome)) {
           return true;
         }
-        if (nome === "MESA DO CHEFE") {
+        if (nome === "MESA DO CHEFE" || nome === PA_COLUNA_AGUARDANDO_DISTRIBUICAO) {
           return true;
         }
         if (nomesAssessoresSet.has(nome)) {
@@ -455,8 +476,21 @@ export function MesaPA({
     );
   }
 
+  // Colunas fixas (Mesa do Chefe antes de Aguardando Distribuição) — mesmos
+  // moldes do DU: ficam na mesma linha das colunas de tipo (Sindicâncias/
+  // IPM/Conselhos), sempre à esquerda delas.
+  const colunasPAFixas = [
+    grupos.find((a) => a.nome === "MESA DO CHEFE"),
+    grupos.find((a) => a.nome === PA_COLUNA_AGUARDANDO_DISTRIBUICAO),
+  ].filter((a): a is (typeof grupos)[number] => Boolean(a));
+
   const colunasPAEmAndamento = grupos.filter((a) => paColunaLabelSet.has(a.nome));
-  const colunasPAAssessores = grupos.filter((a) => !paColunaLabelSet.has(a.nome));
+  const colunasPAAssessores = grupos.filter(
+    (a) =>
+      !paColunaLabelSet.has(a.nome)
+      && a.nome !== "MESA DO CHEFE"
+      && a.nome !== PA_COLUNA_AGUARDANDO_DISTRIBUICAO,
+  );
 
   return (
     <DndContext
@@ -476,33 +510,8 @@ export function MesaPA({
         </div>
         <div className="space-y-4">
           <div className="flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
-            {colunasPAEmAndamento.map((a) => (
-              <AssessorGroup
-                key={`PA-${a.nome}`}
-                responsavel={a.nome}
-                tipo="PA"
-                processos={a.itensAtivos}
-                processosPortariaAssinada={a.itensPortariaAssinada}
-                processosAtrasados={a.itensAtrasados}
-                processosConcluidos={a.itensConcluidos}
-                ehAdmin={ehAdmin}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onMove={onMove}
-                onReativarProcesso={onReativarProcesso}
-                siteSettings={siteSettings}
-                unreadProcessIds={unreadProcessIds}
-                onReadProcess={onReadProcess}
-                isWide={a.nome === paColunaLabelPorId.get("sindicancia")}
-                mapaCoresAssessores={mapaCoresAssessores}
-              />
-            ))}
-          </div>
-          <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
-            {colunasPAAssessores.map((a) => {
-              const isColunaGeral = paColunaLabelSet.has(a.nome);
-
-              return a.nome === "MESA DO CHEFE" ? (
+            {colunasPAFixas.map((a) =>
+              a.nome === "MESA DO CHEFE" ? (
                 <ChefeGroup
                   key={`PA-chefe-${a.nome}`}
                   responsavel={a.nome}
@@ -525,14 +534,13 @@ export function MesaPA({
                 />
               ) : (
                 <AssessorGroup
-                  key={`PA-assessor-${a.nome}`}
+                  key={`PA-fixa-${a.nome}`}
                   responsavel={a.nome}
                   tipo="PA"
-                  processos={isColunaGeral ? a.itensAtivos : a.itensAssessorAtivosTotal}
-                  processosPortariaAssinada={isColunaGeral ? a.itensPortariaAssinada : []}
-                  processosAtrasados={isColunaGeral ? a.itensAtrasados : []}
-                  processosConcluidos={isColunaGeral ? a.itensConcluidos : a.itensAssessorConcluidosTotal}
-                  vistaAssessor={!isColunaGeral}
+                  processos={a.itensAtivos}
+                  processosPortariaAssinada={a.itensPortariaAssinada}
+                  processosAtrasados={a.itensAtrasados}
+                  processosConcluidos={a.itensConcluidos}
                   ehAdmin={ehAdmin}
                   onEdit={onEdit}
                   onDelete={onDelete}
@@ -543,8 +551,51 @@ export function MesaPA({
                   onReadProcess={onReadProcess}
                   mapaCoresAssessores={mapaCoresAssessores}
                 />
-              );
-            })}
+              )
+            )}
+            {colunasPAEmAndamento.map((a) => (
+              <AssessorGroup
+                key={`PA-${a.nome}`}
+                responsavel={a.nome}
+                tipo="PA"
+                processos={a.itensAtivos}
+                processosPortariaAssinada={a.itensPortariaAssinada}
+                processosAtrasados={a.itensAtrasados}
+                processosConcluidos={a.itensConcluidos}
+                ehAdmin={ehAdmin}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onMove={onMove}
+                onReativarProcesso={onReativarProcesso}
+                siteSettings={siteSettings}
+                unreadProcessIds={unreadProcessIds}
+                onReadProcess={onReadProcess}
+                mapaCoresAssessores={mapaCoresAssessores}
+              />
+            ))}
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
+            {colunasPAAssessores.map((a) => (
+              <AssessorGroup
+                key={`PA-assessor-${a.nome}`}
+                responsavel={a.nome}
+                tipo="PA"
+                processos={a.itensAssessorAtivosTotal}
+                processosPortariaAssinada={[]}
+                processosAtrasados={[]}
+                processosConcluidos={a.itensAssessorConcluidosTotal}
+                vistaAssessor
+                ehAdmin={ehAdmin}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onMove={onMove}
+                onReativarProcesso={onReativarProcesso}
+                siteSettings={siteSettings}
+                unreadProcessIds={unreadProcessIds}
+                onReadProcess={onReadProcess}
+                mapaCoresAssessores={mapaCoresAssessores}
+              />
+            ))}
           </div>
         </div>
       </section>

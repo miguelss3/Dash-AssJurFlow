@@ -29,6 +29,7 @@ import { useProcessos } from "@/hooks/useProcessos";
 import { useProcessosStats } from "@/hooks/useProcessosStats";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Dashboard } from "@/components/Dashboard";
+import { IndiceMensalCard } from "@/components/IndiceMensalCard";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { IAChatBox } from "@/components/IAChatBox";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
@@ -169,6 +170,20 @@ function normalizarTexto(valor: unknown): string {
     .toLowerCase();
 }
 
+// Achata hist\u00f3ricos de documentos (DIEx enviados, recebidos, prorroga\u00e7\u00f5es, docs IP)
+// em uma \u00fanica string pesquis\u00e1vel, aceitando tanto o formato legado (string) quanto
+// o formato estruturado (objeto com campo de n\u00famero/descri\u00e7\u00e3o).
+function extrairNumeros<T>(
+  itens: Array<string | T> | undefined,
+  campo: keyof T,
+): string {
+  if (!itens?.length) return "";
+  return itens
+    .map((item) => (typeof item === "string" ? item : item[campo]))
+    .filter(Boolean)
+    .join(" ");
+}
+
 function processoTimestampMs(p: Processo | undefined): number {
   if (!p) return 0;
   const dt = new Date(p.atualizadoEm || p.criadoEm).getTime();
@@ -232,6 +247,13 @@ function Index() {
     }
   }, [ehAdmin, setorUsuario, filtroTipo]);
 
+  // Chefia (acesso a todos os processos) navega em 2 abas distintas: DU ou PA — nunca combinadas
+  useEffect(() => {
+    if (ehAdmin && filtroTipo === "todos") {
+      setFiltroTipo("DU");
+    }
+  }, [ehAdmin, filtroTipo]);
+
   // Filtra dados para dashboard/indicadores: assessor vê só seu setor, admin vê todos
   const processosParaDashboard = useMemo(() => {
     if (ehAdmin) {
@@ -272,6 +294,30 @@ function Index() {
           p.observacoes,
           p.pedidoSubsidios?.observacoes,
           p.respostaDU?.observacoes,
+          // Números de documentos emitidos/recebidos — fluxo DU
+          p.numeroDocumentoDU,
+          p.numeroDiexExterno,
+          p.numeroOficioExterno,
+          p.pedidoSubsidios?.numeroDocumentoDU,
+          p.pedidoSubsidios?.numeroDiex,
+          p.pedidoSubsidios?.numeroSaida,
+          p.pedidoSubsidios?.numeroRecebido,
+          p.pedidoSubsidios?.numeroDocFinal,
+          p.pedidoSubsidios?.numeroDiexExterno,
+          p.pedidoSubsidios?.numeroOficioExterno,
+          p.respostaDU?.numeroOficio,
+          p.respostaDU?.numeroOficioExterno,
+          p.respostaDU?.numeroDiex,
+          p.respostaDU?.numeroRecebido,
+          extrairNumeros(p.pedidoSubsidios?.numeroDiexHistorico, "numero"),
+          extrairNumeros(p.pedidoSubsidios?.historicoRecebidos, "numero"),
+          // Números de documentos — fluxo PA
+          p.numeroDIExRemessa,
+          p.numeroMemoriaAth,
+          p.docEnvioAth,
+          extrairNumeros(p.prorrogacoes, "doc"),
+          // Documentos expedidos/recebidos — fluxo IP
+          extrairNumeros(p.documentosIP, "descricao"),
         ];
         return camposBusca.some((campo) => normalizarTexto(campo).includes(q));
       }
@@ -970,6 +1016,15 @@ function Index() {
             })}
           </nav>
 
+          {/* Índice Mensal — movido do Dashboard para cá, logo acima do usuário */}
+          <div className="px-3 pb-2">
+            <IndiceMensalCard
+              processos={processosParaDashboard}
+              loadingProcessos={loadingProcessos}
+              statsServidor={statsServidor}
+            />
+          </div>
+
           {/* Footer com usuário (estilo AssJur) */}
           <div className="border-t border-sidebar-border p-3">
             <div className="flex items-center gap-3 px-2 py-2">
@@ -1099,22 +1154,14 @@ function Index() {
                   />
                 </div>
 
-                {/* Filtros tipo à direita - APENAS ADMIN */}
+                {/* Abas DU / PA — exclusivas da chefia (acesso a todos os processos) */}
                 {ehAdmin && (
-                  <div className="hidden sm:flex gap-1 shrink-0">
+                  <div className="hidden sm:flex gap-1 shrink-0" role="tablist" aria-label="Setor">
                     <button
-                      onClick={() => startTransition(() => setFiltroTipo("todos"))}
-                      className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
-                        filtroTipo === "todos"
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-card text-muted-foreground border-border hover:border-foreground/30"
-                      }`}
-                    >
-                      Todos
-                    </button>
-                    <button
+                      role="tab"
+                      aria-selected={filtroTipo === "DU"}
                       onClick={() => startTransition(() => setFiltroTipo("DU"))}
-                      className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
+                      className={`px-5 h-11 rounded-full text-[12px] font-bold transition-all border ${
                         filtroTipo === "DU"
                           ? "bg-[var(--tipo-du-bg)] text-[var(--tipo-du)] border-[var(--tipo-du)]/40"
                           : "bg-card text-muted-foreground border-border hover:border-foreground/30"
@@ -1123,8 +1170,10 @@ function Index() {
                       DU
                     </button>
                     <button
+                      role="tab"
+                      aria-selected={filtroTipo === "PA"}
                       onClick={() => startTransition(() => setFiltroTipo("PA"))}
-                      className={`px-4 h-11 rounded-full text-[12px] font-bold transition-all border ${
+                      className={`px-5 h-11 rounded-full text-[12px] font-bold transition-all border ${
                         filtroTipo === "PA"
                           ? "bg-[var(--tipo-pa-bg)] text-[var(--tipo-pa)] border-[var(--tipo-pa)]/40"
                           : "bg-card text-muted-foreground border-border hover:border-foreground/30"

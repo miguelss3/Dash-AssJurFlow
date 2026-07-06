@@ -4,10 +4,8 @@ import {
   Clock,
   CalendarRange,
   TrendingUp,
-  Trophy,
   CheckCircle2,
   Inbox,
-  BarChart2,
   Loader2,
   RefreshCw,
 } from "lucide-react";
@@ -42,6 +40,14 @@ function ehDoMesAtual(value: unknown, ref: Date): boolean {
   if (!d) return false;
   return d.getFullYear() === ref.getFullYear() && d.getMonth() === ref.getMonth();
 }
+
+const KPI_TONES: Record<string, { bg: string; text: string }> = {
+  blue: { bg: "bg-[oklch(0.6_0.16_230_/_0.12)]", text: "text-[oklch(0.55_0.17_230)]" },
+  green: { bg: "bg-[var(--deadline-safe-bg)]", text: "text-[var(--deadline-safe)]" },
+  purple: { bg: "bg-[var(--tipo-pa-bg)]", text: "text-[var(--tipo-pa)]" },
+  amber: { bg: "bg-[var(--deadline-today-bg)]", text: "text-[var(--deadline-today)]" },
+  red: { bg: "bg-[var(--deadline-overdue-bg)]", text: "text-[var(--deadline-overdue)]" },
+};
 
 export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos = false, statsServidor }: Props) {
   // O array `processos` agora vem HÍBRIDO do useProcessos: ATIVOS + Últimos 50
@@ -97,11 +103,6 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     [processos, mesRef],
   );
 
-  const mesNome = useMemo(
-    () => mesRef.toLocaleString("pt-BR", { month: "long", year: "numeric" }),
-    [mesRef],
-  );
-
   const resolutividadeMes = criadosMes > 0 ? Math.round((finalizadosMes / criadosMes) * 100) : 0;
 
   // ---------- Acervo Processual (total, DU, PA, Ativos, % de conclusão) ----------
@@ -141,55 +142,8 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
     <div className="space-y-4">
       {/* === HERO BANNER: Acervo Processual === */}
       <div className="grid lg:grid-cols-3 gap-4">
-        {/* Índice Mensal (esquerdo) */}
-        <div className="rounded-2xl bg-card border border-border p-3 shadow-card flex flex-col gap-2.5">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-6 w-6 rounded-md bg-[oklch(0.6_0.16_230_/_0.12)] items-center justify-center shrink-0">
-              <BarChart2 className="h-3 w-3 text-[oklch(0.55_0.17_230)]" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-[9px] uppercase tracking-wider font-bold text-foreground leading-tight">
-                Índice Mensal
-              </p>
-              <p className="text-[9px] text-muted-foreground capitalize leading-tight">
-                {mesNome}
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground font-medium">Cadastrados</span>
-              <span className="text-xs font-bold tabular-nums text-foreground">
-                {mostrarPlaceholderAtivos ? placeholder : displayCriadosMes}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-muted-foreground font-medium">Finalizados</span>
-              <span className="text-xs font-bold tabular-nums text-[var(--deadline-safe)]">
-                {mostrarPlaceholderHistorico ? placeholder : displayFinalizadosMes}
-              </span>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[11px] text-muted-foreground font-medium">Resolutividade</span>
-              <span className="text-[11px] font-bold tabular-nums text-foreground">
-                {mostrarPlaceholderCombinado ? placeholder : `${displayResolutividadeMes}%`}
-              </span>
-            </div>
-            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[oklch(0.6_0.16_230)] to-[oklch(0.78_0.18_145)] transition-all"
-                style={{ width: `${displayResolutividadeMes}%` }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Acervo Processual — JSX espelhado de Indicadores de Gestão (Estatisticas.tsx)
-            para garantir paridade visual e numérica entre as duas telas. */}
+        {/* Acervo Processual (esquerda, maior) — JSX espelhado de Indicadores de Gestão
+            (Estatisticas.tsx) para garantir paridade visual e numérica entre as duas telas. */}
         <div className="lg:col-span-2 rounded-2xl bg-gradient-to-br from-[oklch(0.22_0.05_258)] to-[oklch(0.32_0.1_245)] text-white p-3.5 sm:p-4 shadow-elegant relative overflow-hidden">
           <div className="absolute -top-20 -right-20 h-48 w-48 rounded-full bg-[oklch(0.6_0.16_230)]/30 blur-3xl pointer-events-none" />
 
@@ -242,10 +196,30 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
             </div>
           </div>
         </div>
+
+        {/* Vencidos / Vencem Hoje — versão compacta, ao lado do Acervo Processual */}
+        <div className="flex flex-col gap-3">
+          <KpiMini
+            label="Vencidos"
+            value={mostrarPlaceholderAtivos ? placeholder : displayVencidos}
+            icon={AlertTriangle}
+            tone="red"
+            active={filtro === "vencidos"}
+            onClick={() => onFiltroChange(filtro === "vencidos" ? "todos" : "vencidos")}
+          />
+          <KpiMini
+            label="Vencem Hoje"
+            value={mostrarPlaceholderAtivos ? placeholder : displayHoje}
+            icon={Clock}
+            tone="amber"
+            active={filtro === "hoje"}
+            onClick={() => onFiltroChange(filtro === "hoje" ? "todos" : "hoje")}
+          />
+        </div>
       </div>
 
       {/* === KPIs do mês === */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         <KpiCard
           label="Entradas no mês"
           value={mostrarPlaceholderAtivos ? placeholder : displayCriadosMes}
@@ -268,39 +242,10 @@ export function Dashboard({ processos, filtro, onFiltroChange, loadingProcessos 
           tone="purple"
           active={false}
         />
-        <KpiCard
-          label="Acervo Total"
-          value={mostrarPlaceholderHistorico ? placeholder : displayTotalGeral}
-          icon={Trophy}
-          tone="amber"
-          active={false}
-        />
       </div>
 
       {/* === KPIs de prazo (clicáveis para filtrar) === */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        <KpiCard
-          label="Vencidos"
-          value={mostrarPlaceholderAtivos ? placeholder : displayVencidos}
-          sub={mostrarPlaceholderAtivos
-            ? "sincronizando…"
-            : displayVencidos > 0 ? "ação imediata" : "tudo em dia"}
-          icon={AlertTriangle}
-          tone="red"
-          active={filtro === "vencidos"}
-          onClick={() => onFiltroChange(filtro === "vencidos" ? "todos" : "vencidos")}
-        />
-        <KpiCard
-          label="Vencem Hoje"
-          value={mostrarPlaceholderAtivos ? placeholder : displayHoje}
-          sub={mostrarPlaceholderAtivos
-            ? "sincronizando…"
-            : displayHoje > 0 ? "priorizar" : "sem prazos"}
-          icon={Clock}
-          tone="amber"
-          active={filtro === "hoje"}
-          onClick={() => onFiltroChange(filtro === "hoje" ? "todos" : "hoje")}
-        />
         <KpiCard
           label="Próximos 7 dias"
           value={mostrarPlaceholderAtivos ? placeholder : displaySemana}
@@ -332,14 +277,7 @@ function KpiCard({
   active: boolean;
   onClick?: () => void;
 }) {
-  const tones: Record<string, { bg: string; text: string }> = {
-    blue: { bg: "bg-[oklch(0.6_0.16_230_/_0.12)]", text: "text-[oklch(0.55_0.17_230)]" },
-    green: { bg: "bg-[var(--deadline-safe-bg)]", text: "text-[var(--deadline-safe)]" },
-    purple: { bg: "bg-[var(--tipo-pa-bg)]", text: "text-[var(--tipo-pa)]" },
-    amber: { bg: "bg-[var(--deadline-today-bg)]", text: "text-[var(--deadline-today)]" },
-    red: { bg: "bg-[var(--deadline-overdue-bg)]", text: "text-[var(--deadline-overdue)]" },
-  };
-  const t = tones[tone];
+  const t = KPI_TONES[tone];
   const Component = onClick ? "button" : "div";
 
   return (
@@ -369,6 +307,54 @@ function KpiCard({
       {sub && (
         <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>
       )}
+    </Component>
+  );
+}
+
+/**
+ * Versão compacta do KpiCard — usada ao lado do Acervo Processual para
+ * "Vencidos" e "Vencem Hoje" em escala reduzida (sem o texto `sub`).
+ */
+function KpiMini({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: ReactNode;
+  icon: typeof AlertTriangle;
+  tone: "blue" | "green" | "purple" | "amber" | "red";
+  active: boolean;
+  onClick?: () => void;
+}) {
+  const t = KPI_TONES[tone];
+  const Component = onClick ? "button" : "div";
+
+  return (
+    <Component
+      onClick={onClick}
+      className={`flex-1 text-left rounded-xl border bg-card p-2.5 transition-all shadow-card ${
+        onClick ? "hover:-translate-y-0.5 hover:shadow-card-hover cursor-pointer" : ""
+      } ${
+        active
+          ? "ring-2 ring-offset-1 ring-offset-background ring-accent border-accent"
+          : "border-border"
+      }`}
+    >
+      <div className="flex items-center gap-1.5 mb-1">
+        <span className={`inline-flex h-5 w-5 rounded-md items-center justify-center ${t.bg}`}>
+          <Icon className={`h-2.5 w-2.5 ${t.text}`} />
+        </span>
+        <p className="text-[9px] uppercase tracking-wider font-bold text-muted-foreground truncate">
+          {label}
+        </p>
+      </div>
+      <div className={`text-xl font-bold tabular-nums tracking-tight font-display ${t.text}`}>
+        {value}
+      </div>
     </Component>
   );
 }
