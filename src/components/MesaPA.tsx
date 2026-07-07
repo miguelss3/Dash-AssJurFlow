@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import type { Processo, StatusProcesso, TipoProcesso } from "@/types/processo";
+import type { Processo, StatusProcesso, TipoProcesso, FiltroPrazo } from "@/types/processo";
 import { AssessorGroup } from "./AssessorGroup";
 import { ChefeGroup } from "./ChefeGroup";
 import {
@@ -34,6 +34,7 @@ interface Props {
   unreadProcessIds?: Set<string>;
   onReadProcess?: (processoId: string) => void;
   siteSettings?: SiteSettings;
+  filtro?: FiltroPrazo;
   busca?: string;
 }
 
@@ -65,6 +66,7 @@ export function MesaPA({
   unreadProcessIds,
   onReadProcess,
   siteSettings,
+  filtro,
   busca,
 }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -262,16 +264,17 @@ export function MesaPA({
       return { emAndamento: null, portaria: null, atrasado: false };
     }
 
-    // 4. Se chegou aqui, está na mão do Encarregado (Em Andamento Real)
+    // 4. Se chegou aqui, está na mão do Encarregado (Em Andamento Real) —
+    // ou, para tipos sem coluna fixa (Investigação Preliminar/Outros), na
+    // mesa do assessor/Aguardando Distribuição. O atraso é calculado pelo
+    // prazo em ambos os casos, senão o filtro "Vencidos" nunca encontra
+    // esses processos (ficavam sempre com atrasado=false).
     let emAndamento: string | null = null;
-    let atrasado = false;
+    const prazoBase = p.prazoFatal || p.finalPrazo;
+    const atrasado = Boolean(prazoBase && diasRestantes(prazoBase) < 0);
 
     if (colunaTipo) {
       emAndamento = colunaTipo;
-      const prazoBase = p.prazoFatal || p.finalPrazo;
-      if (prazoBase && diasRestantes(prazoBase) < 0) {
-        atrasado = true;
-      }
     }
 
     return { emAndamento, portaria: null, atrasado };
@@ -319,6 +322,10 @@ export function MesaPA({
     // atuação da Assessoria Jurídica é necessária.
     const mapAssessorAtivos = new Map<string, Processo[]>();
     const mapAssessorConcluidos = new Map<string, Processo[]>();
+    // Subconjunto vencido de mapAssessorAtivos — alimenta a aba "Atrasado"
+    // da Mesa do Assessor (o item continua também em mapAssessorAtivos,
+    // que já engloba ativos+atrasados na aba "Em Andamento").
+    const mapAssessorAtrasados = new Map<string, Processo[]>();
 
     const garantirChave = (chave: string) => {
       if (!mapAtivos.has(chave)) mapAtivos.set(chave, []);
@@ -327,6 +334,7 @@ export function MesaPA({
       if (!mapConcluidos.has(chave)) mapConcluidos.set(chave, []);
       if (!mapAssessorAtivos.has(chave)) mapAssessorAtivos.set(chave, []);
       if (!mapAssessorConcluidos.has(chave)) mapAssessorConcluidos.set(chave, []);
+      if (!mapAssessorAtrasados.has(chave)) mapAssessorAtrasados.set(chave, []);
     };
 
     paColunaLabels.forEach(garantirChave);
@@ -356,6 +364,9 @@ export function MesaPA({
       if (responsavelAssessor && !bloquearMesaAssessorPA) {
         garantirChave(responsavelAssessor);
         mapAssessorAtivos.get(responsavelAssessor)!.push(p);
+        if (isPAAtrasadoPorId.get(p.id)) {
+          mapAssessorAtrasados.get(responsavelAssessor)!.push(p);
+        }
       }
 
       const colunaPortariaAssinadaPA = colunaPAPortariaAssinadaPorId.get(p.id) || null;
@@ -397,7 +408,13 @@ export function MesaPA({
         mapPortariaAssinada.get(responsavelNormalizado)!.push(p);
         return;
       }
-      if (isPAAtrasadoPorId.get(p.id)) {
+      // "Aguardando Distribuição"/"MESA DO CHEFE" só têm a aba "Em Andamento"
+      // (ver AssessorGroup — colunas de transição não exibem aba "Atrasado"),
+      // então um processo vencido ali precisa permanecer em itensAtivos ou
+      // desaparece da tela. O desvio para o bucket de atrasados só faz
+      // sentido para colunas de assessor nomeado (que têm aba própria).
+      const colunaTemAbaAtraso = Boolean(responsavelBruto);
+      if (colunaTemAbaAtraso && isPAAtrasadoPorId.get(p.id)) {
         mapAtrasados.get(responsavelNormalizado)!.push(p);
         return;
       }
@@ -441,6 +458,7 @@ export function MesaPA({
         // V6.4 — Conjunto completo por responsável para a Mesa do Assessor.
         itensAssessorAtivosTotal: mapAssessorAtivos.get(nome) || [],
         itensAssessorConcluidosTotal: mapAssessorConcluidos.get(nome) || [],
+        itensAssessorAtrasadosTotal: mapAssessorAtrasados.get(nome) || [],
       }))
       .filter(({ nome, itensAtivos, itensPortariaAssinada, itensAtrasados, itensConcluidos }) => {
         if (paColunaLabelSet.has(nome)) {
@@ -548,6 +566,7 @@ export function MesaPA({
                 unreadProcessIds={unreadProcessIds}
                 onReadProcess={onReadProcess}
                 mapaCoresAssessores={mapaCoresAssessores}
+                filtro={filtro}
               />
             ))}
           </div>
@@ -570,6 +589,7 @@ export function MesaPA({
                 unreadProcessIds={unreadProcessIds}
                 onReadProcess={onReadProcess}
                 mapaCoresAssessores={mapaCoresAssessores}
+                filtro={filtro}
               />
             )}
             {colunasPAAssessores.map((a) => (
@@ -579,7 +599,7 @@ export function MesaPA({
                 tipo="PA"
                 processos={a.itensAssessorAtivosTotal}
                 processosPortariaAssinada={[]}
-                processosAtrasados={[]}
+                processosAtrasados={a.itensAssessorAtrasadosTotal}
                 processosConcluidos={a.itensAssessorConcluidosTotal}
                 vistaAssessor
                 ehAdmin={ehAdmin}
@@ -591,6 +611,7 @@ export function MesaPA({
                 unreadProcessIds={unreadProcessIds}
                 onReadProcess={onReadProcess}
                 mapaCoresAssessores={mapaCoresAssessores}
+                filtro={filtro}
               />
             ))}
           </div>

@@ -122,6 +122,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           unreadProcessIds={unreadProcessIds}
           onReadProcess={onReadProcess}
           siteSettings={siteSettings}
+          filtro={filtro}
           busca={busca}
         />
       )}
