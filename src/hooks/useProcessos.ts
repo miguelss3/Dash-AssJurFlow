@@ -328,6 +328,17 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                 : (procData.prazoFatalDU || procData.finalPrazo || procData.prazoFatal);
               const responsavelLegado = responsaveisLegado.get(String(procData.id));
 
+              // Investigação Preliminar/Outros não têm coluna fixa de tipo em
+              // MesaPA — se caírem no fallback "criado/atualizado por" abaixo,
+              // viram uma coluna nova com o nome de quem cadastrou em vez de
+              // ficar em "Aguardando Distribuição" (mesmo comportamento do DU).
+              const tipoPANorm = String(procData.tipoPA || "")
+                .normalize("NFD")
+                .replace(/[̀-ͯ]/g, "")
+                .toLowerCase()
+                .trim();
+              const ehIPouOutrosPA = tipoPANorm === "investigacao preliminar" || tipoPANorm === "outros";
+
               const processoMapeado: Processo = {
                 id: procData.id,
                 numero: procData.numeroProcesso || procData.numero || "S/N",
@@ -335,7 +346,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                 vara: procData.vara || "N/A",
                 parteContraria: procData.parteContraria || "N/A",
                 tipoAcao: procData.assunto || procData.tipoAcao || "Sem assunto",
-                responsavel: procData.responsavel || responsavelLegado || (setorCanonico === "PA" ? (procData.criadoPorNome || procData.atualizadoPorNome || "") : ""),
+                responsavel: procData.responsavel || responsavelLegado || (setorCanonico === "PA" && !ehIPouOutrosPA ? (procData.criadoPorNome || procData.atualizadoPorNome || "") : ""),
                 prazo: procData.prazoInternoDU || procData.prazo || procData.pedidoSubsidios?.dataPrazo || procData.pedidoSubsidios?.prazoResposta,
                 prazoFatal: prazoFatalProcesso,
                 descricao: descricaoUltimoMovimento,

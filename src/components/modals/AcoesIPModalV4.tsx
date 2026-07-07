@@ -66,6 +66,17 @@ interface NotaHistorico {
   timestamp?: string;
 }
 
+// Alguns registros legados gravam `timestamp` como Firestore Timestamp em vez
+// de string ISO — normaliza para string antes de qualquer .slice()/formatação.
+const normalizarTimestamp = (valor: unknown): string => {
+  if (typeof valor === "string") return valor;
+  if (valor instanceof Timestamp) return valor.toDate().toISOString();
+  if (valor && typeof (valor as { toDate?: () => Date }).toDate === "function") {
+    return (valor as { toDate: () => Date }).toDate().toISOString();
+  }
+  return "";
+};
+
 export function AcoesIPModalV4({
   open,
   onOpenChange,
@@ -152,7 +163,7 @@ export function AcoesIPModalV4({
             id: d.id,
             autor: (v.autor as string | undefined) || "",
             texto: (v.texto as string | undefined) || "",
-            timestamp: (v.timestamp as string | undefined) || "",
+            timestamp: normalizarTimestamp(v.timestamp),
           };
         });
         setUltimasNotas(itens);
@@ -167,7 +178,7 @@ export function AcoesIPModalV4({
               id: d.id,
               autor: (v.autor as string | undefined) || "",
               texto: (v.texto as string | undefined) || "",
-              timestamp: (v.timestamp as string | undefined) || "",
+              timestamp: normalizarTimestamp(v.timestamp),
             };
           });
           setUltimasNotas(itens);

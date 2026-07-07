@@ -72,12 +72,14 @@ const AcoesIPModalV4 = lazy(() =>
 );
 
 // V5.1 — Router de modal de ações por tipoPA.
-const resolverModalPARoute = (tipoPA?: string): "PA" | "CONSELHO" | "IP" => {
+const resolverModalPARoute = (tipoPA?: string): "PA" | "CONSELHO" | "IP" | "OUTROS" => {
   const t = (tipoPA || "").trim().toLowerCase();
+  // Temporário: "Outros" reaproveita o modal/fluxo de ações do DU até termos
+  // um fluxo próprio (evita o modal de IP, que quebrava para esse tipo).
+  if (t === "outros") return "OUTROS";
   if (
     t === "investigação preliminar"
     || t === "investigacao preliminar"
-    || t === "outros"
   ) return "IP";
   if (t === "conselho de disciplina" || t === "conselho de justificação" || t === "conselho de justificacao") return "CONSELHO";
   return "PA";
@@ -641,7 +643,7 @@ function Index() {
 
   const registrarMovimentacao = async (processoId: string, texto: string) => {
     const { db } = await import("@/lib/firebase");
-    const { collection, addDoc, doc, getDoc, setDoc, Timestamp } =
+    const { collection, addDoc, doc, getDoc, setDoc } =
       await import("firebase/firestore");
 
     const agoraISO = new Date().toISOString();
@@ -653,7 +655,7 @@ function Index() {
       autor,
       autorId,
       texto,
-      timestamp: Timestamp.now(),
+      timestamp: agoraISO,
     });
 
     const mensagensRef = doc(db, "mensagens", processoId);
@@ -1306,7 +1308,8 @@ function Index() {
       {processoAcaoSelecionado && (
         <Suspense fallback={null}>
           {normalizarSetor(processoAcaoSelecionado.setor || processoAcaoSelecionado.tipo) ===
-          "DU" ? (
+          "DU" ||
+          resolverModalPARoute(processoAcaoSelecionado.tipoPA) === "OUTROS" ? (
             <AcoesDUModalNovo
               open={processoAcaoOpen}
               onOpenChange={(open) => {
