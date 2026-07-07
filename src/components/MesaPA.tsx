@@ -550,6 +550,8 @@ export function MesaPA({
                 mapaCoresAssessores={mapaCoresAssessores}
               />
             ))}
+          </div>
+          <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
             {colunaPAAguardandoDistribuicao && (
               <AssessorGroup
                 key={`PA-fixa-${colunaPAAguardandoDistribuicao.nome}`}
@@ -570,8 +572,6 @@ export function MesaPA({
                 mapaCoresAssessores={mapaCoresAssessores}
               />
             )}
-          </div>
-          <div className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
             {colunasPAAssessores.map((a) => (
               <AssessorGroup
                 key={`PA-assessor-${a.nome}`}

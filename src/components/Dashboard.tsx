@@ -330,13 +330,6 @@ export function Dashboard({ processos, filtro, onFiltroChange, setorAtivo, loadi
             />
           </>
         )}
-        <KpiCard
-          label="Índice de Resolutividade"
-          value={mostrarPlaceholderCombinado ? placeholder : `${displayResolutividadeGlobal}%`}
-          icon={TrendingUp}
-          tone="purple"
-          active={false}
-        />
         {setorAtivo === "PA" && (
           <KpiDuplo
             label="Conselhos"
@@ -346,6 +339,13 @@ export function Dashboard({ processos, filtro, onFiltroChange, setorAtivo, loadi
             tone="amber"
           />
         )}
+        <KpiCard
+          label="Índice de Resolutividade"
+          value={mostrarPlaceholderCombinado ? placeholder : `${displayResolutividadeGlobal}%`}
+          icon={TrendingUp}
+          tone="purple"
+          active={false}
+        />
         <KpiCard
           label="Próximos 7 dias"
           value={mostrarPlaceholderAtivos ? placeholder : displaySemana}

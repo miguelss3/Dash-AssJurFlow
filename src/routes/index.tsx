@@ -337,11 +337,15 @@ function Index() {
       if (filtro === "todos") return true;
       if (p.status === "concluido") return false;
 
-      // Filtros de prazo (Vencidos/Hoje/Semana) sao exclusivos do setor DU.
-      if (setorProcesso !== "DU") return false;
+      // Filtros de prazo (Vencidos/Hoje/Semana) valem para DU e PA — cada
+      // setor usa seus próprios campos de prazo secundário (mesma lógica de
+      // Dashboard.tsx/prazosRelevantes: DU = pedidoSubsidios.prazoResposta,
+      // PA = finalPrazo).
+      if (setorProcesso !== "DU" && setorProcesso !== "PA") return false;
 
+      const prazoSecundario = setorProcesso === "DU" ? p.pedidoSubsidios?.prazoResposta : p.finalPrazo;
       const sFatal = statusPrazo(p.prazoFatal);
-      const sResp = statusPrazo(p.pedidoSubsidios?.prazoResposta);
+      const sResp = statusPrazo(prazoSecundario);
 
       if (filtro === "vencidos") {
         return sFatal === "overdue" || sResp === "overdue";
