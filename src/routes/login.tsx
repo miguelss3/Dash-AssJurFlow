@@ -228,13 +228,13 @@ function LoginPage() {
 
             <div className="mt-6 text-center">
               <p className="text-xs text-muted-foreground">
-                Para acesso, utilize suas credenciais do Firebase Authentication
+                Uso Interno
               </p>
             </div>
           </div>
 
           <p className="text-center text-xs text-white/50 mt-6">
-            Sistema homologado &middot; Uso institucional &middot; v3.9
+            Sistema homologado &middot; Uso institucional &middot; v4.0
           </p>
           <p className="text-center text-[11px] text-white/30 mt-1">
             &copy; {new Date().getFullYear()} Maj Cav Miguel &mdash; AssJur Flow &middot; 12ª Região Militar
