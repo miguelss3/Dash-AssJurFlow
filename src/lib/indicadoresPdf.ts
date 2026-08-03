@@ -32,12 +32,25 @@ function isIPM(p: Processo) {
   return text.includes("ipm");
 }
 
+// Mesma prioridade usada em MesaPA/AssessorGroup para atraso: o prazo FATAL
+// é o que conta. `prazo` (interno/opcional) entrava antes aqui e podia
+// mascarar o atraso real quando os dois campos estavam preenchidos.
 function prazoReferencia(p: Processo) {
-  return p.prazo || p.finalPrazo || p.prazoFatal;
+  return p.prazoFatal || p.finalPrazo || p.prazo;
+}
+
+// Mesmo critério de conclusão usado no restante do app (MesaPA/MesaDU):
+// `p.status === "concluido"` sozinho não pega `finalizado === true` com status
+// desatualizado, nem a variante acentuada "concluído" — o que fazia um
+// processo já finalizado (mas sem o status normalizado) ser contado como
+// "em curso" ou até "atrasado" neste relatório.
+function ehConcluido(p: Processo) {
+  const statusNorm = String(p.status || "").trim().toLowerCase();
+  return p.finalizado === true || statusNorm === "concluido" || statusNorm === "concluído";
 }
 
 function isAtrasado(p: Processo) {
-  return p.status !== "concluido" && statusPrazo(prazoReferencia(p)) === "overdue";
+  return !ehConcluido(p) && statusPrazo(prazoReferencia(p)) === "overdue";
 }
 
 // Um atraso em PA acontece em uma de duas fases: o Encarregado ainda não
@@ -217,10 +230,10 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
 
   const base = processos.filter((p) => p.tipo === "PA" && matcher(p));
   const emCurso = base
-    .filter((p) => p.status !== "concluido" && !isAtrasado(p))
+    .filter((p) => !ehConcluido(p) && !isAtrasado(p))
     .sort((a, b) => diasParaOrdenacao(a) - diasParaOrdenacao(b));
   const atrasadas = base
-    .filter((p) => p.status !== "concluido" && isAtrasado(p))
+    .filter((p) => !ehConcluido(p) && isAtrasado(p))
     .sort((a, b) => diasParaOrdenacao(a) - diasParaOrdenacao(b));
   const totalAtivas = emCurso.length + atrasadas.length;
   const atrasadasEncarregado = atrasadas.filter((p) => motivoAtraso(p) === "Encarregado").length;

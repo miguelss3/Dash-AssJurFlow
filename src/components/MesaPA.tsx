@@ -351,15 +351,28 @@ export function MesaPA({
       const sitConselho = normalizarSituacao(p.situacaoFluxoConselho);
       const sitLegado = normalizarSituacao(p.situacaoFluxo);
 
+      const colunaPortariaAssinadaPA = colunaPAPortariaAssinadaPorId.get(p.id) || null;
+      const colunaEspecialPA = colunaPAEmAndamentoPorId.get(p.id) || null;
+      // V6.5 — "Bloquear Mesa do Assessor" (COM_ENCARREGADO etc.) só faz
+      // sentido quando existe uma coluna de tipo (Sindicância/IPM/Conselho)
+      // para o processo cair em seu lugar. Para Investigação Preliminar/Outros
+      // (sem coluna de tipo), bloquear aqui fazia o processo sumir do
+      // dashboard: ele era excluído da Mesa do Assessor (bloqueado) e também
+      // não aparecia em nenhuma coluna de tipo (não existe), pois a coluna do
+      // assessor nomeado só exibe o total vindo de mapAssessorAtivos/Atrasados.
+      const temColunaDeTipo = Boolean(colunaPortariaAssinadaPA || colunaEspecialPA);
+
       const bloquearMesaAssessorPA =
-        sitPA === "COM_ENCARREGADO" ||
-        sitPA === "ASSINANDO_PORTARIA" ||
-        sitPA === "AGUARDANDO_ENTREGA" ||
-        sitPA === "AGUARDANDO_PRAZO" ||
-        sitConselho === "COM_CONSELHO" ||
-        sitLegado === "EM_CURSO" ||
-        sitLegado === "C_EM_CURSO" ||
-        sitLegado === "AGUARDANDO_PRAZO";
+        temColunaDeTipo && (
+          sitPA === "COM_ENCARREGADO" ||
+          sitPA === "ASSINANDO_PORTARIA" ||
+          sitPA === "AGUARDANDO_ENTREGA" ||
+          sitPA === "AGUARDANDO_PRAZO" ||
+          sitConselho === "COM_CONSELHO" ||
+          sitLegado === "EM_CURSO" ||
+          sitLegado === "C_EM_CURSO" ||
+          sitLegado === "AGUARDANDO_PRAZO"
+        );
 
       if (responsavelAssessor && !bloquearMesaAssessorPA) {
         garantirChave(responsavelAssessor);
@@ -369,13 +382,11 @@ export function MesaPA({
         }
       }
 
-      const colunaPortariaAssinadaPA = colunaPAPortariaAssinadaPorId.get(p.id) || null;
       if (colunaPortariaAssinadaPA) {
         mapPortariaAssinada.get(colunaPortariaAssinadaPA)!.push(p);
         return;
       }
 
-      const colunaEspecialPA = colunaPAEmAndamentoPorId.get(p.id) || null;
       if (colunaEspecialPA) {
         if (isPAAtrasadoPorId.get(p.id)) {
           mapAtrasados.get(colunaEspecialPA)!.push(p);
