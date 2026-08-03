@@ -16,7 +16,9 @@
       "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; cd \"c:\\\\Dash-AssJurFlow\\\\functions\"; npm install 2>&1 | Select-Object -Last 100)",
       "Bash(firebase apps:list)",
       "Bash(firebase apps:sdkconfig WEB 1:441416018941:web:fc57211a142956f7854794)",
-      "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; cd \"c:\\\\Dash-AssJurFlow\"; npm run build 2>&1 | Select-Object -Last 40)"
+      "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; cd \"c:\\\\Dash-AssJurFlow\"; npm run build 2>&1 | Select-Object -Last 40)",
+      "Bash(firebase deploy *)",
+      "Bash(grep -iE \"\\\\.env$|serviceaccount|firebase-adminsdk|\\\\.pem$|\\\\.key$\")"
     ]
   }
 }

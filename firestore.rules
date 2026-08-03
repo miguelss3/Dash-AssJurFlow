@@ -74,6 +74,17 @@ service cloud.firestore {
         data.userEmail == authEmail();
     }
 
+    // V4.0 — Impede que o campo livre "autor" seja usado para se passar por
+    // uma autoridade (sistema/chefia/admin) enquanto o autorId real (não
+    // falsificável, preso ao uid autenticado) pertence a outra pessoa.
+    function autorTextoValido(autor) {
+      return autor is string &&
+        autor.size() > 0 &&
+        autor.size() <= 100 &&
+        (isChefePerfil() || isAdminUniversal() ||
+          !autor.lower().matches('.*(sistema|admin|chefe|administrador).*'));
+    }
+
     function canCreateProcess(data) {
       return isSignedIn() &&
         (data.setor in ['DU', 'PA']) &&
@@ -105,14 +116,20 @@ service cloud.firestore {
         allow read: if canAccessProcessById(processoId);
         allow create: if canAccessProcessById(processoId) &&
           request.resource.data.keys().hasOnly(['autor', 'autorId', 'texto', 'timestamp']) &&
-          request.resource.data.autorId == request.auth.uid;
+          request.resource.data.autorId == request.auth.uid &&
+          autorTextoValido(request.resource.data.autor);
         allow update, delete: if false;
       }
     }
     
     // Regras para a coleção de usuários
     match /usuarios/{userId} {
-      allow read:  if isSignedIn();
+      // V4.0 — Antes qualquer conta autenticada (mesmo sem vínculo real com
+      // a organização) lia a coleção inteira, expondo e-mail/telefone/cargo
+      // de todo o efetivo. Agora só quem já tem perfil próprio cadastrado
+      // (ou é chefe/admin) pode navegar pela equipe.
+      allow read: if isSignedIn() &&
+        (userId == request.auth.uid || hasUserProfileByUid() || isAdminUniversal());
       allow write: if isSignedIn() && (isAdminUniversal() || isChefePerfil());
     }
     
@@ -136,8 +153,27 @@ service cloud.firestore {
     
     match /mensagens/{mensagemId} {
       allow read: if isAdminUniversal() || canAccessProcessById(mensagemId);
-      allow create, update: if canAccessProcessById(mensagemId) &&
-        request.resource.data.keys().hasOnly(['historico']);
+
+      // V4.0 — Antes só o nome do campo era validado: qualquer pessoa com
+      // acesso ao processo podia mandar historico:[] e apagar o histórico
+      // inteiro, ou reescrever mensagens antigas. Agora é obrigatório
+      // "append-only": o novo array precisa conter todo o array antigo
+      // intacto, crescer em exatamente 1 item, e o item novo precisa estar
+      // autenticado como o autor real (autorId == uid), não falsificável.
+      allow create: if canAccessProcessById(mensagemId) &&
+        request.resource.data.keys().hasOnly(['historico']) &&
+        request.resource.data.historico is list &&
+        request.resource.data.historico.size() == 1 &&
+        request.resource.data.historico[0].autorId == request.auth.uid;
+
+      allow update: if canAccessProcessById(mensagemId) &&
+        request.resource.data.keys().hasOnly(['historico']) &&
+        request.resource.data.historico is list &&
+        resource.data.historico is list &&
+        request.resource.data.historico.size() == resource.data.historico.size() + 1 &&
+        request.resource.data.historico.hasAll(resource.data.historico) &&
+        request.resource.data.historico[resource.data.historico.size()].autorId == request.auth.uid;
+
       allow delete: if false;
     }
 
