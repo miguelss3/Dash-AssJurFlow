@@ -26,7 +26,13 @@
       "Bash(curl -sI \"https://assjur-flow-12rm.web.app/\")",
       "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; cd \"c:\\\\Dash-AssJurFlow\"; npm run build 2>&1 | Select-Object -Last 60)",
       "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" \"https://assjur-flow-12rm.web.app/\")",
-      "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; cd \"c:\\\\Dash-AssJurFlow\"; npm run build 2>&1 | Select-Object -Last 15)"
+      "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; cd \"c:\\\\Dash-AssJurFlow\"; npm run build 2>&1 | Select-Object -Last 15)",
+      "Bash(npm view *)",
+      "Bash(mkdir -p \"/c/Users/ADJSFP~1/AppData/Local/Temp/claude/c--Dash-AssJurFlow/8f569d7b-35a9-4f14-94fc-606e0f99a854/scratchpad/ff-test\")",
+      "Read(//c/Users/ADJSFP~1/AppData/Local/Temp/claude/c--Dash-AssJurFlow/8f569d7b-35a9-4f14-94fc-606e0f99a854/scratchpad/**)",
+      "Bash(npm init *)",
+      "PowerShell($dir = \"$env:TEMP\\\\claude-ff-test\"; New-Item -ItemType Directory -Force -Path $dir | Out-Null; Set-Location $dir; npm init -y | Out-Null; npm install firebase-functions@latest --silent 2>&1 | Select-Object -Last 20)",
+      "PowerShell($dir = \"$env:TEMP\\\\claude-ff-test\"; Test-Path \"$dir\\\\node_modules\\\\firebase-functions\\\\package.json\"; if \\(Test-Path \"$dir\\\\node_modules\\\\firebase-functions\\\\package.json\"\\) { \\(Get-Content \"$dir\\\\node_modules\\\\firebase-functions\\\\package.json\" -Raw | ConvertFrom-Json\\).version })"
     ]
   }
 }

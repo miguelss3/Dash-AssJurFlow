@@ -1,5 +1,8 @@
 const admin = require("firebase-admin");
-const functions = require("firebase-functions");
+// A partir do firebase-functions v6, o pacote raiz passou a exportar a API
+// v2 por padrão; `.region().https.onRequest(...)` (estilo 1ª geração usado
+// aqui) precisa vir explicitamente do subpath /v1.
+const functions = require("firebase-functions/v1");
 
 admin.initializeApp();
 
