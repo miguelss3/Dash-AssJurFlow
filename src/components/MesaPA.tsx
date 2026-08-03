@@ -233,10 +233,17 @@ export function MesaPA({
 
     // 2. Verifica se está fechado
     const stNorm = String(p.status || "").trim().toLowerCase();
+    // V6.6 — Processos reabertos (processoReaberto=true) podem manter um
+    // situacaoFluxoPA/Conselho/IP="FINALIZADO" residual de antes da reabertura,
+    // enquanto `finalizado`/`status` já foram corretamente atualizados para
+    // ativo. Sem esta guarda, o processo some do dash (fica com
+    // emAndamento=null, portaria=null, atrasado=false) mesmo estando ativo e
+    // vencido — foi o que aconteceu com a Portaria 14/2026.
     const finalizadoNovo =
-      situacaoPA === "FINALIZADO" ||
-      situacaoConselho === "FINALIZADO" ||
-      situacaoIP === "FINALIZADO" ||
+      (!p.processoReaberto &&
+        (situacaoPA === "FINALIZADO" ||
+          situacaoConselho === "FINALIZADO" ||
+          situacaoIP === "FINALIZADO")) ||
       p.finalizado === true ||
       stNorm === "concluido" ||
       stNorm === "concluído";
