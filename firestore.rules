@@ -130,7 +130,11 @@ service cloud.firestore {
       // (ou é chefe/admin) pode navegar pela equipe.
       allow read: if isSignedIn() &&
         (userId == request.auth.uid || hasUserProfileByUid() || isAdminUniversal());
-      allow write: if isSignedIn() && (isAdminUniversal() || isChefePerfil());
+      // V4.0 — Fecha o problema 1: só o Admin Universal (miguelss3@yahoo.com.br)
+      // cadastra, exclui ou atribui a função de Admin/Chefe a outros usuários.
+      // Antes, qualquer chefe podia escrever em QUALQUER perfil — inclusive
+      // promovendo a si mesmo (ou a um cúmplice) a Admin Universal.
+      allow write: if isSignedIn() && isAdminUniversal();
     }
     
     // Regras para a coleção de distribuições

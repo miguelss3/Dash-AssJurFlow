@@ -131,6 +131,19 @@ export function isAdmin(user: AuthUser | null): boolean {
   return false;
 }
 
+/**
+ * Verifica se o usuário é o Admin Universal (miguelss3@yahoo.com.br) —
+ * distinto de `isAdmin`, que também inclui chefes. Gerenciamento de contas
+ * (criar/excluir usuários, atribuir função de Admin) e Ajustes do Site são
+ * exclusivos do Admin Universal; chefes têm a mesma visão operacional, mas
+ * não essas duas funcionalidades.
+ */
+export function isAdminUniversal(user: AuthUser | null): boolean {
+  if (!user) return false;
+  const emailNormalizado = user.email?.trim().toLowerCase();
+  return !!emailNormalizado && EMAILS_ADMIN_UNIVERSAL.has(emailNormalizado);
+}
+
 // sessionStorage (não localStorage): o cache do perfil expira junto com a sessão
 // do navegador, alinhado à persistência do Firebase Auth (browserSessionPersistence
 // em src/lib/firebase.ts). Evita que dados pessoais (nome, e-mail, telefone, cargo)

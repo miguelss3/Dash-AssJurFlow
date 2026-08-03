@@ -7,7 +7,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
 import { Pencil, Trash2, UserPlus } from "lucide-react";
-import { useAuth, type AuthUser } from "@/hooks/useAuth";
+import { useAuth, isAdminUniversal, type AuthUser } from "@/hooks/useAuth";
 import { nomeMilitarUsuario } from "@/lib/userProfiles";
 
 const PALETA_CORES = [
@@ -54,6 +54,10 @@ interface Usuario extends AuthUser {
 
 export function GestaoEquipe() {
   const { user: usuarioLogado } = useAuth();
+  // Cadastrar/excluir usuários e atribuir a função de Admin/Chefe é
+  // exclusivo do Admin Universal — chefes "comuns" têm a mesma visão da
+  // equipe, mas sem esta funcionalidade de gestão de contas.
+  const souAdminUniversal = isAdminUniversal(usuarioLogado);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -334,8 +338,9 @@ export function GestaoEquipe() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-3 gap-8">
-      {/* FORMULÁRIO */}
+    <div className={`max-w-7xl mx-auto grid grid-cols-1 gap-8 ${souAdminUniversal ? "xl:grid-cols-3" : ""}`}>
+      {/* FORMULÁRIO — exclusivo do Admin Universal */}
+      {souAdminUniversal && (
       <Card className="xl:col-span-1 p-6 shadow-lg h-fit xl:sticky xl:top-6">
         <div className="mb-4">
           <h3 className="font-extrabold text-lg text-foreground">
@@ -422,9 +427,10 @@ export function GestaoEquipe() {
           {editando && <Button type="button" variant="outline" onClick={resetarForm} className="w-full">Cancelar</Button>}
         </form>
       </Card>
+      )}
 
       {/* LISTAGEM BLINDADA CONTRA QUEDAS */}
-      <div className="xl:col-span-2 space-y-4">
+      <div className={souAdminUniversal ? "xl:col-span-2 space-y-4" : "space-y-4"}>
         <div className="mb-4">
           <h3 className="font-bold text-lg text-foreground">Integrantes Cadastrados ({usuarios.length})</h3>
           <p className="text-xs text-muted-foreground mt-1">Membros com permissões ativas no sistema.</p>
@@ -467,10 +473,12 @@ export function GestaoEquipe() {
                     </p>
                     <p className="text-sm text-muted-foreground mt-1">{usuario.email}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => editarUsuario(usuario)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button size="sm" variant="destructive" onClick={() => removerUsuario(usuario)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                  </div>
+                  {souAdminUniversal && (
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => editarUsuario(usuario)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="sm" variant="destructive" onClick={() => removerUsuario(usuario)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div>
+                  )}
                 </div>
               </Card>
             ))}

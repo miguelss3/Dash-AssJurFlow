@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useState, useTransition } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SoldierAvatar } from "@/components/SoldierAvatar";
-import { useAuth, isAdmin } from "@/hooks/useAuth";
+import { useAuth, isAdmin, isAdminUniversal } from "@/hooks/useAuth";
 import {
   Scale,
   Plus,
@@ -232,6 +232,7 @@ function Index() {
   // Usuário logado (sem fallback fixo para evitar flicker visual no reload)
   const usuario = user ?? { posto: "", nome: "", role: "", setor: "" };
   const ehAdmin = isAdmin(user);
+  const ehAdminUniversal = isAdminUniversal(user);
   // Cast para Record permite ler campos legados (`secao`, `cargo`) sem quebrar o tipo AuthUser.
   const usuarioLegado = usuario as Record<string, unknown>;
   const setorUsuario = normalizarSetor(
@@ -910,7 +911,7 @@ function Index() {
   const navSec: { id: Aba; label: string; icon: typeof LayoutGrid }[] = [
     { id: "prazos", label: "Controle de Prazos", icon: Calendar },
     { id: "equipe", label: "Gestão da Equipe", icon: Users },
-    ...(ehAdmin ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
+    ...(ehAdminUniversal ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
   ];
 
   // Tabs principais (estilo AssJur)
@@ -930,11 +931,17 @@ function Index() {
   const tabs = ehAdmin ? tabsCompletas : tabsAssessor;
 
   useEffect(() => {
+    // "Ajustes do Site" é exclusivo do Admin Universal — chefes têm a mesma
+    // visão operacional, mas não esta funcionalidade.
+    if (aba === "ajustes" && !ehAdminUniversal) {
+      setAba("mesa");
+      return;
+    }
     // Permite aba 'prazos', 'ajustes' e 'equipe' mesmo que não estejam em tabs
     if (aba !== "prazos" && aba !== "ajustes" && aba !== "equipe" && !tabs.some((t) => t.id === aba)) {
       setAba("mesa");
     }
-  }, [tabs, aba]);
+  }, [tabs, aba, ehAdminUniversal]);
 
   // Renderiza tela de carregamento enquanto a sessão não foi sincronizada
   if (!ready && !user) {
@@ -1258,7 +1265,7 @@ function Index() {
             </Suspense>
           )}
 
-          {aba === "ajustes" && ehAdmin && (
+          {aba === "ajustes" && ehAdminUniversal && (
             <Suspense fallback={<TabLoading label="Carregando ajustes do site..." />}>
               <AjustesSite
                 settings={siteSettings}

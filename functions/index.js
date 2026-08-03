@@ -25,31 +25,15 @@ function setCorsHeaders(req, res) {
   res.set("Vary", "Origin");
 }
 
-function normalizeText(value) {
-  return String(value || "").trim().toUpperCase();
-}
-
-function parseBooleanLike(value) {
-  if (value === true) return true;
-  const normalized = normalizeText(value);
-  return normalized === "SIM" || normalized === "TRUE" || normalized === "1";
-}
-
+// V4.0 — Criar/excluir contas é exclusivo do Admin Universal. Antes, qualquer
+// perfil "chefe" (isChefe/role/cargo/setor) também passava aqui — o que,
+// combinado com a antiga regra do Firestore que deixava qualquer chefe
+// escrever em qualquer perfil `usuarios`, permitia que uma conta de chefe
+// comprometida se auto-promovesse a Admin Universal. `profile` é mantido no
+// parâmetro só para constar no log de acesso negado.
 function profileIndicatesAdmin(profile, email) {
-  if (email && ADMIN_EMAILS.has(String(email).trim().toLowerCase())) return true;
-  if (!profile) return false;
-
-  const role = normalizeText(profile.role);
-  const cargo = normalizeText(profile.cargo);
-  const setor = normalizeText(profile.setor);
-
-  return (
-    parseBooleanLike(profile.isChefe) ||
-    role.includes("CHEFE") ||
-    cargo.includes("CHEFE") ||
-    cargo === "ADMIN UNIVERSAL" ||
-    setor === "CHEFE ASSEAPASSJUR"
-  );
+  void profile;
+  return !!(email && ADMIN_EMAILS.has(String(email).trim().toLowerCase()));
 }
 
 async function loadCallerProfile(uid, email) {

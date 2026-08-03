@@ -23,7 +23,9 @@
       "Bash(gcloud config *)",
       "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('firebase.json','utf8'\\)\\); console.log\\('firebase.json OK'\\)\")",
       "Bash(\"/c/Program Files/nodejs/node.exe\" -c functions/index.js)",
-      "Bash(curl -sI \"https://assjur-flow-12rm.web.app/\")"
+      "Bash(curl -sI \"https://assjur-flow-12rm.web.app/\")",
+      "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; cd \"c:\\\\Dash-AssJurFlow\"; npm run build 2>&1 | Select-Object -Last 60)",
+      "Bash(curl -s -o /dev/null -w \"status=%{http_code}\\\\n\" \"https://assjur-flow-12rm.web.app/\")"
     ]
   }
 }
