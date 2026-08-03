@@ -406,6 +406,22 @@ exports.geminiChat = functions.region("us-central1").https.onRequest(async (req,
     }
 
     const uid = decodedToken.uid;
+    const callerEmail = String(decodedToken.email || "").trim().toLowerCase();
+
+    // V4.0 — exige perfil real cadastrado em `usuarios`, não apenas uma conta
+    // autenticada qualquer. Sem isso, uma leva de contas auto-cadastradas no
+    // Firebase Auth (fora do fluxo oficial de criação via admin) poderia criar
+    // uma conta por chamada e multiplicar o limite de 20 perguntas/dia por uid.
+    let callerProfile = null;
+    try {
+      callerProfile = await loadCallerProfile(uid, callerEmail);
+    } catch (e) {
+      console.error("loadCallerProfile failed:", e.message);
+    }
+    if (!callerProfile) {
+      res.status(403).json({ error: "permission-denied", message: "Perfil não cadastrado no sistema." });
+      return;
+    }
 
     // Rate limiting: 20 perguntas por dia por usuário
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD

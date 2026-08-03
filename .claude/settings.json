@@ -18,7 +18,12 @@
       "Bash(firebase apps:sdkconfig WEB 1:441416018941:web:fc57211a142956f7854794)",
       "PowerShell($env:Path = \"C:\\\\Program Files\\\\nodejs;\" + $env:Path; cd \"c:\\\\Dash-AssJurFlow\"; npm run build 2>&1 | Select-Object -Last 40)",
       "Bash(firebase deploy *)",
-      "Bash(grep -iE \"\\\\.env$|serviceaccount|firebase-adminsdk|\\\\.pem$|\\\\.key$\")"
+      "Bash(grep -iE \"\\\\.env$|serviceaccount|firebase-adminsdk|\\\\.pem$|\\\\.key$\")",
+      "Bash(gcloud --version)",
+      "Bash(gcloud config *)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('firebase.json','utf8'\\)\\); console.log\\('firebase.json OK'\\)\")",
+      "Bash(\"/c/Program Files/nodejs/node.exe\" -c functions/index.js)",
+      "Bash(curl -sI \"https://assjur-flow-12rm.web.app/\")"
     ]
   }
 }

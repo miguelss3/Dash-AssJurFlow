@@ -179,7 +179,10 @@ service cloud.firestore {
 
     // Regras do Calendário (Blindado mas flexível)
     match /eventosCalendario/{eventoId} {
-      allow read: if isSignedIn();
+      // V4.0 — restringe a leitura a efetivo real cadastrado (impede que uma
+      // conta autenticada "de fora" (ex.: auto-cadastro no Firebase Auth sem
+      // vínculo com a organização) veja prazos/agenda de todos os processos.
+      allow read: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
       allow create: if isSignedIn() &&
         request.resource.data.setor in ['DU', 'PA'] &&
         canManageSetor(request.resource.data.setor);
@@ -192,7 +195,9 @@ service cloud.firestore {
     }
 
     match /configuracoesSistema/{configId} {
-      allow read: if isSignedIn();
+      // V4.0 — mesma restrição: só efetivo real cadastrado enxerga as
+      // configurações do sistema.
+      allow read: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
       allow create, update: if isSignedIn() &&
         isAdminUniversal() &&
         configId == 'layoutPrincipal' &&
