@@ -116,14 +116,12 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
   };
 
   const processosAtivosOrdenados = useMemo(() => {
-    if (tipo !== "PA") return processos;
     return ordenarPorPrazo(processos);
-  }, [processos, tipo]);
+  }, [processos]);
 
   const processosAtrasadosOrdenados = useMemo(() => {
-    if (tipo !== "PA") return processosAtrasados;
     return ordenarPorPrazo(processosAtrasados);
-  }, [processosAtrasados, tipo]);
+  }, [processosAtrasados]);
 
   const processosDaAba = aba === "portaria_assinada"
     ? processosPortariaAssinada
