@@ -394,7 +394,7 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
 
             <div className="space-y-2">
               <Label htmlFor="parte" className="uppercase text-xs font-semibold">Parte / Interessado</Label>
-              <Input id="parte" value={parte} onChange={(e) => setParte(e.target.value)} placeholder="Nome" />
+              <Input id="parte" value={parte} onChange={(e) => setParte(e.target.value.toUpperCase())} placeholder="Nome" className="uppercase" />
             </div>
           </div>
 

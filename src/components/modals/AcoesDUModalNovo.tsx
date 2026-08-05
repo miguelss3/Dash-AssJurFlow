@@ -522,12 +522,16 @@ export function AcoesDUModalNovo({
     switch (situacaoFluxo) {
       case "MESA_ASSESSOR": {
         const ehReiteracao = acaoPrincipal === "DILIGENCIA" && isReiteracao;
+        // V3.10 — Se o assessor já definiu o prazo ao despachar, a flag
+        // possuiPrazoDU precisa ir junto com o mesmo valor "true". Sem isso,
+        // o Firestore ficava com dataPrazo preenchido mas possuiPrazoDU=false,
+        // e a Chefia via o toggle em "Não" mesmo com o prazo já definido.
+        const temPrazoInformado = acaoPrincipal === "DILIGENCIA" && Boolean(dataPrazo.trim());
         void avancarFluxo("CHEFIA_DILIGENCIA", {
           assinaturaDestino,
           acaoPrincipal,
-          ...(acaoPrincipal === "DILIGENCIA" && dataPrazo.trim()
-            ? { dataPrazo: dataPrazo.trim() }
-            : {}),
+          possuiPrazoDU: temPrazoInformado,
+          ...(temPrazoInformado ? { dataPrazo: dataPrazo.trim() } : {}),
           ...(ehReiteracao ? { reiteracoesIncrement: 1 } : {}),
           descricaoOverride: ehReiteracao
             ? "Reiteração de Pedido de Subsídios despachada para a Chefia."
