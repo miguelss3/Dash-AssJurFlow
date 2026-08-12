@@ -18,6 +18,7 @@ import {
   Plus,
   ArrowUpRight,
   ArrowDownLeft,
+  Copy,
   type LucideIcon,
 } from "lucide-react";
 import { formatarData, diasRestantes } from "@/lib/prazo";
@@ -73,14 +74,47 @@ function mapearHistoricoParaForm(
   });
 }
 
+// Extrai o número de um item do histórico de enviados (string legada ou objeto).
+function numeroDoItemHistorico(
+  item: string | { numero?: string; nomeDocumento?: string } | undefined,
+): string {
+  if (!item) return "";
+  return typeof item === "string" ? item : item.numero || item.nomeDocumento || "";
+}
+
+// Monta a lista de números enviados a partir do processo salvo (não do rascunho
+// em edição) — usada para montar o texto copiado para a área de transferência.
+function construirListaEnviados(processo: Processo): string[] {
+  const historico = processo.pedidoSubsidios?.numeroDiexHistorico || [];
+  return historico.map(numeroDoItemHistorico).filter((s) => s.trim().length > 0);
+}
+
+// Monta a lista de números recebidos a partir do processo salvo, com o mesmo
+// fallback para o campo legado usado na inicialização do editor.
+function construirListaRecebidos(processo: Processo): string[] {
+  const historicoRec = processo.pedidoSubsidios?.historicoRecebidos;
+  if (Array.isArray(historicoRec) && historicoRec.length > 0) {
+    return historicoRec.map((r) => r.numero || "").filter((s) => s.trim().length > 0);
+  }
+  const numLegado =
+    processo.respostaDU?.numeroOficioExterno
+    || processo.respostaDU?.numeroDiex
+    || processo.respostaDU?.numeroOficio
+    || processo.pedidoSubsidios?.numeroRecebido
+    || "";
+  return numLegado ? [numLegado] : [];
+}
+
 export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalDUProps) {
   const [editandoPrazosDU, setEditandoPrazosDU] = useState(false);
   const [savingPrazosDU, setSavingPrazosDU] = useState(false);
   const [prazoInternoEdit, setPrazoInternoEdit] = useState("");
   const [prazoFatalEdit, setPrazoFatalEdit] = useState("");
   const [prazoRespostaEdit, setPrazoRespostaEdit] = useState("");
-  const [editandoDocs, setEditandoDocs] = useState(false);
-  const [savingDocs, setSavingDocs] = useState(false);
+  const [editandoEnviados, setEditandoEnviados] = useState(false);
+  const [savingEnviados, setSavingEnviados] = useState(false);
+  const [editandoRecebidos, setEditandoRecebidos] = useState(false);
+  const [savingRecebidos, setSavingRecebidos] = useState(false);
   const [historicoEdit, setHistoricoEdit] = useState<
     Array<{ numero: string; dataEnvio: string; prazo: string }>
   >([]);
@@ -110,7 +144,8 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
       const dataLegado = processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "";
       setRecebidosEdit(numLegado ? [{ numero: numLegado, dataRecebimento: dataSomente(dataLegado) }] : []);
     }
-    setEditandoDocs(false);
+    setEditandoEnviados(false);
+    setEditandoRecebidos(false);
   }, [open, processo]);
 
   if (!processo) return null;
@@ -163,9 +198,9 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     }
   };
 
-  const handleSalvarDocs = async () => {
+  const handleSalvarEnviados = async () => {
     try {
-      setSavingDocs(true);
+      setSavingEnviados(true);
 
       // Normaliza o histórico: descarta itens vazios. dataEnvio já é uma data
       // civil (YYYY-MM-DD), sem conversão para ISO — evita o bug de fuso
@@ -193,12 +228,43 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
       });
       if (duplicadoEnvio) {
         toast.error(`O documento "${duplicadoEnvio.numero}" já está na lista de Enviados. Remova a repetição antes de salvar.`);
-        setSavingDocs(false);
+        setSavingEnviados(false);
         return;
       }
 
       const ultimoEnviado =
         historicoLimpo.length > 0 ? historicoLimpo[historicoLimpo.length - 1].numero : "";
+
+      // Um DIEx da Assessoria não pode ser também um recebimento da Unidade —
+      // compara contra o que já está salvo em Recebidos (não o rascunho, que
+      // pode não estar em edição neste momento).
+      const recebidoAtual = construirListaRecebidos(processo)[0] || "";
+      if (ultimoEnviado && recebidoAtual && ultimoEnviado === recebidoAtual) {
+        toast.error(`O número "${ultimoEnviado}" já está cadastrado como Recebido. Ajuste a lista de Recebidos antes de salvar.`);
+        setSavingEnviados(false);
+        return;
+      }
+
+      const processoRef = doc(db, "processos", processo.id);
+      await updateDoc(processoRef, sanitizarPatch({
+        "pedidoSubsidios.numeroDocumentoDU": ultimoEnviado,
+        "pedidoSubsidios.numeroDiex": ultimoEnviado,
+        "pedidoSubsidios.numeroDiexHistorico": historicoLimpo,
+        atualizadoEm: new Date().toISOString(),
+      }));
+      setEditandoEnviados(false);
+      toast.success("Documentos enviados atualizados com sucesso.");
+    } catch (error) {
+      console.error("Erro ao atualizar documentos enviados DU:", error);
+      toast.error("Não foi possível salvar os documentos enviados.");
+    } finally {
+      setSavingEnviados(false);
+    }
+  };
+
+  const handleSalvarRecebidos = async () => {
+    try {
+      setSavingRecebidos(true);
 
       // Limpa e valida a lista de recebidos
       const recebidosLimpos = recebidosEdit
@@ -218,36 +284,26 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
       });
       if (duplicadoRecebido) {
         toast.error(`O documento "${duplicadoRecebido.numero}" já está na lista de Recebidos. Remova a repetição antes de salvar.`);
-        setSavingDocs(false);
+        setSavingRecebidos(false);
         return;
       }
 
       // Mantém o primeiro item como campo legado para compatibilidade
       const primarioRecebido = recebidosLimpos[0] ?? { numero: "", dataRecebimento: "" };
-      let recebido = primarioRecebido.numero;
+      const recebido = primarioRecebido.numero;
       const recebidoData = primarioRecebido.dataRecebimento;
 
-      if (ultimoEnviado && recebido && ultimoEnviado === recebido) {
-        const confirmar = typeof window !== "undefined"
-          ? window.confirm(
-              "O número informado em 'Recebido' é igual ao último 'Enviado'. "
-                + "Um DIEx da Assessoria não pode ser também um recebimento da Unidade. "
-                + "Deseja limpar o campo 'Recebido'?",
-            )
-          : true;
-        if (!confirmar) {
-          setSavingDocs(false);
-          return;
-        }
-        recebido = "";
-        setRecebidosEdit([]);
+      // Um DIEx da Assessoria não pode ser também um recebimento da Unidade —
+      // compara contra o que já está salvo em Enviados.
+      const ultimoEnviadoAtual = construirListaEnviados(processo).slice(-1)[0] || "";
+      if (recebido && ultimoEnviadoAtual && recebido === ultimoEnviadoAtual) {
+        toast.error(`O número "${recebido}" já está cadastrado como Enviado. Ajuste a lista de Enviados antes de salvar.`);
+        setSavingRecebidos(false);
+        return;
       }
 
       const processoRef = doc(db, "processos", processo.id);
       await updateDoc(processoRef, sanitizarPatch({
-        "pedidoSubsidios.numeroDocumentoDU": ultimoEnviado,
-        "pedidoSubsidios.numeroDiex": ultimoEnviado,
-        "pedidoSubsidios.numeroDiexHistorico": historicoLimpo,
         "pedidoSubsidios.historicoRecebidos": recebidosLimpos.length > 0 ? recebidosLimpos : null,
         "respostaDU.numeroDiex": recebido,
         "respostaDU.numeroOficioExterno": recebido,
@@ -255,13 +311,32 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
         "respostaDU.registradoEm": recebido ? (recebidoData || null) : null,
         atualizadoEm: new Date().toISOString(),
       }));
-      setEditandoDocs(false);
-      toast.success("Documentos atualizados com sucesso.");
+      setEditandoRecebidos(false);
+      toast.success("Documentos recebidos atualizados com sucesso.");
     } catch (error) {
-      console.error("Erro ao atualizar documentos DU:", error);
-      toast.error("Não foi possível salvar os documentos.");
+      console.error("Erro ao atualizar documentos recebidos DU:", error);
+      toast.error("Não foi possível salvar os documentos recebidos.");
     } finally {
-      setSavingDocs(false);
+      setSavingRecebidos(false);
+    }
+  };
+
+  const handleCopiarDocumentos = async () => {
+    const enviados = construirListaEnviados(processo);
+    const recebidos = construirListaRecebidos(processo);
+    const linhas = [
+      "Documentos relacionados:",
+      "Enviado:",
+      ...enviados.map((d) => `- ${d}`),
+      "Recebidos:",
+      ...recebidos.map((d) => `- ${d}`),
+    ];
+    try {
+      await navigator.clipboard.writeText(linhas.join("\n"));
+      toast.success("Documentos copiados para a área de transferência.");
+    } catch (error) {
+      console.error("Erro ao copiar documentos DU:", error);
+      toast.error("Não foi possível copiar os documentos.");
     }
   };
 
@@ -381,47 +456,9 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-2">
                 <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Documentos</h4>
-                <div className="flex items-center gap-2">
-                  {editandoDocs ? (
-                    <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditandoDocs(false);
-                          setHistoricoEdit(
-                            mapearHistoricoParaForm(processo.pedidoSubsidios?.numeroDiexHistorico),
-                          );
-                          // Reinicializa lista de recebidos (mesma lógica do useEffect)
-                          const historicoRec = processo.pedidoSubsidios?.historicoRecebidos;
-                          if (Array.isArray(historicoRec) && historicoRec.length > 0) {
-                            setRecebidosEdit(historicoRec.map((r) => ({ numero: r.numero || "", dataRecebimento: dataSomente(r.dataRecebimento) })));
-                          } else {
-                            const numLegado =
-                              processo.respostaDU?.numeroOficioExterno
-                              || processo.respostaDU?.numeroDiex
-                              || processo.respostaDU?.numeroOficio
-                              || processo.pedidoSubsidios?.numeroRecebido
-                              || "";
-                            const dataLegado = processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "";
-                            setRecebidosEdit(numLegado ? [{ numero: numLegado, dataRecebimento: dataSomente(dataLegado) }] : []);
-                          }
-                        }}
-                        disabled={savingDocs}
-                      >
-                        <X className="w-3.5 h-3.5 mr-1" /> Cancelar
-                      </Button>
-                      <Button type="button" size="sm" onClick={handleSalvarDocs} disabled={savingDocs}>
-                        <Save className="w-3.5 h-3.5 mr-1" /> {savingDocs ? "Salvando..." : "Salvar"}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button type="button" size="sm" variant="outline" onClick={() => setEditandoDocs(true)}>
-                      <Pencil className="w-3.5 h-3.5 mr-1" /> Editar documentos
-                    </Button>
-                  )}
-                </div>
+                <Button type="button" size="sm" variant="outline" onClick={handleCopiarDocumentos}>
+                  <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
+                </Button>
               </div>
 
               {(() => {
@@ -449,12 +486,42 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                   <>
                     {/* ENVIADOS — um card por documento do histórico */}
                     <div>
-                      <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
-                        <ArrowUpRight className="w-4 h-4 text-sky-500" />
-                        Enviados (Histórico)
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold">
+                          <ArrowUpRight className="w-4 h-4 text-sky-500" />
+                          Enviados (Histórico)
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {editandoEnviados ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-[11px]"
+                                onClick={() => {
+                                  setEditandoEnviados(false);
+                                  setHistoricoEdit(
+                                    mapearHistoricoParaForm(processo.pedidoSubsidios?.numeroDiexHistorico),
+                                  );
+                                }}
+                                disabled={savingEnviados}
+                              >
+                                <X className="w-3 h-3 mr-1" /> Cancelar
+                              </Button>
+                              <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={handleSalvarEnviados} disabled={savingEnviados}>
+                                <Save className="w-3 h-3 mr-1" /> {savingEnviados ? "Salvando..." : "Salvar"}
+                              </Button>
+                            </>
+                          ) : (
+                            <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setEditandoEnviados(true)}>
+                              <Pencil className="w-3 h-3 mr-1" /> Editar
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
-                      {editandoDocs ? (
+                      {editandoEnviados ? (
                         <div className="space-y-3 mt-2">
                           {historicoEdit.length === 0 && (
                             <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
@@ -573,11 +640,51 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
 
                     {/* RECEBIDO */}
                     <div className="mt-4">
-                      <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
-                        <ArrowDownLeft className="w-4 h-4 text-sky-500" />
-                        Recebidos (Histórico)
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold">
+                          <ArrowDownLeft className="w-4 h-4 text-sky-500" />
+                          Recebidos (Histórico)
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {editandoRecebidos ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-[11px]"
+                                onClick={() => {
+                                  setEditandoRecebidos(false);
+                                  const historicoRec = processo.pedidoSubsidios?.historicoRecebidos;
+                                  if (Array.isArray(historicoRec) && historicoRec.length > 0) {
+                                    setRecebidosEdit(historicoRec.map((r) => ({ numero: r.numero || "", dataRecebimento: dataSomente(r.dataRecebimento) })));
+                                  } else {
+                                    const numLegado =
+                                      processo.respostaDU?.numeroOficioExterno
+                                      || processo.respostaDU?.numeroDiex
+                                      || processo.respostaDU?.numeroOficio
+                                      || processo.pedidoSubsidios?.numeroRecebido
+                                      || "";
+                                    const dataLegado = processo.respostaDU?.registradoEm || processo.pedidoSubsidios?.dataRecebido || "";
+                                    setRecebidosEdit(numLegado ? [{ numero: numLegado, dataRecebimento: dataSomente(dataLegado) }] : []);
+                                  }
+                                }}
+                                disabled={savingRecebidos}
+                              >
+                                <X className="w-3 h-3 mr-1" /> Cancelar
+                              </Button>
+                              <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={handleSalvarRecebidos} disabled={savingRecebidos}>
+                                <Save className="w-3 h-3 mr-1" /> {savingRecebidos ? "Salvando..." : "Salvar"}
+                              </Button>
+                            </>
+                          ) : (
+                            <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setEditandoRecebidos(true)}>
+                              <Pencil className="w-3 h-3 mr-1" /> Editar
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      {editandoDocs ? (
+                      {editandoRecebidos ? (
                         <div className="space-y-3 mt-2">
                           {recebidosEdit.length === 0 && (
                             <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
