@@ -111,9 +111,12 @@ export function Estatisticas({ processos, loadingProcessos = false, statsServido
     toast.success("PDF de IPM gerado.");
   };
 
+  // "Audiência" e "Recurso" são estados legados de um fluxo que não existe
+  // na rotina da assessoria (só DU/PA) — nunca são atribuídos a um processo
+  // aqui, então ficam fora deste gráfico para não poluir a legenda.
   const dadosStatus = useMemo(
     () =>
-      COLUNAS.map((c) => ({
+      COLUNAS.filter((c) => c.id !== "audiencia" && c.id !== "recurso").map((c) => ({
         name: c.titulo,
         value: processos.filter((p) => p.status === c.id).length,
         fill: STATUS_COLORS[c.id],
