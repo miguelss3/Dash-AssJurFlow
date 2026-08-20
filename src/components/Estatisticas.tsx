@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -14,7 +14,7 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { TrendingUp, Award, AlertTriangle, CheckCircle2, Clock, FileText, RefreshCw, Loader2 } from "lucide-react";
+import { TrendingUp, Award, AlertTriangle, CheckCircle2, Clock, FileText, RefreshCw, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
 import { COLUNAS } from "@/types/processo";
@@ -188,6 +188,8 @@ export function Estatisticas({ processos, loadingProcessos = false, statsServido
       .slice(0, 6);
   }, [processos]);
 
+  const [outrosAssuntosAbertos, setOutrosAssuntosAbertos] = useState(false);
+
   const dadosTipoAcao = useMemo(() => {
     const map = new Map<string, { nome: string; valor: number }>();
     processos.forEach((p) => {
@@ -200,10 +202,18 @@ export function Estatisticas({ processos, loadingProcessos = false, statsServido
       }
       map.set(chave, { ...atual, valor: atual.valor + 1 });
     });
-    return Array.from(map.values())
+    const completo = Array.from(map.values())
       .map((item) => ({ name: item.nome, value: item.valor }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 5);
+      .sort((a, b) => b.value - a.value);
+
+    // Antes o ranking cortava em 5 e o resto desaparecia silenciosamente.
+    // Agora os assuntos além do Top 5 ficam agrupados em "Outros assuntos",
+    // com seu próprio ranking expansível — nada some da visão.
+    const principais = completo.slice(0, 5);
+    const demais = completo.slice(5);
+    const totalDemais = demais.reduce((soma, item) => soma + item.value, 0);
+
+    return { principais, demais, totalDemais };
   }, [processos]);
 
   const dadosCadastros = useMemo(() => {
@@ -610,15 +620,15 @@ export function Estatisticas({ processos, loadingProcessos = false, statsServido
       {/* Tipos de ação */}
       <ChartCard
         title="Tipos de ação mais comuns"
-        subtitle="Top 5 categorias"
+        subtitle={dadosTipoAcao.demais.length > 0 ? "Top 5 + ranking dos demais assuntos" : "Top 5 categorias"}
         icon={TrendingUp}
       >
-        {dadosTipoAcao.length === 0 ? (
+        {dadosTipoAcao.principais.length === 0 ? (
           <p className="text-xs text-muted-foreground py-8 text-center">Sem dados.</p>
         ) : (
           <div className="space-y-3.5 py-2">
-            {dadosTipoAcao.map((d, i) => {
-              const max = dadosTipoAcao[0].value;
+            {dadosTipoAcao.principais.map((d, i) => {
+              const max = dadosTipoAcao.principais[0].value;
               const pct = (d.value / max) * 100;
               return (
                 <div key={d.name}>
@@ -640,6 +650,56 @@ export function Estatisticas({ processos, loadingProcessos = false, statsServido
                 </div>
               );
             })}
+
+            {dadosTipoAcao.demais.length > 0 && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setOutrosAssuntosAbertos((v) => !v)}
+                  className="w-full flex items-center justify-between text-[11px] mb-1.5"
+                >
+                  <span className="font-semibold text-foreground flex items-center gap-1">
+                    {outrosAssuntosAbertos ? (
+                      <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
+                    )}
+                    Outros assuntos ({dadosTipoAcao.demais.length})
+                  </span>
+                  <span className="tabular-nums text-muted-foreground shrink-0 font-bold">
+                    {dadosTipoAcao.totalDemais}
+                  </span>
+                </button>
+                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-gradient-accent/50 transition-all"
+                    style={{ width: `${(dadosTipoAcao.totalDemais / dadosTipoAcao.principais[0].value) * 100}%` }}
+                  />
+                </div>
+
+                {outrosAssuntosAbertos && (
+                  <div className="mt-3 pl-4 border-l-2 border-muted space-y-2.5">
+                    {dadosTipoAcao.demais.map((d) => {
+                      const pctDemais = (d.value / dadosTipoAcao.demais[0].value) * 100;
+                      return (
+                        <div key={d.name}>
+                          <div className="flex items-center justify-between text-[10px] mb-1">
+                            <span className="text-muted-foreground truncate pr-2">{d.name}</span>
+                            <span className="tabular-nums text-muted-foreground shrink-0">{d.value}</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-muted-foreground/40"
+                              style={{ width: `${pctDemais}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </ChartCard>
