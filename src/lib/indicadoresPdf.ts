@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { Processo } from "@/types/processo";
 import { statusPrazo, diasRestantes } from "@/lib/prazo";
+import { gerarResumoDU, gerarResumoPA } from "@/lib/resumoProcesso";
 
 type Html2CanvasModule = {
   default?: (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
@@ -68,12 +69,13 @@ function diasParaOrdenacao(p: Processo) {
   return diasRestantes(prazo);
 }
 
-function buildBasePdf(title: string, subtitle: string) {
-  const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+function buildBasePdf(title: string, subtitle: string, orientation: "p" | "l" = "p") {
+  const doc = new jsPDF({ orientation, unit: "mm", format: "a4" });
   const generatedAt = new Date().toLocaleString("pt-BR");
+  const pageWidth = doc.internal.pageSize.getWidth();
 
   doc.setFillColor(14, 43, 85);
-  doc.rect(0, 0, 210, 30, "F");
+  doc.rect(0, 0, pageWidth, 30, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
@@ -375,6 +377,14 @@ function sanitizarNomeArquivo(texto: string) {
   return normalizeText(texto).replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "processos";
 }
 
+// Mesmo mini-resumo por template usado nos cards do dashboard (ver
+// src/components/CardDU.tsx e CardPA.tsx) — aqui só decide qual gerador usar
+// a partir do setor do processo, já que o PDF mistura DU e PA na mesma busca.
+function resumoDoProcesso(p: Processo): string {
+  const setor = (p.setor || p.tipo || "").toString().trim().toUpperCase();
+  return setor === "PA" ? gerarResumoPA(p) : gerarResumoDU(p);
+}
+
 export function exportResultadosBuscaPdf(processos: Processo[], termoBusca: string) {
   // Mais recentes primeiro. Processos sem data de entrada vão para o fim,
   // em vez de embolar a ordenação vindo como "maior" data (NaN).
@@ -389,21 +399,31 @@ export function exportResultadosBuscaPdf(processos: Processo[], termoBusca: stri
     p.numero || "-",
     p.tipoAcao || "-",
     ehConcluido(p) ? "Sim" : "Nao",
+    resumoDoProcesso(p),
   ]);
 
+  // Paisagem: a coluna de Resumo precisa de mais largura do que o A4 retrato
+  // comporta sem espremer as demais colunas.
   const doc = buildBasePdf(
     "Resultado de Busca",
     `Termo pesquisado: "${termoBusca}" - ${processos.length} processo(s) encontrado(s)`,
+    "l",
   );
 
   autoTable(doc, {
     startY: 36,
-    head: [["Data de Entrada", "Numero do Processo", "Assunto", "Finalizado"]],
+    head: [["Data de Entrada", "Numero do Processo", "Assunto", "Finalizado", "Resumo"]],
     body: rows,
     theme: "striped",
-    styles: { fontSize: 9, cellPadding: 2.5 },
+    styles: { fontSize: 9, cellPadding: 2.5, overflow: "linebreak" },
     headStyles: { fillColor: [14, 43, 85] },
-    columnStyles: { 2: { cellWidth: 80 } },
+    columnStyles: {
+      0: { cellWidth: 24 },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 45 },
+      3: { cellWidth: 20 },
+      4: { cellWidth: "auto" },
+    },
   });
 
   doc.save(`busca-${sanitizarNomeArquivo(termoBusca)}.pdf`);
