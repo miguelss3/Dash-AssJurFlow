@@ -370,3 +370,33 @@ export function exportSindicanciasPdf(processos: Processo[]) {
 export function exportIPMPdf(processos: Processo[]) {
   exportTipoPA(processos, "ipm");
 }
+
+function sanitizarNomeArquivo(texto: string) {
+  return normalizeText(texto).replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "processos";
+}
+
+export function exportResultadosBuscaPdf(processos: Processo[], termoBusca: string) {
+  const rows = processos.map((p) => [
+    formatDate(p.dataEntrada),
+    p.numero || "-",
+    p.tipoAcao || "-",
+    ehConcluido(p) ? "Sim" : "Nao",
+  ]);
+
+  const doc = buildBasePdf(
+    "Resultado de Busca",
+    `Termo pesquisado: "${termoBusca}" - ${processos.length} processo(s) encontrado(s)`,
+  );
+
+  autoTable(doc, {
+    startY: 36,
+    head: [["Data de Entrada", "Numero do Processo", "Assunto", "Finalizado"]],
+    body: rows,
+    theme: "striped",
+    styles: { fontSize: 9, cellPadding: 2.5 },
+    headStyles: { fillColor: [14, 43, 85] },
+    columnStyles: { 2: { cellWidth: 80 } },
+  });
+
+  doc.save(`busca-${sanitizarNomeArquivo(termoBusca)}.pdf`);
+}

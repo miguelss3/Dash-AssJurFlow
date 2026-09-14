@@ -13,6 +13,7 @@ import {
   LogOut,
   Calendar,
   Users,
+  Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,7 @@ import { IAChatBox } from "@/components/IAChatBox";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
 import type { SiteSettings } from "@/types/siteSettings";
 import { statusPrazo } from "@/lib/prazo";
+import { exportResultadosBuscaPdf } from "@/lib/indicadoresPdf";
 import { toast } from "sonner";
 
 // Desligado temporariamente: créditos da API Gemini esgotados (ver functions/index.js geminiChat).
@@ -1175,6 +1177,22 @@ function Index() {
                     className="pl-11 h-11 rounded-full bg-card border-border focus-visible:ring-accent text-sm"
                   />
                 </div>
+
+                {busca.trim().length > 0 && filtrados.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-11 w-11 rounded-full shrink-0"
+                    title={`Imprimir os ${filtrados.length} processos encontrados`}
+                    onClick={() => {
+                      exportResultadosBuscaPdf(filtrados, busca.trim());
+                      toast.success(`PDF gerado com ${filtrados.length} processos.`);
+                    }}
+                  >
+                    <Printer className="h-4 w-4" />
+                  </Button>
+                )}
 
                 {/* Abas DU / PA — exclusivas da chefia (acesso a todos os processos) */}
                 {ehAdmin && (
