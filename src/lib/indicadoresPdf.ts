@@ -376,7 +376,15 @@ function sanitizarNomeArquivo(texto: string) {
 }
 
 export function exportResultadosBuscaPdf(processos: Processo[], termoBusca: string) {
-  const rows = processos.map((p) => [
+  // Mais recentes primeiro. Processos sem data de entrada vão para o fim,
+  // em vez de embolar a ordenação vindo como "maior" data (NaN).
+  const ordenados = [...processos].sort((a, b) => {
+    const tA = a.dataEntrada ? new Date(a.dataEntrada).getTime() : Number.NEGATIVE_INFINITY;
+    const tB = b.dataEntrada ? new Date(b.dataEntrada).getTime() : Number.NEGATIVE_INFINITY;
+    return tB - tA;
+  });
+
+  const rows = ordenados.map((p) => [
     formatDate(p.dataEntrada),
     p.numero || "-",
     p.tipoAcao || "-",

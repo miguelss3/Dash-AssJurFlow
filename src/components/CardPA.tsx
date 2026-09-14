@@ -27,6 +27,7 @@ import {
   User,
   Calendar,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Timestamp } from "firebase/firestore";
@@ -34,6 +35,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
 import { getBadgeSituacaoPA } from "@/lib/utils";
+import { gerarResumoPA } from "@/lib/resumoProcesso";
 import { DetalhesModalPA } from "./DetalhesModalPA";
 import { ChatModal } from "./ChatModal";
 import { useDraggable } from "@dnd-kit/core";
@@ -308,6 +310,13 @@ const CardPAComponent = ({
             {p.encarregado && (
               <p className="flex items-center gap-1 text-purple-700 font-medium"><User className="w-3 h-3" /> <strong>Encarregado:</strong> {p.encarregado}</p>
             )}
+          </div>
+
+          <div className="rounded-lg border border-purple-100 bg-purple-50/60 px-3 py-2">
+            <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-purple-700 mb-1">
+              <Sparkles className="w-3 h-3" /> Resumo
+            </div>
+            <div className="text-[11px] text-slate-600 leading-snug">{gerarResumoPA(p)}</div>
           </div>
 
           {prorrogacoesPA.length > 0 && (

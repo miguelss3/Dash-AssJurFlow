@@ -29,6 +29,7 @@ import {
   Mail,
   Building2,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Timestamp } from "firebase/firestore";
@@ -36,6 +37,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { formatarData, diasRestantes } from "@/lib/prazo";
 import { getBadgeSituacaoDUContextual } from "@/lib/utils";
+import { gerarResumoDU } from "@/lib/resumoProcesso";
 import { DetalhesModalDU } from "./DetalhesModalDU";
 import { ChatModal } from "./ChatModal";
 import { useDraggable } from "@dnd-kit/core";
@@ -275,6 +277,13 @@ const CardDUComponent = ({
             {p.responsavel && (
               <p className="flex items-center gap-1 text-sky-700 font-semibold"><User className="w-3 h-3" /> Assessor: {p.responsavel}</p>
             )}
+          </div>
+
+          <div className="rounded-lg border border-sky-100 bg-sky-50/60 px-3 py-2">
+            <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-sky-700 mb-1">
+              <Sparkles className="w-3 h-3" /> Resumo
+            </div>
+            <div className="text-[11px] text-slate-600 leading-snug">{gerarResumoDU(p)}</div>
           </div>
 
           {showActions && (
