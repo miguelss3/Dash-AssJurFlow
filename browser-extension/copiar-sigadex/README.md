@@ -74,9 +74,17 @@ extensão prefere devolver texto a mais a arriscar apagar conteúdo real.
 ## Observação
 
 O botão automático só é injetado em `sped.12rm.eb.mil.br` (domínio
-configurado em `manifest.json`, em `content_scripts.matches`). Em qualquer
-outra página, a extensão fica parada — só age quando você clica no ícone dela
-manualmente. Nada roda em segundo plano fora dessas duas situações.
+configurado em `manifest.json`). Em qualquer outra página, a extensão fica
+parada — só age quando você clica no ícone dela manualmente.
+
+O botão é injetado por **dois caminhos redundantes**: a forma declarativa
+(`content_scripts` no manifest, que o próprio navegador injeta ao carregar a
+página) e um `background.js` que reinjeta explicitamente toda vez que a aba
+do SPED termina de carregar (`tabs.onUpdated`). O segundo existia porque, em
+alguns casos no Firefox, a injeção declarativa sozinha não disparava de
+forma confiável num F5 — com os dois juntos, o botão deve aparecer sempre.
+`content.js` se protege contra rodar duas vezes na mesma página (não cria
+botão/observer duplicado se as duas vias disparado).
 
 Erros no console do tipo `e.detalhe.status is undefined`, `apenasVisualizacao`
 ou `textLayerDiv.nextElementSibling is null` são bugs internos do próprio

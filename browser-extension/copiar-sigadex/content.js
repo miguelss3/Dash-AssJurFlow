@@ -1,10 +1,16 @@
-// Roda automaticamente nas páginas do SPED (ver "matches" no manifest.json).
+// Roda automaticamente nas páginas do SPED (ver "matches" no manifest.json)
+// E pode ser injetado de novo pelo background.js (segundo caminho, mais
+// direto, disparado em tabs.onUpdated) — por isso precisa ser seguro rodar
+// mais de uma vez na mesma página sem duplicar botão/observer.
 // Injeta um botão flutuante fixo no canto da tela; ao clicar, extrai e
 // corrige o texto do documento aberto (extrairTextoDaPagina, de
 // extrator.js) e copia para a área de transferência — sem precisar abrir o
 // ícone da extensão.
 
 (function iniciar() {
+  if (window.__assjurflowCopiarInjetado) return;
+  window.__assjurflowCopiarInjetado = true;
+
   const ID_BOTAO = "assjurflow-btn-copiar";
 
   function criarBotao() {
