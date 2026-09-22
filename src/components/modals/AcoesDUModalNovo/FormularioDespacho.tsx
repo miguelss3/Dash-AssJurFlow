@@ -67,6 +67,11 @@ export function FormularioDespacho({
     && acaoPrincipal === "DILIGENCIA"
     && Boolean(numeroAnterior && numeroAnterior.trim());
 
+  // V3.9 — "Resposta Definitiva" é competência exclusiva de CHEM/Comandante;
+  // o Chefe da AssJur só despacha Pedido de Subsídios.
+  const opcoesAcao: AcaoPrincipal[] =
+    assinaturaDestino === "chefe" ? ["DILIGENCIA"] : (Object.keys(LABEL_ACAO) as AcaoPrincipal[]);
+
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2">
       <article className={docContainerClass(assinaturaDestino)}>
@@ -80,7 +85,11 @@ export function FormularioDespacho({
                   name="assinatura-destino-du"
                   aria-label={LABEL_ASSINATURA_DESTINO[opt]}
                   checked={assinaturaDestino === opt}
-                  onChange={() => setAssinaturaDestino(opt)}
+                  onChange={() => {
+                    setAssinaturaDestino(opt);
+                    // Chefe da AssJur não assina Resposta Definitiva.
+                    if (opt === "chefe" && acaoPrincipal === "DEFESA") setAcaoPrincipal("DILIGENCIA");
+                  }}
                   className="hidden"
                 />
                 {LABEL_ASSINATURA_DESTINO[opt]}
@@ -91,8 +100,8 @@ export function FormularioDespacho({
 
         <section>
           <p className={DOC_LABEL_CLASS}>Objeto do Despacho</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {(Object.keys(LABEL_ACAO) as AcaoPrincipal[]).map((opt) => (
+          <div className={opcoesAcao.length > 1 ? "grid grid-cols-1 sm:grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
+            {opcoesAcao.map((opt) => (
               <label key={opt} className={docRadioClass(acaoPrincipal === opt)}>
                 <input
                   type="radio"
@@ -142,20 +151,24 @@ export function FormularioDespacho({
           )}
         </section>
 
-        <CamposDocumento
-          assinaturaDestino={assinaturaDestino}
-          numeroDocumentoDU={numeroDocumentoDU}
-          setNumeroDocumentoDU={setNumeroDocumentoDU}
-          incluiDiexExterno={incluiDiexExterno}
-          setIncluiDiexExterno={setIncluiDiexExterno}
-          incluiOficioExterno={incluiOficioExterno}
-          setIncluiOficioExterno={setIncluiOficioExterno}
-          numeroDiexExterno={numeroDiexExterno}
-          setNumeroDiexExterno={setNumeroDiexExterno}
-          numeroOficioExterno={numeroOficioExterno}
-          setNumeroOficioExterno={setNumeroOficioExterno}
-          opcional
-        />
+        {/* V3.9 — Quem assina "Chefe da AssJur" é o próprio Chefe (DIEx
+             Simplificado próprio dele, preenchido na mesa da Chefia) — o
+             assessor não define esse número, então o campo nem aparece aqui. */}
+        {assinaturaDestino !== "chefe" && (
+          <CamposDocumento
+            assinaturaDestino={assinaturaDestino}
+            numeroDocumentoDU={numeroDocumentoDU}
+            setNumeroDocumentoDU={setNumeroDocumentoDU}
+            incluiDiexExterno={incluiDiexExterno}
+            setIncluiDiexExterno={setIncluiDiexExterno}
+            incluiOficioExterno={incluiOficioExterno}
+            setIncluiOficioExterno={setIncluiOficioExterno}
+            numeroDiexExterno={numeroDiexExterno}
+            setNumeroDiexExterno={setNumeroDiexExterno}
+            numeroOficioExterno={numeroOficioExterno}
+            setNumeroOficioExterno={setNumeroOficioExterno}
+          />
+        )}
 
         {acaoPrincipal === "DILIGENCIA" && (
           <section>

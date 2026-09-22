@@ -749,7 +749,11 @@ export function AcoesDUModalNovo({
     switch (situacaoFluxo) {
       case "MESA_ASSESSOR":
         // Para DILIGENCIA exigimos prazo; DEFESA é livre.
-        return acaoPrincipal === "DILIGENCIA" && !dataPrazo.trim();
+        if (acaoPrincipal === "DILIGENCIA" && !dataPrazo.trim()) return true;
+        // CHEM/Cmt assinam por fora do sistema (DIEx externo ou Ofício) — o
+        // tipo não é mais opcional, o assessor precisa escolher um dos dois.
+        if (assinaturaDestino !== "chefe" && !incluiDiexExterno && !incluiOficioExterno) return true;
+        return false;
       case "CHEFIA_DILIGENCIA":
         if (!ehChefia) return true;
         if (assinaturaDestino === "chefe") {
