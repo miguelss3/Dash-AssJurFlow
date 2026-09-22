@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
-import { Lock, Send } from "lucide-react";
+import { Lock, Send, CheckCircle2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
@@ -98,6 +98,10 @@ export function AcoesDUModalNovo({
   const [numeroRecebidoTardio, setNumeroRecebidoTardio] = useState("");
   const [dataRecebidoTardio, setDataRecebidoTardio] = useState("");
   const [salvandoTardio, setSalvandoTardio] = useState(false);
+  // V3.7 — Processo já concluído: o despacho (signatário/objeto/etc.) some
+  // do corpo do modal, restando só o complemento de registrar uma resposta
+  // que chegou atrasada. Ver carregarFluxo() para o cálculo.
+  const [processoConcluido, setProcessoConcluido] = useState(false);
 
   // ---------------- Carga ----------------
   const carregarFluxo = async () => {
@@ -108,6 +112,14 @@ export function AcoesDUModalNovo({
       if (!snap.exists()) return;
       const data = snap.data();
       const pedido = data?.pedidoSubsidios || {};
+
+      // Mesmo critério de conclusão usado no resto do app (Estatisticas/
+      // indicadoresPdf): `status === "concluido"` sozinho não pega
+      // `finalizado === true` com status desatualizado.
+      const statusNorm = String(data?.status || "").trim().toLowerCase();
+      setProcessoConcluido(
+        data?.finalizado === true || statusNorm === "concluido" || statusNorm === "concluído",
+      );
 
       setSituacaoFluxo(normalizeSituacao(pedido?.situacaoFluxo));
       setAcaoPrincipal((pedido?.acaoPrincipal as AcaoPrincipal) || "DILIGENCIA");
@@ -512,7 +524,13 @@ export function AcoesDUModalNovo({
     }
   };
 
-  const cabecalhoSituacao = useMemo(() => LABEL_SITUACAO[situacaoFluxo], [situacaoFluxo]);
+  // Processo finalizado: `situacaoFluxo` cai no fallback "MESA_ASSESSOR" (ver
+  // normalizeSituacao em shared.ts), o que exibiria "Mesa do Assessor" de
+  // forma enganosa aqui — sobrepõe com "Finalizado" quando é o caso.
+  const cabecalhoSituacao = useMemo(
+    () => (processoConcluido ? "Finalizado" : LABEL_SITUACAO[situacaoFluxo]),
+    [situacaoFluxo, processoConcluido],
+  );
 
   // ---------------- V2.7 — Handler Universal "Despachar / Encaminhar" ----------------
   // Roteia a transição com base em (situacaoFluxo, papel, signatário). Mantém
@@ -888,6 +906,16 @@ export function AcoesDUModalNovo({
           <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-center text-sm text-slate-600">
             Carregando ações do processo...
           </div>
+        ) : processoConcluido ? (
+          // V3.7 — Processo já finalizado: despacho/signatário não fazem mais
+          // sentido aqui. Só resta o complemento de resposta tardia abaixo.
+          <div className="bg-emerald-50 p-6 rounded-xl border border-emerald-200 text-center animate-in fade-in">
+            <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+            <h4 className="font-bold text-emerald-900 text-sm">Processo finalizado</h4>
+            <p className="text-[11px] text-emerald-800 mt-1">
+              Este processo já foi concluído. Use o campo abaixo apenas se uma resposta da Unidade chegar atrasada.
+            </p>
+          </div>
         ) : ehChefia ? (
           renderVisaoChefe()
         ) : (
@@ -898,62 +926,72 @@ export function AcoesDUModalNovo({
             uma única ação primária por fase, com secundários condicionais. */}
         {!carregandoFluxo && (
           <div className="mt-5 pt-4 border-t border-slate-200 flex flex-col gap-2">
-            {/* 1. Ação principal — único botão primário por fase. */}
-            <button
-              onClick={handleDespachoUniversal}
-              disabled={despachoBloqueado}
-              className="w-full py-3 rounded-xl text-sm font-bold border border-transparent bg-[#0F172A] hover:bg-slate-800 text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Send className="w-4 h-4" />
-              Despachar / Encaminhar
-            </button>
+            {/* Despacho/signatário só fazem sentido enquanto o processo está
+                em curso — some inteiro (botão principal, devoluções,
+                reiteração) quando já foi finalizado. */}
+            {!processoConcluido && (
+              <>
+                {/* 1. Ação principal — único botão primário por fase. */}
+                <button
+                  onClick={handleDespachoUniversal}
+                  disabled={despachoBloqueado}
+                  className="w-full py-3 rounded-xl text-sm font-bold border border-transparent bg-[#0F172A] hover:bg-slate-800 text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                  Despachar / Encaminhar
+                </button>
 
-            {/* 2. Retorno / Devolução — contorno âmbar. Padronizado para
-                 "Devolver ao Assessor" tanto na Chefia quanto no SPED. */}
-            {ehChefia && situacaoFluxo === "CHEFIA_DILIGENCIA" && (
-              <button
-                onClick={handleDevolverAssessor}
-                className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-amber-400 text-amber-700 hover:bg-amber-50"
-              >
-                Devolver ao Assessor
-              </button>
-            )}
+                {/* 2. Retorno / Devolução — contorno âmbar. Padronizado para
+                     "Devolver ao Assessor" tanto na Chefia quanto no SPED. */}
+                {ehChefia && situacaoFluxo === "CHEFIA_DILIGENCIA" && (
+                  <button
+                    onClick={handleDevolverAssessor}
+                    className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-amber-400 text-amber-700 hover:bg-amber-50"
+                  >
+                    Devolver ao Assessor
+                  </button>
+                )}
 
-            {situacaoFluxo === "AGUARDANDO_ASSINATURA" && (
-              <button
-                onClick={handleMinutaRejeitada}
-                className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-amber-400 text-amber-700 hover:bg-amber-50"
-              >
-                Devolver ao Assessor
-              </button>
-            )}
+                {situacaoFluxo === "AGUARDANDO_ASSINATURA" && (
+                  <button
+                    onClick={handleMinutaRejeitada}
+                    className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-amber-400 text-amber-700 hover:bg-amber-50"
+                  >
+                    Devolver ao Assessor
+                  </button>
+                )}
 
-            {/* V3.2 — Reiteração rápida na fase de aguardo de resposta. */}
-            {situacaoFluxo === "AGUARDANDO_RESPOSTA" && (
-              <button
-                onClick={handleReiterar}
-                className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-blue-400 text-blue-700 hover:bg-blue-50"
-              >
-                Reiterar Pedido (Devolver à Chefia)
-              </button>
+                {/* V3.2 — Reiteração rápida na fase de aguardo de resposta. */}
+                {situacaoFluxo === "AGUARDANDO_RESPOSTA" && (
+                  <button
+                    onClick={handleReiterar}
+                    className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-blue-400 text-blue-700 hover:bg-blue-50"
+                  >
+                    Reiterar Pedido (Devolver à Chefia)
+                  </button>
+                )}
+              </>
             )}
 
             {/* V3.6 — Resgate de resposta tardia: o Robô Vigia já devolveu o
                  processo à mesa do assessor (3 dias de tolerância vencidos),
                  mas a resposta da Unidade chegou depois disso. Permite
-                 registrar o recebimento sem precisar reabrir o fluxo. */}
-            {situacaoFluxo === "MESA_ASSESSOR" && (
+                 registrar o recebimento sem precisar reabrir o fluxo — quem
+                 decide se reabre é o assessor, em ação separada. Continua
+                 disponível com o processo já finalizado (é o caso mais comum). */}
+            {(situacaoFluxo === "MESA_ASSESSOR" || processoConcluido) && (
               <div className="rounded-xl border border-teal-300 bg-teal-50/60 p-3">
                 {!tardioAberto ? (
                   <button
                     type="button"
                     onClick={() => {
+                      setNumeroRecebidoTardio("");
                       setDataRecebidoTardio(dataCivilAtual());
                       setTardioAberto(true);
                     }}
                     className="w-full py-2.5 rounded-lg text-sm font-bold bg-white border border-teal-400 text-teal-800 hover:bg-teal-100"
                   >
-                    Registrar Resposta Recebida (Fora do Prazo)
+                    Registrar Resposta Recebida
                   </button>
                 ) : (
                   <div className="space-y-3">
@@ -965,6 +1003,8 @@ export function AcoesDUModalNovo({
                       <label className={DOC_LABEL_CLASS}>Número do Documento Recebido</label>
                       <input
                         type="text"
+                        name="numero-recebido-tardio"
+                        autoComplete="off"
                         value={numeroRecebidoTardio}
                         onChange={(e) => setNumeroRecebidoTardio(e.target.value)}
                         placeholder="Ex: Ofício 321/2026"
@@ -1007,13 +1047,16 @@ export function AcoesDUModalNovo({
               </div>
             )}
 
-            {/* 3. Encerramento — contorno vermelho, sempre disponível. */}
-            <button
-              onClick={() => void finalizarProcesso()}
-              className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-red-300 text-red-700 hover:bg-red-50"
-            >
-              Finalizar Processo
-            </button>
+            {/* 3. Encerramento — contorno vermelho, disponível enquanto o
+                 processo ainda não foi finalizado. */}
+            {!processoConcluido && (
+              <button
+                onClick={() => void finalizarProcesso()}
+                className="w-full py-3 rounded-xl text-sm font-bold bg-white border border-red-300 text-red-700 hover:bg-red-50"
+              >
+                Finalizar Processo
+              </button>
+            )}
           </div>
         )}
       </DialogContent>

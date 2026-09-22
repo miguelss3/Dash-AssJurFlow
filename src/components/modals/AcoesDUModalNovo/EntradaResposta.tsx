@@ -16,6 +16,8 @@ export function EntradaResposta({
       <label className={DOC_LABEL_CLASS}>Número do Documento Recebido</label>
       <input
         type="text"
+        name="numero-recebido"
+        autoComplete="off"
         aria-label="Número do documento recebido"
         value={numeroRecebido}
         onChange={(e) => setNumeroRecebido(e.target.value)}
