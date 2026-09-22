@@ -34,12 +34,34 @@ const TAGS_PERMITIDAS = new Set([
 // Tags cujo conteúdo também deve ser descartado (não só a tag em si).
 const TAGS_REMOVER_CONTEUDO = new Set(["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "LINK", "META", "NOSCRIPT", "SVG"]);
 
+// Restaura espaços perdidos em pontos de quebra de linha do documento de
+// origem — comum ao colar de visualizadores de PDF com texto justificado:
+// a quebra/justificação "engole" o espaço, colando a última palavra de uma
+// linha direto com a primeira da linha seguinte (ex.: "nosautos",
+// "IMEDIATO.Ademais"). Só corrige os dois casos em que não existe ambiguidade
+// nenhuma em português — nunca um espaço legítimo seria omitido nessas
+// posições, então não há risco de alterar o sentido do texto:
+//   1) pontuação (. , ; :) colada direto numa letra (exclui dígitos, para
+//      não mexer em números de processo/data como "94.2017" ou "2.000,50");
+//   2) letra minúscula colada direto numa maiúscula (fronteira que não
+//      ocorre de propósito em prosa — não existe "camelCase" em português).
+// Palavras minúsculas coladas entre si (ex.: "anexapara") não têm sinal
+// seguro pra corrigir automaticamente — ficam para revisão manual.
+function restaurarEspacosProvaveis(texto: string): string {
+  return texto
+    .replace(/([.,;:])([A-Za-zÀ-ÖØ-öø-ÿ])/g, "$1 $2")
+    .replace(/([a-zà-öø-ÿ])([A-ZÀ-Ö])/g, "$1 $2");
+}
+
 function sanitizarHtmlColado(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
 
   const limpar = (raiz: Element) => {
     Array.from(raiz.childNodes).forEach((no) => {
-      if (no.nodeType === Node.TEXT_NODE) return;
+      if (no.nodeType === Node.TEXT_NODE) {
+        no.textContent = restaurarEspacosProvaveis(no.textContent || "");
+        return;
+      }
       if (no.nodeType !== Node.ELEMENT_NODE) {
         no.parentNode?.removeChild(no);
         return;
@@ -119,7 +141,7 @@ export function RichTextEditor({
 
     const htmlParaInserir = html.trim()
       ? sanitizarHtmlColado(html)
-      : texto.split(/\r\n|\r|\n/).map(escapeHtml).join("<br>");
+      : texto.split(/\r\n|\r|\n/).map((linha) => escapeHtml(restaurarEspacosProvaveis(linha))).join("<br>");
 
     if (!htmlParaInserir.trim()) return;
     // eslint-disable-next-line @typescript-eslint/no-deprecated
