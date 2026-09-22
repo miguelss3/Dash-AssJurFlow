@@ -1,11 +1,18 @@
 {
   "manifest_version": 3,
   "name": "AssJurFlow - Copiar Documento (SIGADEX/PDF)",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Corrige o espaçamento perdido ao copiar texto de documentos PDF (SIGADEX e outros visualizadores baseados em PDF.js) para colar no AssJurFlow.",
   "permissions": ["activeTab", "scripting", "clipboardWrite"],
   "action": {
     "default_popup": "popup.html",
     "default_title": "Copiar documento formatado"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://sped.12rm.eb.mil.br/*"],
+      "js": ["extrator.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ]
 }
