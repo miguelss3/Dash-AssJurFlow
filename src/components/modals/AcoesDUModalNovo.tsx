@@ -91,7 +91,7 @@ export function AcoesDUModalNovo({
   const [numeroAnterior, setNumeroAnterior] = useState<string>("");
   const [prazoAnterior, setPrazoAnterior] = useState<string>("");
   // V3.6 — Registro de resposta tardia: cobre o caso em que o Robô Vigia já
-  // devolveu o processo à mesa do assessor (3 dias de tolerância vencidos)
+  // devolveu o processo à mesa do assessor (2 dias de tolerância vencidos)
   // mas a resposta da Unidade chega depois disso. Não altera o fluxo, só
   // registra o documento na lista de Recebidos.
   const [tardioAberto, setTardioAberto] = useState(false);
@@ -683,7 +683,7 @@ export function AcoesDUModalNovo({
   };
 
   // V3.6 — Registra uma resposta que chegou depois do Robô Vigia já ter
-  // devolvido o processo à mesa do assessor (3 dias de tolerância vencidos).
+  // devolvido o processo à mesa do assessor (2 dias de tolerância vencidos).
   // Só adiciona o documento à lista de Recebidos e ao histórico — não mexe
   // no fluxo, que já está em MESA_ASSESSOR.
   const handleRegistrarRespostaTardia = async () => {
@@ -974,7 +974,7 @@ export function AcoesDUModalNovo({
             )}
 
             {/* V3.6 — Resgate de resposta tardia: o Robô Vigia já devolveu o
-                 processo à mesa do assessor (3 dias de tolerância vencidos),
+                 processo à mesa do assessor (2 dias de tolerância vencidos),
                  mas a resposta da Unidade chegou depois disso. Permite
                  registrar o recebimento sem precisar reabrir o fluxo — quem
                  decide se reabre é o assessor, em ação separada. Continua

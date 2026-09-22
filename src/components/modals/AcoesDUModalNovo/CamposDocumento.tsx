@@ -61,34 +61,67 @@ export function CamposDocumento({
   }
 
   // Externo (CHEM / Cmt).
+  // V3.8 — Fora do modo duplo (os dois de fato saindo juntos), o seletor
+  // mostra só o tipo escolhido: o outro pill some em vez de ficar exposto
+  // sem função. "+ Também enviar X" é o único jeito de entrar no modo duplo.
+  const ambosSelecionados = incluiDiexExterno && incluiOficioExterno;
+  const exibirPillDiex = !incluiOficioExterno || ambosSelecionados;
+  const exibirPillOficio = !incluiDiexExterno || ambosSelecionados;
+  const totalPillsVisiveis = (exibirPillDiex ? 1 : 0) + (exibirPillOficio ? 1 : 0);
+
   return (
     <section className="space-y-4">
       <div>
         <p className={DOC_LABEL_CLASS}>
           Tipo(s) de Documento Externo {opcional && <span className="text-slate-500">(opcional)</span>}
         </p>
-        <div className="grid grid-cols-2 gap-2">
-          <label className={docCheckboxPillClass(incluiDiexExterno)}>
-            <input
-              type="checkbox"
-              aria-label="Incluir DIEx"
-              checked={incluiDiexExterno}
-              onChange={(e) => setIncluiDiexExterno(e.target.checked)}
-              className="hidden"
-            />
-            DIEx
-          </label>
-          <label className={docCheckboxPillClass(incluiOficioExterno)}>
-            <input
-              type="checkbox"
-              aria-label="Incluir Ofício"
-              checked={incluiOficioExterno}
-              onChange={(e) => setIncluiOficioExterno(e.target.checked)}
-              className="hidden"
-            />
-            Ofício
-          </label>
+        <div className={totalPillsVisiveis === 2 ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
+          {exibirPillDiex && (
+            <label className={docCheckboxPillClass(incluiDiexExterno)}>
+              <input
+                type="checkbox"
+                aria-label="Incluir DIEx"
+                checked={incluiDiexExterno}
+                onChange={(e) => {
+                  // Fora do modo duplo, marcar um tipo desmarca o outro — a
+                  // única forma de ter os dois juntos é o link abaixo.
+                  setIncluiDiexExterno(e.target.checked);
+                  if (e.target.checked && !ambosSelecionados) setIncluiOficioExterno(false);
+                }}
+                className="hidden"
+              />
+              DIEx
+            </label>
+          )}
+          {exibirPillOficio && (
+            <label className={docCheckboxPillClass(incluiOficioExterno)}>
+              <input
+                type="checkbox"
+                aria-label="Incluir Ofício"
+                checked={incluiOficioExterno}
+                onChange={(e) => {
+                  setIncluiOficioExterno(e.target.checked);
+                  if (e.target.checked && !ambosSelecionados) setIncluiDiexExterno(false);
+                }}
+                className="hidden"
+              />
+              Ofício
+            </label>
+          )}
         </div>
+
+        {!ambosSelecionados && (incluiDiexExterno || incluiOficioExterno) && (
+          <button
+            type="button"
+            onClick={() => {
+              setIncluiDiexExterno(true);
+              setIncluiOficioExterno(true);
+            }}
+            className="mt-2 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 underline underline-offset-2"
+          >
+            + Também enviar {incluiDiexExterno ? "Ofício" : "DIEx"} (documento duplo)
+          </button>
+        )}
       </div>
 
       {incluiDiexExterno && (
