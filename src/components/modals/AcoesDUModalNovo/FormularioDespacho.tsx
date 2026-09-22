@@ -151,9 +151,11 @@ export function FormularioDespacho({
           )}
         </section>
 
-        {/* V3.9 — Quem assina "Chefe da AssJur" é o próprio Chefe (DIEx
-             Simplificado próprio dele, preenchido na mesa da Chefia) — o
-             assessor não define esse número, então o campo nem aparece aqui. */}
+        {/* V3.9/V3.10 — Na mesa do assessor, quem assina define o número, não
+             o assessor: "Chefe da AssJur" nem mostra o campo (some inteiro);
+             CHEM/Cmt mostram só a escolha do tipo — o número (DIEx/Ofício
+             externo) só aparece depois, na Vigília do SPED, já aprovado e
+             aguardando a assinatura de quem vai assinar de fato. */}
         {assinaturaDestino !== "chefe" && (
           <CamposDocumento
             assinaturaDestino={assinaturaDestino}
@@ -167,6 +169,7 @@ export function FormularioDespacho({
             setNumeroDiexExterno={setNumeroDiexExterno}
             numeroOficioExterno={numeroOficioExterno}
             setNumeroOficioExterno={setNumeroOficioExterno}
+            ocultarNumeros
           />
         )}
 

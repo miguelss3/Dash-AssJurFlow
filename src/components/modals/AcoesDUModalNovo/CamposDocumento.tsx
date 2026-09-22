@@ -23,6 +23,10 @@ interface CamposDocumentoProps {
   // Quando true, deixa preenchimento opcional (ex.: assessor antecipando os
   // tipos antes da assinatura). Quando false, é obrigatório (Chefia / SPED).
   opcional?: boolean;
+  // V3.10 — Quando true, esconde os campos de número (DIEx/Ofício externo):
+  // na mesa do assessor só o tipo é escolhido, o número quem preenche é
+  // quem assina (CHEM/Cmt), já na Vigília do SPED.
+  ocultarNumeros?: boolean;
 }
 
 // V2.4 — Bloco unificado de "Montagem de Documento(s)" reutilizável nas três
@@ -41,6 +45,7 @@ export function CamposDocumento({
   numeroOficioExterno,
   setNumeroOficioExterno,
   opcional = false,
+  ocultarNumeros = false,
 }: CamposDocumentoProps) {
   if (assinaturaDestino === "chefe") {
     return (
@@ -124,7 +129,7 @@ export function CamposDocumento({
         )}
       </div>
 
-      {incluiDiexExterno && (
+      {!ocultarNumeros && incluiDiexExterno && (
         <div>
           <label className={DOC_LABEL_CLASS}>Número do DIEx Externo</label>
           <input
@@ -138,7 +143,7 @@ export function CamposDocumento({
         </div>
       )}
 
-      {incluiOficioExterno && (
+      {!ocultarNumeros && incluiOficioExterno && (
         <div>
           <label className={DOC_LABEL_CLASS}>Número do Ofício</label>
           <input
