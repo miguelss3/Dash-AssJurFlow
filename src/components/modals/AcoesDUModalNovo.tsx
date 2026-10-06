@@ -569,6 +569,13 @@ export function AcoesDUModalNovo({
             toast.error("Informe o número do DIEx Simplificado.");
             return;
           }
+          // V3.11 — Resposta Definitiva assinada pelo Chefe não espera
+          // retorno de ninguém: a assinatura É a resposta final, então
+          // finaliza na hora, sem passar pelo "existe prazo?".
+          if (acaoPrincipal === "DEFESA") {
+            void finalizarProcesso();
+            return;
+          }
           if (possuiPrazoDU) {
             if (!dataPrazo.trim()) {
               toast.error("Defina o prazo para resposta antes de assinar.");

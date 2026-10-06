@@ -67,10 +67,12 @@ export function FormularioDespacho({
     && acaoPrincipal === "DILIGENCIA"
     && Boolean(numeroAnterior && numeroAnterior.trim());
 
-  // V3.9 — "Resposta Definitiva" é competência exclusiva de CHEM/Comandante;
-  // o Chefe da AssJur só despacha Pedido de Subsídios.
-  const opcoesAcao: AcaoPrincipal[] =
-    assinaturaDestino === "chefe" ? ["DILIGENCIA"] : (Object.keys(LABEL_ACAO) as AcaoPrincipal[]);
+  // V3.11 — O Chefe da AssJur também pode assinar uma Resposta Definitiva
+  // (não só Pedido de Subsídios): quando o assessor já redigiu a resposta
+  // final e só falta a assinatura interna do Chefe, sem precisar passar
+  // pelo SPED via CHEM/Comandante. Ver handleDespachoUniversal/MesaChefia
+  // para o que isso muda no fluxo (assinar finaliza na hora).
+  const opcoesAcao: AcaoPrincipal[] = Object.keys(LABEL_ACAO) as AcaoPrincipal[];
 
   return (
     <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2">
@@ -85,11 +87,7 @@ export function FormularioDespacho({
                   name="assinatura-destino-du"
                   aria-label={LABEL_ASSINATURA_DESTINO[opt]}
                   checked={assinaturaDestino === opt}
-                  onChange={() => {
-                    setAssinaturaDestino(opt);
-                    // Chefe da AssJur não assina Resposta Definitiva.
-                    if (opt === "chefe" && acaoPrincipal === "DEFESA") setAcaoPrincipal("DILIGENCIA");
-                  }}
+                  onChange={() => setAssinaturaDestino(opt)}
                   className="hidden"
                 />
                 {LABEL_ASSINATURA_DESTINO[opt]}

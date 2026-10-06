@@ -81,38 +81,52 @@ export function MesaChefia({
               setNumeroOficioExterno={setNumeroOficioExterno}
             />
 
-            <section>
-              <p className={DOC_LABEL_CLASS}>Existe Prazo para Resposta?</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[true, false].map((v) => (
-                  <label key={String(v)} className={docRadioClass(possuiPrazoDU === v)}>
-                    <input
-                      type="radio"
-                      name="possui-prazo-chefia"
-                      aria-label={v ? "Sim" : "Não"}
-                      checked={possuiPrazoDU === v}
-                      onChange={() => setPossuiPrazoDU(v)}
-                      className="hidden"
-                    />
-                    {v ? "Sim" : "Não"}
-                  </label>
-                ))}
-              </div>
-            </section>
+            {/* V3.11 — Resposta Definitiva assinada pelo Chefe não aguarda
+                 resposta de ninguém: assinar já encerra o processo (ver
+                 handleDespachoUniversal). "Existe prazo?" só faz sentido
+                 pra Pedido de Subsídios, que de fato espera um retorno. */}
+            {acaoPrincipal === "DEFESA" ? (
+              <p className="text-[12px] text-emerald-800 bg-emerald-50 border border-emerald-200 p-3 rounded-md">
+                Resposta Definitiva: ao confirmar o número do documento e assinar, o
+                processo é <strong>finalizado automaticamente</strong>, permanecendo no
+                histórico do assessor responsável.
+              </p>
+            ) : (
+              <>
+                <section>
+                  <p className={DOC_LABEL_CLASS}>Existe Prazo para Resposta?</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[true, false].map((v) => (
+                      <label key={String(v)} className={docRadioClass(possuiPrazoDU === v)}>
+                        <input
+                          type="radio"
+                          name="possui-prazo-chefia"
+                          aria-label={v ? "Sim" : "Não"}
+                          checked={possuiPrazoDU === v}
+                          onChange={() => setPossuiPrazoDU(v)}
+                          className="hidden"
+                        />
+                        {v ? "Sim" : "Não"}
+                      </label>
+                    ))}
+                  </div>
+                </section>
 
-            {possuiPrazoDU && (
-              <section>
-                <label className={`${DOC_LABEL_CLASS} flex items-center gap-1`}>
-                  <CalendarIcon className="w-3 h-3" /> Prazo para Resposta
-                </label>
-                <input
-                  type="date"
-                  aria-label="Prazo para resposta do DIEx"
-                  value={dataPrazo}
-                  onChange={(e) => setDataPrazo(e.target.value)}
-                  className={DOC_INPUT_CLASS}
-                />
-              </section>
+                {possuiPrazoDU && (
+                  <section>
+                    <label className={`${DOC_LABEL_CLASS} flex items-center gap-1`}>
+                      <CalendarIcon className="w-3 h-3" /> Prazo para Resposta
+                    </label>
+                    <input
+                      type="date"
+                      aria-label="Prazo para resposta do DIEx"
+                      value={dataPrazo}
+                      onChange={(e) => setDataPrazo(e.target.value)}
+                      className={DOC_INPUT_CLASS}
+                    />
+                  </section>
+                )}
+              </>
             )}
           </>
         ) : (
