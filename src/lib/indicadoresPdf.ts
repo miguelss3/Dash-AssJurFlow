@@ -4,11 +4,6 @@ import type { Processo } from "@/types/processo";
 import { statusPrazo, diasRestantes } from "@/lib/prazo";
 import { gerarResumoDU, gerarResumoPA } from "@/lib/resumoProcesso";
 
-type Html2CanvasModule = {
-  default?: (element: HTMLElement, options?: Record<string, unknown>) => Promise<HTMLCanvasElement>;
-  (element: HTMLElement, options?: Record<string, unknown>): Promise<HTMLCanvasElement>;
-};
-
 function formatDate(dateStr?: string) {
   if (!dateStr) return "-";
   const d = new Date(dateStr);
@@ -99,12 +94,23 @@ function buildBasePdf(title: string, subtitle: string, orientation: "p" | "l" = 
 // Mesmo agrupamento usado no painel de Estatísticas (ChartCard "Tipos de
 // ação mais comuns"): ignora o que vem depois de " - " no assunto e agrupa
 // por chave normalizada (sem acento/maiúscula) para não duplicar variações
-// de grafia do mesmo assunto.
+// de grafia do mesmo assunto. Exceção: quando o prefixo é literalmente
+// "Outros" mas existe complemento depois do hífen (ex.: "Outros - Licença
+// para tratamento de saúde"), mostra o texto completo em vez de esconder o
+// assunto real atrás do rótulo genérico.
 function assuntoIndicePrincipal(value?: string): string {
   const texto = String(value || "Outros").trim();
   if (!texto) return "Outros";
-  const [principal] = texto.split(/\s[-–—]\s/);
-  return (principal || texto).trim() || "Outros";
+  const partes = texto.split(/\s[-–—]\s/);
+  const principal = (partes[0] || texto).trim() || "Outros";
+  if (normalizeText(principal) === "outros" && partes.length > 1) {
+    return texto;
+  }
+  return principal;
+}
+
+function setorDe(p: Processo): string {
+  return (p.setor || p.tipo || "").toString().trim().toUpperCase();
 }
 
 const LABEL_STATUS: Record<string, string> = {
@@ -113,25 +119,101 @@ const LABEL_STATUS: Record<string, string> = {
   concluido: "Concluído",
 };
 
-// V2 — Relatório pensado para circular fora da equipe (chefia, outras OMs):
+// Percentuais arredondados para número inteiro, cada um independentemente,
+// podem não somar 100% (ex.: 2% + 9% + 90% = 101%). Uma casa decimal reduz
+// bastante esse erro de arredondamento — formato pt-BR (vírgula decimal).
+function formatarPercentual(parte: number, total: number): string {
+  if (total <= 0) return "0,0%";
+  return `${((parte / total) * 100).toLocaleString("pt-BR", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  })}%`;
+}
+
+// Gráfico de barras desenhado direto no PDF (sem depender de captura de
+// tela): duas colunas por mês — verde (processos registrados, escala
+// própria pelo maior valor do período) e vermelha (taxa de conclusão,
+// sempre 0-100%). Como as duas têm unidades diferentes, cada valor fica
+// escrito acima da própria barra em vez de usar um eixo numérico comum,
+// que seria enganoso.
+function desenharGraficoMensal(
+  doc: jsPDF,
+  dados: Array<{ rotulo: string; cadastrados: number; taxa: number | null }>,
+  x: number,
+  y: number,
+  largura: number,
+  altura: number,
+) {
+  const VERDE: [number, number, number] = [34, 170, 110];
+  const VERMELHO: [number, number, number] = [205, 60, 60];
+  const maxCadastrados = Math.max(1, ...dados.map((d) => d.cadastrados));
+  const baseY = y + altura;
+  const larguraSlot = largura / dados.length;
+  const larguraBarra = larguraSlot * 0.32;
+  const gapBarras = larguraSlot * 0.06;
+
+  // Legenda.
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setFillColor(...VERDE);
+  doc.rect(x, y - 6, 3, 3, "F");
+  doc.setTextColor(60, 60, 60);
+  doc.text("Registrados", x + 5, y - 3.5);
+  doc.setFillColor(...VERMELHO);
+  doc.rect(x + 32, y - 6, 3, 3, "F");
+  doc.text("Taxa de Conclusão (%)", x + 37, y - 3.5);
+
+  // Linha de base.
+  doc.setDrawColor(200, 200, 200);
+  doc.line(x, baseY, x + largura, baseY);
+
+  dados.forEach((d, i) => {
+    const slotX = x + i * larguraSlot + (larguraSlot - 2 * larguraBarra - gapBarras) / 2;
+
+    const alturaVerde = (d.cadastrados / maxCadastrados) * (altura - 10);
+    doc.setFillColor(...VERDE);
+    doc.rect(slotX, baseY - alturaVerde, larguraBarra, alturaVerde, "F");
+    doc.setFontSize(7);
+    doc.setTextColor(...VERDE);
+    doc.text(String(d.cadastrados), slotX + larguraBarra / 2, baseY - alturaVerde - 1.5, { align: "center" });
+
+    const alturaVermelha = ((d.taxa ?? 0) / 100) * (altura - 10);
+    const xVermelha = slotX + larguraBarra + gapBarras;
+    doc.setFillColor(...VERMELHO);
+    doc.rect(xVermelha, baseY - alturaVermelha, larguraBarra, alturaVermelha, "F");
+    doc.setTextColor(...VERMELHO);
+    doc.text(
+      d.taxa === null ? "-" : `${Math.round(d.taxa)}%`,
+      xVermelha + larguraBarra / 2,
+      baseY - alturaVermelha - 1.5,
+      { align: "center" },
+    );
+
+    doc.setFontSize(8);
+    doc.setTextColor(80, 80, 80);
+    doc.text(d.rotulo, x + i * larguraSlot + larguraSlot / 2, baseY + 5, { align: "center" });
+  });
+
+  doc.setTextColor(20, 20, 20);
+  doc.setDrawColor(0, 0, 0);
+}
+
+// V3 — Relatório pensado para circular fora da equipe (chefia, outras OMs):
 // sem prazos/atrasos internos, com os números que dão uma visão geral de
 // volume e produtividade (cadastros e conclusão mês a mês, assuntos mais
-// recorrentes, composição DU/PA).
-export function exportIndicadoresGeraisPdf(processos: Processo[]) {
+// recorrentes). Separado por setor — este é o de Defesa da União; o de
+// Processos Administrativos (exportIndicadoresPAPdf) é um resumo mais
+// enxuto, logo abaixo.
+export function exportIndicadoresDUPdf(processosTodos: Processo[]) {
+  const processos = processosTodos.filter((p) => setorDe(p) === "DU");
   const total = processos.length;
   const concluidos = processos.filter(ehConcluido).length;
   const ativos = total - concluidos;
-  const percentualConclusao = total > 0 ? Math.round((concluidos / total) * 100) : 0;
 
   const statusRows = ["novo", "andamento", "concluido"].map((status) => {
     const quantidade = processos.filter((p) => p.status === status).length;
-    const percentual = total > 0 ? `${Math.round((quantidade / total) * 100)}%` : "0%";
-    return [LABEL_STATUS[status], String(quantidade), percentual];
+    return [LABEL_STATUS[status], String(quantidade), formatarPercentual(quantidade, total)];
   });
-
-  const setorDe = (p: Processo) => (p.setor || p.tipo || "").toString().trim().toUpperCase();
-  const totalDU = processos.filter((p) => setorDe(p) === "DU").length;
-  const totalPA = processos.filter((p) => setorDe(p) === "PA").length;
 
   // Cadastros e conclusão por mês — mesma janela de 6 meses do painel.
   const agora = new Date();
@@ -140,6 +222,7 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
     return {
       chave: `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`,
       rotulo: ref.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+      rotuloCurto: ref.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
     };
   });
   const porMes = new Map(meses.map((m) => [m.chave, { cadastrados: 0, concluidos: 0 }]));
@@ -154,9 +237,17 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
     bucket.cadastrados += 1;
     if (ehConcluido(p)) bucket.concluidos += 1;
   });
+  const dadosGraficoMensal = meses.map((m) => {
+    const b = porMes.get(m.chave) as { cadastrados: number; concluidos: number };
+    return {
+      rotulo: m.rotuloCurto,
+      cadastrados: b.cadastrados,
+      taxa: b.cadastrados > 0 ? (b.concluidos / b.cadastrados) * 100 : null,
+    };
+  });
   const mensalRows = meses.map((m) => {
     const b = porMes.get(m.chave) as { cadastrados: number; concluidos: number };
-    const taxa = b.cadastrados > 0 ? `${Math.round((b.concluidos / b.cadastrados) * 100)}%` : "-";
+    const taxa = b.cadastrados > 0 ? formatarPercentual(b.concluidos, b.cadastrados) : "-";
     const rotulo = m.rotulo.charAt(0).toUpperCase() + m.rotulo.slice(1);
     return [rotulo, String(b.cadastrados), String(b.concluidos), taxa];
   });
@@ -176,16 +267,23 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
   const assuntosRows = Array.from(mapaAssuntos.values())
     .sort((a, b) => b.valor - a.valor)
     .slice(0, 5)
-    .map((item) => [
-      item.nome,
-      String(item.valor),
-      total > 0 ? `${Math.round((item.valor / total) * 100)}%` : "0%",
-    ]);
+    .map((item) => [item.nome, String(item.valor), formatarPercentual(item.valor, total)]);
 
   const doc = buildBasePdf(
-    "Indicadores de Gestão - Estatísticas",
-    "Resumo consolidado de produtividade e distribuição do acervo",
+    "Indicadores de Gestão - Defesa da União",
+    "Resumo consolidado de produtividade e distribuição do acervo de DU",
   );
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Evita heading/gráfico cortado na virada de página — se não couber o
+  // bloco inteiro antes da margem inferior, pula pra próxima página.
+  const garantirEspaco = (yAtual: number, alturaNecessaria: number): number => {
+    if (yAtual + alturaNecessaria > pageHeight - 15) {
+      doc.addPage();
+      return 20;
+    }
+    return yAtual;
+  };
 
   autoTable(doc, {
     startY: 36,
@@ -194,9 +292,7 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
       ["Total de processos cadastrados", String(total)],
       ["Processos finalizados", String(concluidos)],
       ["Processos ativos", String(ativos)],
-      ["Taxa de conclusão geral", `${percentualConclusao}%`],
-      ["Processos DU", String(totalDU)],
-      ["Processos PA", String(totalPA)],
+      ["Taxa de conclusão geral", formatarPercentual(concluidos, total)],
     ],
     theme: "grid",
     styles: { fontSize: 10 },
@@ -212,12 +308,17 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
     headStyles: { fillColor: [14, 43, 85] },
   });
 
-  const yMensal = proximoY(doc, 150);
+  // Heading + gráfico + tabela andam juntos — ~125mm no total.
+  const yMensal = garantirEspaco(proximoY(doc, 150), 125);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text("Cadastros e Conclusão por Mês", 14, yMensal);
+
+  const larguraGrafico = doc.internal.pageSize.getWidth() - 28;
+  desenharGraficoMensal(doc, dadosGraficoMensal, 14, yMensal + 14, larguraGrafico, 45);
+
   autoTable(doc, {
-    startY: yMensal + 2,
+    startY: yMensal + 70,
     head: [["Mês", "Registrados", "Concluídos", "Taxa de Conclusão"]],
     body: mensalRows,
     theme: "striped",
@@ -225,7 +326,7 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
     headStyles: { fillColor: [14, 43, 85] },
   });
 
-  const yAssuntos = proximoY(doc, 220);
+  const yAssuntos = garantirEspaco(proximoY(doc, 220), 50);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.text("Assuntos Mais Frequentes", 14, yAssuntos);
@@ -238,89 +339,48 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
     headStyles: { fillColor: [14, 43, 85] },
   });
 
-  doc.save("indicadores-estatisticas.pdf");
+  doc.save("indicadores-du.pdf");
 }
 
-export async function exportIndicadoresGeraisPdfFromElement(element: HTMLElement) {
-  const imported = (await import("html2canvas")) as Html2CanvasModule;
-  const html2canvas = imported.default ?? imported;
+// V1 — Resumo enxuto de PA: volume de Sindicâncias e IPM com taxa de
+// conclusão de cada um, mais o total geral de PA cadastrados/finalizados.
+// As listas detalhadas (processos em curso/atrasados) continuam nos
+// relatórios dedicados exportSindicanciasPdf/exportIPMPdf — este é só um
+// retrato rápido pra quem está de fora.
+export function exportIndicadoresPAPdf(processosTodos: Processo[]) {
+  const processos = processosTodos.filter((p) => setorDe(p) === "PA");
+  const total = processos.length;
+  const concluidos = processos.filter(ehConcluido).length;
 
-  if (typeof html2canvas !== "function") {
-    throw new Error("html2canvas não disponível em runtime");
-  }
+  const sindicancias = processos.filter(isSindicancia);
+  const sindicanciasConcluidas = sindicancias.filter(ehConcluido).length;
 
-  const clone = element.cloneNode(true) as HTMLElement;
-  clone.style.width = `${element.scrollWidth}px`;
-  clone.style.background = "white";
-  clone.style.padding = "12px";
-  clone.querySelectorAll('[data-print-ignore="true"]').forEach((node) => node.remove());
+  const ipm = processos.filter(isIPM);
+  const ipmConcluidos = ipm.filter(ehConcluido).length;
 
-  const wrapper = document.createElement("div");
-  wrapper.style.position = "fixed";
-  wrapper.style.left = "-100000px";
-  wrapper.style.top = "0";
-  wrapper.style.width = `${element.scrollWidth + 24}px`;
-  wrapper.style.background = "white";
-  wrapper.appendChild(clone);
-  document.body.appendChild(wrapper);
+  const doc = buildBasePdf(
+    "Indicadores de Gestão - Processos Administrativos",
+    "Resumo consolidado de produtividade do acervo de PA",
+  );
 
-  try {
-    const canvas = await html2canvas(clone, {
-      scale: 1.6,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-      logging: false,
-      windowWidth: clone.scrollWidth,
-      windowHeight: clone.scrollHeight,
-    });
+  autoTable(doc, {
+    startY: 36,
+    head: [["Métrica", "Valor"]],
+    body: [
+      ["Total de processos PA cadastrados", String(total)],
+      ["Processos PA finalizados", String(concluidos)],
+      ["Taxa de conclusão geral", formatarPercentual(concluidos, total)],
+      ["Total de Sindicâncias", String(sindicancias.length)],
+      ["Taxa de conclusão (Sindicâncias)", formatarPercentual(sindicanciasConcluidas, sindicancias.length)],
+      ["Total de IPM", String(ipm.length)],
+      ["Taxa de conclusão (IPM)", formatarPercentual(ipmConcluidos, ipm.length)],
+    ],
+    theme: "grid",
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [26, 86, 219] },
+  });
 
-    if (!canvas || canvas.width === 0 || canvas.height === 0) {
-      throw new Error("Falha ao capturar área de indicadores");
-    }
-
-    const imgData = canvas.toDataURL("image/png", 1);
-    const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    // Cabeçalho igual ao padrão anterior
-    doc.setFillColor(14, 43, 85);
-    doc.rect(0, 0, pageWidth, 30, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.text("Indicadores de Gestão - Estatísticas", 14, 13);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text("Painel completo dos indicadores exibidos em tela", 14, 20);
-    doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 14, 25);
-
-    const marginX = 8;
-    const startY = 36;
-    const usableWidth = pageWidth - marginX * 2;
-    const usableHeight = pageHeight - startY - 8;
-    const imgWidth = usableWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    let yRemaining = imgHeight;
-    let position = startY;
-
-    doc.setTextColor(20, 20, 20);
-    doc.addImage(imgData, "PNG", marginX, position, imgWidth, imgHeight);
-    yRemaining -= usableHeight;
-
-    while (yRemaining > 0) {
-      position = yRemaining - imgHeight + startY;
-      doc.addPage();
-      doc.addImage(imgData, "PNG", marginX, position, imgWidth, imgHeight);
-      yRemaining -= usableHeight;
-    }
-
-    doc.save("indicadores-estatisticas-geral.pdf");
-  } finally {
-    document.body.removeChild(wrapper);
-  }
+  doc.save("indicadores-pa.pdf");
 }
 
 function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {

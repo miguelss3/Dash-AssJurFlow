@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -21,8 +21,8 @@ import type { ProcessosStats } from "@/hooks/useProcessosStats";
 import { useAcervoProcessual } from "@/hooks/useAcervoProcessual";
 import { Button } from "@/components/ui/button";
 import {
-  exportIndicadoresGeraisPdf,
-  exportIndicadoresGeraisPdfFromElement,
+  exportIndicadoresDUPdf,
+  exportIndicadoresPAPdf,
   exportSindicanciasPdf,
   exportIPMPdf,
 } from "@/lib/indicadoresPdf";
@@ -64,12 +64,19 @@ const GRID_COLOR = "oklch(0.92 0.005 240)";
 const ACCENT = "oklch(0.6 0.16 230)";
 const ACCENT_LIME = "oklch(0.78 0.18 145)";
 
+// "Outros" sozinho não diz nada — se tiver complemento depois do hífen
+// (ex.: "Outros - Licença para tratamento de saúde"), mostra o texto
+// completo em vez de esconder o assunto real atrás do rótulo genérico.
 function assuntoIndicePrincipal(value?: string) {
   const texto = String(value || "Outros").trim();
   if (!texto) return "Outros";
 
-  const [principal] = texto.split(/\s[-–—]\s/);
-  return (principal || texto).trim() || "Outros";
+  const partes = texto.split(/\s[-–—]\s/);
+  const principal = (partes[0] || texto).trim() || "Outros";
+  if (normalizarChaveAssunto(principal) === "outros" && partes.length > 1) {
+    return texto;
+  }
+  return principal;
 }
 
 function normalizarChaveAssunto(value: string) {
@@ -81,22 +88,14 @@ function normalizarChaveAssunto(value: string) {
 }
 
 export function Estatisticas({ processos, loadingProcessos = false, statsServidor }: Props) {
-  const indicadoresPrintRef = useRef<HTMLDivElement | null>(null);
+  const handleExportIndicadoresDU = () => {
+    exportIndicadoresDUPdf(processos);
+    toast.success("PDF de indicadores de DU gerado.");
+  };
 
-  const handleExportEstatisticas = async () => {
-    if (!indicadoresPrintRef.current) {
-      toast.error("Não foi possível localizar a área de impressão dos indicadores.");
-      return;
-    }
-
-    try {
-      await exportIndicadoresGeraisPdfFromElement(indicadoresPrintRef.current);
-      toast.success("PDF de estatísticas gerais gerado e baixado com sucesso.");
-    } catch (error) {
-      console.error("Falha ao gerar PDF visual dos indicadores:", error);
-      exportIndicadoresGeraisPdf(processos);
-      toast.warning("Falha no layout visual. PDF simplificado foi gerado automaticamente.");
-    }
+  const handleExportIndicadoresPA = () => {
+    exportIndicadoresPAPdf(processos);
+    toast.success("PDF de indicadores de PA gerado.");
   };
 
   const handleExportSindicancias = () => {
@@ -311,22 +310,26 @@ export function Estatisticas({ processos, loadingProcessos = false, statsServido
   }, [processos]);
 
   return (
-    <div className="space-y-5 indicadores-print-root" ref={indicadoresPrintRef}>
-      <div data-print-ignore="true" className="rounded-2xl border border-border bg-card p-4 shadow-card">
+    <div className="space-y-5">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-card">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wide text-slate-700">
               Relatórios em PDF
             </h3>
             <p className="mt-1 text-[11px] text-muted-foreground">
-              Exporte os indicadores gerais, sindicâncias e IPM em documentos prontos para
+              Exporte os indicadores de DU, PA, sindicâncias e IPM em documentos prontos para
               impressão.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={handleExportEstatisticas}>
+            <Button type="button" variant="outline" onClick={handleExportIndicadoresDU}>
               <FileText className="mr-2 h-4 w-4" />
-              Estatísticas
+              Indicadores DU
+            </Button>
+            <Button type="button" variant="outline" onClick={handleExportIndicadoresPA}>
+              <FileText className="mr-2 h-4 w-4" />
+              Indicadores PA
             </Button>
             <Button type="button" variant="outline" onClick={handleExportSindicancias}>
               <FileText className="mr-2 h-4 w-4" />
