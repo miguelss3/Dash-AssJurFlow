@@ -332,6 +332,32 @@ export function AcoesDUModalNovo({
           ? [...historicoExistente, ...novosItens]
           : historicoExistente;
 
+      // V3.12 — Histórico de recebidos: a tela de Detalhes (DetalhesModalDU)
+      // e a Resposta Tardia já leem/gravam em `historicoRecebidos`, e assim
+      // que esse array existe uma vez, a tela passa a ignorar o campo legado
+      // singular `numeroRecebido` por completo. Esta transição (Aguardando
+      // Resposta → Mesa do Assessor) só gravava no campo legado — então,
+      // num card que já tivesse `historicoRecebidos` de uma reiteração ou
+      // edição anterior, a resposta nova era salva mas nunca aparecia na
+      // tela. Acumula aqui do mesmo jeito que o resto do app já faz.
+      const historicoRecebidosExistente: Array<{ numero?: string; dataRecebimento?: string }> =
+        Array.isArray(pedidoAtual?.historicoRecebidos)
+          ? (pedidoAtual.historicoRecebidos as Array<{ numero?: string; dataRecebimento?: string }>)
+          : [];
+      const jaRegistradoComoRecebido = historicoRecebidosExistente.some(
+        (r) => (r?.numero || "").trim().toLowerCase() === numeroRecebidoEfetivo.toLowerCase(),
+      );
+      const historicoRecebidos =
+        numeroRecebidoEfetivo && !jaRegistradoComoRecebido
+          ? [
+              ...historicoRecebidosExistente,
+              {
+                numero: numeroRecebidoEfetivo,
+                dataRecebimento: extras?.dataRecebido || dataCivilAtual(),
+              },
+            ]
+          : historicoRecebidosExistente;
+
       // V2.3 — Contador de reiterações preservado entre transições.
       const reiteracoesAtual = Number(pedidoAtual?.reiteracoes) || 0;
       const reiteracoesEfetivo = reiteracoesAtual + (extras?.reiteracoesIncrement ?? 0);
@@ -366,6 +392,7 @@ export function AcoesDUModalNovo({
             : numeroDocEfetivo || (pedidoAtual?.numeroDiex as string) || "",
         numeroDiexHistorico,
         numeroRecebido: numeroRecebidoEfetivo,
+        historicoRecebidos,
         dataRecebido: extras?.dataRecebido !== undefined ? extras.dataRecebido : (pedidoAtual?.dataRecebido || null),
         possuiPrazoDU: possuiPrazoEfetivo,
         // V2.4 — Composição de documentos externos persistida no pedido.
@@ -642,8 +669,11 @@ export function AcoesDUModalNovo({
           toast.error("Informe o número do documento recebido.");
           return;
         }
-        // Salva a data do dia no campo dataRecebido (AAAA-MM-DD)
-        const dataRecebido = new Date().toISOString().split("T")[0];
+        // Salva a data do dia no campo dataRecebido (AAAA-MM-DD). Usa
+        // dataCivilAtual() (fuso local) em vez de toISOString() — evita o
+        // mesmo bug de fuso já corrigido alhures: UTC pode "recuar" um dia
+        // em fusos negativos como o do Brasil perto da meia-noite.
+        const dataRecebido = dataCivilAtual();
         void avancarFluxo("MESA_ASSESSOR", {
           numeroRecebido: numero,
           dataRecebido,
