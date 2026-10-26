@@ -57,16 +57,23 @@ function isAtrasado(p: Processo) {
 // Um atraso em PA acontece em uma de duas fases: o Encarregado ainda não
 // concluiu a instrução (ou pediu prorrogação), ou o processo já passou para
 // o Assessor, que está atrasando a confecção/assinatura da solução.
-function motivoAtraso(p: Processo): "Assessor (Solucao)" | "Encarregado" {
+function motivoAtraso(p: Processo): "Assessor (Solução)" | "Encarregado" {
   const sitPA = String(p.situacaoFluxoPA || "").trim().toUpperCase();
   const emFaseAssessorSolucao = sitPA === "FAZENDO_SOLUCAO" || sitPA === "ASSINANDO_SOLUCAO";
-  return emFaseAssessorSolucao ? "Assessor (Solucao)" : "Encarregado";
+  return emFaseAssessorSolucao ? "Assessor (Solução)" : "Encarregado";
 }
 
 function diasParaOrdenacao(p: Processo) {
   const prazo = prazoReferencia(p);
   if (!prazo) return Number.POSITIVE_INFINITY;
   return diasRestantes(prazo);
+}
+
+// Evita repetir o cast feio toda vez que uma tabela precisa começar logo
+// abaixo da anterior.
+function proximoY(doc: jsPDF, fallback: number): number {
+  const comAutoTable = doc as unknown as { lastAutoTable?: { finalY?: number } };
+  return comAutoTable.lastAutoTable?.finalY ? comAutoTable.lastAutoTable.finalY + 8 : fallback;
 }
 
 function buildBasePdf(title: string, subtitle: string, orientation: "p" | "l" = "p") {
@@ -89,33 +96,107 @@ function buildBasePdf(title: string, subtitle: string, orientation: "p" | "l" = 
   return doc;
 }
 
+// Mesmo agrupamento usado no painel de Estatísticas (ChartCard "Tipos de
+// ação mais comuns"): ignora o que vem depois de " - " no assunto e agrupa
+// por chave normalizada (sem acento/maiúscula) para não duplicar variações
+// de grafia do mesmo assunto.
+function assuntoIndicePrincipal(value?: string): string {
+  const texto = String(value || "Outros").trim();
+  if (!texto) return "Outros";
+  const [principal] = texto.split(/\s[-–—]\s/);
+  return (principal || texto).trim() || "Outros";
+}
+
+const LABEL_STATUS: Record<string, string> = {
+  novo: "Triagem",
+  andamento: "Em Andamento",
+  concluido: "Concluído",
+};
+
+// V2 — Relatório pensado para circular fora da equipe (chefia, outras OMs):
+// sem prazos/atrasos internos, com os números que dão uma visão geral de
+// volume e produtividade (cadastros e conclusão mês a mês, assuntos mais
+// recorrentes, composição DU/PA).
 export function exportIndicadoresGeraisPdf(processos: Processo[]) {
   const total = processos.length;
-  const concluidos = processos.filter((p) => p.status === "concluido").length;
+  const concluidos = processos.filter(ehConcluido).length;
   const ativos = total - concluidos;
-  const atrasados = processos.filter(isAtrasado).length;
   const percentualConclusao = total > 0 ? Math.round((concluidos / total) * 100) : 0;
 
   const statusRows = ["novo", "andamento", "concluido"].map((status) => {
     const quantidade = processos.filter((p) => p.status === status).length;
     const percentual = total > 0 ? `${Math.round((quantidade / total) * 100)}%` : "0%";
-    return [status.toUpperCase(), String(quantidade), percentual];
+    return [LABEL_STATUS[status], String(quantidade), percentual];
   });
 
+  const setorDe = (p: Processo) => (p.setor || p.tipo || "").toString().trim().toUpperCase();
+  const totalDU = processos.filter((p) => setorDe(p) === "DU").length;
+  const totalPA = processos.filter((p) => setorDe(p) === "PA").length;
+
+  // Cadastros e conclusão por mês — mesma janela de 6 meses do painel.
+  const agora = new Date();
+  const meses = Array.from({ length: 6 }).map((_, index) => {
+    const ref = new Date(agora.getFullYear(), agora.getMonth() - (5 - index), 1);
+    return {
+      chave: `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`,
+      rotulo: ref.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }),
+    };
+  });
+  const porMes = new Map(meses.map((m) => [m.chave, { cadastrados: 0, concluidos: 0 }]));
+  processos.forEach((p) => {
+    const dataBase = p.criadoEm || p.dataEntrada;
+    if (!dataBase) return;
+    const d = new Date(dataBase);
+    if (Number.isNaN(d.getTime())) return;
+    const chave = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const bucket = porMes.get(chave);
+    if (!bucket) return;
+    bucket.cadastrados += 1;
+    if (ehConcluido(p)) bucket.concluidos += 1;
+  });
+  const mensalRows = meses.map((m) => {
+    const b = porMes.get(m.chave) as { cadastrados: number; concluidos: number };
+    const taxa = b.cadastrados > 0 ? `${Math.round((b.concluidos / b.cadastrados) * 100)}%` : "-";
+    const rotulo = m.rotulo.charAt(0).toUpperCase() + m.rotulo.slice(1);
+    return [rotulo, String(b.cadastrados), String(b.concluidos), taxa];
+  });
+
+  // Assuntos mais frequentes (Top 5).
+  const mapaAssuntos = new Map<string, { nome: string; valor: number }>();
+  processos.forEach((p) => {
+    const principal = assuntoIndicePrincipal(p.tipoAcao);
+    const chave = normalizeText(principal);
+    const atual = mapaAssuntos.get(chave);
+    if (!atual) {
+      mapaAssuntos.set(chave, { nome: principal, valor: 1 });
+      return;
+    }
+    mapaAssuntos.set(chave, { ...atual, valor: atual.valor + 1 });
+  });
+  const assuntosRows = Array.from(mapaAssuntos.values())
+    .sort((a, b) => b.valor - a.valor)
+    .slice(0, 5)
+    .map((item) => [
+      item.nome,
+      String(item.valor),
+      total > 0 ? `${Math.round((item.valor / total) * 100)}%` : "0%",
+    ]);
+
   const doc = buildBasePdf(
-    "Indicadores de Gestao - Estatisticas",
-    "Resumo consolidado de produtividade e distribuicao do acervo",
+    "Indicadores de Gestão - Estatísticas",
+    "Resumo consolidado de produtividade e distribuição do acervo",
   );
 
   autoTable(doc, {
     startY: 36,
-    head: [["Metrica", "Valor"]],
+    head: [["Métrica", "Valor"]],
     body: [
       ["Total de processos cadastrados", String(total)],
       ["Processos finalizados", String(concluidos)],
       ["Processos ativos", String(ativos)],
-      ["Processos atrasados", String(atrasados)],
-      ["Taxa de conclusao", `${percentualConclusao}%`],
+      ["Taxa de conclusão geral", `${percentualConclusao}%`],
+      ["Processos DU", String(totalDU)],
+      ["Processos PA", String(totalPA)],
     ],
     theme: "grid",
     styles: { fontSize: 10 },
@@ -123,11 +204,35 @@ export function exportIndicadoresGeraisPdf(processos: Processo[]) {
   });
 
   autoTable(doc, {
-    startY: (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY
-      ? (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
-      : 92,
+    startY: proximoY(doc, 92),
     head: [["Status", "Quantidade", "% do total"]],
     body: statusRows,
+    theme: "striped",
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [14, 43, 85] },
+  });
+
+  const yMensal = proximoY(doc, 150);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Cadastros e Conclusão por Mês", 14, yMensal);
+  autoTable(doc, {
+    startY: yMensal + 2,
+    head: [["Mês", "Registrados", "Concluídos", "Taxa de Conclusão"]],
+    body: mensalRows,
+    theme: "striped",
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [14, 43, 85] },
+  });
+
+  const yAssuntos = proximoY(doc, 220);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Assuntos Mais Frequentes", 14, yAssuntos);
+  autoTable(doc, {
+    startY: yAssuntos + 2,
+    head: [["Assunto", "Quantidade", "% do total"]],
+    body: assuntosRows.length > 0 ? assuntosRows : [["-", "-", "-"]],
     theme: "striped",
     styles: { fontSize: 10 },
     headStyles: { fillColor: [14, 43, 85] },
@@ -185,7 +290,7 @@ export async function exportIndicadoresGeraisPdfFromElement(element: HTMLElement
     doc.setTextColor(255, 255, 255);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(16);
-    doc.text("Indicadores de Gestao - Estatisticas", 14, 13);
+    doc.text("Indicadores de Gestão - Estatísticas", 14, 13);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.text("Painel completo dos indicadores exibidos em tela", 14, 20);
@@ -221,11 +326,11 @@ export async function exportIndicadoresGeraisPdfFromElement(element: HTMLElement
 function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
   const titulo =
     tipo === "sindicancia"
-      ? "Relatorio - Sindicancias em Curso e Atrasadas"
-      : "Relatorio - IPM em Curso e Atrasados";
+      ? "Relatório - Sindicâncias em Curso e Atrasadas"
+      : "Relatório - IPM em Curso e Atrasados";
   const subtitulo =
     tipo === "sindicancia"
-      ? "Controle de sindicancias ativas e com atraso de prazo"
+      ? "Controle de sindicâncias ativas e com atraso de prazo"
       : "Controle de IPM ativos e com atraso de prazo";
 
   const matcher = tipo === "sindicancia" ? isSindicancia : isIPM;
@@ -239,19 +344,19 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
     .sort((a, b) => diasParaOrdenacao(a) - diasParaOrdenacao(b));
   const totalAtivas = emCurso.length + atrasadas.length;
   const atrasadasEncarregado = atrasadas.filter((p) => motivoAtraso(p) === "Encarregado").length;
-  const atrasadasAssessor = atrasadas.filter((p) => motivoAtraso(p) === "Assessor (Solucao)").length;
+  const atrasadasAssessor = atrasadas.filter((p) => motivoAtraso(p) === "Assessor (Solução)").length;
 
   const doc = buildBasePdf(titulo, subtitulo);
 
   autoTable(doc, {
     startY: 36,
-    head: [["Metrica", "Valor"]],
+    head: [["Métrica", "Valor"]],
     body: [
       ["Total mapeado", String(base.length)],
       ["Em curso", String(emCurso.length)],
       ["Atrasadas", String(atrasadas.length)],
-      ["  - Atraso com o Encarregado (nao concluiu / prorrogacao)", String(atrasadasEncarregado)],
-      ["  - Atraso com o Assessor (confeccao da solucao)", String(atrasadasAssessor)],
+      ["  - Atraso com o Encarregado (não concluiu / prorrogação)", String(atrasadasEncarregado)],
+      ["  - Atraso com o Assessor (confecção da solução)", String(atrasadasAssessor)],
       [
         "Taxa de atraso",
         totalAtivas > 0 ? `${Math.round((atrasadas.length / totalAtivas) * 100)}%` : "0%",
@@ -288,7 +393,7 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
   // `atrasadas` já vem ordenada do mais atrasado para o menos atrasado
   // (diasParaOrdenacao ascendente = mais dias negativos primeiro).
   const atrasadasAssessorRows = atrasadas
-    .filter((p) => motivoAtraso(p) === "Assessor (Solucao)")
+    .filter((p) => motivoAtraso(p) === "Assessor (Solução)")
     .map((p) => {
       const dias = diasParaOrdenacao(p);
       return [
@@ -300,10 +405,7 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
       ];
     });
 
-  const firstTableY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable
-    ?.finalY
-    ? (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
-    : 92;
+  const firstTableY = proximoY(doc, 92);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -311,7 +413,7 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
 
   autoTable(doc, {
     startY: firstTableY + 2,
-    head: [["Processo", "Interessado", "Encarregado", "Responsavel", "Entrada", "Prazo"]],
+    head: [["Processo", "Interessado", "Encarregado", "Responsável", "Entrada", "Prazo"]],
     body: emCursoRows.length > 0
       ? emCursoRows
       : [["-", "-", "-", "-", "-", "Sem registros em curso"]],
@@ -320,10 +422,7 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
     headStyles: { fillColor: [14, 43, 85] },
   });
 
-  const secondTableY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable
-    ?.finalY
-    ? (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
-    : firstTableY + 50;
+  const secondTableY = proximoY(doc, firstTableY + 50);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -331,7 +430,7 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
 
   autoTable(doc, {
     startY: secondTableY + 2,
-    head: [["Processo", "Interessado", "Encarregado", "Responsavel", "Entrada", "Prazo", "Atraso por"]],
+    head: [["Processo", "Interessado", "Encarregado", "Responsável", "Entrada", "Prazo", "Atraso por"]],
     body: atrasadasRows.length > 0
       ? atrasadasRows
       : [["-", "-", "-", "-", "-", "-", "Sem registros em atraso"]],
@@ -340,10 +439,7 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
     headStyles: { fillColor: [176, 55, 55] },
   });
 
-  const thirdTableY = (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable
-    ?.finalY
-    ? (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
-    : secondTableY + 50;
+  const thirdTableY = proximoY(doc, secondTableY + 50);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -351,7 +447,7 @@ function exportTipoPA(processos: Processo[], tipo: "sindicancia" | "ipm") {
 
   autoTable(doc, {
     startY: thirdTableY + 2,
-    head: [["Processo", "Interessado", "Responsavel", "Prazo", "Dias em atraso"]],
+    head: [["Processo", "Interessado", "Responsável", "Prazo", "Dias em atraso"]],
     body: atrasadasAssessorRows.length > 0
       ? atrasadasAssessorRows
       : [["-", "-", "-", "-", "Sem registros"]],
@@ -398,7 +494,7 @@ export function exportResultadosBuscaPdf(processos: Processo[], termoBusca: stri
     formatDate(p.dataEntrada),
     p.numero || "-",
     p.tipoAcao || "-",
-    ehConcluido(p) ? "Sim" : "Nao",
+    ehConcluido(p) ? "Sim" : "Não",
     resumoDoProcesso(p),
   ]);
 
@@ -412,7 +508,7 @@ export function exportResultadosBuscaPdf(processos: Processo[], termoBusca: stri
 
   autoTable(doc, {
     startY: 36,
-    head: [["Data de Entrada", "Numero do Processo", "Assunto", "Finalizado", "Resumo"]],
+    head: [["Data de Entrada", "Número do Processo", "Assunto", "Finalizado", "Resumo"]],
     body: rows,
     theme: "striped",
     styles: { fontSize: 9, cellPadding: 2.5, overflow: "linebreak" },

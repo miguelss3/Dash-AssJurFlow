@@ -11,8 +11,6 @@ import {
   Pie,
   Cell,
   Legend,
-  Area,
-  AreaChart,
 } from "recharts";
 import { TrendingUp, Award, AlertTriangle, CheckCircle2, Clock, FileText, RefreshCw, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
@@ -579,18 +577,12 @@ export function Estatisticas({ processos, loadingProcessos = false, statsServido
         </ChartCard>
 
         <ChartCard
-          title="Linha de cadastros"
-          subtitle="Cadastros por mês (últimos 6 meses)"
+          title="Cadastros por mês"
+          subtitle="Volume de registros (últimos 6 meses)"
           icon={Clock}
         >
           <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={dadosCadastros} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="grad-area" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={ACCENT_LIME} stopOpacity={0.6} />
-                  <stop offset="100%" stopColor={ACCENT_LIME} stopOpacity={0} />
-                </linearGradient>
-              </defs>
+            <BarChart data={dadosCadastros} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
               <XAxis
                 dataKey="name"
@@ -605,14 +597,8 @@ export function Estatisticas({ processos, loadingProcessos = false, statsServido
                 allowDecimals={false}
               />
               <Tooltip contentStyle={TOOLTIP_STYLE} />
-              <Area
-                type="monotone"
-                dataKey="cadastros"
-                stroke={ACCENT_LIME}
-                strokeWidth={2.5}
-                fill="url(#grad-area)"
-              />
-            </AreaChart>
+              <Bar dataKey="cadastros" fill={ACCENT_LIME} radius={[8, 8, 0, 0]} name="Cadastros" />
+            </BarChart>
           </ResponsiveContainer>
         </ChartCard>
       </div>
