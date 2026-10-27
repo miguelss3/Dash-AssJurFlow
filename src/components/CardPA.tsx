@@ -172,21 +172,25 @@ const CardPAComponent = ({
 
   const abrirReativacao = () => {
     setMotivoReabertura("");
-    setNovoPrazoFatal(p.prazoFatal || "");
+    // Começa vazio de propósito — o prazo fatal antigo já venceu (é por isso
+    // que o processo está sendo reaberto), então não faz sentido pré-marcar
+    // essa data como se já estivesse certa.
+    setNovoPrazoFatal("");
     setModalReativar(true);
   };
 
   const reativarProcesso = async () => {
     if (!onReativarProcesso) return;
-    if (!ehAdmin) {
-      if (!motivoReabertura.trim()) {
-        toast.error("Informe o motivo da reabertura.");
-        return;
-      }
-      if (!novoPrazoFatal) {
-        toast.error("Informe o novo prazo fatal.");
-        return;
-      }
+    if (!ehAdmin && !motivoReabertura.trim()) {
+      toast.error("Informe o motivo da reabertura.");
+      return;
+    }
+    // Novo prazo fatal é obrigatório pra qualquer um que reabrir — o antigo
+    // já está vencido, então reabrir sem definir um novo deixaria o processo
+    // "atrasado" desde o primeiro segundo.
+    if (!novoPrazoFatal) {
+      toast.error("Informe o novo prazo fatal.");
+      return;
     }
     try {
       setReativando(true);
@@ -430,7 +434,7 @@ const CardPAComponent = ({
             <DialogHeader>
               <DialogTitle>Reabrir Processo {p.numero}</DialogTitle>
               <DialogDescription>
-                {ehAdmin ? "Ao reabrir, o processo volta ao fluxo ativo." : "Informe o motivo da reabertura e defina o novo prazo fatal."}
+                {ehAdmin ? "Defina o novo prazo fatal para reabrir o processo." : "Informe o motivo da reabertura e defina o novo prazo fatal."}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
@@ -439,7 +443,7 @@ const CardPAComponent = ({
                 <Textarea id={`motivo-${p.id}`} value={motivoReabertura} onChange={(e) => setMotivoReabertura(e.target.value)} placeholder="Descreva o motivo" rows={3} />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor={`prazo-fatal-${p.id}`}>Novo prazo fatal {!ehAdmin ? "*" : ""}</Label>
+                <Label htmlFor={`prazo-fatal-${p.id}`}>Novo prazo fatal *</Label>
                 <Input id={`prazo-fatal-${p.id}`} type="date" value={novoPrazoFatal} onChange={(e) => setNovoPrazoFatal(e.target.value)} />
               </div>
             </div>

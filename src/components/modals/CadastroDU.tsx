@@ -46,6 +46,26 @@ const sanitizarPayload = (obj: unknown): unknown => {
   return obj;
 };
 
+// Prazo interno = 2 dias antes do prazo fatal. Quando isso cair antes da
+// data de entrada (prazo fatal muito próximo, sem os 2 dias de folga),
+// usa o próprio prazo fatal — nunca um prazo interno "no passado".
+function calcularPrazoInternoDU(prazoFatal: string, dataEntrada: string): string {
+  if (!prazoFatal) return "";
+  const dFatal = new Date(`${prazoFatal}T00:00:00`);
+  if (Number.isNaN(dFatal.getTime())) return "";
+
+  const dInterno = new Date(dFatal);
+  dInterno.setDate(dInterno.getDate() - 2);
+
+  const dEntrada = dataEntrada ? new Date(`${dataEntrada}T00:00:00`) : null;
+  if (dEntrada && !Number.isNaN(dEntrada.getTime()) && dInterno < dEntrada) {
+    return prazoFatal;
+  }
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${dInterno.getFullYear()}-${pad(dInterno.getMonth() + 1)}-${pad(dInterno.getDate())}`;
+}
+
 const inferirSetorPorCampos = (...valores: Array<unknown>): "DU" | "PA" | "" => {
   const candidatos = valores
     .filter(Boolean)
@@ -122,7 +142,8 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
     setOrigemDU(p.origemDU || "");
     setSecaoDU(p.secaoDU || "SVP");
     setIsMS(p.isMS || false);
-    setPrazoInternoDU(p.prazo || "");
+    // Prazo interno não é lido daqui — o useEffect abaixo recalcula sozinho
+    // a partir do prazo fatal assim que ele for setado logo abaixo.
     setPrazoFatalDU(p.prazoFatal || "");
 
     const pedido = p.pedidoSubsidios || {};
@@ -142,6 +163,13 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
       resetForm();
     }
   }, [open, processo]);
+
+  // Prazo interno não é mais digitado — recalcula sozinho sempre que o
+  // prazo fatal ou a data de entrada mudam (inclusive ao carregar um
+  // processo existente pra edição).
+  useEffect(() => {
+    setPrazoInternoDU(calcularPrazoInternoDU(prazoFatalDU, dataEntrada));
+  }, [prazoFatalDU, dataEntrada]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -283,12 +311,23 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
         const processoRef = doc(db, "processos", processo.id);
         const msgAtualizacao = "Dados do processo atualizados.";
 
+        // V3.13 — BUG GRAVE: `status`/`finalizado` aqui em cima são os valores
+        // de CADASTRO NOVO ("Aguardando Distribuição" / false). Antes dessa
+        // correção, editar QUALQUER campo de um processo já existente (até um
+        // ajuste bobo de "Parte" ou "Seção") sobrescrevia esses dois campos
+        // sem pedir nada — podendo "destravar" silenciosamente um processo já
+        // finalizado de volta pra mesa do assessor, sem motivo nem prazo
+        // novo. Status/finalizado são geridos só pelo fluxo (AcoesDUModalNovo)
+        // e pela Reabertura — uma edição de dados cadastrais nunca deve
+        // tocar neles.
         const {
           criadoEm: _,
           userId: _uid,
           userEmail: _email,
           criadoPorUid: _cpUid,
           criadoPorEmail: _cpEmail,
+          status: _status,
+          finalizado: _finalizado,
           ...dadosUpdate
         } = dados;
 
@@ -453,7 +492,10 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="prazoInternoDU">Prazo Interno</Label>
-              <Input id="prazoInternoDU" type="date" value={prazoInternoDU} onChange={(e) => setPrazoInternoDU(e.target.value)} />
+              <Input id="prazoInternoDU" type="date" value={prazoInternoDU} disabled className="disabled:opacity-100 disabled:cursor-not-allowed bg-muted" />
+              <p className="text-[11px] text-muted-foreground">
+                Calculado automaticamente: 2 dias antes do prazo fatal (ou o mesmo dia, se não houver folga).
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="prazoFatalDU">Prazo Fatal</Label>

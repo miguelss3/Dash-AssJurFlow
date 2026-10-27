@@ -852,15 +852,15 @@ function Index() {
       const novoPrazoFatal = payload?.novoPrazoFatal?.trim() || "";
       const setor = normalizarSetor(processo.setor || processo.tipo);
 
-      if (!ehAdmin) {
-        if (!motivo) {
-          toast.error("Informe o motivo da reabertura.");
-          return;
-        }
-        if (!novoPrazoFatal) {
-          toast.error("Informe o novo prazo fatal.");
-          return;
-        }
+      if (!ehAdmin && !motivo) {
+        toast.error("Informe o motivo da reabertura.");
+        return;
+      }
+      // Prazo fatal novo é obrigatório pra qualquer um que reabrir — o
+      // antigo já venceu (por isso o processo está sendo reaberto).
+      if (!novoPrazoFatal) {
+        toast.error("Informe o novo prazo fatal.");
+        return;
       }
 
       const mensagens: string[] = ["Processo reaberto."];
