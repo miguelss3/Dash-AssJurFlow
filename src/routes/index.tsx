@@ -202,7 +202,7 @@ function Index() {
     loading: siteSettingsLoading,
     saveSettings: persistSiteSettings,
   } = useSiteSettings(ready && !!user);
-  const { processos, carregando: loadingProcessos, criar, atualizar, remover } = useProcessos(siteSettings, user);
+  const { processos, carregando: loadingProcessos, criar, atualizar, remover, buscarSnapshotBruto } = useProcessos(siteSettings, user);
   // Fonte única das contagens históricas do servidor — compartilhada entre
   // Dashboard e Estatisticas para não duplicar as mesmas consultas getCountFromServer.
   const statsServidor = useProcessosStats();
@@ -868,6 +868,15 @@ function Index() {
       if (novoPrazoFatal) mensagens.push(`Novo prazo fatal: ${novoPrazoFatal}.`);
       const msgHistorico = mensagens.join(" ");
 
+      // V3.15 — Snapshot fiel (direto do Firestore) de como o processo
+      // estava ANTES de reabrir, pro botão "Desfazer" do card voltar pro
+      // lugar certo (finalizado) em vez de reaproveitar o `ultimaAcaoFluxo`
+      // de uma transição de fluxo bem mais antiga, que é o que acontecia
+      // antes — Reabertura nunca registrava seu próprio ponto de desfazer.
+      const snapshotAntes = await buscarSnapshotBruto(processoId);
+      const previousDoc = snapshotAntes ? { ...snapshotAntes } : null;
+      if (previousDoc) delete previousDoc.ultimaAcaoFluxo;
+
       const patch: Record<string, unknown> = {
         status: "andamento",
         finalizado: false,
@@ -878,6 +887,16 @@ function Index() {
         descricao: msgHistorico,
         atualizadoEm: new Date().toISOString(),
         atualizadoPorNome: nomeMilitarAtual,
+        ...(previousDoc
+          ? {
+              ultimaAcaoFluxo: {
+                tipo: setor || "GERAL",
+                criadoEm: new Date().toISOString(),
+                criadoPorNome: nomeMilitarAtual,
+                previousDoc,
+              },
+            }
+          : {}),
       };
 
       if (novoPrazoFatal) {

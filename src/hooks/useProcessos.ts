@@ -3,11 +3,12 @@ import {
   collection, 
   query, 
   where,
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  deleteDoc,
   doc,
+  getDoc,
   getDocs,
   writeBatch,
   Timestamp,
@@ -576,6 +577,17 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
     }
   };
 
+  // V3.15 — Lê o documento DIRETO do Firestore (não o objeto já normalizado
+  // de `processos`, que tem campos calculados/derivados no cliente). Usado
+  // por ações fora do fluxo padrão (ex.: Reabertura) que precisam guardar um
+  // snapshot fiel em `ultimaAcaoFluxo.previousDoc` pro botão "Desfazer"
+  // funcionar — sem isso, "Desfazer" usa o snapshot da ÚLTIMA transição de
+  // fluxo registrada (que pode ser bem anterior), voltando pro lugar errado.
+  const buscarSnapshotBruto = async (id: string): Promise<Record<string, unknown> | null> => {
+    const snap = await getDoc(doc(db, "processos", id));
+    return snap.exists() ? (snap.data() as Record<string, unknown>) : null;
+  };
+
   // Função para atualizar processo existente
   const atualizar = async (id: string, dados: Partial<Processo>) => {
     try {
@@ -718,13 +730,14 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
     void varrerProcessosVencidos();
   }, [processos]);
 
-  return { 
-    processos, 
-    carregando, 
+  return {
+    processos,
+    carregando,
     erro,
     criar,
     atualizar,
     remover,
-    moverStatus
+    moverStatus,
+    buscarSnapshotBruto,
   };
 }
