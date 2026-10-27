@@ -19,6 +19,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { toast } from "sonner";
 import type { Processo, StatusProcesso, TipoProcesso, Prioridade } from "@/types/processo";
 import { isAdmin, type AuthUser } from "./useAuth";
+import { registrarErro } from "@/lib/errorLog";
 
 // Sentinela de m\u00f3dulo: garante que a recupera\u00e7\u00e3o de "fantasmas" (docs sem o
 // campo `ativo`) rode no m\u00e1ximo UMA vez por sess\u00e3o do navegador, mesmo que o
@@ -573,6 +574,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       // console.log("✅ Processo criado com sucesso para", currentUser.email);
     } catch (err: unknown) {
       console.error("❌ Erro ao criar processo:", err);
+      registrarErro("useProcessos.criar", err, { dados });
       throw err;
     }
   };
@@ -608,6 +610,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       // console.log("✅ Processo atualizado com sucesso");
     } catch (err: unknown) {
       console.error("❌ Erro ao atualizar processo:", err);
+      registrarErro("useProcessos.atualizar", err, { id, dados });
       throw err;
     }
   };
@@ -632,6 +635,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       // console.log(`✅ Processo ${id} e todos os dados relacionados foram excluídos permanentemente`);
     } catch (err: unknown) {
       console.error("❌ Erro ao remover processo:", err);
+      registrarErro("useProcessos.remover", err, { id });
       throw err;
     }
   };

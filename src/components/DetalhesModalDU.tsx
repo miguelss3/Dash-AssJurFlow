@@ -27,6 +27,7 @@ import { Separator } from "@/components/ui/separator";
 import { useEffect, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { registrarErro } from "@/lib/errorLog";
 import { toast } from "sonner";
 
 interface DetalhesModalDUProps {
@@ -183,6 +184,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
       toast.success("Prazos finais do DU atualizados com sucesso.");
     } catch (error) {
       console.error("Erro ao atualizar prazos DU:", error);
+      registrarErro("DetalhesModalDU.handleSalvarPrazosDU", error, { processoId: processo.id });
       toast.error("Não foi possível salvar os prazos finais do DU.");
     } finally {
       setSavingPrazosDU(false);
@@ -256,6 +258,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
       toast.success("Documentos enviados atualizados com sucesso.");
     } catch (error) {
       console.error("Erro ao atualizar documentos enviados DU:", error);
+      registrarErro("DetalhesModalDU.handleSalvarEnviados", error, { processoId: processo.id });
       toast.error("Não foi possível salvar os documentos enviados.");
     } finally {
       setSavingEnviados(false);
@@ -315,6 +318,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
       toast.success("Documentos recebidos atualizados com sucesso.");
     } catch (error) {
       console.error("Erro ao atualizar documentos recebidos DU:", error);
+      registrarErro("DetalhesModalDU.handleSalvarRecebidos", error, { processoId: processo.id });
       toast.error("Não foi possível salvar os documentos recebidos.");
     } finally {
       setSavingRecebidos(false);

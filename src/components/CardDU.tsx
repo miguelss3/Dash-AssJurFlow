@@ -36,6 +36,7 @@ import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Time
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { formatarData, diasRestantes } from "@/lib/prazo";
+import { registrarErro } from "@/lib/errorLog";
 import { getBadgeSituacaoDUContextual } from "@/lib/utils";
 import { gerarResumoDU } from "@/lib/resumoProcesso";
 import { DetalhesModalDU } from "./DetalhesModalDU";
@@ -191,6 +192,7 @@ const CardDUComponent = ({
       toast.success("Última ação desfeita com sucesso.");
     } catch (error) {
       console.error("Erro ao desfazer última ação:", error);
+      registrarErro("CardDU.desfazerUltimaAcao", error, { processoId: p.id });
       toast.error("Não foi possível desfazer a última ação.");
     } finally {
       setDesfazendo(false);

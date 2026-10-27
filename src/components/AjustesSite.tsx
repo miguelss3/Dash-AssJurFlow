@@ -16,6 +16,7 @@ import { DEFAULT_SITE_SETTINGS } from "@/types/siteSettings";
 import { AjustesGerais } from "./ajustes/AjustesGerais";
 import AjustesDU from "./ajustes/AjustesDU";
 import AjustesPA from "./ajustes/AjustesPA";
+import { AjustesLogs } from "./ajustes/AjustesLogs";
 import { SortableAssuntoRow, AssuntoDragPreview, SortableFlowActionCard } from "./ajustes/SortableItem";
 
 interface AjustesSiteProps {
@@ -33,6 +34,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
   const [openGeral, setOpenGeral] = useState(false);
   const [openPA, setOpenPA] = useState(false);
   const [openDU, setOpenDU] = useState(false);
+  const [openLogs, setOpenLogs] = useState(false);
   const [openPAAssuntos, setOpenPAAssuntos] = useState(false);
   const [openPAPrazos, setOpenPAPrazos] = useState(false);
   const [openPAAbas, setOpenPAAbas] = useState(false);
@@ -280,6 +282,8 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
           </div>
 
           <AjustesGerais form={form} openGeral={openGeral} setOpenGeral={setOpenGeral} updateField={updateField} />
+
+          <AjustesLogs openLogs={openLogs} setOpenLogs={setOpenLogs} />
 
           {/* SETOR DEFESA DA UNIÃO — Propriedades exatas mapeadas com a interface */}
           <AjustesDU

@@ -5,6 +5,7 @@ import { Lock, Send, CheckCircle2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
+import { registrarErro } from "@/lib/errorLog";
 
 // --- Função utilitária para sanitizar objetos recursivamente (undefined → null) ---
 const sanitizar = (valor: unknown): unknown => {
@@ -216,6 +217,7 @@ export function AcoesDUModalNovo({
       );
     } catch (error) {
       console.error("Erro ao carregar fluxo DU:", error);
+      registrarErro("AcoesDUModalNovo.carregarFluxo", error, { processoId });
       toast.error("Não foi possível carregar o fluxo do processo.");
     } finally {
       setCarregandoFluxo(false);
@@ -461,6 +463,7 @@ export function AcoesDUModalNovo({
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error("Erro ao avançar fluxo DU:", error);
+      registrarErro("AcoesDUModalNovo.avancarFluxo", error, { processoId, proximaSituacao });
       toast.error("Falha ao atualizar o fluxo DU.");
     }
   };
@@ -547,6 +550,7 @@ export function AcoesDUModalNovo({
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error("Erro ao finalizar processo:", error);
+      registrarErro("AcoesDUModalNovo.finalizarProcesso", error, { processoId });
       toast.error("Não foi possível finalizar o processo.");
     }
   };
@@ -775,6 +779,7 @@ export function AcoesDUModalNovo({
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error("Erro ao registrar resposta tardia:", error);
+      registrarErro("AcoesDUModalNovo.handleRegistrarRespostaTardia", error, { processoId });
       toast.error("Não foi possível registrar a resposta tardia.");
     } finally {
       setSalvandoTardio(false);

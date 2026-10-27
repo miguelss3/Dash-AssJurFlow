@@ -11,6 +11,7 @@ import type { Processo } from "@/types/processo";
 import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
+import { registrarErro } from "@/lib/errorLog";
 import {
   DEFAULT_ORIGENS_DU_DOCUMENTOS,
   DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
@@ -399,6 +400,7 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
       onSuccess?.();
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
+      registrarErro("CadastroDU.handleSubmit", error, { processoId: processo?.id });
       if (err?.code === "permission-denied") {
         toast.error("Sem permissão para criar processo. Verifique se o perfil deste usuário está salvo em /usuarios/{uid} com o setor correto.");
       } else {

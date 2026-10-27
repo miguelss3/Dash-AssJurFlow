@@ -34,6 +34,7 @@ import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Time
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
+import { registrarErro } from "@/lib/errorLog";
 import { getBadgeSituacaoPA } from "@/lib/utils";
 import { gerarResumoPA } from "@/lib/resumoProcesso";
 import { DetalhesModalPA } from "./DetalhesModalPA";
@@ -239,6 +240,7 @@ const CardPAComponent = ({
       toast.success("Última ação desfeita com sucesso.");
     } catch (error) {
       console.error("Erro ao desfazer última ação:", error);
+      registrarErro("CardPA.desfazerUltimaAcao", error, { processoId: p.id });
       toast.error("Não foi possível desfazer a última ação.");
     } finally {
       setDesfazendo(false);

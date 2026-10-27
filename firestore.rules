@@ -228,7 +228,22 @@ service cloud.firestore {
         
       allow delete: if false;
     }
-    
+
+    // V3.16 — Log de erros do sistema (ver src/lib/errorLog.ts). Qualquer
+    // usuário autenticado pode registrar um erro da própria sessão (é só
+    // diagnóstico, não dado de negócio) — só não pode gravar em nome de
+    // outra pessoa. Só quem administra o site lê (painel em Ajustes do
+    // Site); nunca pode ser editado/apagado pelo cliente, só criado.
+    match /logsErro/{logId} {
+      allow create: if isSignedIn() &&
+        request.resource.data.contexto is string &&
+        request.resource.data.mensagem is string &&
+        request.resource.data.criadoEm is timestamp &&
+        (request.resource.data.userId == null || request.resource.data.userId == request.auth.uid);
+      allow get, list: if isAdminUniversal() || isChefePerfil();
+      allow update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

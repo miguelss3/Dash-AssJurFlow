@@ -37,6 +37,7 @@ import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
 import type { SiteSettings } from "@/types/siteSettings";
 import { statusPrazo } from "@/lib/prazo";
 import { exportResultadosBuscaPdf } from "@/lib/indicadoresPdf";
+import { registrarErro } from "@/lib/errorLog";
 import { toast } from "sonner";
 
 // Desligado temporariamente: créditos da API Gemini esgotados (ver functions/index.js geminiChat).
@@ -920,6 +921,7 @@ function Index() {
       toast.success("Processo reaberto com sucesso.");
     } catch (error) {
       console.error("❌ Erro ao reabrir processo:", error);
+      registrarErro("routes.handleReativarProcesso", error, { processoId });
       toast.error("Não foi possível reabrir o processo.");
     }
   };
