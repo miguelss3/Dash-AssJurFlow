@@ -32,9 +32,36 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
   const [erro, setErro] = useState<string | null>(null);
   const mergeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // V3.14 — Antes só limpava `undefined` nas chaves de primeiro nível. Um
+  // patch como `{ pedidoSubsidios: { ...existente, situacaoFluxo: "X" } }`
+  // (ex.: handleReativarProcesso) carrega qualquer `undefined` que já
+  // existisse DENTRO de `pedidoSubsidios` (ex.: `solicitadoEm`) — o
+  // Firestore rejeita updateDoc() com `undefined` em qualquer profundidade,
+  // não só no topo. Agora limpa recursivamente (objetos e arrays),
+  // convertendo `undefined` em `null`, sem mexer em Date/Timestamp.
+  const sanitizarRecursivo = (valor: unknown): unknown => {
+    if (valor === undefined) return null;
+    if (Array.isArray(valor)) return valor.map(sanitizarRecursivo);
+    if (
+      valor !== null &&
+      typeof valor === "object" &&
+      !(valor instanceof Date) &&
+      !(valor instanceof Timestamp)
+    ) {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(valor as Record<string, unknown>)) {
+        out[k] = sanitizarRecursivo(v);
+      }
+      return out;
+    }
+    return valor;
+  };
+
   const limparCamposUndefined = <T extends Record<string, unknown>>(obj: T): Partial<T> => {
     return Object.fromEntries(
-      Object.entries(obj).filter(([, valor]) => valor !== undefined)
+      Object.entries(obj)
+        .filter(([, valor]) => valor !== undefined)
+        .map(([chave, valor]) => [chave, sanitizarRecursivo(valor)])
     ) as Partial<T>;
   };
 
