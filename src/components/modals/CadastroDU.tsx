@@ -12,6 +12,7 @@ import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc, query, w
 import { db } from "@/lib/firebase";
 import { useAuth, isAdmin } from "@/hooks/useAuth";
 import { registrarErro } from "@/lib/errorLog";
+import { diaUtilAnteriorOuIgual } from "@/lib/prazo";
 import {
   DEFAULT_ORIGENS_DU_DOCUMENTOS,
   DEFAULT_ASSUNTOS_DU_PRINCIPAIS,
@@ -49,7 +50,10 @@ const sanitizarPayload = (obj: unknown): unknown => {
 
 // Prazo interno = 2 dias antes do prazo fatal. Quando isso cair antes da
 // data de entrada (prazo fatal muito próximo, sem os 2 dias de folga),
-// usa o próprio prazo fatal — nunca um prazo interno "no passado".
+// usa o próprio prazo fatal — nunca um prazo interno "no passado". Em
+// qualquer um dos dois casos, se o resultado cair em fim de semana ou
+// feriado nacional, volta pro dia útil anterior (ver diaUtilAnteriorOuIgual
+// em @/lib/prazo) — nunca marca prazo interno pra um dia sem expediente.
 function calcularPrazoInternoDU(prazoFatal: string, dataEntrada: string): string {
   if (!prazoFatal) return "";
   const dFatal = new Date(`${prazoFatal}T00:00:00`);
@@ -60,11 +64,12 @@ function calcularPrazoInternoDU(prazoFatal: string, dataEntrada: string): string
 
   const dEntrada = dataEntrada ? new Date(`${dataEntrada}T00:00:00`) : null;
   if (dEntrada && !Number.isNaN(dEntrada.getTime()) && dInterno < dEntrada) {
-    return prazoFatal;
+    return diaUtilAnteriorOuIgual(prazoFatal);
   }
 
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${dInterno.getFullYear()}-${pad(dInterno.getMonth() + 1)}-${pad(dInterno.getDate())}`;
+  const candidato = `${dInterno.getFullYear()}-${pad(dInterno.getMonth() + 1)}-${pad(dInterno.getDate())}`;
+  return diaUtilAnteriorOuIgual(candidato);
 }
 
 const inferirSetorPorCampos = (...valores: Array<unknown>): "DU" | "PA" | "" => {
@@ -496,7 +501,8 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
               <Label htmlFor="prazoInternoDU">Prazo Interno</Label>
               <Input id="prazoInternoDU" type="date" value={prazoInternoDU} disabled className="disabled:opacity-100 disabled:cursor-not-allowed bg-muted" />
               <p className="text-[11px] text-muted-foreground">
-                Calculado automaticamente: 2 dias antes do prazo fatal (ou o mesmo dia, se não houver folga).
+                Calculado automaticamente: 2 dias antes do prazo fatal (ou o mesmo dia, se não houver folga),
+                recuando para o dia útil anterior se cair em fim de semana ou feriado nacional.
               </p>
             </div>
             <div className="space-y-2">

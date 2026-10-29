@@ -61,6 +61,108 @@ export function toDateLocal(value: unknown): Date | null {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Feriados nacionais do Brasil (fixos + móveis, calculados a partir da
+// Páscoa pelo algoritmo de Gauss/Meeus) e util de "dia útil anterior" — usado
+// pelo cálculo automático de Prazo Interno do DU (CadastroDU.tsx), que não
+// pode cair em fim de semana/feriado. Cobre só feriados NACIONAIS: estaduais/
+// municipais variam por OM/guarnição e não dá pra assumir um calendário
+// único aqui.
+// ---------------------------------------------------------------------------
+
+function calcularPascoa(ano: number): { mes: number; dia: number } {
+  const a = ano % 19;
+  const b = Math.floor(ano / 100);
+  const c = ano % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31);
+  const dia = ((h + l - 7 * m + 114) % 31) + 1;
+  return { mes, dia };
+}
+
+function chaveDiaCivil(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function feriadosNacionaisDoAno(ano: number): Set<string> {
+  const datas = new Set<string>();
+  const add = (mes: number, dia: number) =>
+    datas.add(`${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`);
+
+  // Fixos.
+  add(1, 1); // Confraternização Universal
+  add(4, 21); // Tiradentes
+  add(5, 1); // Dia do Trabalho
+  add(9, 7); // Independência do Brasil
+  add(10, 12); // Nossa Senhora Aparecida
+  add(11, 2); // Finados
+  add(11, 15); // Proclamação da República
+  add(11, 20); // Consciência Negra (Lei 14.759/2023)
+  add(12, 25); // Natal
+
+  // Móveis, relativos à Páscoa.
+  const pascoa = calcularPascoa(ano);
+  const dPascoa = new Date(ano, pascoa.mes - 1, pascoa.dia);
+  const comOffset = (offsetDias: number) => {
+    const d = new Date(dPascoa);
+    d.setDate(d.getDate() + offsetDias);
+    datas.add(chaveDiaCivil(d));
+  };
+  comOffset(-47); // Carnaval (terça-feira)
+  comOffset(-2); // Sexta-feira Santa
+  comOffset(60); // Corpus Christi
+
+  return datas;
+}
+
+// Cache por ano — evita recalcular a Páscoa a cada chamada.
+const cacheFeriadosPorAno = new Map<number, Set<string>>();
+function feriadosDoAnoCache(ano: number): Set<string> {
+  let conjunto = cacheFeriadosPorAno.get(ano);
+  if (!conjunto) {
+    conjunto = feriadosNacionaisDoAno(ano);
+    cacheFeriadosPorAno.set(ano, conjunto);
+  }
+  return conjunto;
+}
+
+export function ehFeriadoNacionalBrasileiro(dataISO: string): boolean {
+  const d = toDateLocal(dataISO);
+  if (!d) return false;
+  return feriadosDoAnoCache(d.getFullYear()).has(chaveDiaCivil(d));
+}
+
+export function ehDiaUtil(dataISO: string): boolean {
+  const d = toDateLocal(dataISO);
+  if (!d) return false;
+  const diaSemana = d.getDay(); // 0 = domingo, 6 = sábado
+  if (diaSemana === 0 || diaSemana === 6) return false;
+  return !ehFeriadoNacionalBrasileiro(dataISO);
+}
+
+// Volta dia a dia até cair num dia útil (seg-sex, sem feriado nacional). O
+// limite de 30 iterações é só proteção defensiva — nunca deve chegar perto
+// disso (a sequência mais longa de dias não úteis seguidos no Brasil é bem
+// menor que isso).
+export function diaUtilAnteriorOuIgual(dataISO: string): string {
+  const d = toDateLocal(dataISO);
+  if (!d) return dataISO;
+  const cursor = new Date(d);
+  for (let i = 0; i < 30 && !ehDiaUtil(chaveDiaCivil(cursor)); i++) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return chaveDiaCivil(cursor);
+}
+
 type ProrrogacaoPA = {
   dias?: number | null;
   inicio?: string | null;
