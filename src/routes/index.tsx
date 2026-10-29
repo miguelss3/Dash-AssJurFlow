@@ -31,6 +31,7 @@ import { useProcessosStats } from "@/hooks/useProcessosStats";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { Dashboard } from "@/components/Dashboard";
 import { IndiceMensalCard } from "@/components/IndiceMensalCard";
+import { SidebarAssessoresResumo } from "@/components/SidebarAssessoresResumo";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { IAChatBox } from "@/components/IAChatBox";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
@@ -1058,6 +1059,9 @@ function Index() {
                 </button>
               );
             })}
+
+            {/* Visão só do Admin Universal — não dos chefes de setor. */}
+            {ehAdminUniversal && <SidebarAssessoresResumo processos={processosParaDashboard} />}
           </nav>
 
           {/* Índice Mensal — movido do Dashboard para cá, logo acima do usuário */}
