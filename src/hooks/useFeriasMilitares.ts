@@ -13,19 +13,34 @@ import { onAuthStateChanged } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 import { registrarErro } from "@/lib/errorLog";
 
+// Os 8 processos de um militar em férias não precisam ir todos para a mesma
+// pessoa — cada um pode ser redistribuído para um substituto diferente, por
+// isso o rastreio é por processo (não um único substituto por período).
+export interface DistribuicaoFerias {
+  processoId: string;
+  substitutoUid: string;
+  substitutoNome: string;
+}
+
 export interface FeriasMilitar {
   id: string;
   userId: string;
   nomeMilitar: string;
   posto?: string;
   nomeGuerra?: string;
-  setor: "DU" | "PA";
+  // "GERAL" cobre a chefia geral (AsseApAssJur), que não pertence a um
+  // setor DU/PA específico — ver resolverSetorFerias em FeriasMilitares.tsx.
+  setor: "DU" | "PA" | "GERAL";
   dataInicio: string; // YYYY-MM-DD
   dataRetorno: string; // YYYY-MM-DD
-  substitutoUid?: string;
-  substitutoNome?: string;
+  distribuicoes?: DistribuicaoFerias[];
   processosRedistribuidos?: string[];
   processosRevertidos?: string[];
+  // Pares de férias com período sobreposto (militares diferentes) já
+  // reconhecidos pela chefia — guarda o id do OUTRO registro do par, ver
+  // reconhecerConflito abaixo. Some de cena sozinho quando o período termina,
+  // já que conflitos só são calculados entre períodos ainda não concluídos.
+  conflitosCientes?: string[];
   criadoPorUid?: string;
   criadoEm?: string;
   atualizadoEm?: string;
@@ -78,20 +93,16 @@ export function useFeriasMilitares() {
     });
   };
 
-  // Aplica a escolha do substituto e registra os processos movidos por causa
-  // desta ausência específica — é esta lista que o robô de retorno usa para
-  // saber quais processos devolver automaticamente, sem tocar em processos
-  // que o substituto tenha recebido por outro motivo.
-  const redistribuir = async (
-    id: string,
-    substitutoUid: string,
-    substitutoNome: string,
-    processoIds: string[],
-  ) => {
+  // Aplica a distribuição escolhida (um substituto por processo, não
+  // necessariamente o mesmo para todos) e registra quais processos foram
+  // movidos por causa desta ausência específica — é esta lista que o robô
+  // de retorno usa para saber o que devolver automaticamente, sem tocar em
+  // processos que o substituto tenha recebido por outro motivo.
+  const redistribuir = async (id: string, distribuicoes: DistribuicaoFerias[]) => {
+    if (distribuicoes.length === 0) return;
     await updateDoc(doc(db, "feriasMilitares", id), {
-      substitutoUid,
-      substitutoNome,
-      processosRedistribuidos: arrayUnion(...processoIds),
+      distribuicoes: arrayUnion(...distribuicoes),
+      processosRedistribuidos: arrayUnion(...distribuicoes.map((d) => d.processoId)),
       atualizadoEm: new Date().toISOString(),
     });
   };
@@ -108,5 +119,35 @@ export function useFeriasMilitares() {
     await deleteDoc(doc(db, "feriasMilitares", id));
   };
 
-  return { ferias, carregando, criar, redistribuir, marcarRevertido, excluir };
+  // Edição do período sem precisar excluir e recriar o registro — usado
+  // tanto pelo próprio militar (seu período) quanto pela chefia (qualquer um).
+  const atualizarPeriodo = async (id: string, dataInicio: string, dataRetorno: string) => {
+    await updateDoc(doc(db, "feriasMilitares", id), {
+      dataInicio,
+      dataRetorno,
+      atualizadoEm: new Date().toISOString(),
+    });
+  };
+
+  // Marca como "ciente" um par de períodos sobrepostos entre militares
+  // diferentes — grava dos dois lados para que o aviso suma mesmo que um
+  // dos dois registros seja consultado isoladamente.
+  const reconhecerConflito = async (idA: string, idB: string) => {
+    const agoraISO = new Date().toISOString();
+    await Promise.all([
+      updateDoc(doc(db, "feriasMilitares", idA), { conflitosCientes: arrayUnion(idB), atualizadoEm: agoraISO }),
+      updateDoc(doc(db, "feriasMilitares", idB), { conflitosCientes: arrayUnion(idA), atualizadoEm: agoraISO }),
+    ]);
+  };
+
+  return {
+    ferias,
+    carregando,
+    criar,
+    redistribuir,
+    marcarRevertido,
+    excluir,
+    atualizarPeriodo,
+    reconhecerConflito,
+  };
 }

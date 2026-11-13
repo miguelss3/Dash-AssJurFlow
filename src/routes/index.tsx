@@ -216,7 +216,15 @@ function Index() {
     saveSettings: persistSiteSettings,
   } = useSiteSettings(ready && !!user);
   const { processos, carregando: loadingProcessos, criar, atualizar, remover, buscarSnapshotBruto } = useProcessos(siteSettings, user);
-  const { ferias, criar: criarFerias, redistribuir: redistribuirFerias, marcarRevertido: marcarFeriasRevertida, excluir: excluirFerias } = useFeriasMilitares();
+  const {
+    ferias,
+    criar: criarFerias,
+    redistribuir: redistribuirFerias,
+    marcarRevertido: marcarFeriasRevertida,
+    excluir: excluirFerias,
+    atualizarPeriodo: editarPeriodoFerias,
+    reconhecerConflito: reconhecerConflitoFerias,
+  } = useFeriasMilitares();
   // Fonte única das contagens históricas do servidor — compartilhada entre
   // Dashboard e Estatisticas para não duplicar as mesmas consultas getCountFromServer.
   const statsServidor = useProcessosStats();
@@ -862,9 +870,11 @@ function Index() {
           const statusNorm = String(processo?.status || "").trim().toLowerCase();
           const concluido = !processo || processo.finalizado === true || statusNorm === "concluido" || statusNorm === "concluído";
 
-          // Já não está mais com o substituto (foi movido manualmente por
-          // outro motivo) — não é mais responsabilidade deste robô.
-          const aindaComSubstituto = !!processo && processo.responsavel === f.substitutoNome;
+          // Já não está mais com o substituto que recebeu ESTE processo
+          // especificamente (foi movido manualmente por outro motivo) —
+          // não é mais responsabilidade deste robô.
+          const distribuicao = f.distribuicoes?.find((d) => d.processoId === processoId);
+          const aindaComSubstituto = !!processo && !!distribuicao && processo.responsavel === distribuicao.substitutoNome;
 
           if (concluido || !aindaComSubstituto) {
             feriasAutoRevertRef.current.add(chave);
@@ -1437,6 +1447,8 @@ function Index() {
                 ferias={ferias}
                 onCriarFerias={criarFerias}
                 onExcluirFerias={excluirFerias}
+                onEditarPeriodo={editarPeriodoFerias}
+                onReconhecerConflito={reconhecerConflitoFerias}
                 onRedistribuirFerias={redistribuirFerias}
                 onRedistribuirProcesso={handleRedistribuir}
               />

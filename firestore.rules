@@ -48,6 +48,14 @@ service cloud.firestore {
         (setor in ['DU', 'PA'] && userSetor() == setor);
     }
 
+    // feriasMilitares aceita um terceiro valor de setor, 'GERAL' (chefia
+    // geral AsseApAssJur, que não pertence a DU/PA) — só a própria chefia
+    // pode criar/editar/excluir um registro com esse valor.
+    function podeGerenciarFeriasSetor(setor) {
+      return (setor in ['DU', 'PA'] && canManageSetor(setor)) ||
+        (setor == 'GERAL' && (isAdminUniversal() || isChefePerfil()));
+    }
+
     function canReadProcessData(data) {
       return isSignedIn() && (
         data.userId == request.auth.uid ||
@@ -257,20 +265,31 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
         request.resource.data.userId is string &&
         request.resource.data.nomeMilitar is string &&
-        request.resource.data.setor in ['DU', 'PA'] &&
+        request.resource.data.setor in ['DU', 'PA', 'GERAL'] &&
         request.resource.data.dataInicio is string &&
         request.resource.data.dataRetorno is string &&
-        (request.resource.data.userId == request.auth.uid || canManageSetor(request.resource.data.setor));
+        (
+          (request.resource.data.setor in ['DU', 'PA'] && request.resource.data.userId == request.auth.uid) ||
+          podeGerenciarFeriasSetor(request.resource.data.setor)
+        );
 
+      // Edição (datas, substituto, conflitos reconhecidos) sempre preserva
+      // o militar (userId) e o setor originais do registro.
       allow update: if isSignedIn() &&
-        resource.data.setor in ['DU', 'PA'] &&
+        resource.data.setor in ['DU', 'PA', 'GERAL'] &&
         request.resource.data.userId == resource.data.userId &&
         request.resource.data.setor == resource.data.setor &&
-        (resource.data.userId == request.auth.uid || canManageSetor(resource.data.setor));
+        (
+          (resource.data.setor in ['DU', 'PA'] && resource.data.userId == request.auth.uid) ||
+          podeGerenciarFeriasSetor(resource.data.setor)
+        );
 
       allow delete: if isSignedIn() &&
-        resource.data.setor in ['DU', 'PA'] &&
-        (resource.data.userId == request.auth.uid || canManageSetor(resource.data.setor));
+        resource.data.setor in ['DU', 'PA', 'GERAL'] &&
+        (
+          (resource.data.setor in ['DU', 'PA'] && resource.data.userId == request.auth.uid) ||
+          podeGerenciarFeriasSetor(resource.data.setor)
+        );
     }
 
     match /{document=**} {
