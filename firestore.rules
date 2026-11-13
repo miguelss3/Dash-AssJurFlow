@@ -244,6 +244,35 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // V4.1 — Férias de Militares. Qualquer militar com perfil cadastrado
+    // registra seu próprio período (userId == uid autenticado); a chefia do
+    // setor (ou Admin Universal) também pode cadastrar/editar em nome de um
+    // subordinado e é quem define o substituto / lista de processos movidos
+    // por causa da ausência. Leitura aberta a todo efetivo cadastrado, como
+    // em `usuarios`, pois todos precisam ver quem está de férias e com quem
+    // falar sobre os processos.
+    match /feriasMilitares/{feriasId} {
+      allow get, list: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
+
+      allow create: if isSignedIn() &&
+        request.resource.data.userId is string &&
+        request.resource.data.nomeMilitar is string &&
+        request.resource.data.setor in ['DU', 'PA'] &&
+        request.resource.data.dataInicio is string &&
+        request.resource.data.dataRetorno is string &&
+        (request.resource.data.userId == request.auth.uid || canManageSetor(request.resource.data.setor));
+
+      allow update: if isSignedIn() &&
+        resource.data.setor in ['DU', 'PA'] &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.setor == resource.data.setor &&
+        (resource.data.userId == request.auth.uid || canManageSetor(resource.data.setor));
+
+      allow delete: if isSignedIn() &&
+        resource.data.setor in ['DU', 'PA'] &&
+        (resource.data.userId == request.auth.uid || canManageSetor(resource.data.setor));
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

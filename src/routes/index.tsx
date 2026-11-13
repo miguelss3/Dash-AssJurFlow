@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState, useTransition } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SoldierAvatar } from "@/components/SoldierAvatar";
 import { useAuth, isAdmin, isAdminUniversal } from "@/hooks/useAuth";
@@ -14,6 +14,7 @@ import {
   Calendar,
   Users,
   Printer,
+  Plane,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ import {
 import { useProcessos } from "@/hooks/useProcessos";
 import { useProcessosStats } from "@/hooks/useProcessosStats";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useFeriasMilitares } from "@/hooks/useFeriasMilitares";
 import { Dashboard } from "@/components/Dashboard";
 import { IndiceMensalCard } from "@/components/IndiceMensalCard";
 import { SidebarAssessoresResumo } from "@/components/SidebarAssessoresResumo";
@@ -36,7 +38,7 @@ import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { IAChatBox } from "@/components/IAChatBox";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
 import type { SiteSettings } from "@/types/siteSettings";
-import { statusPrazo } from "@/lib/prazo";
+import { statusPrazo, formatarData } from "@/lib/prazo";
 import { exportResultadosBuscaPdf } from "@/lib/indicadoresPdf";
 import { registrarErro } from "@/lib/errorLog";
 import { toast } from "sonner";
@@ -58,6 +60,9 @@ const CalendarioPrazos = lazy(() =>
 );
 const GestaoEquipe = lazy(() =>
   import("@/components/GestaoEquipe").then((m) => ({ default: m.GestaoEquipe })),
+);
+const FeriasMilitares = lazy(() =>
+  import("@/components/FeriasMilitares").then((m) => ({ default: m.FeriasMilitares })),
 );
 const AjustesSite = lazy(() =>
   import("@/components/AjustesSite").then((m) => ({ default: m.AjustesSite })),
@@ -152,7 +157,7 @@ export const Route = createFileRoute("/")({
   },
 });
 
-type Aba = "mesa" | "prazos" | "ajustes" | "indicadores" | "equipe";
+type Aba = "mesa" | "prazos" | "ajustes" | "indicadores" | "equipe" | "ferias";
 type FiltroTipo = "todos" | "DU" | "PA";
 
 function normalizarSetor(valor: unknown): "DU" | "PA" | "" {
@@ -166,6 +171,12 @@ function normalizarSetor(valor: unknown): "DU" | "PA" | "" {
   if (txt === "DU" || txt.includes("DEFESA") || txt.includes("USUARIO")) return "DU";
   if (txt === "PA" || txt.includes("PROCESSO") || txt.includes("ADMIN")) return "PA";
   return "";
+}
+
+function dataCivilAtual(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 function normalizarTexto(valor: unknown): string {
@@ -205,6 +216,7 @@ function Index() {
     saveSettings: persistSiteSettings,
   } = useSiteSettings(ready && !!user);
   const { processos, carregando: loadingProcessos, criar, atualizar, remover, buscarSnapshotBruto } = useProcessos(siteSettings, user);
+  const { ferias, criar: criarFerias, redistribuir: redistribuirFerias, marcarRevertido: marcarFeriasRevertida, excluir: excluirFerias } = useFeriasMilitares();
   // Fonte única das contagens históricas do servidor — compartilhada entre
   // Dashboard e Estatisticas para não duplicar as mesmas consultas getCountFromServer.
   const statsServidor = useProcessosStats();
@@ -401,6 +413,10 @@ function Index() {
       equipe: {
         titulo: "Gestão da Equipe",
         descricao: "Cadastre, atualize e acompanhe os integrantes autorizados no sistema.",
+      },
+      ferias: {
+        titulo: "Férias de Militares",
+        descricao: "Registre períodos de férias e redistribua os processos de quem está ausente.",
       },
     };
 
@@ -708,6 +724,23 @@ function Index() {
         return;
       }
 
+      // Caixa bloqueada durante férias — bloqueia QUALQUER caminho que tente
+      // atribuir um processo a quem está no período [dataInicio, dataRetorno).
+      // Único ponto de escrita de `responsavel` no app (ver handleRedistribuir),
+      // então basta travar aqui para cobrir drag-and-drop e a redistribuição
+      // feita a partir da página Férias de Militares.
+      if (novoResponsavel?.trim()) {
+        const hojeCivil = dataCivilAtual();
+        const feriasBloqueio = ferias.find(
+          (f) => f.nomeMilitar === novoResponsavel.trim() && f.dataInicio <= hojeCivil && hojeCivil < f.dataRetorno,
+        );
+        if (feriasBloqueio) {
+          toast.dismiss(toastId);
+          toast.error(`Caixa bloqueada: ${novoResponsavel} está de férias até ${formatarData(feriasBloqueio.dataRetorno)}.`);
+          return;
+        }
+      }
+
       const tinhaResponsavelAntes = !!processo.responsavel?.trim();
       const vaiParaAguardando = !novoResponsavel?.trim();
 
@@ -799,6 +832,65 @@ function Index() {
       toast.error("Não foi possível redistribuir o processo.", { id: toastId });
     }
   };
+
+  // -------------------------------------------------------------------
+  // Robô Vigia das Férias — quando o período [dataInicio, dataRetorno) de
+  // um militar termina, qualquer processo que ainda esteja com o substituto
+  // (e ainda não finalizado) volta automaticamente para a caixa original.
+  // Roda só na sessão da chefia/admin (quem tem permissão de redistribuir
+  // processos de qualquer assessor do setor) para não disputar a mesma
+  // escrita em várias abas abertas por assessores ao mesmo tempo.
+  // `feriasAutoRevertRef` evita reprocessar o mesmo par (férias, processo)
+  // enquanto o `await` de uma reversão anterior ainda está em voo.
+  const feriasAutoRevertRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!ehAdmin || ferias.length === 0 || processos.length === 0) return;
+
+    const hojeCivil = dataCivilAtual();
+
+    const executar = async () => {
+      for (const f of ferias) {
+        if (hojeCivil < f.dataRetorno) continue;
+        const pendentes = f.processosRedistribuidos || [];
+        if (pendentes.length === 0) continue;
+
+        for (const processoId of pendentes) {
+          const chave = `${f.id}:${processoId}`;
+          if (feriasAutoRevertRef.current.has(chave)) continue;
+
+          const processo = processos.find((p) => p.id === processoId);
+          const statusNorm = String(processo?.status || "").trim().toLowerCase();
+          const concluido = !processo || processo.finalizado === true || statusNorm === "concluido" || statusNorm === "concluído";
+
+          // Já não está mais com o substituto (foi movido manualmente por
+          // outro motivo) — não é mais responsabilidade deste robô.
+          const aindaComSubstituto = !!processo && processo.responsavel === f.substitutoNome;
+
+          if (concluido || !aindaComSubstituto) {
+            feriasAutoRevertRef.current.add(chave);
+            void marcarFeriasRevertida(f.id, processoId).catch((error) => {
+              console.error("❌ Erro ao marcar processo de férias como revertido:", error);
+              feriasAutoRevertRef.current.delete(chave);
+            });
+            continue;
+          }
+
+          feriasAutoRevertRef.current.add(chave);
+          try {
+            await handleRedistribuir(processoId, f.nomeMilitar, {
+              mensagemHistorico: `🤖 SISTEMA: Período de férias de ${f.nomeMilitar} encerrado em ${formatarData(f.dataRetorno)}. Processo retornado automaticamente.`,
+            });
+            await marcarFeriasRevertida(f.id, processoId);
+          } catch (error) {
+            console.error("❌ Erro ao reverter processo pós-férias:", error);
+            feriasAutoRevertRef.current.delete(chave);
+          }
+        }
+      }
+    };
+
+    void executar();
+  }, [ehAdmin, ferias, processos]);
 
   const handleMoverStatus = async (processoId: string, novoStatus: StatusProcesso) => {
     const rotulosStatus: Record<StatusProcesso, string> = {
@@ -935,6 +1027,7 @@ function Index() {
   const navSec: { id: Aba; label: string; icon: typeof LayoutGrid }[] = [
     { id: "prazos", label: "Controle de Prazos", icon: Calendar },
     { id: "equipe", label: "Gestão da Equipe", icon: Users },
+    { id: "ferias", label: "Férias de Militares", icon: Plane },
     ...(ehAdminUniversal ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
   ];
 
@@ -961,8 +1054,8 @@ function Index() {
       setAba("mesa");
       return;
     }
-    // Permite aba 'prazos', 'ajustes' e 'equipe' mesmo que não estejam em tabs
-    if (aba !== "prazos" && aba !== "ajustes" && aba !== "equipe" && !tabs.some((t) => t.id === aba)) {
+    // Permite aba 'prazos', 'ajustes', 'equipe' e 'ferias' mesmo que não estejam em tabs
+    if (aba !== "prazos" && aba !== "ajustes" && aba !== "equipe" && aba !== "ferias" && !tabs.some((t) => t.id === aba)) {
       setAba("mesa");
     }
   }, [tabs, aba, ehAdminUniversal]);
@@ -1332,6 +1425,21 @@ function Index() {
           {aba === "equipe" && (
             <Suspense fallback={<TabLoading label="Carregando gestão da equipe..." />}>
               <GestaoEquipe />
+            </Suspense>
+          )}
+
+          {aba === "ferias" && (
+            <Suspense fallback={<TabLoading label="Carregando férias de militares..." />}>
+              <FeriasMilitares
+                usuario={usuario}
+                ehAdmin={ehAdmin}
+                processos={processos}
+                ferias={ferias}
+                onCriarFerias={criarFerias}
+                onExcluirFerias={excluirFerias}
+                onRedistribuirFerias={redistribuirFerias}
+                onRedistribuirProcesso={handleRedistribuir}
+              />
             </Suspense>
           )}
         </main>
