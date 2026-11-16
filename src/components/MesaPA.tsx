@@ -36,6 +36,8 @@ interface Props {
   siteSettings?: SiteSettings;
   filtro?: FiltroPrazo;
   busca?: string;
+  /** nomeMilitar -> dataRetorno (YYYY-MM-DD) para quem está de férias hoje. */
+  bloqueiosFerias?: Record<string, string>;
 }
 
 // Coluna "Aguardando Distribuição" — mesmos moldes/características do DU:
@@ -68,6 +70,7 @@ export function MesaPA({
   siteSettings,
   filtro,
   busca,
+  bloqueiosFerias,
 }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
@@ -584,6 +587,7 @@ export function MesaPA({
                 unreadProcessIds={unreadProcessIds}
                 onReadProcess={onReadProcess}
                 mapaCoresAssessores={mapaCoresAssessores}
+                emFeriasAte={bloqueiosFerias?.[a.nome]}
                 filtro={filtro}
               />
             ))}
@@ -607,6 +611,7 @@ export function MesaPA({
                 unreadProcessIds={unreadProcessIds}
                 onReadProcess={onReadProcess}
                 mapaCoresAssessores={mapaCoresAssessores}
+                emFeriasAte={bloqueiosFerias?.[colunaPAAguardandoDistribuicao.nome]}
                 filtro={filtro}
               />
             )}
@@ -629,6 +634,7 @@ export function MesaPA({
                 unreadProcessIds={unreadProcessIds}
                 onReadProcess={onReadProcess}
                 mapaCoresAssessores={mapaCoresAssessores}
+                emFeriasAte={bloqueiosFerias?.[a.nome]}
                 filtro={filtro}
               />
             ))}

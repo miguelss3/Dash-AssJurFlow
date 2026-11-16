@@ -5,7 +5,8 @@ import { DEFAULT_COLUMN_TABS, DEFAULT_PA_EM_ANDAMENTO_COLUMNS, normalizarPAEmAnd
 import type { SiteSettings } from "@/types/siteSettings";
 import { useDroppable } from "@dnd-kit/core";
 import { useEffect, useMemo, useState } from "react";
-import { diasRestantes } from "@/lib/prazo";
+import { diasRestantes, formatarData } from "@/lib/prazo";
+import { Lock } from "lucide-react";
 
 
 interface Props {
@@ -34,9 +35,16 @@ interface Props {
    * "Em Andamento" englobando ativos + atrasados + portarias assinadas.
    */
   vistaAssessor?: boolean;
+  /**
+   * V4.2 — Data de retorno (YYYY-MM-DD) quando este assessor está de férias
+   * hoje. Bloqueia visualmente a coluna (cadeado + selo âmbar) e desativa o
+   * drop — reforça na tela o mesmo bloqueio que o backend já aplica em
+   * handleRedistribuir, pra não depender só do chefe lembrar.
+   */
+  emFeriasAte?: string;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca, mapaCoresAssessores = {}, vistaAssessor = false }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca, mapaCoresAssessores = {}, vistaAssessor = false, emFeriasAte }: Props) {
   const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">("andamento");
   const corColuna = mapaCoresAssessores[(responsavel || "").trim()];
 
@@ -64,6 +72,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
   }, [busca, processos.length, processosAtrasados.length, processosPortariaAssinada.length, processosConcluidos.length]);
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
+    disabled: !!emFeriasAte,
   });
 
   const isDU = tipo === "DU";
@@ -292,21 +301,31 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
   const CardComponente = tipo === "DU" ? CardDU : CardPA;
 
   return (
-    <div 
+    <div
       ref={setNodeRef}
-      style={corColuna ? { borderTopColor: corColuna, borderTopWidth: "4px" } : undefined}
+      style={corColuna && !emFeriasAte ? { borderTopColor: corColuna, borderTopWidth: "4px" } : undefined}
       className={`shrink-0 w-[88vw] ${isWide ? "sm:w-[450px]" : "sm:w-[340px]"} snap-start flex flex-col rounded-3xl bg-card border shadow-card overflow-hidden transition-all ${
-        isOver ? "border-blue-500 border-2 ring-2 ring-blue-200 scale-[1.02]" : "border-border"
+        emFeriasAte
+          ? "border-amber-400 border-2 bg-amber-50/40"
+          : isOver
+            ? "border-blue-500 border-2 ring-2 ring-blue-200 scale-[1.02]"
+            : "border-border"
       }`}
     >
       {/* Header do assessor */}
       <div className="px-4 py-3 border-b border-border space-y-3">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <span
             className={`inline-flex items-center rounded-full px-3 py-1.5 text-[12px] font-bold tracking-wide border ${bgClass} ${textClass} ${borderClass}`}
           >
             {tipo} · {responsavel}
           </span>
+          {emFeriasAte && (
+            <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide border bg-amber-100 text-amber-800 border-amber-300">
+              <Lock className="h-3.5 w-3.5" />
+              Em férias até {formatarData(emFeriasAte)}
+            </span>
+          )}
         </div>
 
         <div className="rounded-xl bg-muted p-1 gap-1 grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, abasConfiguradas.length)}, minmax(0, 1fr))` }}>

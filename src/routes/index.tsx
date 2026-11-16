@@ -34,6 +34,7 @@ import { useFeriasMilitares } from "@/hooks/useFeriasMilitares";
 import { Dashboard } from "@/components/Dashboard";
 import { IndiceMensalCard } from "@/components/IndiceMensalCard";
 import { SidebarAssessoresResumo } from "@/components/SidebarAssessoresResumo";
+import { AlertaFeriasPendentes } from "@/components/AlertaFeriasPendentes";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { IAChatBox } from "@/components/IAChatBox";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
@@ -902,6 +903,40 @@ function Index() {
     void executar();
   }, [ehAdmin, ferias, processos]);
 
+  // Mapa nomeMilitar -> dataRetorno para quem está de férias HOJE — usado
+  // pelo bloqueio visual das colunas da Mesa (AssessorGroup) e também já
+  // serve de base de leitura para o handleRedistribuir acima.
+  const bloqueiosFerias = useMemo(() => {
+    const hojeCivil = dataCivilAtual();
+    const mapa: Record<string, string> = {};
+    ferias.forEach((f) => {
+      if (f.dataInicio <= hojeCivil && hojeCivil < f.dataRetorno) {
+        mapa[f.nomeMilitar] = f.dataRetorno;
+      }
+    });
+    return mapa;
+  }, [ferias]);
+
+  // Avisa a chefia na tela principal quando alguém de férias ainda tem
+  // processos ativos não redistribuídos — para não depender só de lembrar
+  // de abrir o Plano de Férias.
+  const feriasPendentesItens = useMemo(() => {
+    const hojeCivil = dataCivilAtual();
+    return ferias
+      .filter((f) => f.dataInicio <= hojeCivil && hojeCivil < f.dataRetorno)
+      .map((f) => {
+        const quantidade = processos.filter((p) => {
+          if ((p.responsavel || "").trim() !== f.nomeMilitar) return false;
+          if (f.processosRedistribuidos?.includes(p.id)) return false;
+          const statusNorm = String(p.status || "").trim().toLowerCase();
+          const concluido = p.finalizado === true || statusNorm === "concluido" || statusNorm === "concluído";
+          return !concluido;
+        }).length;
+        return { nomeMilitar: f.nomeMilitar, dataRetorno: f.dataRetorno, quantidade };
+      })
+      .filter((item) => item.quantidade > 0);
+  }, [ferias, processos]);
+
   const handleMoverStatus = async (processoId: string, novoStatus: StatusProcesso) => {
     const rotulosStatus: Record<StatusProcesso, string> = {
       novo: "Triagem",
@@ -1355,6 +1390,13 @@ function Index() {
 
               {IA_CHAT_HABILITADA && <IAChatBox processos={processosParaDashboard} />}
 
+              {ehAdmin && (
+                <AlertaFeriasPendentes
+                  itens={feriasPendentesItens}
+                  onIrParaFerias={() => startTransition(() => setAba("ferias"))}
+                />
+              )}
+
               <Dashboard
                 processos={processosParaDashboard}
                 filtro={filtro}
@@ -1397,6 +1439,7 @@ function Index() {
                 siteSettings={siteSettings}
                 unreadProcessIds={processosNaoLidosIds}
                 onReadProcess={marcarProcessoComoLido}
+                bloqueiosFerias={bloqueiosFerias}
               />
             </>
           )}

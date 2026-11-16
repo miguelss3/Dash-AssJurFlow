@@ -27,9 +27,11 @@ interface Props {
   siteSettings?: SiteSettings;
   filtro?: FiltroPrazo;
   busca?: string;
+  /** nomeMilitar -> dataRetorno (YYYY-MM-DD) para quem está de férias hoje. */
+  bloqueiosFerias?: Record<string, string>;
 }
 
-export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess, siteSettings, filtro, busca }: Props) {
+export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, onReativarProcesso, onRedistribuir, usuario, ehAdmin, unreadProcessIds, onReadProcess, siteSettings, filtro, busca, bloqueiosFerias }: Props) {
   const [assessoresDoSetor, setAssessoresDoSetor] = useState<{ nome: string; setor: string; corCard?: string }[]>([]);
 
   
@@ -107,6 +109,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           siteSettings={siteSettings}
           filtro={filtro}
           busca={busca}
+          bloqueiosFerias={bloqueiosFerias}
         />
       )}
       {renderPA && (
@@ -124,6 +127,7 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
           siteSettings={siteSettings}
           filtro={filtro}
           busca={busca}
+          bloqueiosFerias={bloqueiosFerias}
         />
       )}
     </div>

@@ -36,6 +36,8 @@ interface Props {
   siteSettings?: SiteSettings;
   filtro?: FiltroPrazo;
   busca?: string;
+  /** nomeMilitar -> dataRetorno (YYYY-MM-DD) para quem está de férias hoje. */
+  bloqueiosFerias?: Record<string, string>;
 }
 
 export function MesaDU({
@@ -52,6 +54,7 @@ export function MesaDU({
   siteSettings,
   filtro,
   busca,
+  bloqueiosFerias,
 }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeProcesso, setActiveProcesso] = useState<Processo | null>(null);
@@ -482,6 +485,7 @@ export function MesaDU({
                   filtro={filtro}
                   busca={busca}
                   mapaCoresAssessores={mapaCoresAssessores}
+                  emFeriasAte={bloqueiosFerias?.[a.nome]}
                 />
               )
             )}
@@ -529,6 +533,7 @@ export function MesaDU({
                   filtro={filtro}
                   busca={busca}
                   mapaCoresAssessores={mapaCoresAssessores}
+                  emFeriasAte={bloqueiosFerias?.[a.nome]}
                 />
               )
             )}
