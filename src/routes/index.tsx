@@ -34,7 +34,7 @@ import { useFeriasMilitares } from "@/hooks/useFeriasMilitares";
 import { useComandoAssJur } from "@/hooks/useComandoAssJur";
 import { Dashboard } from "@/components/Dashboard";
 import { IndiceMensalCard } from "@/components/IndiceMensalCard";
-import { SidebarAssessoresResumo } from "@/components/SidebarAssessoresResumo";
+import { AssessoresTicker } from "@/components/AssessoresTicker";
 import { AlertaFeriasPendentes } from "@/components/AlertaFeriasPendentes";
 import { ComandoAssJurBanner } from "@/components/ComandoAssJurBanner";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
@@ -1288,8 +1288,6 @@ function Index() {
               );
             })}
 
-            {/* Visão só do Admin Universal — não dos chefes de setor. */}
-            {ehAdminUniversal && <SidebarAssessoresResumo processos={processosParaDashboard} />}
           </nav>
 
           {/* Índice Mensal — movido do Dashboard para cá, logo acima do usuário */}
@@ -1365,12 +1363,16 @@ function Index() {
               <Menu className="h-5 w-5" />
             </Button>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0">
               <h2 className="font-bold text-2xl sm:text-3xl tracking-tight leading-tight font-display text-foreground">
                 {cabecalhoAtual.titulo}
               </h2>
               <p className="text-sm text-muted-foreground mt-1">{cabecalhoAtual.descricao}</p>
             </div>
+
+            {/* Visão só do Admin Universal — não dos chefes de setor. Aparece
+                em todas as abas porque o header é universal (fora do switch de aba). */}
+            {ehAdminUniversal && <AssessoresTicker processos={processosParaDashboard} />}
 
             <div className="flex items-center gap-2 ml-auto shrink-0">
               <Button
