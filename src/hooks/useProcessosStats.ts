@@ -47,9 +47,11 @@ const STATS_INICIAIS: Omit<ProcessosStats, "refresh"> = {
 
 const INTERVALO_REFRESH_MS = 60_000;
 
-export function useProcessosStats(): ProcessosStats {
+export function useProcessosStats(ehAdminEfetivo?: boolean): ProcessosStats {
   const { user } = useAuth();
-  const ehAdmin = isAdmin(user);
+  // V4.3 — `ehAdminEfetivo` cobre quem recebeu o comando delegado (Comando
+  // da AssJur), que precisa ver os totais de DU+PA, não só do próprio setor.
+  const ehAdmin = isAdmin(user) || !!ehAdminEfetivo;
   const setorUsuario = String(user?.setor || "").trim().toUpperCase();
   const escopoSetor =
     !ehAdmin && (setorUsuario === "DU" || setorUsuario === "PA") ? setorUsuario : null;

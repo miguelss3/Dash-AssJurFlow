@@ -172,7 +172,10 @@ service cloud.firestore {
       // cadastra, exclui ou atribui a função de Admin/Chefe a outros usuários.
       // Antes, qualquer chefe podia escrever em QUALQUER perfil — inclusive
       // promovendo a si mesmo (ou a um cúmplice) a Admin Universal.
-      allow write: if isSignedIn() && isAdminUniversal() && !souDelegadorEmObservacao();
+      // V4.3 — Comando da AssJur: quem recebeu o comando delegado também
+      // pode gerenciar contas, como se fosse o Admin Universal, enquanto a
+      // delegação estiver vigente.
+      allow write: if isSignedIn() && (isAdminUniversal() || souDelegadoAtivo()) && !souDelegadorEmObservacao();
     }
 
     // Regras para a coleção de distribuições
@@ -249,8 +252,10 @@ service cloud.firestore {
       // V4.0 — mesma restrição: só efetivo real cadastrado enxerga as
       // configurações do sistema.
       allow read: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
+      // V4.3 — Comando da AssJur: quem recebeu o comando delegado também
+      // pode publicar Ajustes do Site enquanto a delegação estiver vigente.
       allow create, update: if isSignedIn() &&
-        isAdminUniversal() &&
+        (isAdminUniversal() || souDelegadoAtivo()) &&
         !souDelegadorEmObservacao() &&
         configId == 'layoutPrincipal' &&
         request.resource.data.sidebarTitle is string &&

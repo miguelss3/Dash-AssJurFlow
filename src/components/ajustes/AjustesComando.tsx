@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, isAdminUniversal } from "@/hooks/useAuth";
 import { useComandoAssJur } from "@/hooks/useComandoAssJur";
 import { nomeMilitarUsuario } from "@/lib/userProfiles";
 import { formatarData } from "@/lib/prazo";
@@ -40,6 +40,9 @@ function dataCivilAtual(): string {
 export function AjustesComando({ openComando, setOpenComando }: AjustesComandoProps) {
   const { user } = useAuth();
   const { comando, delegar, revogar } = useComandoAssJur();
+  // Transferir/revogar o comando é exclusivo da identidade real do Admin
+  // Universal — mesmo quem está recebendo o comando delegado (e por isso
+  // enxerga o resto de Ajustes do Site) não pode re-delegar nem revogar.
   const [usuarios, setUsuarios] = useState<UsuarioLista[]>([]);
   const [militarSelecionadoId, setMilitarSelecionadoId] = useState("");
   const [dataInicio, setDataInicio] = useState("");
@@ -56,6 +59,8 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
     });
     return () => unsub();
   }, []);
+
+  if (!isAdminUniversal(user)) return null;
 
   const hoje = dataCivilAtual();
   // dataFim é exclusivo: o 1º dia de volta ao comando normal — mesma

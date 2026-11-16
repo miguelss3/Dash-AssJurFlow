@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
 import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAuth, isAdmin } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { useComandoEfetivo } from "@/hooks/useComandoEfetivo";
 import { registrarErro } from "@/lib/errorLog";
 import { diaUtilAnteriorOuIgual } from "@/lib/prazo";
 import {
@@ -88,7 +89,7 @@ const inferirSetorPorCampos = (...valores: Array<unknown>): "DU" | "PA" | "" => 
 
 export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettings }: CadastroDUProps) {
   const { user } = useAuth();
-  const ehAdminOuChefe = isAdmin(user);
+  const { ehAdminEfetivo: ehAdminOuChefe } = useComandoEfetivo();
 
   const assuntosDUPrincipais = useMemo(
     () => normalizarAssuntosDU(siteSettings?.assuntosDUPrincipais, DEFAULT_ASSUNTOS_DU_PRINCIPAIS),

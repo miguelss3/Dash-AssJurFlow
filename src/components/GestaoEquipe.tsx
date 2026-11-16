@@ -52,12 +52,22 @@ interface Usuario extends AuthUser {
   corCard?: string;
 }
 
-export function GestaoEquipe() {
+interface GestaoEquipeProps {
+  /**
+   * V4.3 — Comando da AssJur: quem recebeu o comando delegado também pode
+   * cadastrar/editar/excluir integrantes, como se fosse o Admin Universal,
+   * enquanto a delegação estiver vigente (ver routes/index.tsx).
+   */
+  ehAdminUniversalEfetivo?: boolean;
+}
+
+export function GestaoEquipe({ ehAdminUniversalEfetivo }: GestaoEquipeProps = {}) {
   const { user: usuarioLogado } = useAuth();
   // Cadastrar/excluir usuários e atribuir a função de Admin/Chefe é
-  // exclusivo do Admin Universal — chefes "comuns" têm a mesma visão da
-  // equipe, mas sem esta funcionalidade de gestão de contas.
-  const souAdminUniversal = isAdminUniversal(usuarioLogado);
+  // exclusivo do Admin Universal (ou de quem está com o comando delegado) —
+  // chefes "comuns" têm a mesma visão da equipe, mas sem esta funcionalidade
+  // de gestão de contas.
+  const souAdminUniversal = isAdminUniversal(usuarioLogado) || !!ehAdminUniversalEfetivo;
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [salvando, setSalvando] = useState(false);

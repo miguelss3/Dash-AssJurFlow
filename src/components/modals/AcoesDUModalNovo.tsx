@@ -4,7 +4,8 @@ import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "f
 import { Lock, Send, CheckCircle2 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
-import { useAuth, isAdmin } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { useComandoEfetivo } from "@/hooks/useComandoEfetivo";
 import { registrarErro } from "@/lib/errorLog";
 
 // --- Função utilitária para sanitizar objetos recursivamente (undefined → null) ---
@@ -68,7 +69,7 @@ export function AcoesDUModalNovo({
   onSuccess,
 }: AcoesDUModalNovoProps) {
   const { user } = useAuth();
-  const ehChefia = isAdmin(user);
+  const { ehAdminEfetivo: ehChefia } = useComandoEfetivo();
   const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
   const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
 

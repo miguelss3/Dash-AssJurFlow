@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import type { Processo } from "@/types/processo";
 import { collection, addDoc, updateDoc, doc, Timestamp, setDoc, getDoc, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAuth, isAdmin } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { useComandoEfetivo } from "@/hooks/useComandoEfetivo";
 import { calcularFaixasProrrogacaoPA, calcularPrazoFinalPA } from "@/lib/prazo";
 import { registrarErro } from "@/lib/errorLog";
 import {
@@ -114,7 +115,7 @@ const formatarPortaria = (valor: string) => {
 
 export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettings }: CadastroPAProps) {
   const { user } = useAuth();
-  const ehAdminOuChefe = isAdmin(user);
+  const { ehAdminEfetivo: ehAdminOuChefe } = useComandoEfetivo();
 
   const assuntosPASindicancia = useMemo(
     () => normalizarAssuntosPA(siteSettings?.assuntosPASindicancia, DEFAULT_ASSUNTOS_PA_SINDICANCIA),

@@ -28,7 +28,7 @@ let recuperacaoFantasmasExecutada = false;
 import { calcularPrazoFinalPA, normalizarTextoHistoricoPrazoPA } from "@/lib/prazo";
 import type { SiteSettings } from "@/types/siteSettings";
 
-export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | null) {
+export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | null, ehAdminEfetivo?: boolean) {
   const [processos, setProcessos] = useState<Processo[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -148,7 +148,11 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
         uid: firebaseUser.uid,
       };
 
-      const ehAdmin = isAdmin(usuarioEfetivo);
+      // V4.3 — `ehAdminEfetivo` cobre quem recebeu o comando delegado
+      // (Comando da AssJur): sem isso, a query abaixo continuaria presa ao
+      // próprio setor do delegado, mesmo ele tendo ganhado visão de chefia
+      // no resto da tela.
+      const ehAdmin = isAdmin(usuarioEfetivo) || !!ehAdminEfetivo;
       const setorUsuario = normalizarSetor(
         usuarioEfetivo.setor || usuarioEfetivo.role || usuarioEfetivo.secao || usuarioEfetivo.cargo,
       );
@@ -546,7 +550,7 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
       unsubAuth();
       if (unsubProcessos) unsubProcessos();
     };
-  }, [authUser, siteSettings]);
+  }, [authUser, siteSettings, ehAdminEfetivo]);
 
   // Função para criar novo processo
   const criar = async (dados: Omit<Processo, "id" | "criadoEm" | "userId" | "userEmail">) => {

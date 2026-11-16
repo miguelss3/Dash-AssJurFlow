@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { Processo } from "@/types/processo";
-import { useAuth, isAdmin } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
+import { useComandoEfetivo } from "@/hooks/useComandoEfetivo";
 import { CadastroDU } from "@/components/modals/CadastroDU";
 import { CadastroPA } from "@/components/modals/CadastroPA";
 import type { SiteSettings } from "@/types/siteSettings";
@@ -36,7 +37,7 @@ const inferirSetorProcesso = (processo?: Processo | null): "DU" | "PA" => {
 
 export function CadastroProcessoModal({ open, onOpenChange, processo, onSuccess, siteSettings }: CadastroProcessoModalProps) {
   const { user } = useAuth();
-  const ehAdminOuChefe = isAdmin(user);
+  const { ehAdminEfetivo: ehAdminOuChefe } = useComandoEfetivo();
 
   const setorUsuario = useMemo(() => inferirSetorUsuario(user), [user]);
   const [setorEscolhido, setSetorEscolhido] = useState<"DU" | "PA" | "">("");

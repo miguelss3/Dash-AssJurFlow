@@ -218,7 +218,17 @@ function Index() {
     loading: siteSettingsLoading,
     saveSettings: persistSiteSettings,
   } = useSiteSettings(ready && !!user);
-  const { processos, carregando: loadingProcessos, criar, atualizar, remover, buscarSnapshotBruto } = useProcessos(siteSettings, user);
+  const { comando, revogar: revogarComando } = useComandoAssJur();
+  // V4.3 — calculado cedo (antes do useProcessos) porque a busca de
+  // processos precisa saber, já na query do Firestore, se quem está logado
+  // está agindo com comando delegado — senão continuaria só vendo o próprio
+  // setor, mesmo tendo ganhado poderes de chefia no resto da tela.
+  const hojeComando = dataCivilAtual();
+  const comandoVigente = !!comando && hojeComando >= comando.dataInicio && hojeComando < comando.dataFim;
+  const souDelegadoAtivo = comandoVigente && comando?.delegadoUid === user?.uid;
+  const ehObservador = comandoVigente && comando?.delegadorUid === user?.uid;
+
+  const { processos, carregando: loadingProcessos, criar, atualizar, remover, buscarSnapshotBruto } = useProcessos(siteSettings, user, souDelegadoAtivo);
   const {
     ferias,
     criar: criarFerias,
@@ -228,10 +238,9 @@ function Index() {
     atualizarPeriodo: editarPeriodoFerias,
     reconhecerConflito: reconhecerConflitoFerias,
   } = useFeriasMilitares();
-  const { comando, revogar: revogarComando } = useComandoAssJur();
   // Fonte única das contagens históricas do servidor — compartilhada entre
   // Dashboard e Estatisticas para não duplicar as mesmas consultas getCountFromServer.
-  const statsServidor = useProcessosStats();
+  const statsServidor = useProcessosStats(souDelegadoAtivo);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Processo | null>(null);
   const [defaultStatus, setDefaultStatus] = useState<StatusProcesso>("novo");
@@ -261,18 +270,18 @@ function Index() {
   // Usuário logado (sem fallback fixo para evitar flicker visual no reload)
   const usuario = user ?? { posto: "", nome: "", role: "", setor: "" };
   const ehAdminUniversal = isAdminUniversal(user);
+  // V4.3 — equivalente a `ehAdminUniversal`, mas também vale para quem
+  // recebeu o comando (Gestão da Equipe, Ajustes do Site). A própria
+  // delegação/revogação (comandoAssJur) continua exclusiva da identidade
+  // real (`ehAdminUniversal`), nunca do efetivo — ver AjustesComando.tsx.
+  const ehAdminUniversalEfetivo = ehAdminUniversal || souDelegadoAtivo;
 
   // V4.3 — Comando da AssJur: enquanto uma delegação estiver vigente
   // ([dataInicio, dataFim)), quem a recebeu (`delegado`) enxerga/gerencia
   // tudo como chefia (ver `ehAdmin` abaixo); quem delegou (`delegador`) vira
   // observador — mantém a visão ampla (não mexe em `ehAdmin`), mas toda
   // escrita dele é bloqueada no backend (firestore.rules) e nos handlers
-  // abaixo. `comandoVigente` usa a mesma convenção [início, fim) de Férias.
-  const hojeComando = dataCivilAtual();
-  const comandoVigente = !!comando && hojeComando >= comando.dataInicio && hojeComando < comando.dataFim;
-  const souDelegadoAtivo = comandoVigente && comando?.delegadoUid === user?.uid;
-  const ehObservador = comandoVigente && comando?.delegadorUid === user?.uid;
-
+  // abaixo.
   const ehAdmin = isAdmin(user) || souDelegadoAtivo;
 
   // Bloqueia a ação e avisa quando quem está agindo delegou o comando e
@@ -1151,7 +1160,7 @@ function Index() {
     { id: "prazos", label: "Controle de Prazos", icon: Calendar },
     { id: "equipe", label: "Gestão da Equipe", icon: Users },
     { id: "ferias", label: "Férias de Militares", icon: Plane },
-    ...(ehAdminUniversal ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
+    ...(ehAdminUniversalEfetivo ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
   ];
 
   // Tabs principais (estilo AssJur)
@@ -1171,9 +1180,10 @@ function Index() {
   const tabs = ehAdmin ? tabsCompletas : tabsAssessor;
 
   useEffect(() => {
-    // "Ajustes do Site" é exclusivo do Admin Universal — chefes têm a mesma
-    // visão operacional, mas não esta funcionalidade.
-    if (aba === "ajustes" && !ehAdminUniversal) {
+    // "Ajustes do Site" é exclusivo do Admin Universal (ou de quem está com
+    // o comando delegado) — chefes comuns têm a mesma visão operacional,
+    // mas não esta funcionalidade.
+    if (aba === "ajustes" && !ehAdminUniversalEfetivo) {
       setAba("mesa");
       return;
     }
@@ -1181,7 +1191,7 @@ function Index() {
     if (aba !== "prazos" && aba !== "ajustes" && aba !== "equipe" && aba !== "ferias" && !tabs.some((t) => t.id === aba)) {
       setAba("mesa");
     }
-  }, [tabs, aba, ehAdminUniversal]);
+  }, [tabs, aba, ehAdminUniversalEfetivo]);
 
   // Renderiza tela de carregamento enquanto a sessão não foi sincronizada
   if (!ready && !user) {
@@ -1542,7 +1552,7 @@ function Index() {
             </Suspense>
           )}
 
-          {aba === "ajustes" && ehAdminUniversal && (
+          {aba === "ajustes" && ehAdminUniversalEfetivo && (
             <Suspense fallback={<TabLoading label="Carregando ajustes do site..." />}>
               <AjustesSite
                 settings={siteSettings}
@@ -1565,7 +1575,7 @@ function Index() {
 
           {aba === "equipe" && (
             <Suspense fallback={<TabLoading label="Carregando gestão da equipe..." />}>
-              <GestaoEquipe />
+              <GestaoEquipe ehAdminUniversalEfetivo={ehAdminUniversalEfetivo} />
             </Suspense>
           )}
 
