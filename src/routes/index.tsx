@@ -564,6 +564,7 @@ function Index() {
   };
 
   const handleEdit = (p: Processo) => {
+    if (bloquearSeObservador()) return;
     setEditing(p);
     setDialogOpen(true);
   };
@@ -716,6 +717,7 @@ function Index() {
   };
 
   const handleAdd = (status: StatusProcesso) => {
+    if (bloquearSeObservador()) return;
     startTransition(() => {
       setEditing(null);
       setDefaultStatus(status);

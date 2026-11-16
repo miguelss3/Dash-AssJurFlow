@@ -115,7 +115,7 @@ const formatarPortaria = (valor: string) => {
 
 export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettings }: CadastroPAProps) {
   const { user } = useAuth();
-  const { ehAdminEfetivo: ehAdminOuChefe } = useComandoEfetivo();
+  const { ehAdminEfetivo: ehAdminOuChefe, ehObservador } = useComandoEfetivo();
 
   const assuntosPASindicancia = useMemo(
     () => normalizarAssuntosPA(siteSettings?.assuntosPASindicancia, DEFAULT_ASSUNTOS_PA_SINDICANCIA),
@@ -302,6 +302,10 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+    if (ehObservador) {
+      toast.error("Modo Observador: o comando está delegado. Você não pode cadastrar processos até revogar ou o período terminar.");
+      return;
+    }
 
     if (!numeroProcesso.trim()) {
       toast.error("Informe o número do processo.");

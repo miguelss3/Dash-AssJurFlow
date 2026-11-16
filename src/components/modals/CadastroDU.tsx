@@ -89,7 +89,7 @@ const inferirSetorPorCampos = (...valores: Array<unknown>): "DU" | "PA" | "" => 
 
 export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettings }: CadastroDUProps) {
   const { user } = useAuth();
-  const { ehAdminEfetivo: ehAdminOuChefe } = useComandoEfetivo();
+  const { ehAdminEfetivo: ehAdminOuChefe, ehObservador } = useComandoEfetivo();
 
   const assuntosDUPrincipais = useMemo(
     () => normalizarAssuntosDU(siteSettings?.assuntosDUPrincipais, DEFAULT_ASSUNTOS_DU_PRINCIPAIS),
@@ -181,6 +181,10 @@ export function CadastroDU({ open, onOpenChange, processo, onSuccess, siteSettin
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
+    if (ehObservador) {
+      toast.error("Modo Observador: o comando está delegado. Você não pode cadastrar processos até revogar ou o período terminar.");
+      return;
+    }
 
     const isRequerimentoExtrajudicial = assunto === "Requerimento EXTRAJUDICIAL";
 
