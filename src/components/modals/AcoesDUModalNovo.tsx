@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { doc, updateDoc, Timestamp, collection, addDoc, setDoc, getDoc } from "firebase/firestore";
 import { Lock, Send, CheckCircle2 } from "lucide-react";
@@ -105,11 +105,19 @@ export function AcoesDUModalNovo({
   const [processoConcluido, setProcessoConcluido] = useState(false);
 
   // ---------------- Carga ----------------
+  // V4.2 — Contador de corrida: se o usuário abrir o modal de um processo e,
+  // antes do getDoc() responder, trocar para outro (ou fechar e reabrir),
+  // a resposta antiga chegando depois sobrescrevia o estado com os dados do
+  // processo ERRADO (ex.: número de ofício de outro processo "fantasma" no
+  // campo). Só a carga mais recente pode aplicar seu resultado.
+  const cargaEmCursoRef = useRef(0);
   const carregarFluxo = async () => {
     if (!processoId) return;
+    const minhaCarga = ++cargaEmCursoRef.current;
     setCarregandoFluxo(true);
     try {
       const snap = await getDoc(doc(db, "processos", processoId));
+      if (cargaEmCursoRef.current !== minhaCarga) return;
       if (!snap.exists()) return;
       const data = snap.data();
       const pedido = data?.pedidoSubsidios || {};
@@ -220,16 +228,36 @@ export function AcoesDUModalNovo({
       registrarErro("AcoesDUModalNovo.carregarFluxo", error, { processoId });
       toast.error("Não foi possível carregar o fluxo do processo.");
     } finally {
-      setCarregandoFluxo(false);
+      if (cargaEmCursoRef.current === minhaCarga) setCarregandoFluxo(false);
     }
   };
 
   useEffect(() => {
     if (!open) return;
-    carregarFluxo();
+    // V4.2 — Zera o estado ANTES de buscar os dados do processo atual.
+    // Sem isso, ao trocar de processo o modal continuava mostrando, por um
+    // instante (ou indefinidamente, numa corrida de buscas), os valores do
+    // processo anterior — incluindo campos como número de ofício que ainda
+    // não existem para o processo recém-aberto.
+    setSituacaoFluxo("MESA_ASSESSOR");
+    setAcaoPrincipal("DILIGENCIA");
+    setAssinaturaDestino("chefe");
+    setDataPrazo("");
+    setNumeroDocumentoDU("");
+    setNumeroRecebido("");
+    setPossuiPrazoDU(true);
+    setIsReiteracao(false);
+    setIncluiDiexExterno(false);
+    setIncluiOficioExterno(false);
+    setNumeroDiexExterno("");
+    setNumeroOficioExterno("");
+    setNumeroAnterior("");
+    setPrazoAnterior("");
+    setProcessoConcluido(false);
     setTardioAberto(false);
     setNumeroRecebidoTardio("");
     setDataRecebidoTardio("");
+    carregarFluxo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, processoId]);
 
