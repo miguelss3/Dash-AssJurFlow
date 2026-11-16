@@ -31,10 +31,12 @@ import { useProcessos } from "@/hooks/useProcessos";
 import { useProcessosStats } from "@/hooks/useProcessosStats";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useFeriasMilitares } from "@/hooks/useFeriasMilitares";
+import { useComandoAssJur } from "@/hooks/useComandoAssJur";
 import { Dashboard } from "@/components/Dashboard";
 import { IndiceMensalCard } from "@/components/IndiceMensalCard";
 import { SidebarAssessoresResumo } from "@/components/SidebarAssessoresResumo";
 import { AlertaFeriasPendentes } from "@/components/AlertaFeriasPendentes";
+import { ComandoAssJurBanner } from "@/components/ComandoAssJurBanner";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { IAChatBox } from "@/components/IAChatBox";
 import type { Processo, StatusProcesso, FiltroPrazo } from "@/types/processo";
@@ -226,6 +228,7 @@ function Index() {
     atualizarPeriodo: editarPeriodoFerias,
     reconhecerConflito: reconhecerConflitoFerias,
   } = useFeriasMilitares();
+  const { comando, revogar: revogarComando } = useComandoAssJur();
   // Fonte única das contagens históricas do servidor — compartilhada entre
   // Dashboard e Estatisticas para não duplicar as mesmas consultas getCountFromServer.
   const statsServidor = useProcessosStats();
@@ -249,6 +252,7 @@ function Index() {
   const [processosLidos, setProcessosLidos] = useState<Record<string, number>>({});
   const [processoAcaoSelecionado, setProcessoAcaoSelecionado] = useState<Processo | null>(null);
   const [processoAcaoOpen, setProcessoAcaoOpen] = useState(false);
+  const [revogandoComando, setRevogandoComando] = useState(false);
 
   useEffect(() => {
     if (ready && !user) navigate({ to: "/login" });
@@ -256,8 +260,73 @@ function Index() {
 
   // Usuário logado (sem fallback fixo para evitar flicker visual no reload)
   const usuario = user ?? { posto: "", nome: "", role: "", setor: "" };
-  const ehAdmin = isAdmin(user);
   const ehAdminUniversal = isAdminUniversal(user);
+
+  // V4.3 — Comando da AssJur: enquanto uma delegação estiver vigente
+  // ([dataInicio, dataFim)), quem a recebeu (`delegado`) enxerga/gerencia
+  // tudo como chefia (ver `ehAdmin` abaixo); quem delegou (`delegador`) vira
+  // observador — mantém a visão ampla (não mexe em `ehAdmin`), mas toda
+  // escrita dele é bloqueada no backend (firestore.rules) e nos handlers
+  // abaixo. `comandoVigente` usa a mesma convenção [início, fim) de Férias.
+  const hojeComando = dataCivilAtual();
+  const comandoVigente = !!comando && hojeComando >= comando.dataInicio && hojeComando < comando.dataFim;
+  const souDelegadoAtivo = comandoVigente && comando?.delegadoUid === user?.uid;
+  const ehObservador = comandoVigente && comando?.delegadorUid === user?.uid;
+
+  const ehAdmin = isAdmin(user) || souDelegadoAtivo;
+
+  // Bloqueia a ação e avisa quando quem está agindo delegou o comando e
+  // está em modo observador — chamar no início de cada handler de escrita.
+  // O bloqueio real (contra qualquer caminho, inclusive os que escrevem
+  // direto no Firestore sem passar por cá) está em firestore.rules; isto
+  // aqui é só para dar um aviso amigável em vez de um erro de permissão cru.
+  const bloquearSeObservador = (): boolean => {
+    if (!ehObservador) return false;
+    toast.error("Modo Observador: o comando está delegado. Você não pode alterar nada até revogar ou o período terminar.");
+    return true;
+  };
+
+  // Wrappers com o mesmo bloqueio para as ações da página Férias de
+  // Militares — essas chamam os métodos do hook diretamente (sem passar
+  // por um handler próprio aqui), então o aviso amigável precisa entrar
+  // nesta borda.
+  const criarFeriasComGuard: typeof criarFerias = async (dados) => {
+    if (bloquearSeObservador()) return;
+    await criarFerias(dados);
+  };
+  const excluirFeriasComGuard: typeof excluirFerias = async (id) => {
+    if (bloquearSeObservador()) return;
+    await excluirFerias(id);
+  };
+  const editarPeriodoFeriasComGuard: typeof editarPeriodoFerias = async (id, dataInicio, dataRetorno) => {
+    if (bloquearSeObservador()) return;
+    await editarPeriodoFerias(id, dataInicio, dataRetorno);
+  };
+  const reconhecerConflitoFeriasComGuard: typeof reconhecerConflitoFerias = async (idA, idB) => {
+    if (bloquearSeObservador()) return;
+    await reconhecerConflitoFerias(idA, idB);
+  };
+  const redistribuirFeriasComGuard: typeof redistribuirFerias = async (id, distribuicoes) => {
+    if (bloquearSeObservador()) return;
+    await redistribuirFerias(id, distribuicoes);
+  };
+
+  const handleRevogarComando = async () => {
+    const confirmado = window.confirm(
+      "Revogar o comando delegado e retomar o controle agora? Você volta imediatamente ao modo normal.",
+    );
+    if (!confirmado) return;
+    setRevogandoComando(true);
+    try {
+      await revogarComando();
+      toast.success("Comando revogado. Você está no controle novamente.");
+    } catch (error) {
+      console.error("Erro ao revogar comando da AssJur:", error);
+      toast.error("Não foi possível revogar o comando.");
+    } finally {
+      setRevogandoComando(false);
+    }
+  };
   // Cast para Record permite ler campos legados (`secao`, `cargo`) sem quebrar o tipo AuthUser.
   const usuarioLegado = usuario as Record<string, unknown>;
   const setorUsuario = normalizarSetor(
@@ -646,6 +715,7 @@ function Index() {
   };
 
   const handleSalvarAjustesSite = async (nextSettings: SiteSettings) => {
+    if (bloquearSeObservador()) return;
     try {
       await persistSiteSettings(nextSettings, {
         name: nomeMilitarAtual,
@@ -660,6 +730,7 @@ function Index() {
   };
 
   const handleSave = (dados: Omit<Processo, "id" | "criadoEm">) => {
+    if (bloquearSeObservador()) return;
     if (editing) {
       toast.promise(atualizar(editing.id, dados), {
         loading: "Salvando alterações...",
@@ -714,6 +785,7 @@ function Index() {
     novoResponsavel: string,
     opcoes?: { situacaoFluxo?: string; mensagemHistorico?: string },
   ) => {
+    if (bloquearSeObservador()) return;
     const retrocessoFluxo = opcoes?.situacaoFluxo;
     const toastId = toast.loading(
       retrocessoFluxo
@@ -850,10 +922,13 @@ function Index() {
   // processos de qualquer assessor do setor) para não disputar a mesma
   // escrita em várias abas abertas por assessores ao mesmo tempo.
   // `feriasAutoRevertRef` evita reprocessar o mesmo par (férias, processo)
-  // enquanto o `await` de uma reversão anterior ainda está em voo.
+  // enquanto o `await` de uma reversão anterior ainda está em voo. Pulado
+  // inteiro quando `ehObservador`: a escrita seria negada pelo backend de
+  // qualquer forma (comando delegado), então deixa o robô rodar na sessão
+  // de quem está de fato no comando (delegado ou outro chefe).
   const feriasAutoRevertRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!ehAdmin || ferias.length === 0 || processos.length === 0) return;
+    if (!ehAdmin || ehObservador || ferias.length === 0 || processos.length === 0) return;
 
     const hojeCivil = dataCivilAtual();
 
@@ -938,6 +1013,7 @@ function Index() {
   }, [ferias, processos]);
 
   const handleMoverStatus = async (processoId: string, novoStatus: StatusProcesso) => {
+    if (bloquearSeObservador()) return;
     const rotulosStatus: Record<StatusProcesso, string> = {
       novo: "Triagem",
       andamento: "Em Andamento",
@@ -972,6 +1048,7 @@ function Index() {
   };
 
   const handleRemover = async (id: string) => {
+    if (bloquearSeObservador()) return;
     await toast.promise(remover(id), {
       loading: "Excluindo processo...",
       success: "Processo excluído.",
@@ -983,6 +1060,7 @@ function Index() {
     processoId: string,
     payload?: { motivo: string; novoPrazoFatal: string },
   ) => {
+    if (bloquearSeObservador()) return;
     try {
       const processo = processos.find((p) => p.id === processoId);
       if (!processo) return;
@@ -1319,6 +1397,16 @@ function Index() {
 
         {/* Content */}
         <main className="px-4 sm:px-6 lg:px-8 py-5 space-y-5 max-w-[1700px] mx-auto">
+          <ComandoAssJurBanner
+            souObservador={ehObservador}
+            souDelegado={souDelegadoAtivo}
+            delegadoNome={comando?.delegadoNome}
+            delegadorNome={comando?.delegadorNome}
+            dataFim={comando?.dataFim}
+            onRevogar={handleRevogarComando}
+            revogando={revogandoComando}
+          />
+
           {aba === "mesa" && (
             <>
               {/* Sub-controles: Minha Mesa | Visão do Setor | DU | PA + busca + filtros à direita */}
@@ -1488,11 +1576,11 @@ function Index() {
                 ehAdmin={ehAdmin}
                 processos={processos}
                 ferias={ferias}
-                onCriarFerias={criarFerias}
-                onExcluirFerias={excluirFerias}
-                onEditarPeriodo={editarPeriodoFerias}
-                onReconhecerConflito={reconhecerConflitoFerias}
-                onRedistribuirFerias={redistribuirFerias}
+                onCriarFerias={criarFeriasComGuard}
+                onExcluirFerias={excluirFeriasComGuard}
+                onEditarPeriodo={editarPeriodoFeriasComGuard}
+                onReconhecerConflito={reconhecerConflitoFeriasComGuard}
+                onRedistribuirFerias={redistribuirFeriasComGuard}
                 onRedistribuirProcesso={handleRedistribuir}
               />
             </Suspense>

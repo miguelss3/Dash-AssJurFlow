@@ -42,9 +42,36 @@ service cloud.firestore {
       );
     }
 
+    // V4.3 — Comando da AssJur: o Admin Universal pode delegar temporariamente
+    // seus poderes de chefia a outro militar (ex.: durante uma ausência),
+    // virando "observador" (mantém toda a leitura, perde toda a escrita)
+    // enquanto a delegação estiver vigente. Documento único
+    // (comandoAssJur/atual); sua ausência ou estar fora de
+    // [dataInicio, dataFim) significa "sem delegação ativa" — comportamento
+    // normal. `souDelegadorEmObservacao()` SÓ entra nas regras de ESCRITA
+    // (nunca nas de leitura) para não tirar a visão ampla do próprio chefe.
+    function comandoAtivoData() {
+      return get(/databases/$(database)/documents/comandoAssJur/atual).data;
+    }
+
+    function existeComandoAtivo() {
+      return exists(/databases/$(database)/documents/comandoAssJur/atual) &&
+        request.time >= comandoAtivoData().dataInicio &&
+        request.time < comandoAtivoData().dataFim;
+    }
+
+    function souDelegadorEmObservacao() {
+      return isSignedIn() && existeComandoAtivo() && request.auth.uid == comandoAtivoData().delegadorUid;
+    }
+
+    function souDelegadoAtivo() {
+      return isSignedIn() && existeComandoAtivo() && request.auth.uid == comandoAtivoData().delegadoUid;
+    }
+
     function canManageSetor(setor) {
       return isAdminUniversal() ||
         isChefePerfil() ||
+        souDelegadoAtivo() ||
         (setor in ['DU', 'PA'] && userSetor() == setor);
     }
 
@@ -97,19 +124,21 @@ service cloud.firestore {
       return isSignedIn() &&
         (data.setor in ['DU', 'PA']) &&
         isOwnerPayload(data) &&
-        canManageSetor(data.setor);
+        canManageSetor(data.setor) &&
+        !souDelegadorEmObservacao();
     }
 
     function canUpdateProcess(oldData, newData) {
       // Simplificado: Exige login, permissão no setor e impede roubo de processo
       return isSignedIn() &&
         canManageSetor(oldData.setor) &&
+        !souDelegadorEmObservacao() &&
         oldData.userId == newData.userId &&
         oldData.setor == newData.setor;
     }
 
     function canDeleteProcess(oldData) {
-      return isSignedIn() && canManageSetor(oldData.setor);
+      return isSignedIn() && canManageSetor(oldData.setor) && !souDelegadorEmObservacao();
     }
     
     // Regras para a coleção de processos
@@ -123,6 +152,7 @@ service cloud.firestore {
       match /historico/{mensagemId} {
         allow read: if canAccessProcessById(processoId);
         allow create: if canAccessProcessById(processoId) &&
+          !souDelegadorEmObservacao() &&
           request.resource.data.keys().hasOnly(['autor', 'autorId', 'texto', 'timestamp']) &&
           request.resource.data.autorId == request.auth.uid &&
           autorTextoValido(request.resource.data.autor);
@@ -142,24 +172,28 @@ service cloud.firestore {
       // cadastra, exclui ou atribui a função de Admin/Chefe a outros usuários.
       // Antes, qualquer chefe podia escrever em QUALQUER perfil — inclusive
       // promovendo a si mesmo (ou a um cúmplice) a Admin Universal.
-      allow write: if isSignedIn() && isAdminUniversal();
+      allow write: if isSignedIn() && isAdminUniversal() && !souDelegadorEmObservacao();
     }
-    
+
     // Regras para a coleção de distribuições
     match /distribuicoes/{distribuicaoId} {
       allow get, list: if resource.data.processoId is string &&
         canAccessProcessById(resource.data.processoId);
       allow create: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
         request.resource.data.processoId is string &&
         canAccessProcessById(request.resource.data.processoId);
       allow update: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
         resource.data.processoId is string &&
         request.resource.data.processoId == resource.data.processoId &&
         canAccessProcessById(resource.data.processoId);
-      allow delete: if isAdminUniversal() || (
-        isSignedIn() &&
-        resource.data.processoId is string &&
-        canAccessProcessById(resource.data.processoId)
+      allow delete: if !souDelegadorEmObservacao() && (
+        isAdminUniversal() || (
+          isSignedIn() &&
+          resource.data.processoId is string &&
+          canAccessProcessById(resource.data.processoId)
+        )
       );
     }
     
@@ -173,12 +207,14 @@ service cloud.firestore {
       // intacto, crescer em exatamente 1 item, e o item novo precisa estar
       // autenticado como o autor real (autorId == uid), não falsificável.
       allow create: if canAccessProcessById(mensagemId) &&
+        !souDelegadorEmObservacao() &&
         request.resource.data.keys().hasOnly(['historico']) &&
         request.resource.data.historico is list &&
         request.resource.data.historico.size() == 1 &&
         request.resource.data.historico[0].autorId == request.auth.uid;
 
       allow update: if canAccessProcessById(mensagemId) &&
+        !souDelegadorEmObservacao() &&
         request.resource.data.keys().hasOnly(['historico']) &&
         request.resource.data.historico is list &&
         resource.data.historico is list &&
@@ -196,12 +232,15 @@ service cloud.firestore {
       // vínculo com a organização) veja prazos/agenda de todos os processos.
       allow read: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
       allow create: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
         request.resource.data.setor in ['DU', 'PA'] &&
         canManageSetor(request.resource.data.setor);
       allow update: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
         resource.data.setor in ['DU', 'PA'] &&
         canManageSetor(resource.data.setor);
       allow delete: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
         resource.data.setor in ['DU', 'PA'] &&
         canManageSetor(resource.data.setor);
     }
@@ -212,6 +251,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
       allow create, update: if isSignedIn() &&
         isAdminUniversal() &&
+        !souDelegadorEmObservacao() &&
         configId == 'layoutPrincipal' &&
         request.resource.data.sidebarTitle is string &&
         request.resource.data.sidebarSubtitle is string &&
@@ -263,6 +303,7 @@ service cloud.firestore {
       allow get, list: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
 
       allow create: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
         request.resource.data.userId is string &&
         request.resource.data.nomeMilitar is string &&
         request.resource.data.setor in ['DU', 'PA', 'GERAL'] &&
@@ -276,6 +317,7 @@ service cloud.firestore {
       // Edição (datas, substituto, conflitos reconhecidos) sempre preserva
       // o militar (userId) e o setor originais do registro.
       allow update: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
         resource.data.setor in ['DU', 'PA', 'GERAL'] &&
         request.resource.data.userId == resource.data.userId &&
         request.resource.data.setor == resource.data.setor &&
@@ -285,11 +327,23 @@ service cloud.firestore {
         );
 
       allow delete: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
         resource.data.setor in ['DU', 'PA', 'GERAL'] &&
         (
           (resource.data.setor in ['DU', 'PA'] && resource.data.userId == request.auth.uid) ||
           podeGerenciarFeriasSetor(resource.data.setor)
         );
+    }
+
+    // V4.3 — Comando da AssJur: documento único (sempre id "atual") com a
+    // delegação vigente/futura. Só o Admin Universal pode criar, editar ou
+    // revogar — mesmo estando ele próprio "em observação" no momento (senão
+    // nunca conseguiria retomar o comando), por isso NÃO leva
+    // `souDelegadorEmObservacao()`. Leitura aberta a todo efetivo cadastrado:
+    // todos precisam saber quem está no comando no momento.
+    match /comandoAssJur/{comandoId} {
+      allow get, list: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
+      allow create, update, delete: if comandoId == 'atual' && isAdminUniversal();
     }
 
     match /{document=**} {
