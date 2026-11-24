@@ -123,6 +123,17 @@ function periodosSeSobrepoem(a: FeriasMilitar, b: FeriasMilitar): boolean {
   return a.dataInicio < b.dataRetorno && b.dataInicio < a.dataRetorno;
 }
 
+// Interseção dos dois períodos [dataInicio, dataRetorno) — datas em que os
+// dois estão de férias ao mesmo tempo, e quantos dias isso soma.
+function calcularSobreposicao(a: FeriasMilitar, b: FeriasMilitar): { inicio: string; fim: string; dias: number } {
+  const inicio = a.dataInicio > b.dataInicio ? a.dataInicio : b.dataInicio;
+  const fim = a.dataRetorno < b.dataRetorno ? a.dataRetorno : b.dataRetorno;
+  const dias = Math.round(
+    (new Date(`${fim}T00:00:00`).getTime() - new Date(`${inicio}T00:00:00`).getTime()) / 86400000,
+  );
+  return { inicio, fim, dias };
+}
+
 export function FeriasMilitares({
   usuario: usuarioProp,
   ehAdmin,
@@ -185,7 +196,7 @@ export function FeriasMilitares({
   // Some sozinho da lista quando o período passa — não precisa de limpeza.
   const conflitos = useMemo(() => {
     const emAberto = ferias.filter((f) => statusDaFerias(f, hoje) !== "concluida");
-    const pares: { a: FeriasMilitar; b: FeriasMilitar }[] = [];
+    const pares: { a: FeriasMilitar; b: FeriasMilitar; inicio: string; fim: string; dias: number }[] = [];
     for (let i = 0; i < emAberto.length; i++) {
       for (let j = i + 1; j < emAberto.length; j++) {
         const a = emAberto[i];
@@ -194,7 +205,7 @@ export function FeriasMilitares({
         if (!periodosSeSobrepoem(a, b)) continue;
         const reconhecido = (a.conflitosCientes || []).includes(b.id) || (b.conflitosCientes || []).includes(a.id);
         if (reconhecido) continue;
-        pares.push({ a, b });
+        pares.push({ a, b, ...calcularSobreposicao(a, b) });
       }
     }
     return pares;
@@ -447,12 +458,13 @@ export function FeriasMilitares({
             <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
             <div className="flex-1 space-y-3">
               <h4 className="font-bold text-amber-900">Períodos de férias sobrepostos</h4>
-              {conflitos.map(({ a, b }) => (
+              {conflitos.map(({ a, b, inicio, fim, dias }) => (
                 <div key={`${a.id}_${b.id}`} className="flex items-center justify-between gap-3 flex-wrap text-sm text-amber-900">
                   <span>
                     <b>{a.nomeMilitar}</b> ({formatarData(a.dataInicio)}–{formatarData(a.dataRetorno)}) e{" "}
                     <b>{b.nomeMilitar}</b> ({formatarData(b.dataInicio)}–{formatarData(b.dataRetorno)}) estão de férias
-                    em período que se sobrepõe.
+                    em período que se sobrepõe: <b>{dias} dia{dias === 1 ? "" : "s"}</b> em comum, de{" "}
+                    <b>{formatarData(inicio)}</b> até <b>{formatarData(fim)}</b>.
                   </span>
                   <Button size="sm" variant="outline" onClick={() => handleReconhecerConflito(a.id, b.id)}>
                     <Check className="h-3.5 w-3.5 mr-1.5" />
