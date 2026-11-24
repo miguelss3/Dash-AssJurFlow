@@ -438,8 +438,6 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
             </div>
 
             <div className="space-y-4 order-2 lg:col-span-2">
-              <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Documentos</h4>
-
               {(() => {
                 // Histórico completo de envios (array de Nº DIEx). Ordem do array =
                 // ordem cronológica de envio (mais antigo primeiro).
@@ -465,12 +463,11 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* ENVIADOS — um card por documento do histórico */}
                     <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold">
-                          <ArrowUpRight className="w-4 h-4 text-sky-500" />
-                          Enviados (Histórico)
-                        </div>
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
+                        <ArrowUpRight className="w-4 h-4 text-sky-500 shrink-0" />
+                        <span className="whitespace-nowrap">Enviados (Histórico)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mb-2">
                           {editandoEnviados ? (
                             <>
                               <Button
@@ -497,14 +494,13 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                               <Pencil className="w-3 h-3 mr-1" /> Editar
                             </Button>
                           )}
-                        </div>
                       </div>
 
                       {editandoEnviados ? (
                         <div className="space-y-3 mt-2">
                           {historicoEdit.length === 0 && (
                             <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
-                              Nenhum documento cadastrado. Clique em “Adicionar Documento”.
+                              Nenhum documento cadastrado. Clique em “Adicionar Enviado”.
                             </div>
                           )}
                           {historicoEdit.map((item, idx) => (
@@ -564,7 +560,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                             onClick={adicionarItemHistorico}
                             className="w-full text-xs h-8 border-dashed border-slate-300 text-slate-500 hover:text-slate-800"
                           >
-                            <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Documento
+                            <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Enviado
                           </Button>
                         </div>
                       ) : historicoEnviado.length > 0 ? (
@@ -619,12 +615,11 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
 
                     {/* RECEBIDO */}
                     <div>
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold">
-                          <ArrowDownLeft className="w-4 h-4 text-sky-500" />
-                          Recebidos (Histórico)
-                        </div>
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
+                        <ArrowDownLeft className="w-4 h-4 text-sky-500 shrink-0" />
+                        <span className="whitespace-nowrap">Recebidos (Histórico)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mb-2">
                           {editandoRecebidos ? (
                             <>
                               <Button
@@ -661,7 +656,6 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                               <Pencil className="w-3 h-3 mr-1" /> Editar
                             </Button>
                           )}
-                        </div>
                       </div>
                       {editandoRecebidos ? (
                         <div className="space-y-3 mt-2">
@@ -762,14 +756,18 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
             </div>
 
             <div className="space-y-4 order-1">
-              <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
+                <Calendar className="w-4 h-4 text-sky-500 shrink-0" />
+                <span className="whitespace-nowrap">Prazos e Datas</span>
+              </div>
+              <div className="flex items-center gap-1.5 mb-2">
                 {editandoPrazosDU ? (
                     <>
                       <Button
                         type="button"
                         size="sm"
                         variant="outline"
+                        className="h-7 px-2 text-[11px]"
                         onClick={() => {
                           setEditandoPrazosDU(false);
                           setPrazoInternoEdit(processo.prazo || "");
@@ -778,10 +776,10 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                         }}
                         disabled={savingPrazosDU}
                       >
-                        <X className="w-3.5 h-3.5 mr-1" /> Cancelar
+                        <X className="w-3 h-3 mr-1" /> Cancelar
                       </Button>
-                      <Button type="button" size="sm" onClick={handleSalvarPrazosDU} disabled={savingPrazosDU}>
-                        <Save className="w-3.5 h-3.5 mr-1" /> {savingPrazosDU ? "Salvando..." : "Salvar"}
+                      <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={handleSalvarPrazosDU} disabled={savingPrazosDU}>
+                        <Save className="w-3 h-3 mr-1" /> {savingPrazosDU ? "Salvando..." : "Salvar"}
                       </Button>
                     </>
                   ) : (
@@ -795,7 +793,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
 
               {editandoPrazosDU && (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 gap-3">
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Prazo Interno</label>
                       <Input type="date" value={prazoInternoEdit} onChange={(e) => setPrazoInternoEdit(e.target.value)} />
