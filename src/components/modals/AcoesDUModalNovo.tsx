@@ -165,8 +165,13 @@ export function AcoesDUModalNovo({
       }
       setAssinaturaDestino(destinoFinal);
 
+      // V4.11 — `pedidoSubsidios` é a fonte da verdade; o espelho top-level
+      // (data.numeroDocumentoDU) é legado e NADA no código atual volta a
+      // escrevê-lo/zerá-lo. Em processos antigos ele ficava com um valor
+      // "fantasma" que sobrepunha o campo já corretamente limpo em
+      // pedidoSubsidios. Por isso o top-level agora só serve de fallback.
       setNumeroDocumentoDU(
-        (data?.numeroDocumentoDU || pedido?.numeroDocumentoDU || pedido?.numeroSaida || "").toString(),
+        (pedido?.numeroDocumentoDU || pedido?.numeroSaida || data?.numeroDocumentoDU || "").toString(),
       );
 
       // ---------------------------------------------------------------
@@ -202,11 +207,12 @@ export function AcoesDUModalNovo({
             : false;
       setIncluiDiexExterno(incluiDiex);
       setIncluiOficioExterno(incluiOficio);
+      // V4.11 — Mesmo caso do numeroDocumentoDU acima: pedidoSubsidios primeiro.
       setNumeroDiexExterno(
-        (data?.numeroDiexExterno || pedido?.numeroDiexExterno || "").toString(),
+        (pedido?.numeroDiexExterno || data?.numeroDiexExterno || "").toString(),
       );
       setNumeroOficioExterno(
-        (data?.numeroOficioExterno || pedido?.numeroOficioExterno || "").toString(),
+        (pedido?.numeroOficioExterno || data?.numeroOficioExterno || "").toString(),
       );
 
       // V2.8 — Snapshot do despacho anterior para o banner de Reiteração.
@@ -707,9 +713,18 @@ export function AcoesDUModalNovo({
         // mesmo bug de fuso já corrigido alhures: UTC pode "recuar" um dia
         // em fusos negativos como o do Brasil perto da meia-noite.
         const dataRecebido = dataCivilAtual();
+        // V4.10 — Limpa os números do documento que foi ENVIADO nesta
+        // rodada: a resposta já chegou, e se a próxima rodada precisar de
+        // um documento novo, o campo não deve vir com o número antigo
+        // "fantasma" (ver handleDevolverAssessor/handleMinutaRejeitada).
         void avancarFluxo("MESA_ASSESSOR", {
           numeroRecebido: numero,
           dataRecebido,
+          numeroDocumentoDU: "",
+          numeroDiex: "",
+          numeroSaida: "",
+          numeroDiexExterno: "",
+          numeroOficioExterno: "",
           descricaoOverride: "Resposta recebida. Em análise pelo assessor.",
         });
         return;
@@ -738,16 +753,31 @@ export function AcoesDUModalNovo({
   };
 
   // V2.7 — Marcha à Ré: minuta rejeitada na assinatura externa (Vigília SPED).
+  // V4.10 — Limpa os números do documento desta rodada (rejeitada): o
+  // assessor vai preparar uma minuta nova, o campo não deve vir pré-
+  // preenchido com o número antigo "fantasma".
   const handleMinutaRejeitada = () => {
     void avancarFluxo("MESA_ASSESSOR", {
       possuiPrazoDU: false,
+      numeroDocumentoDU: "",
+      numeroDiex: "",
+      numeroSaida: "",
+      numeroDiexExterno: "",
+      numeroOficioExterno: "",
       descricaoOverride: "Minuta rejeitada no SPED. Devolvida ao assessor para correções.",
     });
   };
 
   // V2.7 — Devolver ao Assessor (Chefia desiste sem ação).
+  // V4.10 — Mesma limpeza: a chefia desistiu desta rodada, então o número
+  // (se já tinha sido informado) não deve sobrar pré-preenchido na próxima.
   const handleDevolverAssessor = () => {
     void avancarFluxo("MESA_ASSESSOR", {
+      numeroDocumentoDU: "",
+      numeroDiex: "",
+      numeroSaida: "",
+      numeroDiexExterno: "",
+      numeroOficioExterno: "",
       descricaoOverride: "Chefia devolveu o processo ao assessor sem ação.",
     });
   };

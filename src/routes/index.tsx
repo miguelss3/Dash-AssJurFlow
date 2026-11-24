@@ -1156,9 +1156,23 @@ function Index() {
       }
 
       if (setor === "DU") {
+        // V4.10 — Reabertura começa uma rodada nova: limpa os números/prazo
+        // ativos da rodada anterior (já encerrada), senão o próximo
+        // despacho "herdava" o DIEx/Ofício antigo como se já estivesse
+        // definido (campo aparecia pré-preenchido, "fantasma", em vez de
+        // vazio). O histórico (numeroDiexHistorico/historicoRecebidos)
+        // continua intacto — só os campos "ativos" desta rodada são zerados.
         patch.pedidoSubsidios = {
           ...(processo.pedidoSubsidios || {}),
           situacaoFluxo: "MESA_ASSESSOR",
+          numeroDocumentoDU: "",
+          numeroDiex: "",
+          numeroSaida: "",
+          numeroDiexExterno: "",
+          numeroOficioExterno: "",
+          numeroRecebido: "",
+          dataPrazo: "",
+          prazoResposta: "",
         };
       }
 
