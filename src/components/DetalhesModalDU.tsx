@@ -751,7 +751,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                           </div>
                         ) : (
                           <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
-                            Pendente
+                            Nenhum documento recebido.
                           </div>
                         );
                       })()}
@@ -762,10 +762,9 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
             </div>
 
             <div className="space-y-4 order-1">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
-                <div className="flex items-center gap-2">
-                  {editandoPrazosDU ? (
+              <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
+              <div className="flex items-center justify-end gap-2">
+                {editandoPrazosDU ? (
                     <>
                       <Button
                         type="button"
@@ -790,7 +789,6 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                       <Pencil className="w-3 h-3 mr-1" /> Editar
                     </Button>
                   )}
-                </div>
               </div>
 
               {processo.dataEntrada && <InfoRow icon={Calendar} label="Data de Entrada" value={formatarData(processo.dataEntrada)} />}
