@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
-import { Pencil, Trash2, UserPlus, Crown } from "lucide-react";
+import { Pencil, Trash2, UserPlus, Crown, Lock } from "lucide-react";
 import { useAuth, isAdminUniversal, type AuthUser } from "@/hooks/useAuth";
 import { nomeMilitarUsuario } from "@/lib/userProfiles";
 
@@ -64,20 +64,28 @@ function ehChefeGeral(usuario: Pick<Usuario, "setor">): boolean {
 
 interface GestaoEquipeProps {
   /**
-   * V4.3 — Comando da AssJur: quem recebeu o comando delegado também pode
-   * cadastrar/editar/excluir integrantes, como se fosse o Admin Universal,
-   * enquanto a delegação estiver vigente (ver routes/index.tsx).
+   * V4.3/V4.8 — Comando da AssJur: quem recebeu o comando DO DONO delegado
+   * também pode gerenciar contas como se fosse o Admin Universal, inclusive
+   * a conta do próprio dono (ver routes/index.tsx). Só esta identidade (ou
+   * o dono de verdade) consegue mexer na conta protegida dele.
    */
   ehAdminUniversalEfetivo?: boolean;
+  /**
+   * V4.8 — Chefe Geral da AssJur (cargo permanente) ou quem está com o
+   * comando DELE delegado: pode cadastrar, editar e excluir qualquer
+   * integrante, EXCETO a conta do dono do site (protegida à parte).
+   */
+  podeGerenciarEquipe?: boolean;
 }
 
-export function GestaoEquipe({ ehAdminUniversalEfetivo }: GestaoEquipeProps = {}) {
+export function GestaoEquipe({ ehAdminUniversalEfetivo, podeGerenciarEquipe }: GestaoEquipeProps = {}) {
   const { user: usuarioLogado } = useAuth();
-  // Cadastrar/excluir usuários e atribuir a função de Admin/Chefe é
-  // exclusivo do Admin Universal (ou de quem está com o comando delegado) —
-  // chefes "comuns" têm a mesma visão da equipe, mas sem esta funcionalidade
-  // de gestão de contas.
-  const souAdminUniversal = isAdminUniversal(usuarioLogado) || !!ehAdminUniversalEfetivo;
+  // V4.8 — "pode gerenciar a equipe" (cadastrar/editar/excluir) agora
+  // também vale pro Chefe Geral da AssJur, não só o dono do site — mas só o
+  // dono (ou quem está com o comando DELE delegado) pode mexer na conta
+  // protegida dele (ver podeMexerNaContaDoDono abaixo).
+  const souAdminUniversal = isAdminUniversal(usuarioLogado) || !!ehAdminUniversalEfetivo || !!podeGerenciarEquipe;
+  const podeMexerNaContaDoDono = isAdminUniversal(usuarioLogado) || !!ehAdminUniversalEfetivo;
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -151,6 +159,10 @@ export function GestaoEquipe({ ehAdminUniversalEfetivo }: GestaoEquipeProps = {}
   }
 
   function editarUsuario(usuario: Usuario) {
+    if (isAdminUniversal(usuario) && !podeMexerNaContaDoDono) {
+      toast.error("Esta conta é protegida — só o Admin Universal pode editá-la.");
+      return;
+    }
     setEditando(usuario);
     setFormData({
       posto: usuario.posto || "",
@@ -310,6 +322,10 @@ export function GestaoEquipe({ ehAdminUniversalEfetivo }: GestaoEquipeProps = {}
 
   async function removerUsuario(usuario: Usuario) {
     if (!usuario.id) return;
+    if (isAdminUniversal(usuario) && !podeMexerNaContaDoDono) {
+      toast.error("Esta conta é protegida — só o Admin Universal pode excluí-la.");
+      return;
+    }
     const uidUsuario = String(usuario.uid || usuario.id || "").trim();
     const uidLogado = String(auth.currentUser?.uid || usuarioLogado?.uid || "").trim();
 
@@ -467,7 +483,10 @@ export function GestaoEquipe({ ehAdminUniversalEfetivo }: GestaoEquipeProps = {}
           </Card>
         ) : (
           <div className="space-y-3">
-            {usuarios.map((usuario) => (
+            {usuarios.map((usuario) => {
+              const ehContaDoDono = isAdminUniversal(usuario);
+              const contaProtegida = ehContaDoDono && !podeMexerNaContaDoDono;
+              return (
               <Card key={usuario.id} className="p-5 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -478,6 +497,9 @@ export function GestaoEquipe({ ehAdminUniversalEfetivo }: GestaoEquipeProps = {}
                         </span>
                       ) : (
                         <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${usuario.setor === "DU" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-purple-50 text-purple-700 border border-purple-200"}`}>{usuario.setor}</span>
+                      )}
+                      {ehContaDoDono && (
+                        <span className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider bg-yellow-100 text-yellow-800 border border-yellow-400">ADMIN</span>
                       )}
                       {usuario.isChefe && !ehChefeGeral(usuario) && (
                         <span className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 border border-amber-300">Chefe de Setor</span>
@@ -503,13 +525,30 @@ export function GestaoEquipe({ ehAdminUniversalEfetivo }: GestaoEquipeProps = {}
                   </div>
                   {souAdminUniversal && (
                     <div className="flex items-center gap-2">
-                      <Button size="sm" variant="outline" onClick={() => editarUsuario(usuario)}><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button size="sm" variant="destructive" onClick={() => removerUsuario(usuario)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => editarUsuario(usuario)}
+                        disabled={contaProtegida}
+                        title={contaProtegida ? "Conta protegida — só o Admin Universal pode editá-la" : undefined}
+                      >
+                        {contaProtegida ? <Lock className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => removerUsuario(usuario)}
+                        disabled={contaProtegida}
+                        title={contaProtegida ? "Conta protegida — só o Admin Universal pode excluí-la" : undefined}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   )}
                 </div>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

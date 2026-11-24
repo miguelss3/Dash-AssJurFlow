@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth, isAdminUniversal } from "@/hooks/useAuth";
-import { useComandoAssJur } from "@/hooks/useComandoAssJur";
+import { useComandoAssJur, type PapelComando } from "@/hooks/useComandoAssJur";
 import { nomeMilitarUsuario } from "@/lib/userProfiles";
 import { formatarData } from "@/lib/prazo";
 
@@ -33,16 +33,19 @@ function dataCivilAtual(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// Painel exclusivo do Admin Universal para transferir temporariamente o
-// comando da AssJur — quem recebe assume poderes plenos de chefia; quem
-// delega vira "observador" (mantém toda a visão, perde toda a escrita, ver
-// firestore.rules) até o fim do período ou até clicar em "Revogar".
+function ehChefeGeralSetor(setor: unknown): boolean {
+  return String(setor || "").trim().toUpperCase() === "CHEFE ASSEAPASSJUR";
+}
+
+// V4.8 — Painel de Comando da AssJur, compartilhado por dois assentos
+// diferentes: o Admin Universal (papel "DONO", delega TUDO — inclusive
+// branding/contas) e o Chefe Geral da AssJur, cargo permanente (papel
+// "CHEFE_GERAL", delega só o próprio assento operacional, pra cobrir as
+// próprias ausências). Cada um só vê/gerencia a delegação do PRÓPRIO
+// assento — ver firestore.rules para a separação real de poderes.
 export function AjustesComando({ openComando, setOpenComando }: AjustesComandoProps) {
   const { user } = useAuth();
   const { comando, delegar, revogar } = useComandoAssJur();
-  // Transferir/revogar o comando é exclusivo da identidade real do Admin
-  // Universal — mesmo quem está recebendo o comando delegado (e por isso
-  // enxerga o resto de Ajustes do Site) não pode re-delegar nem revogar.
   const [usuarios, setUsuarios] = useState<UsuarioLista[]>([]);
   const [militarSelecionadoId, setMilitarSelecionadoId] = useState("");
   const [dataInicio, setDataInicio] = useState("");
@@ -60,16 +63,25 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
     return () => unsub();
   }, []);
 
-  if (!isAdminUniversal(user)) return null;
+  const souDono = isAdminUniversal(user);
+  const souChefeGeral = ehChefeGeralSetor(user?.setor);
+  // Dono sempre prevalece quando as duas coisas forem verdade na mesma
+  // conta (ex.: o próprio dono também está com o setor "Chefe AsseApAssJur").
+  const meuPapel: PapelComando | null = souDono ? "DONO" : souChefeGeral ? "CHEFE_GERAL" : null;
+
+  if (!meuPapel) return null;
 
   const hoje = dataCivilAtual();
   // dataFim é exclusivo: o 1º dia de volta ao comando normal — mesma
   // convenção de [dataInicio, dataFim) usada em Férias de Militares.
   const comandoVigente = !!comando && hoje < comando.dataFim;
   const comandoEmCurso = comandoVigente && comando && hoje >= comando.dataInicio;
+  const comandoEhDoMeuAssento = comando?.papel === meuPapel;
+  const tituloAssento = meuPapel === "DONO" ? "comando geral do site" : "comando da Chefia Geral";
 
   async function handleDelegar(e: React.FormEvent) {
     e.preventDefault();
+    if (!meuPapel) return;
     const alvo = usuarios.find((u) => (u.uid || u.id) === militarSelecionadoId);
     if (!alvo) {
       toast.error("Selecione o militar que vai receber o comando.");
@@ -88,9 +100,23 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
       return;
     }
 
+    // Já existe uma delegação ativa de OUTRO assento — como só existe um
+    // registro por vez, criar a minha agora substituiria a dela.
+    if (comandoVigente && comando && !comandoEhDoMeuAssento) {
+      if (meuPapel === "CHEFE_GERAL") {
+        toast.error("Já existe uma delegação ativa do comando geral do site — não é possível criar a sua agora. Avise o Admin Universal.");
+        return;
+      }
+      const confirmarSobrescrita = window.confirm(
+        "Já existe uma delegação ativa do Chefe Geral (não sua). Criar uma nova aqui vai substituí-la. Quer continuar?",
+      );
+      if (!confirmarSobrescrita) return;
+    }
+
     setSalvando(true);
     try {
       await delegar({
+        papel: meuPapel,
         delegadoUid: alvo.uid || alvo.id,
         delegadoNome: nomeMilitarUsuario(alvo),
         delegadorUid: user.uid,
@@ -137,7 +163,9 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
               Comando da AssJur
             </h4>
             <p className="mt-1 text-xs text-muted-foreground">
-              Transfira temporariamente o comando para outro militar durante sua ausência.
+              {meuPapel === "DONO"
+                ? "Transfira temporariamente o comando geral do site para outro militar durante sua ausência."
+                : "Transfira temporariamente o comando da Chefia Geral para outro militar durante sua ausência (férias, missão, etc.)."}
             </p>
           </div>
           <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openComando ? "rotate-180" : ""}`} />
@@ -147,12 +175,18 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
           {comando && (
             <div className={`rounded-xl border p-3 text-sm ${comandoEmCurso ? "border-amber-300 bg-amber-50" : comandoVigente ? "border-sky-300 bg-sky-50" : "border-border bg-muted/30"}`}>
               <p className="font-bold text-foreground">
-                {comandoEmCurso ? "Comando delegado em curso" : comandoVigente ? "Delegação agendada" : "Última delegação (encerrada)"}
+                {!comandoEhDoMeuAssento
+                  ? `Delegação ativa de outro assento (${comando.papel === "DONO" ? "comando geral do site" : "Chefia Geral"})`
+                  : comandoEmCurso
+                    ? "Comando delegado em curso"
+                    : comandoVigente
+                      ? "Delegação agendada"
+                      : "Última delegação (encerrada)"}
               </p>
               <p className="text-muted-foreground mt-1">
                 {comando.delegadoNome} — {formatarData(comando.dataInicio)} até {formatarData(comando.dataFim)}
               </p>
-              {comandoVigente && (
+              {comandoVigente && (comandoEhDoMeuAssento || meuPapel === "DONO") && (
                 <Button
                   size="sm"
                   variant="destructive"
@@ -200,9 +234,9 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
           </form>
 
           <p className="text-xs text-muted-foreground">
-            Enquanto a delegação estiver em curso, quem recebe o comando pode gerenciar processos, equipe e férias
-            normalmente; você passa a observador — continua vendo tudo, mas nenhuma alteração sua é aceita (nem
-            aqui em Ajustes do Site) até o fim do período ou até você revogar.
+            Enquanto a delegação estiver em curso, quem recebe o {tituloAssento} pode gerenciar processos, equipe
+            e férias normalmente; você passa a observador — continua vendo tudo, mas nenhuma alteração sua é
+            aceita até o fim do período ou até você revogar.
           </p>
         </CollapsibleContent>
       </div>

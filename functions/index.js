@@ -28,15 +28,18 @@ function setCorsHeaders(req, res) {
   res.set("Vary", "Origin");
 }
 
-// V4.0 — Criar/excluir contas é exclusivo do Admin Universal. Antes, qualquer
-// perfil "chefe" (isChefe/role/cargo/setor) também passava aqui — o que,
-// combinado com a antiga regra do Firestore que deixava qualquer chefe
-// escrever em qualquer perfil `usuarios`, permitia que uma conta de chefe
-// comprometida se auto-promovesse a Admin Universal. `profile` é mantido no
-// parâmetro só para constar no log de acesso negado.
+// V4.0 — Criar/excluir contas era exclusivo do Admin Universal, pra evitar
+// que uma conta de chefe comprometida se auto-promovesse. V4.8 — o Chefe
+// Geral da AssJur (cargo permanente, setor == "Chefe AsseApAssJur") também
+// pode criar/excluir contas agora, EXCETO a do próprio Admin Universal —
+// essa proteção específica fica em deleteUserAccount, verificando o e-mail
+// ALVO contra ADMIN_EMAILS antes de deletar.
 function profileIndicatesAdmin(profile, email) {
-  void profile;
-  return !!(email && ADMIN_EMAILS.has(String(email).trim().toLowerCase()));
+  if (email && ADMIN_EMAILS.has(String(email).trim().toLowerCase())) {
+    return true;
+  }
+  const setorNormalizado = String((profile && profile.setor) || "").trim().toUpperCase();
+  return setorNormalizado === "CHEFE ASSEAPASSJUR";
 }
 
 async function loadCallerProfile(uid, email) {
@@ -182,6 +185,15 @@ exports.deleteUserAccount = functions.region("us-central1").https.onRequest(asyn
 
     if (uid === callerUid) {
       res.status(400).json({ error: "failed-precondition", message: "Autoexclusão não é permitida." });
+      return;
+    }
+
+    // V4.8 — A conta do Admin Universal é protegida: só ele mesmo pode
+    // removê-la (nunca acontece na prática, já que `uid === callerUid`
+    // acima bloquearia, mas cobre o e-mail também, por segurança).
+    const emailAlvoCheck = String(userRecord.email || (data && data.email) || "").trim().toLowerCase();
+    if (ADMIN_EMAILS.has(emailAlvoCheck) && !ADMIN_EMAILS.has(callerEmail)) {
+      res.status(403).json({ error: "permission-denied", message: "Esta conta é protegida e só pode ser removida pelo próprio Admin Universal." });
       return;
     }
 

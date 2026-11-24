@@ -226,7 +226,14 @@ function Index() {
   // setor, mesmo tendo ganhado poderes de chefia no resto da tela.
   const hojeComando = dataCivilAtual();
   const comandoVigente = !!comando && hojeComando >= comando.dataInicio && hojeComando < comando.dataFim;
+  // V4.8 — `souDelegadoAtivo` genérico cobre os dois assentos (DONO ou
+  // CHEFE_GERAL) e segue valendo para poderes OPERACIONAIS (processos,
+  // equipe, férias — iguais nos dois casos). As duas variantes abaixo
+  // distinguem qual assento, para os poderes exclusivos de cada um
+  // (branding/contas só no caso DONO).
   const souDelegadoAtivo = comandoVigente && comando?.delegadoUid === user?.uid;
+  const souDelegadoComoDono = souDelegadoAtivo && comando?.papel === "DONO";
+  const souDelegadoComoChefeGeral = souDelegadoAtivo && comando?.papel === "CHEFE_GERAL";
   const ehObservador = comandoVigente && comando?.delegadorUid === user?.uid;
 
   const { processos, carregando: loadingProcessos, criar, atualizar, remover, buscarSnapshotBruto } = useProcessos(siteSettings, user, souDelegadoAtivo);
@@ -271,22 +278,24 @@ function Index() {
   // Usuário logado (sem fallback fixo para evitar flicker visual no reload)
   const usuario = user ?? { posto: "", nome: "", role: "", setor: "" };
   const ehAdminUniversal = isAdminUniversal(user);
-  // V4.3 — equivalente a `ehAdminUniversal`, mas também vale para quem
-  // recebeu o comando (Gestão da Equipe, Ajustes do Site). A própria
-  // delegação/revogação (comandoAssJur) continua exclusiva da identidade
-  // real (`ehAdminUniversal`), nunca do efetivo — ver AjustesComando.tsx.
-  const ehAdminUniversalEfetivo = ehAdminUniversal || souDelegadoAtivo;
+  // V4.3/V4.8 — equivalente a `ehAdminUniversal`, mas também vale para quem
+  // está com o comando do DONO delegado especificamente (não o da Chefia
+  // Geral — ver souDelegadoComoDono acima). A própria delegação/revogação
+  // do assento do dono (comandoAssJur, papel DONO) continua exclusiva da
+  // identidade real (`ehAdminUniversal`) — ver AjustesComando.tsx.
+  const ehAdminUniversalEfetivo = ehAdminUniversal || souDelegadoComoDono;
 
-  // V4.7 — Chefe Geral da AssJur (cargo permanente, setor == "Chefe
-  // AsseApAssJur"): acesso "quase ilimitado", mas NÃO equivale ao Admin
-  // Universal nem ao comando delegado. Dá acesso à parte OPERACIONAL de
-  // Ajustes do Site (prazos/tolerâncias, assuntos, colunas, fluxo); NÃO dá
-  // acesso a Gestão da Equipe (criar/editar/excluir contas — isso evita que
-  // o próprio Chefe Geral se entrincheire ou promova alguém sem o dono
-  // saber) nem à identidade/branding do site nem ao painel de Comando.
+  // V4.7/V4.8 — Chefe Geral da AssJur (cargo permanente, setor == "Chefe
+  // AsseApAssJur") OU quem está com o comando DELE delegado temporariamente
+  // (ex.: ela saiu de férias e passou pra um substituto). Acesso "quase
+  // ilimitado": parte operacional de Ajustes do Site (prazos/tolerâncias,
+  // assuntos, colunas, fluxo) e Gestão da Equipe (cadastrar/editar/excluir
+  // integrantes — EXCETO a conta do dono do site, protegida à parte). NÃO
+  // dá acesso à identidade/branding do site nem ao painel de Comando do
+  // assento do dono.
   const ehChefeGeral =
     String(user?.setor || "").trim().toUpperCase() === "CHEFE ASSEAPASSJUR";
-  const ehAjustesOperacionalEfetivo = ehAdminUniversalEfetivo || ehChefeGeral;
+  const ehChefeGeralEfetivo = ehAdminUniversalEfetivo || ehChefeGeral || souDelegadoComoChefeGeral;
 
   // V4.3 — Comando da AssJur: enquanto uma delegação estiver vigente
   // ([dataInicio, dataFim)), quem a recebeu (`delegado`) enxerga/gerencia
@@ -1174,7 +1183,7 @@ function Index() {
     { id: "prazos", label: "Controle de Prazos", icon: Calendar },
     { id: "equipe", label: "Gestão da Equipe", icon: Users },
     { id: "ferias", label: "Férias de Militares", icon: Plane },
-    ...(ehAjustesOperacionalEfetivo ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
+    ...(ehChefeGeralEfetivo ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
   ];
 
   // Tabs principais (estilo AssJur)
@@ -1197,7 +1206,7 @@ function Index() {
     // "Ajustes do Site" é exclusivo do Admin Universal, de quem está com o
     // comando delegado, ou do Chefe Geral da AssJur (este último só vê a
     // parte operacional — ver somenteOperacional em AjustesSite).
-    if (aba === "ajustes" && !ehAjustesOperacionalEfetivo) {
+    if (aba === "ajustes" && !ehChefeGeralEfetivo) {
       setAba("mesa");
       return;
     }
@@ -1205,7 +1214,7 @@ function Index() {
     if (aba !== "prazos" && aba !== "ajustes" && aba !== "equipe" && aba !== "ferias" && !tabs.some((t) => t.id === aba)) {
       setAba("mesa");
     }
-  }, [tabs, aba, ehAjustesOperacionalEfetivo]);
+  }, [tabs, aba, ehChefeGeralEfetivo]);
 
   // Renderiza tela de carregamento enquanto a sessão não foi sincronizada
   if (!ready && !user) {
@@ -1584,7 +1593,7 @@ function Index() {
             </Suspense>
           )}
 
-          {aba === "ajustes" && ehAjustesOperacionalEfetivo && (
+          {aba === "ajustes" && ehChefeGeralEfetivo && (
             <Suspense fallback={<TabLoading label="Carregando ajustes do site..." />}>
               <AjustesSite
                 settings={siteSettings}
@@ -1608,7 +1617,7 @@ function Index() {
 
           {aba === "equipe" && (
             <Suspense fallback={<TabLoading label="Carregando gestão da equipe..." />}>
-              <GestaoEquipe ehAdminUniversalEfetivo={ehAdminUniversalEfetivo} />
+              <GestaoEquipe ehAdminUniversalEfetivo={ehAdminUniversalEfetivo} podeGerenciarEquipe={ehChefeGeralEfetivo} />
             </Suspense>
           )}
 

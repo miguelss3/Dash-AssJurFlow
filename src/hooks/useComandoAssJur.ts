@@ -8,7 +8,14 @@ import { registrarErro } from "@/lib/errorLog";
 // a delegação de comando vigente ou agendada. Ausente (ou fora da janela
 // dataInicio/dataFim) = sem delegação, comportamento normal. Ver
 // firestore.rules para a aplicação real do bloqueio ("modo observador").
+// V4.8 — "DONO" é o Admin Universal delegando o próprio assento (tudo,
+// inclusive branding/contas); "CHEFE_GERAL" é o cargo permanente de Chefe
+// Geral da AssJur delegando só o assento dele (poderes operacionais) — ver
+// firestore.rules para a separação real de cada um.
+export type PapelComando = "DONO" | "CHEFE_GERAL";
+
 export interface ComandoAssJur {
+  papel: PapelComando;
   delegadoUid: string;
   delegadoNome: string;
   delegadorUid: string;
@@ -68,6 +75,7 @@ export function useComandoAssJur() {
           } else {
             const data = snap.data() as Record<string, unknown>;
             setComando({
+              papel: data.papel === "CHEFE_GERAL" ? "CHEFE_GERAL" : "DONO",
               delegadoUid: String(data.delegadoUid || ""),
               delegadoNome: String(data.delegadoNome || ""),
               delegadorUid: String(data.delegadorUid || ""),
@@ -94,6 +102,7 @@ export function useComandoAssJur() {
   }, []);
 
   const delegar = async (dados: {
+    papel: PapelComando;
     delegadoUid: string;
     delegadoNome: string;
     delegadorUid: string;
@@ -105,6 +114,7 @@ export function useComandoAssJur() {
     const fim = new Date(`${dados.dataFim}T00:00:00`);
     const agora = Timestamp.now();
     await setDoc(doc(db, "comandoAssJur", COMANDO_DOC_ID), {
+      papel: dados.papel,
       delegadoUid: dados.delegadoUid,
       delegadoNome: dados.delegadoNome,
       delegadorUid: dados.delegadorUid,

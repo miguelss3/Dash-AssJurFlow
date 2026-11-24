@@ -80,6 +80,23 @@ service cloud.firestore {
       return isSignedIn() && existeComandoAtivo() && request.auth.uid == comandoAtivoData().delegadoUid;
     }
 
+    // V4.8 — `comandoAssJur` agora guarda um `papel` ("DONO" ou
+    // "CHEFE_GERAL"): o Admin Universal pode delegar o PRÓPRIO assento
+    // (tudo, inclusive branding/Ajustes/contas); o Chefe Geral da AssJur
+    // (cargo permanente) também pode delegar temporariamente só O SEU
+    // assento (poderes operacionais), pra cobrir as próprias ausências sem
+    // nunca alcançar nada que seja exclusivo do dono. `souDelegadoAtivo()`
+    // continua genérico (qualquer papel) para os poderes OPERACIONAIS, que
+    // valem nos dois casos; estas duas funções abaixo são só para separar o
+    // que é exclusivo de cada assento.
+    function souDelegadoAtivoComoDono() {
+      return souDelegadoAtivo() && comandoAtivoData().papel == 'DONO';
+    }
+
+    function souDelegadoAtivoComoChefeGeral() {
+      return souDelegadoAtivo() && comandoAtivoData().papel == 'CHEFE_GERAL';
+    }
+
     function canManageSetor(setor) {
       return isAdminUniversal() ||
         isChefePerfil() ||
@@ -92,7 +109,7 @@ service cloud.firestore {
     // pode criar/editar/excluir um registro com esse valor.
     function podeGerenciarFeriasSetor(setor) {
       return (setor in ['DU', 'PA'] && canManageSetor(setor)) ||
-        (setor == 'GERAL' && (isAdminUniversal() || isChefePerfil()));
+        (setor == 'GERAL' && (isAdminUniversal() || isChefePerfil() || souDelegadoAtivo()));
     }
 
     function canReadProcessData(data) {
@@ -180,14 +197,31 @@ service cloud.firestore {
       // (ou é chefe/admin) pode navegar pela equipe.
       allow read: if isSignedIn() &&
         (userId == request.auth.uid || hasUserProfileByUid() || isAdminUniversal());
-      // V4.0 — Fecha o problema 1: só o Admin Universal (miguelss3@yahoo.com.br)
-      // cadastra, exclui ou atribui a função de Admin/Chefe a outros usuários.
-      // Antes, qualquer chefe podia escrever em QUALQUER perfil — inclusive
-      // promovendo a si mesmo (ou a um cúmplice) a Admin Universal.
-      // V4.3 — Comando da AssJur: quem recebeu o comando delegado também
-      // pode gerenciar contas, como se fosse o Admin Universal, enquanto a
-      // delegação estiver vigente.
-      allow write: if isSignedIn() && (isAdminUniversal() || souDelegadoAtivo()) && !souDelegadorEmObservacao();
+      // V4.0 — Fecha o problema 1: antes, qualquer chefe podia escrever em
+      // QUALQUER perfil — inclusive promovendo a si mesmo a Admin Universal.
+      // V4.3 — Comando da AssJur: quem recebeu o comando delegado do dono
+      // também pode gerenciar contas, como se fosse o Admin Universal,
+      // enquanto a delegação estiver vigente.
+      // V4.8 — Chefe Geral da AssJur (cargo permanente, ou quem está com o
+      // comando dele delegado) também pode cadastrar, editar e excluir
+      // integrantes — MENOS a conta do próprio dono do site, que continua
+      // protegida e só pode ser alterada por ele mesmo (ou por quem está
+      // com o comando DELE delegado).
+      allow create: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
+        (isAdminUniversal() || souDelegadoAtivoComoDono() || ehChefeGeralPerfil() || souDelegadoAtivoComoChefeGeral()) &&
+        (
+          isAdminUniversal() || souDelegadoAtivoComoDono() ||
+          request.resource.data.email != 'miguelss3@yahoo.com.br'
+        );
+
+      allow update, delete: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
+        (isAdminUniversal() || souDelegadoAtivoComoDono() || ehChefeGeralPerfil() || souDelegadoAtivoComoChefeGeral()) &&
+        (
+          isAdminUniversal() || souDelegadoAtivoComoDono() ||
+          resource.data.email != 'miguelss3@yahoo.com.br'
+        );
     }
 
     // Regras para a coleção de distribuições
@@ -272,7 +306,7 @@ service cloud.firestore {
       // fluxo) — identidade/branding do site fica obrigatoriamente intacta
       // nas mãos dele (ver os campos exigidos == ao valor já salvo).
       allow create: if isSignedIn() &&
-        (isAdminUniversal() || souDelegadoAtivo()) &&
+        (isAdminUniversal() || souDelegadoAtivoComoDono()) &&
         !souDelegadorEmObservacao() &&
         configId == 'layoutPrincipal' &&
         request.resource.data.sidebarTitle is string &&
@@ -331,9 +365,9 @@ service cloud.firestore {
         request.resource.data.paFlowActions is list &&
         (
           isAdminUniversal() ||
-          souDelegadoAtivo() ||
+          souDelegadoAtivoComoDono() ||
           (
-            ehChefeGeralPerfil() &&
+            (ehChefeGeralPerfil() || souDelegadoAtivoComoChefeGeral()) &&
             request.resource.data.sidebarTitle == resource.data.sidebarTitle &&
             request.resource.data.sidebarSubtitle == resource.data.sidebarSubtitle &&
             request.resource.data.dashboardTitle == resource.data.dashboardTitle &&
@@ -358,7 +392,7 @@ service cloud.firestore {
       // impede de mudar versaoSite), então liberar esta escrita é inofensivo
       // e evita que o save de Ajustes do Site dele falhe neste 2º passo.
       allow create, update: if isSignedIn() &&
-        (isAdminUniversal() || souDelegadoAtivo() || ehChefeGeralPerfil()) &&
+        (isAdminUniversal() || souDelegadoAtivoComoDono() || ehChefeGeralPerfil() || souDelegadoAtivoComoChefeGeral()) &&
         !souDelegadorEmObservacao() &&
         docId == 'versao' &&
         request.resource.data.versaoSite is string;
@@ -423,15 +457,30 @@ service cloud.firestore {
         );
     }
 
-    // V4.3 — Comando da AssJur: documento único (sempre id "atual") com a
-    // delegação vigente/futura. Só o Admin Universal pode criar, editar ou
-    // revogar — mesmo estando ele próprio "em observação" no momento (senão
-    // nunca conseguiria retomar o comando), por isso NÃO leva
-    // `souDelegadorEmObservacao()`. Leitura aberta a todo efetivo cadastrado:
-    // todos precisam saber quem está no comando no momento.
+    // V4.3/V4.8 — Comando da AssJur: documento único (sempre id "atual") com
+    // a delegação vigente/futura, agora com um `papel` ("DONO" ou
+    // "CHEFE_GERAL") que diz QUAL assento está sendo delegado. O Admin
+    // Universal sempre pode criar/revogar (inclusive sobrepor uma delegação
+    // de Chefe Geral, se precisar) — nunca leva `souDelegadorEmObservacao()`
+    // porque senão nunca conseguiria retomar o próprio comando. O Chefe
+    // Geral da AssJur só pode criar/revogar uma delegação do PRÓPRIO
+    // assento (papel == 'CHEFE_GERAL', delegadorUid == o uid dele mesmo) —
+    // nunca em nome do dono. Leitura aberta a todo efetivo cadastrado.
     match /comandoAssJur/{comandoId} {
       allow get, list: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
-      allow create, update, delete: if comandoId == 'atual' && isAdminUniversal();
+
+      allow create, update: if comandoId == 'atual' &&
+        request.resource.data.delegadorUid == request.auth.uid &&
+        (
+          (request.resource.data.papel == 'DONO' && isAdminUniversal()) ||
+          (request.resource.data.papel == 'CHEFE_GERAL' && ehChefeGeralPerfil())
+        );
+
+      allow delete: if comandoId == 'atual' &&
+        (
+          isAdminUniversal() ||
+          (ehChefeGeralPerfil() && resource.data.papel == 'CHEFE_GERAL' && resource.data.delegadorUid == request.auth.uid)
+        );
     }
 
     match /{document=**} {
