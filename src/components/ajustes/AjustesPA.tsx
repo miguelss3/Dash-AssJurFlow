@@ -116,10 +116,14 @@ export default function AjustesPA(props: AjustesPAProps) {
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openPAPrazos ? "rotate-180" : ""}`} />
               </CollapsibleTrigger>
               <CollapsibleContent className="pt-2">
+                <p className="text-xs text-muted-foreground mb-3">
+                  "Tolerância" é a folga após o prazo final vencer antes do processo virar "vencido crítico" nas
+                  telas e no alerta da chefia — não move nem altera nada no processo automaticamente, só reforça o aviso visual.
+                </p>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-4 md:col-span-2">
                     <p className="text-xs font-bold uppercase tracking-wide text-purple-700">IPM</p>
-                    <div className="grid gap-4 md:grid-cols-2 mt-3">
+                    <div className="grid gap-4 md:grid-cols-3 mt-3">
                       <div>
                         <Label>Prazo Inicial (dias)</Label>
                         <Input type="number" min={1} value={form.prazoIPMInicialDias} onChange={(e) => updateField("prazoIPMInicialDias", e.target.valueAsNumber || 0)} />
@@ -127,6 +131,46 @@ export default function AjustesPA(props: AjustesPAProps) {
                       <div>
                         <Label>Prorrogação (dias)</Label>
                         <Input type="number" min={1} value={form.prazoIPMProrrogacaoDias} onChange={(e) => updateField("prazoIPMProrrogacaoDias", e.target.valueAsNumber || 0)} />
+                      </div>
+                      <div>
+                        <Label>Tolerância (dias)</Label>
+                        <Input type="number" min={0} value={form.prazoToleranciaIPMDias} onChange={(e) => updateField("prazoToleranciaIPMDias", Math.max(0, e.target.valueAsNumber || 0))} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-4 md:col-span-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-purple-700">Sindicância</p>
+                    <div className="grid gap-4 md:grid-cols-3 mt-3">
+                      <div>
+                        <Label>Prazo Inicial (dias)</Label>
+                        <Input type="number" min={1} value={form.prazoSindicanciaInicialDias} onChange={(e) => updateField("prazoSindicanciaInicialDias", e.target.valueAsNumber || 0)} />
+                      </div>
+                      <div>
+                        <Label>Prorrogação (dias)</Label>
+                        <Input type="number" min={1} value={form.prazoSindicanciaProrrogacaoDias} onChange={(e) => updateField("prazoSindicanciaProrrogacaoDias", e.target.valueAsNumber || 0)} />
+                      </div>
+                      <div>
+                        <Label>Tolerância (dias)</Label>
+                        <Input type="number" min={0} value={form.prazoToleranciaSindicanciaDias} onChange={(e) => updateField("prazoToleranciaSindicanciaDias", Math.max(0, e.target.valueAsNumber || 0))} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-4 md:col-span-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-purple-700">Conselho</p>
+                    <div className="grid gap-4 md:grid-cols-3 mt-3">
+                      <div>
+                        <Label>Prazo Inicial (dias)</Label>
+                        <Input type="number" min={1} value={form.prazoConselhoInicialDias} onChange={(e) => updateField("prazoConselhoInicialDias", e.target.valueAsNumber || 0)} />
+                      </div>
+                      <div>
+                        <Label>Prorrogação (dias)</Label>
+                        <Input type="number" min={1} value={form.prazoConselhoProrrogacaoDias} onChange={(e) => updateField("prazoConselhoProrrogacaoDias", e.target.valueAsNumber || 0)} />
+                      </div>
+                      <div>
+                        <Label>Tolerância (dias)</Label>
+                        <Input type="number" min={0} value={form.prazoToleranciaConselhoDias} onChange={(e) => updateField("prazoToleranciaConselhoDias", Math.max(0, e.target.valueAsNumber || 0))} />
                       </div>
                     </div>
                   </div>

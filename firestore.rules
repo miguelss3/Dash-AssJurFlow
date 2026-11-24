@@ -272,6 +272,9 @@ service cloud.firestore {
         request.resource.data.prazoSindicanciaProrrogacaoDias is number &&
         request.resource.data.prazoConselhoInicialDias is number &&
         request.resource.data.prazoConselhoProrrogacaoDias is number &&
+        request.resource.data.prazoToleranciaIPMDias is number &&
+        request.resource.data.prazoToleranciaSindicanciaDias is number &&
+        request.resource.data.prazoToleranciaConselhoDias is number &&
         request.resource.data.assuntosPASindicancia is list &&
         request.resource.data.assuntosDUPrincipais is list &&
         request.resource.data.origensDUDocumentos is list &&
@@ -281,6 +284,20 @@ service cloud.firestore {
         request.resource.data.columnTabs is list &&
         request.resource.data.paFlowActions is list;
         
+      allow delete: if false;
+    }
+
+    // V4.4 — Espelho público só da versão do site (ver Ajustes do Site →
+    // Setor Geral), para aparecer na tela de login ANTES do usuário
+    // autenticar — `configuracoesSistema` continua exigindo login porque
+    // carrega listas/colunas internas, não só um texto de versão.
+    match /configPublica/{docId} {
+      allow get: if true;
+      allow create, update: if isSignedIn() &&
+        (isAdminUniversal() || souDelegadoAtivo()) &&
+        !souDelegadorEmObservacao() &&
+        docId == 'versao' &&
+        request.resource.data.versaoSite is string;
       allow delete: if false;
     }
 

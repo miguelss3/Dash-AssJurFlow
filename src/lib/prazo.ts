@@ -244,6 +244,43 @@ export function obterRegraPrazoPA(
   };
 }
 
+// ---------------------------------------------------------------------------
+// V4.5 — Tolerância de PA (por tipo de procedimento: IPM, Sindicância,
+// Conselho). Diferente do DU (cujo Robô Vigia reverte automaticamente o
+// processo após a tolerância), o PA não tem ação automática sobre os dados —
+// a tolerância aqui só reclassifica o nível de urgência exibido na tela
+// (badges, Mesa PA, alertas), para dar um aviso mais forte quando a folga
+// realmente se esgota, sem alterar nada no processo.
+// ---------------------------------------------------------------------------
+export function obterToleranciaPA(
+  tipoPA: string | undefined | null,
+  configuracao?: Partial<ProcessualDeadlineSettings> | null,
+): number {
+  const regras = obterConfiguracaoPrazosProcessuais(configuracao);
+
+  if (tipoPA === "IPM") return regras.prazoToleranciaIPMDias;
+  if (tipoPA === "Sindicância" || tipoPA === "Sindicancia") return regras.prazoToleranciaSindicanciaDias;
+  return regras.prazoToleranciaConselhoDias;
+}
+
+export type NivelUrgenciaPA = "no_prazo" | "vencido_tolerancia" | "vencido_critico";
+
+// `prazo` já deve ser o prazo EFETIVO do processo (p.prazoFatal || p.finalPrazo
+// — useProcessos.ts já resolve prazoFatalOverride antes de popular esses
+// campos, então os componentes não precisam reaplicar a hierarquia aqui).
+export function nivelUrgenciaPA(
+  prazo: unknown,
+  tipoPA: string | undefined | null,
+  configuracao?: Partial<ProcessualDeadlineSettings> | null,
+): NivelUrgenciaPA {
+  if (!prazo) return "no_prazo";
+  const dias = diasRestantes(prazo);
+  if (dias >= 0) return "no_prazo";
+
+  const tolerancia = obterToleranciaPA(tipoPA, configuracao);
+  return Math.abs(dias) > tolerancia ? "vencido_critico" : "vencido_tolerancia";
+}
+
 function normalizarDataPrazoPA(valor: string | undefined | null): string | undefined {
   if (!valor) return undefined;
 

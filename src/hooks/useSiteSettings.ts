@@ -138,6 +138,14 @@ export function useSiteSettings(enabled: boolean) {
 
       const ref = doc(db, COLLECTION_NAME, SITE_SETTINGS_DOC_ID);
       await setDoc(ref, normalized);
+
+      // V4.4 — Espelha só a versão num doc público (configPublica/versao),
+      // legível sem login, pra aparecer na tela de login (ver login.tsx).
+      await setDoc(doc(db, "configPublica", "versao"), {
+        versaoSite: normalized.versaoSite,
+        atualizadoEm: normalized.updatedAt,
+      });
+
       setSettings(normalized);
       return normalized;
     },

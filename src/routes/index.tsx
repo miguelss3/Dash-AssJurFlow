@@ -36,6 +36,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { IndiceMensalCard } from "@/components/IndiceMensalCard";
 import { AssessoresTicker } from "@/components/AssessoresTicker";
 import { AlertaFeriasPendentes } from "@/components/AlertaFeriasPendentes";
+import { AlertaPAVencidos } from "@/components/AlertaPAVencidos";
 import { ComandoAssJurBanner } from "@/components/ComandoAssJurBanner";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { IAChatBox } from "@/components/IAChatBox";
@@ -1498,6 +1499,13 @@ function Index() {
                   onIrParaFerias={() => startTransition(() => setAba("ferias"))}
                 />
               )}
+
+              <AlertaPAVencidos
+                processos={processosParaDashboard}
+                siteSettings={siteSettings}
+                ehAdmin={ehAdmin}
+                nomeMilitarAtual={nomeMilitarAtual}
+              />
 
               <Dashboard
                 processos={processosParaDashboard}

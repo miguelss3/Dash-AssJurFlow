@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
-import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes } from "@/lib/prazo";
+import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes, nivelUrgenciaPA } from "@/lib/prazo";
 import { registrarErro } from "@/lib/errorLog";
 import { getBadgeSituacaoPA } from "@/lib/utils";
 import { gerarResumoPA } from "@/lib/resumoProcesso";
@@ -129,6 +129,8 @@ const CardPAComponent = ({
     por: p.prorrogacoes?.[index]?.por,
     em: p.prorrogacoes?.[index]?.em,
   }));
+
+  const nivelPA = nivelUrgenciaPA(p.prazoFatal || p.finalPrazo, p.tipoPA, siteSettings);
 
   const badgeSituacaoPA = getBadgeSituacaoPA({
     situacaoFluxoPA: p.situacaoFluxoPA,
@@ -299,6 +301,11 @@ const CardPAComponent = ({
               <div className={`flex items-center gap-1 ${diasRestantes(p.prazoFatal) <= 5 ? "text-red-600 font-bold" : "text-orange-600"}`}>
                 <AlertCircle className="w-3 h-3" /> <span className="font-semibold">Final:</span> <span>{formatarData(p.prazoFatal)}</span>
               </div>
+            )}
+            {nivelPA === "vencido_critico" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide">
+                <AlertCircle className="w-3 h-3" /> Vencido
+              </span>
             )}
           </div>
 

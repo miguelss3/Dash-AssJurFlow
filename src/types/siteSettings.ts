@@ -5,6 +5,14 @@ export interface ProcessualDeadlineSettings {
   prazoSindicanciaProrrogacaoDias: number;
   prazoConselhoInicialDias: number;
   prazoConselhoProrrogacaoDias: number;
+  // V4.5 — Dias de tolerância por tipo de PA (ver nivelUrgenciaPA em
+  // src/lib/prazo.ts): folga após o prazo fatal vencer antes do processo ser
+  // tratado como "vencido crítico" nas telas e no alerta da chefia. Não
+  // dispara nenhuma ação automática sobre os dados do processo (diferente
+  // do DU) — só muda o que é mostrado.
+  prazoToleranciaIPMDias: number;
+  prazoToleranciaSindicanciaDias: number;
+  prazoToleranciaConselhoDias: number;
 }
 
 export type PAInProgressColumnId = "sindicancia" | "ipm" | "conselho";
@@ -103,6 +111,9 @@ export const DEFAULT_PROCESSUAL_DEADLINES: ProcessualDeadlineSettings = {
   prazoSindicanciaProrrogacaoDias: 20,
   prazoConselhoInicialDias: 30,
   prazoConselhoProrrogacaoDias: 20,
+  prazoToleranciaIPMDias: 2,
+  prazoToleranciaSindicanciaDias: 2,
+  prazoToleranciaConselhoDias: 2,
 };
 
 export const DEFAULT_ASSUNTOS_DU_PRINCIPAIS = [
@@ -710,7 +721,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   dashboardDescription: "Mesa de trabalho e acompanhamento dos processos em andamento",
   newProcessLabel: "Novo Processo",
   footerText: "Maj Cav Miguel — AssJur Flow · 12ª Região Militar · Todos os direitos reservados.",
-  versaoSite: "1.0",
+  versaoSite: "4.0",
   prazoToleranciaDUDias: 2,
   assuntosPASindicancia: [...DEFAULT_ASSUNTOS_PA_SINDICANCIA],
   assuntosDUPrincipais: [...DEFAULT_ASSUNTOS_DU_PRINCIPAIS],

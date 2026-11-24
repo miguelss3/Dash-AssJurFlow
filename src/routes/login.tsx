@@ -1,10 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Shield, Lock, Mail, LogIn } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SoldierAvatar } from "@/components/SoldierAvatar";
 import { useAuth } from "@/hooks/useAuth";
+import { db } from "@/lib/firebase";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -26,12 +28,25 @@ function LoginPage() {
   const [senha, setSenha] = useState("");
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  // V4.4 — versão editável em Ajustes do Site (Setor Geral), espelhada em
+  // configPublica/versao (leitura sem login). Mantém "4.0" como texto fixo
+  // se a busca falhar ou o campo ainda não tiver sido salvo nenhuma vez.
+  const [versaoSite, setVersaoSite] = useState("4.0");
 
   useEffect(() => {
     if (ready && isAuthenticated) {
       navigate({ to: "/" });
     }
   }, [ready, isAuthenticated, navigate]);
+
+  useEffect(() => {
+    getDoc(doc(db, "configPublica", "versao"))
+      .then((snap) => {
+        const versao = snap.exists() ? String(snap.data()?.versaoSite || "").trim() : "";
+        if (versao) setVersaoSite(versao);
+      })
+      .catch(() => { /* mantém o valor padrão em caso de falha */ });
+  }, []);
 
   if (!ready) {
     return (
@@ -234,7 +249,7 @@ function LoginPage() {
           </div>
 
           <p className="text-center text-xs text-white/50 mt-6">
-            Sistema homologado &middot; Uso institucional &middot; v4.0
+            Sistema homologado &middot; Uso institucional &middot; v{versaoSite}
           </p>
           <p className="text-center text-[11px] text-white/30 mt-1">
             &copy; {new Date().getFullYear()} Maj Cav Miguel &mdash; AssJur Flow &middot; 12ª Região Militar
