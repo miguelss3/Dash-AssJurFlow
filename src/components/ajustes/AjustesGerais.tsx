@@ -34,6 +34,28 @@ export function AjustesGerais({ form, openGeral, setOpenGeral, updateField }: Aj
           <section className="space-y-4">
             <div>
               <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
+                <Settings2 className="h-4 w-4 text-slate-500" />
+                Versão do Sistema
+              </h4>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Atualize conforme for ajustando o sistema — é só um texto livre para controle seu.
+              </p>
+            </div>
+
+            <div className="space-y-2 max-w-[240px]">
+              <Label htmlFor="ajuste-versao-site">Versão</Label>
+              <Input
+                id="ajuste-versao-site"
+                value={form.versaoSite}
+                onChange={(e) => updateField("versaoSite", e.target.value)}
+                placeholder="Ex: 1.3"
+              />
+            </div>
+          </section>
+
+          <section className="space-y-4 border-t border-border pt-5 mt-5">
+            <div>
+              <h4 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-700">
                 <Type className="h-4 w-4 text-slate-500" />
                 Branding da Sidebar
               </h4>

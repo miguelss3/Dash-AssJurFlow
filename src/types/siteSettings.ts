@@ -73,6 +73,14 @@ export interface SiteSettings extends ProcessualDeadlineSettings {
   dashboardDescription: string;
   newProcessLabel: string;
   footerText: string;
+  // V4.4 — Versão exibida em Ajustes do Site (Setor Geral), editada manualmente
+  // pelo admin conforme ajusta o sistema. Texto livre (ex.: "1.3", "24/11/2026").
+  versaoSite: string;
+  // V4.4 — Dias de tolerância do Robô Vigia do DU (ver useProcessos.ts) antes
+  // de devolver automaticamente um processo "Aguardando Resposta" vencido
+  // para a mesa do assessor. Era fixo em código (2 dias); agora configurável
+  // em Ajustes do Site → Setor Defesa da União.
+  prazoToleranciaDUDias: number;
   assuntosPASindicancia: string[];
   assuntosDUPrincipais: string[];
   origensDUDocumentos: string[];
@@ -702,6 +710,8 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   dashboardDescription: "Mesa de trabalho e acompanhamento dos processos em andamento",
   newProcessLabel: "Novo Processo",
   footerText: "Maj Cav Miguel — AssJur Flow · 12ª Região Militar · Todos os direitos reservados.",
+  versaoSite: "1.0",
+  prazoToleranciaDUDias: 2,
   assuntosPASindicancia: [...DEFAULT_ASSUNTOS_PA_SINDICANCIA],
   assuntosDUPrincipais: [...DEFAULT_ASSUNTOS_DU_PRINCIPAIS],
   origensDUDocumentos: [...DEFAULT_ORIGENS_DU_DOCUMENTOS],

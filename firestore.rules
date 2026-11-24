@@ -264,6 +264,8 @@ service cloud.firestore {
         request.resource.data.dashboardDescription is string &&
         request.resource.data.newProcessLabel is string &&
         request.resource.data.footerText is string &&
+        request.resource.data.versaoSite is string &&
+        request.resource.data.prazoToleranciaDUDias is number &&
         request.resource.data.prazoIPMInicialDias is number &&
         request.resource.data.prazoIPMProrrogacaoDias is number &&
         request.resource.data.prazoSindicanciaInicialDias is number &&

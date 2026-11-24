@@ -10,6 +10,7 @@ import { SortableAssuntoRow, AssuntoDragPreview } from "./SortableItem";
 
 interface AjustesDUProps {
   form: SiteSettings;
+  updateField: (field: keyof SiteSettings, value: any) => void;
   openDU: boolean;
   setOpenDU: (open: boolean) => void;
   openDUAssuntos: boolean;
@@ -57,7 +58,7 @@ interface AjustesDUProps {
 }
 
 export default function AjustesDU({
-  form, openDU, setOpenDU, openDUAssuntos, setOpenDUAssuntos, assuntoDUIds,
+  form, updateField, openDU, setOpenDU, openDUAssuntos, setOpenDUAssuntos, assuntoDUIds,
   novoAssuntoDU, setNovoAssuntoDU, addAssuntoDU, updateAssuntoDU, removeAssuntoDU,
   dragAssuntoDUId, dragAssuntoDULabel, handleDragStartDU, handleDragCancelDU, handleDragEndDU, sensors,
   openDUOrigens, setOpenDUOrigens, origemDUIds, novoOrigemDU, setNovoOrigemDU,
@@ -80,6 +81,22 @@ export default function AjustesDU({
           <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${openDU ? "rotate-180" : ""}`} />
         </CollapsibleTrigger>
         <CollapsibleContent className="pt-4 space-y-4">
+          {/* Prazo de Tolerância do Robô Vigia */}
+          <section className="space-y-2">
+            <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700">Prazo de Tolerância</h4>
+            <p className="text-xs text-muted-foreground">
+              Dias de tolerância após o prazo vencer antes do sistema devolver automaticamente um processo
+              "Aguardando Resposta" para a mesa do assessor.
+            </p>
+            <Input
+              type="number"
+              min={0}
+              className="max-w-[160px]"
+              value={form.prazoToleranciaDUDias}
+              onChange={(e) => updateField("prazoToleranciaDUDias", Math.max(0, Number(e.target.value) || 0))}
+            />
+          </section>
+
           {/* Assuntos DU */}
           <Collapsible open={openDUAssuntos} onOpenChange={setOpenDUAssuntos}>
             <section className="space-y-4">

@@ -246,6 +246,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
         dashboardDescription: form.dashboardDescription.trim(),
         newProcessLabel: form.newProcessLabel.trim(),
         footerText: form.footerText.trim(),
+        versaoSite: form.versaoSite.trim(),
         updatedAt: new Date().toISOString()
       });
       toast.success("Ajustes publicados com sucesso!");
@@ -291,7 +292,7 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
 
           {/* SETOR DEFESA DA UNIÃO — Propriedades exatas mapeadas com a interface */}
           <AjustesDU
-            form={form} openDU={openDU} setOpenDU={setOpenDU} openDUAssuntos={openDUAssuntos} setOpenDUAssuntos={setOpenDUAssuntos}
+            form={form} updateField={updateField} openDU={openDU} setOpenDU={setOpenDU} openDUAssuntos={openDUAssuntos} setOpenDUAssuntos={setOpenDUAssuntos}
             assuntoDUIds={assuntoDUIds} addAssuntoDU={addAssuntoDU} updateAssuntoDU={updateAssuntoDU} removeAssuntoDU={removeAssuntoDU}
             dragAssuntoDUId={dragAssuntoDUId} dragAssuntoDULabel={dragAssuntoDULabel}
             handleDragStartDU={handleDragStartDU} handleDragCancelDU={handleDragCancelDU} handleDragEndDU={handleDragEndDU}

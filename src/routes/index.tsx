@@ -1605,6 +1605,7 @@ function Index() {
         <footer className="py-3 px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-[11px] text-muted-foreground/50">
             &copy; {new Date().getFullYear()} {siteSettings.footerText}
+            {siteSettings.versaoSite ? ` · v${siteSettings.versaoSite}` : ""}
           </p>
         </footer>
       </div>
