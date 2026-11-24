@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card } from "./ui/card";
-import { Pencil, Trash2, UserPlus } from "lucide-react";
+import { Pencil, Trash2, UserPlus, Crown } from "lucide-react";
 import { useAuth, isAdminUniversal, type AuthUser } from "@/hooks/useAuth";
 import { nomeMilitarUsuario } from "@/lib/userProfiles";
 
@@ -50,6 +50,16 @@ interface Usuario extends AuthUser {
   dataCadastro?: string;
   atualizadoEm?: string;
   corCard?: string;
+}
+
+// V4.7 — Distingue o cargo permanente de "Chefe Geral da AssJur" (setor
+// "Chefe AsseApAssJur", visão/gerência de DU+PA inteiras) de um "Chefe de
+// Setor" comum (isChefe=true dentro de DU ou PA) — mesma normalização usada
+// em isChefePerfil() no firestore.rules, pra não ficar ambíguo quem está no
+// papel.
+function ehChefeGeral(usuario: Pick<Usuario, "setor">): boolean {
+  const setorNorm = String(usuario.setor || "").trim().toUpperCase();
+  return setorNorm === "CHEFE ASSEAPASSJUR";
 }
 
 interface GestaoEquipeProps {
@@ -462,8 +472,16 @@ export function GestaoEquipe({ ehAdminUniversalEfetivo }: GestaoEquipeProps = {}
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-2">
-                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${usuario.setor === "DU" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-purple-50 text-purple-700 border border-purple-200"}`}>{usuario.setor}</span>
-                      {usuario.isChefe && <span className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 border border-amber-300">Chefe</span>}
+                      {ehChefeGeral(usuario) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700 border border-indigo-300">
+                          <Crown className="h-3 w-3" /> Chefe Geral da AssJur
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${usuario.setor === "DU" ? "bg-blue-50 text-blue-700 border border-blue-200" : "bg-purple-50 text-purple-700 border border-purple-200"}`}>{usuario.setor}</span>
+                      )}
+                      {usuario.isChefe && !ehChefeGeral(usuario) && (
+                        <span className="inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold uppercase bg-amber-100 text-amber-700 border border-amber-300">Chefe de Setor</span>
+                      )}
                       {/* RESTAURAÇÃO: Renderiza novamente a bolinha com a cor do assessor */}
                       {usuario.corCard && (
                         <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider border border-slate-300 bg-slate-50 text-slate-700">

@@ -277,6 +277,17 @@ function Index() {
   // real (`ehAdminUniversal`), nunca do efetivo — ver AjustesComando.tsx.
   const ehAdminUniversalEfetivo = ehAdminUniversal || souDelegadoAtivo;
 
+  // V4.7 — Chefe Geral da AssJur (cargo permanente, setor == "Chefe
+  // AsseApAssJur"): acesso "quase ilimitado", mas NÃO equivale ao Admin
+  // Universal nem ao comando delegado. Dá acesso à parte OPERACIONAL de
+  // Ajustes do Site (prazos/tolerâncias, assuntos, colunas, fluxo); NÃO dá
+  // acesso a Gestão da Equipe (criar/editar/excluir contas — isso evita que
+  // o próprio Chefe Geral se entrincheire ou promova alguém sem o dono
+  // saber) nem à identidade/branding do site nem ao painel de Comando.
+  const ehChefeGeral =
+    String(user?.setor || "").trim().toUpperCase() === "CHEFE ASSEAPASSJUR";
+  const ehAjustesOperacionalEfetivo = ehAdminUniversalEfetivo || ehChefeGeral;
+
   // V4.3 — Comando da AssJur: enquanto uma delegação estiver vigente
   // ([dataInicio, dataFim)), quem a recebeu (`delegado`) enxerga/gerencia
   // tudo como chefia (ver `ehAdmin` abaixo); quem delegou (`delegador`) vira
@@ -1163,7 +1174,7 @@ function Index() {
     { id: "prazos", label: "Controle de Prazos", icon: Calendar },
     { id: "equipe", label: "Gestão da Equipe", icon: Users },
     { id: "ferias", label: "Férias de Militares", icon: Plane },
-    ...(ehAdminUniversalEfetivo ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
+    ...(ehAjustesOperacionalEfetivo ? [{ id: "ajustes" as const, label: "Ajustes do Site", icon: Settings }] : []),
   ];
 
   // Tabs principais (estilo AssJur)
@@ -1183,10 +1194,10 @@ function Index() {
   const tabs = ehAdmin ? tabsCompletas : tabsAssessor;
 
   useEffect(() => {
-    // "Ajustes do Site" é exclusivo do Admin Universal (ou de quem está com
-    // o comando delegado) — chefes comuns têm a mesma visão operacional,
-    // mas não esta funcionalidade.
-    if (aba === "ajustes" && !ehAdminUniversalEfetivo) {
+    // "Ajustes do Site" é exclusivo do Admin Universal, de quem está com o
+    // comando delegado, ou do Chefe Geral da AssJur (este último só vê a
+    // parte operacional — ver somenteOperacional em AjustesSite).
+    if (aba === "ajustes" && !ehAjustesOperacionalEfetivo) {
       setAba("mesa");
       return;
     }
@@ -1194,7 +1205,7 @@ function Index() {
     if (aba !== "prazos" && aba !== "ajustes" && aba !== "equipe" && aba !== "ferias" && !tabs.some((t) => t.id === aba)) {
       setAba("mesa");
     }
-  }, [tabs, aba, ehAdminUniversalEfetivo]);
+  }, [tabs, aba, ehAjustesOperacionalEfetivo]);
 
   // Renderiza tela de carregamento enquanto a sessão não foi sincronizada
   if (!ready && !user) {
@@ -1573,12 +1584,13 @@ function Index() {
             </Suspense>
           )}
 
-          {aba === "ajustes" && ehAdminUniversalEfetivo && (
+          {aba === "ajustes" && ehAjustesOperacionalEfetivo && (
             <Suspense fallback={<TabLoading label="Carregando ajustes do site..." />}>
               <AjustesSite
                 settings={siteSettings}
                 loading={siteSettingsLoading}
                 onSave={handleSalvarAjustesSite}
+                somenteOperacional={!ehAdminUniversalEfetivo}
               />
             </Suspense>
           )}

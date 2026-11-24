@@ -24,9 +24,16 @@ interface AjustesSiteProps {
   settings: SiteSettings;
   loading?: boolean;
   onSave: (settings: SiteSettings) => Promise<void>;
+  /**
+   * V4.7 — true quando quem está vendo a tela é o Chefe Geral da AssJur
+   * (não o Admin Universal nem um comando delegado): só a parte operacional
+   * (prazos/tolerâncias, assuntos, colunas, fluxo) fica disponível —
+   * identidade/branding do site e o painel de Comando da AssJur somem.
+   */
+  somenteOperacional?: boolean;
 }
 
-export function AjustesSite({ settings, loading = false, onSave }: AjustesSiteProps) {
+export function AjustesSite({ settings, loading = false, onSave, somenteOperacional = false }: AjustesSiteProps) {
   const [form, setForm] = useState<SiteSettings>(settings);
   const [saving, setSaving] = useState(false);
   const [gerandoBackup, setGerandoBackup] = useState(false);
@@ -284,11 +291,15 @@ export function AjustesSite({ settings, loading = false, onSave }: AjustesSitePr
             </Button>
           </div>
 
-          <AjustesGerais form={form} openGeral={openGeral} setOpenGeral={setOpenGeral} updateField={updateField} />
+          {!somenteOperacional && (
+            <AjustesGerais form={form} openGeral={openGeral} setOpenGeral={setOpenGeral} updateField={updateField} />
+          )}
 
           <AjustesLogs openLogs={openLogs} setOpenLogs={setOpenLogs} />
 
-          <AjustesComando openComando={openComando} setOpenComando={setOpenComando} />
+          {!somenteOperacional && (
+            <AjustesComando openComando={openComando} setOpenComando={setOpenComando} />
+          )}
 
           {/* SETOR DEFESA DA UNIÃO — Propriedades exatas mapeadas com a interface */}
           <AjustesDU

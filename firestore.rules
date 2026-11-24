@@ -42,6 +42,18 @@ service cloud.firestore {
       );
     }
 
+    // V4.7 — Cargo permanente de "Chefe Geral da AssJur" (setor == "Chefe
+    // AsseApAssJur"), mais estrito que isChefePerfil() (que também cobre
+    // chefes de setor DU/PA comuns). Usado para liberar só a parte
+    // OPERACIONAL de Ajustes do Site — nunca identidade/branding do site,
+    // que continua exclusiva do Admin Universal (ver configuracoesSistema).
+    function ehChefeGeralPerfil() {
+      return hasUserProfileByUid() && (
+        userProfileByUid().setor == 'CHEFE ASSEAPASSJUR' ||
+        userProfileByUid().setor == 'Chefe AsseApAssJur'
+      );
+    }
+
     // V4.3 — Comando da AssJur: o Admin Universal pode delegar temporariamente
     // seus poderes de chefia a outro militar (ex.: durante uma ausência),
     // virando "observador" (mantém toda a leitura, perde toda a escrita)
@@ -254,7 +266,12 @@ service cloud.firestore {
       allow read: if isSignedIn() && (hasUserProfileByUid() || isAdminUniversal());
       // V4.3 — Comando da AssJur: quem recebeu o comando delegado também
       // pode publicar Ajustes do Site enquanto a delegação estiver vigente.
-      allow create, update: if isSignedIn() &&
+      // V4.7 — o doc em si (create, primeira vez) só o dono/delegado cria;
+      // dali em diante, o Chefe Geral da AssJur também pode salvar updates,
+      // mas só a parte OPERACIONAL (prazos/tolerâncias, assuntos, colunas,
+      // fluxo) — identidade/branding do site fica obrigatoriamente intacta
+      // nas mãos dele (ver os campos exigidos == ao valor já salvo).
+      allow create: if isSignedIn() &&
         (isAdminUniversal() || souDelegadoAtivo()) &&
         !souDelegadorEmObservacao() &&
         configId == 'layoutPrincipal' &&
@@ -283,7 +300,50 @@ service cloud.firestore {
         request.resource.data.duBoardColumns is list &&
         request.resource.data.columnTabs is list &&
         request.resource.data.paFlowActions is list;
-        
+
+      allow update: if isSignedIn() &&
+        !souDelegadorEmObservacao() &&
+        configId == 'layoutPrincipal' &&
+        request.resource.data.sidebarTitle is string &&
+        request.resource.data.sidebarSubtitle is string &&
+        request.resource.data.dashboardTitle is string &&
+        request.resource.data.dashboardDescription is string &&
+        request.resource.data.newProcessLabel is string &&
+        request.resource.data.footerText is string &&
+        request.resource.data.versaoSite is string &&
+        request.resource.data.prazoToleranciaDUDias is number &&
+        request.resource.data.prazoIPMInicialDias is number &&
+        request.resource.data.prazoIPMProrrogacaoDias is number &&
+        request.resource.data.prazoSindicanciaInicialDias is number &&
+        request.resource.data.prazoSindicanciaProrrogacaoDias is number &&
+        request.resource.data.prazoConselhoInicialDias is number &&
+        request.resource.data.prazoConselhoProrrogacaoDias is number &&
+        request.resource.data.prazoToleranciaIPMDias is number &&
+        request.resource.data.prazoToleranciaSindicanciaDias is number &&
+        request.resource.data.prazoToleranciaConselhoDias is number &&
+        request.resource.data.assuntosPASindicancia is list &&
+        request.resource.data.assuntosDUPrincipais is list &&
+        request.resource.data.origensDUDocumentos is list &&
+        request.resource.data.secoesDU is list &&
+        request.resource.data.paEmAndamentoColumns is list &&
+        request.resource.data.duBoardColumns is list &&
+        request.resource.data.columnTabs is list &&
+        request.resource.data.paFlowActions is list &&
+        (
+          isAdminUniversal() ||
+          souDelegadoAtivo() ||
+          (
+            ehChefeGeralPerfil() &&
+            request.resource.data.sidebarTitle == resource.data.sidebarTitle &&
+            request.resource.data.sidebarSubtitle == resource.data.sidebarSubtitle &&
+            request.resource.data.dashboardTitle == resource.data.dashboardTitle &&
+            request.resource.data.dashboardDescription == resource.data.dashboardDescription &&
+            request.resource.data.newProcessLabel == resource.data.newProcessLabel &&
+            request.resource.data.footerText == resource.data.footerText &&
+            request.resource.data.versaoSite == resource.data.versaoSite
+          )
+        );
+
       allow delete: if false;
     }
 
@@ -293,8 +353,12 @@ service cloud.firestore {
     // carrega listas/colunas internas, não só um texto de versão.
     match /configPublica/{docId} {
       allow get: if true;
+      // V4.7 — Chefe Geral também pode gravar aqui: o valor que ele manda é
+      // sempre o mesmo já salvo (a regra de configuracoesSistema acima o
+      // impede de mudar versaoSite), então liberar esta escrita é inofensivo
+      // e evita que o save de Ajustes do Site dele falhe neste 2º passo.
       allow create, update: if isSignedIn() &&
-        (isAdminUniversal() || souDelegadoAtivo()) &&
+        (isAdminUniversal() || souDelegadoAtivo() || ehChefeGeralPerfil()) &&
         !souDelegadorEmObservacao() &&
         docId == 'versao' &&
         request.resource.data.versaoSite is string;
