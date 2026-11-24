@@ -36,7 +36,7 @@ import { Dashboard } from "@/components/Dashboard";
 import { IndiceMensalCard } from "@/components/IndiceMensalCard";
 import { AssessoresTicker } from "@/components/AssessoresTicker";
 import { AlertaFeriasPendentes } from "@/components/AlertaFeriasPendentes";
-import { AlertaPAVencidos } from "@/components/AlertaPAVencidos";
+import { AlertaProcessosVencidos } from "@/components/AlertaProcessosVencidos";
 import { ComandoAssJurBanner } from "@/components/ComandoAssJurBanner";
 import { MesaTrabalho } from "@/components/MesaTrabalho";
 import { IAChatBox } from "@/components/IAChatBox";
@@ -1500,7 +1500,16 @@ function Index() {
                 />
               )}
 
-              <AlertaPAVencidos
+              <AlertaProcessosVencidos
+                setor="DU"
+                processos={processosParaDashboard}
+                siteSettings={siteSettings}
+                ehAdmin={ehAdmin}
+                nomeMilitarAtual={nomeMilitarAtual}
+              />
+
+              <AlertaProcessosVencidos
+                setor="PA"
                 processos={processosParaDashboard}
                 siteSettings={siteSettings}
                 ehAdmin={ehAdmin}

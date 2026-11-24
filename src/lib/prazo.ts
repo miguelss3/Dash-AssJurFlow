@@ -281,6 +281,27 @@ export function nivelUrgenciaPA(
   return Math.abs(dias) > tolerancia ? "vencido_critico" : "vencido_tolerancia";
 }
 
+// ---------------------------------------------------------------------------
+// V4.6 — Mesmo conceito de "nível de urgência" acima, só que para DU, usando
+// a tolerância única já existente (`prazoToleranciaDUDias`, Ajustes do Site
+// → Setor Defesa da União). O Robô Vigia do DU já reverte automaticamente
+// processos "Aguardando Resposta" vencidos além dessa tolerância — isto aqui
+// é só para o aviso visual (cards/alertas), que cobre qualquer processo DU
+// vencido, não só os presos em Aguardando Resposta.
+// ---------------------------------------------------------------------------
+export function nivelUrgenciaDU(
+  prazo: unknown,
+  configuracao?: { prazoToleranciaDUDias?: number } | null,
+): NivelUrgenciaPA {
+  if (!prazo) return "no_prazo";
+  const dias = diasRestantes(prazo);
+  if (dias >= 0) return "no_prazo";
+
+  const toleranciaBruta = Number(configuracao?.prazoToleranciaDUDias);
+  const tolerancia = Number.isFinite(toleranciaBruta) && toleranciaBruta >= 0 ? toleranciaBruta : 2;
+  return Math.abs(dias) > tolerancia ? "vencido_critico" : "vencido_tolerancia";
+}
+
 function normalizarDataPrazoPA(valor: string | undefined | null): string | undefined {
   if (!valor) return undefined;
 

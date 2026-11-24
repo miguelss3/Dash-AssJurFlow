@@ -35,7 +35,7 @@ import { toast } from "sonner";
 import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
-import { formatarData, diasRestantes } from "@/lib/prazo";
+import { formatarData, diasRestantes, nivelUrgenciaDU } from "@/lib/prazo";
 import { registrarErro } from "@/lib/errorLog";
 import { getBadgeSituacaoDUContextual } from "@/lib/utils";
 import { gerarResumoDU } from "@/lib/resumoProcesso";
@@ -85,6 +85,7 @@ const CardDUComponent = ({
   const marcarComoLido = () => onMarcarComoLido?.(p.id);
   // CORREÇÃO: garantir uso de 'corDestaque' (com 'a')
   const fundoDestaque = /^#([0-9a-fA-F]{6})$/.test(corDestaque || "") ? `${corDestaque}33` : undefined;
+  const nivelDU = nivelUrgenciaDU(p.prazoFatal || p.finalPrazo, siteSettings);
 
   const { attributes, listeners, setNodeRef, transform, isDragging: isBeingDragged } = useDraggable({
     id: p.id,
@@ -268,6 +269,11 @@ const CardDUComponent = ({
               <div className={`flex items-center gap-1 ${diasRestantes(p.prazoFatal) <= 5 ? "text-red-600 font-bold" : "text-orange-600"}`}>
                 <AlertCircle className="w-3 h-3" /> <span className="font-semibold">Fatal:</span> <span>{formatarData(p.prazoFatal)}</span>
               </div>
+            )}
+            {nivelDU === "vencido_critico" && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide">
+                <AlertCircle className="w-3 h-3" /> Vencido
+              </span>
             )}
           </div>
 

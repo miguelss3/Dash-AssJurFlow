@@ -258,6 +258,16 @@ export function useAuth() {
     try {
       await signOut(auth);
       window.sessionStorage.removeItem(STORAGE_KEY);
+      // V4.6 — limpa avisos "dar ciência" (ex.: processos vencidos além da
+      // tolerância) para que reapareçam no próximo login, mesmo sem fechar
+      // o navegador — ver AlertaProcessosVencidos.tsx.
+      try {
+        Object.keys(window.sessionStorage)
+          .filter((chave) => chave.startsWith("assjur:aviso:"))
+          .forEach((chave) => window.sessionStorage.removeItem(chave));
+      } catch {
+        /* sem sessionStorage disponível — nada a limpar */
+      }
       setUser(null);
       // console.log("✅ Logout realizado");
     } catch (error: any) {
