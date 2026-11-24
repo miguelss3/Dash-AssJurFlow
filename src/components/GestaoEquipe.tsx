@@ -262,6 +262,40 @@ export function GestaoEquipe({ ehAdminUniversalEfetivo, podeGerenciarEquipe }: G
             migradoParaUid: uidCanonico,
           });
         }
+
+        // V4.9 — Campo de senha na edição é opcional: só redefine se foi
+        // preenchido. O Firebase nunca guarda a senha em texto puro pra
+        // "mostrar" — isso aqui redefine pra uma nova, que é o que resolve
+        // repassar/alterar o acesso de alguém.
+        if (formData.senha) {
+          if (formData.senha.length < 6) {
+            alert("A nova senha deve ter no mínimo 6 caracteres.");
+            setSalvando(false);
+            return;
+          }
+          try {
+            const tokenSenha = await auth.currentUser?.getIdToken();
+            if (!tokenSenha) throw new Error("unauthenticated");
+            const respostaSenha = await fetch("/api/resetarSenhaUsuario", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${tokenSenha}`,
+              },
+              body: JSON.stringify({ uid: uidCanonico, novaSenha: formData.senha }),
+            });
+            const payloadSenha = await respostaSenha.json().catch(() => ({}));
+            if (!respostaSenha.ok || !payloadSenha.ok) {
+              alert(payloadSenha.message || "Não foi possível redefinir a senha.");
+              setSalvando(false);
+              return;
+            }
+          } catch {
+            alert("Não foi possível redefinir a senha.");
+            setSalvando(false);
+            return;
+          }
+        }
       } else {
         if (!formData.senha || formData.senha.length < 6) {
           alert("Senha deve ter no mínimo 6 caracteres");
@@ -435,8 +469,23 @@ export function GestaoEquipe({ ehAdminUniversalEfetivo, podeGerenciarEquipe }: G
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Senha Inicial</label>
-            <Input type="password" autoComplete="current-password" minLength={6} value={formData.senha} onChange={(e) => setFormData({ ...formData, senha: e.target.value })} placeholder="Mínimo de 6 caracteres" required={!editando} />
+            <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">
+              {editando ? "Nova Senha (opcional)" : "Senha Inicial"}
+            </label>
+            <Input
+              type="password"
+              autoComplete="new-password"
+              minLength={6}
+              value={formData.senha}
+              onChange={(e) => setFormData({ ...formData, senha: e.target.value })}
+              placeholder={editando ? "Deixe em branco para manter a atual" : "Mínimo de 6 caracteres"}
+              required={!editando}
+            />
+            {editando && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Por segurança, o sistema nunca mostra a senha já salva — preencha aqui só se quiser definir uma nova.
+              </p>
+            )}
           </div>
 
           <div>

@@ -53,6 +53,11 @@
         "region": "us-central1"
       },
       {
+        "source": "/api/resetarSenhaUsuario",
+        "function": "resetarSenhaUsuario",
+        "region": "us-central1"
+      },
+      {
         "source": "/api/geminiChat",
         "function": "geminiChat",
         "region": "us-central1"

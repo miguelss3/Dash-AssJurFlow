@@ -67,21 +67,30 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
   const souChefeGeral = ehChefeGeralSetor(user?.setor);
   // Dono sempre prevalece quando as duas coisas forem verdade na mesma
   // conta (ex.: o próprio dono também está com o setor "Chefe AsseApAssJur").
-  const meuPapel: PapelComando | null = souDono ? "DONO" : souChefeGeral ? "CHEFE_GERAL" : null;
-
-  if (!meuPapel) return null;
+  const papelTitular: PapelComando | null = souDono ? "DONO" : souChefeGeral ? "CHEFE_GERAL" : null;
+  const souTitular = !!papelTitular;
 
   const hoje = dataCivilAtual();
   // dataFim é exclusivo: o 1º dia de volta ao comando normal — mesma
   // convenção de [dataInicio, dataFim) usada em Férias de Militares.
   const comandoVigente = !!comando && hoje < comando.dataFim;
   const comandoEmCurso = comandoVigente && comando && hoje >= comando.dataInicio;
+
+  // V4.9 — Quem RECEBEU um comando delegado também precisa enxergar esta
+  // seção (pelo menos pra poder devolver o comando antes do prazo acabar,
+  // se quiser) — antes só o titular real (dono/Chefe Geral) via acesso.
+  const souDelegadoAtivoDesteAssento =
+    comandoVigente && comando?.delegadoUid === user?.uid ? comando.papel : null;
+  const meuPapel: PapelComando | null = papelTitular || souDelegadoAtivoDesteAssento;
+
+  if (!meuPapel) return null;
+
   const comandoEhDoMeuAssento = comando?.papel === meuPapel;
   const tituloAssento = meuPapel === "DONO" ? "comando geral do site" : "comando da Chefia Geral";
 
   async function handleDelegar(e: React.FormEvent) {
     e.preventDefault();
-    if (!meuPapel) return;
+    if (!papelTitular) return;
     const alvo = usuarios.find((u) => (u.uid || u.id) === militarSelecionadoId);
     if (!alvo) {
       toast.error("Selecione o militar que vai receber o comando.");
@@ -102,8 +111,8 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
 
     // Já existe uma delegação ativa de OUTRO assento — como só existe um
     // registro por vez, criar a minha agora substituiria a dela.
-    if (comandoVigente && comando && !comandoEhDoMeuAssento) {
-      if (meuPapel === "CHEFE_GERAL") {
+    if (comandoVigente && comando && comando.papel !== papelTitular) {
+      if (papelTitular === "CHEFE_GERAL") {
         toast.error("Já existe uma delegação ativa do comando geral do site — não é possível criar a sua agora. Avise o Admin Universal.");
         return;
       }
@@ -116,7 +125,7 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
     setSalvando(true);
     try {
       await delegar({
-        papel: meuPapel,
+        papel: papelTitular,
         delegadoUid: alvo.uid || alvo.id,
         delegadoNome: nomeMilitarUsuario(alvo),
         delegadorUid: user.uid,
@@ -186,7 +195,7 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
               <p className="text-muted-foreground mt-1">
                 {comando.delegadoNome} — {formatarData(comando.dataInicio)} até {formatarData(comando.dataFim)}
               </p>
-              {comandoVigente && (comandoEhDoMeuAssento || meuPapel === "DONO") && (
+              {comandoVigente && (comandoEhDoMeuAssento || papelTitular === "DONO") && (
                 <Button
                   size="sm"
                   variant="destructive"
@@ -195,49 +204,62 @@ export function AjustesComando({ openComando, setOpenComando }: AjustesComandoPr
                   disabled={revogando}
                 >
                   <Lock className="h-3.5 w-3.5 mr-1.5" />
-                  {revogando ? "Revogando..." : "Revogar e retomar o comando"}
+                  {revogando
+                    ? "Revogando..."
+                    : souTitular
+                      ? "Revogar e retomar o comando"
+                      : "Devolver o comando agora"}
                 </Button>
               )}
             </div>
           )}
 
-          <form onSubmit={handleDelegar} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-            <div className="md:col-span-2">
-              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Militar</label>
-              <select
-                required
-                className="w-full border border-input rounded-xl p-2.5 text-sm outline-none bg-background"
-                value={militarSelecionadoId}
-                onChange={(e) => setMilitarSelecionadoId(e.target.value)}
-              >
-                <option value="">Selecionar...</option>
-                {usuarios
-                  .filter((u) => (u.uid || u.id) !== user?.uid)
-                  .map((u) => (
-                    <option key={u.id} value={u.uid || u.id}>
-                      {nomeMilitarUsuario(u)}
-                    </option>
-                  ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Início</label>
-              <Input type="date" required value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Fim</label>
-              <Input type="date" required value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
-            </div>
-            <Button type="submit" disabled={salvando} className="md:col-span-4 w-full md:w-auto">
-              {salvando ? "Transferindo..." : "Transferir comando"}
-            </Button>
-          </form>
+          {souTitular ? (
+            <>
+              <form onSubmit={handleDelegar} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Militar</label>
+                  <select
+                    required
+                    className="w-full border border-input rounded-xl p-2.5 text-sm outline-none bg-background"
+                    value={militarSelecionadoId}
+                    onChange={(e) => setMilitarSelecionadoId(e.target.value)}
+                  >
+                    <option value="">Selecionar...</option>
+                    {usuarios
+                      .filter((u) => (u.uid || u.id) !== user?.uid)
+                      .map((u) => (
+                        <option key={u.id} value={u.uid || u.id}>
+                          {nomeMilitarUsuario(u)}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Início</label>
+                  <Input type="date" required value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-muted-foreground uppercase mb-1">Fim</label>
+                  <Input type="date" required value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+                </div>
+                <Button type="submit" disabled={salvando} className="md:col-span-4 w-full md:w-auto">
+                  {salvando ? "Transferindo..." : "Transferir comando"}
+                </Button>
+              </form>
 
-          <p className="text-xs text-muted-foreground">
-            Enquanto a delegação estiver em curso, quem recebe o {tituloAssento} pode gerenciar processos, equipe
-            e férias normalmente; você passa a observador — continua vendo tudo, mas nenhuma alteração sua é
-            aceita até o fim do período ou até você revogar.
-          </p>
+              <p className="text-xs text-muted-foreground">
+                Enquanto a delegação estiver em curso, quem recebe o {tituloAssento} pode gerenciar processos,
+                equipe e férias normalmente; você passa a observador — continua vendo tudo, mas nenhuma alteração
+                sua é aceita até o fim do período ou até você revogar.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Você está com o {tituloAssento} temporariamente delegado. Só quem delegou pode escolher um novo
+              destinatário; você pode devolver o comando a qualquer momento com o botão acima.
+            </p>
+          )}
         </CollapsibleContent>
       </div>
     </Collapsible>

@@ -410,7 +410,10 @@ service cloud.firestore {
         request.resource.data.mensagem is string &&
         request.resource.data.criadoEm is timestamp &&
         (request.resource.data.userId == null || request.resource.data.userId == request.auth.uid);
-      allow get, list: if isAdminUniversal() || isChefePerfil();
+      // V4.9 — restrito ao dono (ou quem está com o comando DELE delegado)
+      // — era `isChefePerfil()`, o que também abria pro Chefe Geral da
+      // AssJur; ele não deve ver os logs de erro do sistema.
+      allow get, list: if isAdminUniversal() || souDelegadoAtivoComoDono();
       allow update, delete: if false;
     }
 
@@ -476,9 +479,14 @@ service cloud.firestore {
           (request.resource.data.papel == 'CHEFE_GERAL' && ehChefeGeralPerfil())
         );
 
+      // V4.9 — quem RECEBEU a delegação também pode devolvê-la antes do
+      // prazo acabar (não só quem a criou) — souDelegadoAtivoComoDono()/
+      // ComoChefeGeral() já conferem que é exatamente este doc/assento.
       allow delete: if comandoId == 'atual' &&
         (
           isAdminUniversal() ||
+          souDelegadoAtivoComoDono() ||
+          souDelegadoAtivoComoChefeGeral() ||
           (ehChefeGeralPerfil() && resource.data.papel == 'CHEFE_GERAL' && resource.data.delegadorUid == request.auth.uid)
         );
     }

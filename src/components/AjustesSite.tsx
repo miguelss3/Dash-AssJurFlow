@@ -295,11 +295,11 @@ export function AjustesSite({ settings, loading = false, onSave, somenteOperacio
             <AjustesGerais form={form} openGeral={openGeral} setOpenGeral={setOpenGeral} updateField={updateField} />
           )}
 
-          <AjustesLogs openLogs={openLogs} setOpenLogs={setOpenLogs} />
-
           {!somenteOperacional && (
-            <AjustesComando openComando={openComando} setOpenComando={setOpenComando} />
+            <AjustesLogs openLogs={openLogs} setOpenLogs={setOpenLogs} />
           )}
+
+          <AjustesComando openComando={openComando} setOpenComando={setOpenComando} />
 
           {/* SETOR DEFESA DA UNIÃO — Propriedades exatas mapeadas com a interface */}
           <AjustesDU
