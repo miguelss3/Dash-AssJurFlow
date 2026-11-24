@@ -692,8 +692,15 @@ export function AcoesDUModalNovo({
             descricaoOverride: `Documento ${numero} assinado por ${rotuloAutoridade}. Prazo iniciado.`,
           });
         } else {
+          // V4.12 — Assinatura externa (CHEM/Cmt) sem prazo: fecha a rodada e
+          // volta direto à Mesa do Assessor. Faltava limpar o DIEx/Ofício
+          // externo desta rodada (já registrados no histórico acima) — por
+          // isso um processo que passasse por aqui guardava o número antigo
+          // "fantasma" pronto para reaparecer pré-preenchido na rodada seguinte.
           void avancarFluxo("MESA_ASSESSOR", {
             numeroDocumentoDU: numero,
+            numeroDiexExterno: "",
+            numeroOficioExterno: "",
             possuiPrazoDU: false,
             assinaturaDestino,
             descricaoOverride: `Documento ${numero} assinado por ${rotuloAutoridade}. Sem prazo.`,
