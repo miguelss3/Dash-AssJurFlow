@@ -896,6 +896,24 @@ function Index() {
           patchProcesso.pedidoSubsidios = {
             ...(processo.pedidoSubsidios || {}),
             situacaoFluxo: retrocessoFluxo,
+            // V4.13 — Drag-and-drop no Kanban (Mesa DU) força o retorno a
+            // MESA_ASSESSOR sem passar pelos handlers do modal, que já
+            // limpavam o DIEx/Ofício externo da rodada anterior. Sem isso,
+            // soltar um card da coluna da Chefia na coluna do assessor
+            // também deixava o número "fantasma" pronto para reaparecer.
+            ...(retrocessoFluxo === "MESA_ASSESSOR"
+              ? {
+                  numeroDocumentoDU: "",
+                  numeroDiex: "",
+                  numeroSaida: "",
+                  numeroDiexExterno: "",
+                  numeroOficioExterno: "",
+                }
+              : {}),
+            // V4.13 — Forçar para "Aguardando Resposta" via drag-and-drop é o
+            // mesmo tipo de atalho: zera o nº recebido da rodada anterior,
+            // senão o campo de resposta já vinha preenchido com o fantasma.
+            ...(retrocessoFluxo === "AGUARDANDO_RESPOSTA" ? { numeroRecebido: "" } : {}),
           };
         }
       }

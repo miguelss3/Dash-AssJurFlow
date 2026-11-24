@@ -649,6 +649,7 @@ export function AcoesDUModalNovo({
             }
             void avancarFluxo("AGUARDANDO_RESPOSTA", {
               numeroDocumentoDU: numero,
+              numeroRecebido: "",
               possuiPrazoDU: true,
               dataPrazo: dataPrazo.trim(),
               assinaturaDestino: "chefe",
@@ -686,6 +687,7 @@ export function AcoesDUModalNovo({
           }
           void avancarFluxo("AGUARDANDO_RESPOSTA", {
             numeroDocumentoDU: numero,
+            numeroRecebido: "",
             possuiPrazoDU: true,
             dataPrazo: dataPrazo.trim(),
             assinaturaDestino,
