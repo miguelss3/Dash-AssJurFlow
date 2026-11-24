@@ -18,7 +18,6 @@ import {
   Plus,
   ArrowUpRight,
   ArrowDownLeft,
-  Copy,
   type LucideIcon,
 } from "lucide-react";
 import { formatarData, diasRestantes } from "@/lib/prazo";
@@ -325,25 +324,6 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
     }
   };
 
-  const handleCopiarDocumentos = async () => {
-    const enviados = construirListaEnviados(processo);
-    const recebidos = construirListaRecebidos(processo);
-    const linhas = [
-      "Documentos relacionados:",
-      "Enviado:",
-      ...enviados.map((d) => `- ${d}`),
-      "Recebidos:",
-      ...recebidos.map((d) => `- ${d}`),
-    ];
-    try {
-      await navigator.clipboard.writeText(linhas.join("\n"));
-      toast.success("Documentos copiados para a área de transferência.");
-    } catch (error) {
-      console.error("Erro ao copiar documentos DU:", error);
-      toast.error("Não foi possível copiar os documentos.");
-    }
-  };
-
   const handleHistoricoChange = (
     index: number,
     campo: "numero" | "dataEnvio" | "prazo",
@@ -413,7 +393,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className="text-xs font-bold px-2 py-1 rounded bg-sky-100 text-sky-700">DU</span>
@@ -448,7 +428,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
 
           <Separator />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Informações Gerais</h4>
               <InfoRow icon={User} label="Parte / Cliente" value={processo.cliente} />
@@ -457,13 +437,8 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
               <InfoRow icon={User} label="Responsável" value={processo.responsavel} />
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Documentos</h4>
-                <Button type="button" size="sm" variant="outline" onClick={handleCopiarDocumentos}>
-                  <Copy className="w-3.5 h-3.5 mr-1" /> Copiar
-                </Button>
-              </div>
+            <div className="space-y-4 order-2 lg:col-span-2">
+              <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Documentos</h4>
 
               {(() => {
                 // Histórico completo de envios (array de Nº DIEx). Ordem do array =
@@ -487,7 +462,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                 };
 
                 return (
-                  <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {/* ENVIADOS — um card por documento do histórico */}
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
@@ -643,7 +618,7 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                     </div>
 
                     {/* RECEBIDO */}
-                    <div className="mt-4">
+                    <div>
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold">
                           <ArrowDownLeft className="w-4 h-4 text-sky-500" />
@@ -781,12 +756,12 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                         );
                       })()}
                     </div>
-                  </>
+                  </div>
                 );
               })()}
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 order-1">
               <div className="flex items-center justify-between gap-2">
                 <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
                 <div className="flex items-center gap-2">
@@ -811,8 +786,8 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                       </Button>
                     </>
                   ) : (
-                    <Button type="button" size="sm" variant="outline" onClick={() => setEditandoPrazosDU(true)}>
-                      <Pencil className="w-3.5 h-3.5 mr-1" /> Editar prazos DU
+                    <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setEditandoPrazosDU(true)}>
+                      <Pencil className="w-3 h-3 mr-1" /> Editar
                     </Button>
                   )}
                 </div>
