@@ -291,7 +291,7 @@ const CardPAComponent = ({
 
           <h4 className="font-bold text-sm text-slate-800 leading-tight line-clamp-2">{p.tipoAcao}</h4>
 
-          <div className="flex items-center gap-3 text-[11px]">
+          <div className="flex items-center gap-3 text-[11px] flex-wrap">
             {p.prazo && (
               <div className="flex items-center gap-1 text-blue-600">
                 <Clock className="w-3 h-3" /> <span className="font-semibold">Interno:</span> <span>{formatarData(p.prazo)}</span>
@@ -302,12 +302,13 @@ const CardPAComponent = ({
                 <AlertCircle className="w-3 h-3" /> <span className="font-semibold">Final:</span> <span>{formatarData(p.prazoFatal)}</span>
               </div>
             )}
-            {nivelPA === "vencido_critico" && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide">
-                <AlertCircle className="w-3 h-3" /> Vencido
-              </span>
-            )}
           </div>
+
+          {nivelPA === "vencido_critico" && (
+            <span className="inline-flex items-center gap-1 self-start rounded-full bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide animate-pulse">
+              <AlertCircle className="w-3 h-3" /> Vencido
+            </span>
+          )}
 
           <div className="text-xs text-slate-600 space-y-1">
             <p className="flex items-center gap-1"><User className="w-3 h-3" /> <strong>Parte:</strong> {p.cliente}</p>
