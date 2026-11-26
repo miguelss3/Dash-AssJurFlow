@@ -264,13 +264,21 @@ export function MesaPA({
 
     // V9.13 — Solução despachada para a Chefia (ASSINANDO_SOLUCAO) sai da
     // Mesa do Assessor e ganha aba própria na coluna de tipo ("Solução
-    // Aguardando Assinatura") — separado de "No Prazo"/"Em Atraso", que são
-    // só para quem ainda está sendo trabalhado (encarregado ou assessor
-    // redigindo). FAZENDO_SOLUCAO (ainda em elaboração) continua no fluxo
-    // normal abaixo, visível tanto na coluna de tipo quanto na Mesa do
-    // Assessor (V9.11).
+    // Aguardando Assinatura").
     if (situacaoPA === "ASSINANDO_SOLUCAO" && colunaTipo) {
       return { emAndamento: null, portaria: null, aguardandoAssinaturaSolucao: colunaTipo, atrasado: false };
+    }
+
+    // V9.17 — FAZENDO_SOLUCAO agora tem casa própria só na Mesa do Assessor
+    // (abas "Solução/Parecer" e "Atrasado" — ver AssessorGroup). A V9.11
+    // também mostrava esse processo em "No Prazo"/"Em Atraso" da coluna de
+    // tipo, mas isso fazia o botão "Ação", clicado a partir dali, abrir a
+    // etapa real do processo (Fazendo Solução/Parecer — "Despachar Solução
+    // para Chefia") em vez da etapa esperada para quem olha a coluna de tipo
+    // (Com o Encarregado — "Solicitar Prorrogação"/"Receber Autos
+    // Concluídos"), confundindo o usuário. Removido da coluna de tipo.
+    if (situacaoPA === "FAZENDO_SOLUCAO") {
+      return { emAndamento: null, portaria: null, aguardandoAssinaturaSolucao: null, atrasado: false };
     }
 
     // 4. Se chegou aqui, está na mão do Encarregado (Em Andamento Real) —

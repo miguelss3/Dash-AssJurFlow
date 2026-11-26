@@ -163,12 +163,15 @@ const CardPAComponent = ({
   // ("Solução/Parecer"), separada de "Mesa do Assessor" (onde ficam só os
   // processos recém-distribuídos, sem nenhuma ação ainda) — a tag no card
   // agora reflete exatamente em qual aba ele está.
+  // V9.20 — ASSINANDO_SOLUCAO saiu da Mesa do Assessor (V9.13: ganhou aba
+  // própria "Solução para Assinatura" na coluna de tipo), então não deve
+  // mais exibir a tag "Mesa do Assessor" — cai no badgeSituacaoPA padrão,
+  // que já retorna "Aguardando Assinatura da Solucao" para esse estado.
   const badgeExibicaoPA =
     sitPA === "FAZENDO_SOLUCAO"
       ? "Fazendo Solução/Parecer"
       : sitIP === "MESA_ASSESSOR"
         || sitPA === "FAZENDO_PORTARIA"
-        || sitPA === "ASSINANDO_SOLUCAO"
           ? "Mesa do Assessor"
           : badgeSituacaoPA;
 
@@ -485,15 +488,21 @@ const CardPAComponent = ({
 
           {showActions && (
             <div className="space-y-2 mt-3 pt-3 border-t border-slate-100">
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="border-purple-300 text-purple-700 hover:bg-purple-50 text-xs h-9"
-                  onClick={(e) => { e.stopPropagation(); marcarComoLido(); setModalAcoesPA(true); }}
-                >
-                  <FileText className="w-3 h-3 mr-1" /> Ação
-                </Button>
+              {/* V9.18 — "Ação" (modal completo do fluxo) some na Mesa do
+                  Assessor: lá os atalhos dedicados (Enviar Solução/Devolver
+                  ao Encarregado) já cobrem o que é preciso. Continua
+                  aparecendo nas colunas de tipo (Sindicância/IPM/Conselho). */}
+              <div className={`grid gap-2 ${dentroDaMesaDoAssessor ? (onEdit ? "grid-cols-2" : "grid-cols-1") : "grid-cols-3"}`}>
+                {!dentroDaMesaDoAssessor && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-purple-300 text-purple-700 hover:bg-purple-50 text-xs h-9"
+                    onClick={(e) => { e.stopPropagation(); marcarComoLido(); setModalAcoesPA(true); }}
+                  >
+                    <FileText className="w-3 h-3 mr-1" /> Ação
+                  </Button>
+                )}
                 {onEdit && (
                   <Button
                     size="sm"

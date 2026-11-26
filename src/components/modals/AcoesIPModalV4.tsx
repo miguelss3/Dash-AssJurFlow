@@ -203,6 +203,9 @@ export function AcoesIPModalV4({
       const processoRef = doc(db, "processos", processoId);
       const payload: Record<string, unknown> = {
         situacaoFluxoIP: novaSituacao,
+        // V9.18 — "Último Movimento" (descricao) sempre reflete a transição
+        // atual por padrão, igual a AcoesPAModalV4.
+        descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
       };

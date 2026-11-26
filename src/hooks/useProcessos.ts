@@ -420,6 +420,8 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                 prorrogacoes,
                 decisaoAutNomeante: procData.decisaoAutNomeante,
                 numeroDIExRemessa: procData.numeroDIExRemessa,
+                aditamentoNumero: procData.aditamentoNumero,
+                aditamentoData: procData.aditamentoData,
                 resultadoFinalConselho: procData.resultadoFinalConselho,
                 teveRecurso: procData.teveRecurso === true,
                 membrosConselho: procData.membrosConselho,

@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { addDoc, collection, doc, getDoc, Timestamp, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { formatarData } from "@/lib/prazo";
@@ -107,6 +108,14 @@ export function AcoesPAModalV4({
   const [dataRecebimento, setDataRecebimento] = useState<string>("");
   const [dataFatal, setDataFatal] = useState<string>("");
 
+  // V9.19 — ASSINANDO_SOLUCAO: devolver para correção (com motivo) ou
+  // registrar a publicação do aditamento (nº + data), antes de finalizar.
+  const [isDevolvendoCorrecao, setIsDevolvendoCorrecao] = useState<boolean>(false);
+  const [motivoDevolucao, setMotivoDevolucao] = useState<string>("");
+  const [isRegistrandoPublicacao, setIsRegistrandoPublicacao] = useState<boolean>(false);
+  const [numeroAditamento, setNumeroAditamento] = useState<string>("");
+  const [dataAditamento, setDataAditamento] = useState<string>("");
+
   // ---------------- Carga ----------------
   useEffect(() => {
     if (!open || !processoId) return;
@@ -164,6 +173,11 @@ export function AcoesPAModalV4({
       const processoRef = doc(db, "processos", processoId);
       const payload: Record<string, unknown> = {
         situacaoFluxoPA: novaSituacao,
+        // V9.18 — "Último Movimento" (descricao) sempre reflete a transição
+        // atual por padrão. Metade dos botões esquecia de setar isto, então
+        // o card ficava preso ao texto de uma etapa anterior. extraData pode
+        // sobrescrever com um texto mais específico quando precisar.
+        descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
         ...extraData,
@@ -426,10 +440,7 @@ export function AcoesPAModalV4({
               onClick={() =>
                 void avancarFluxo(
                   "ASSINANDO_SOLUCAO",
-                  // V9.15 — grava também em `descricao` (não só no histórico),
-                  // senão "Último Movimento" no card continua preso ao texto
-                  // da transição anterior.
-                  { descricao: `Solução despachada para assinatura da Chefia/Cmt por ${autorMilitar}.` },
+                  {},
                   "Solução despachada para assinatura da Chefia/Cmt.",
                 )
               }
@@ -444,51 +455,151 @@ export function AcoesPAModalV4({
           <div className={FORM_CONTAINER}>
             <h4 className="text-sm font-semibold text-slate-800 mb-1">Assinatura da Solução</h4>
             <p className="text-xs text-slate-600 mb-4">
-              Aguardando assinatura final da Solução pela Chefia/Cmt. Confirme a finalização ou devolva para correção.
+              Aguardando assinatura final da Solução pela Chefia/Cmt.
             </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                disabled={salvando}
-                className={`${SECONDARY_BTN} flex-1`}
-                onClick={() =>
-                  void avancarFluxo(
-                    "FAZENDO_SOLUCAO",
-                    {
-                      // V9.11 — O prazo da solução devolvida não vale mais (era
-                      // referente à versão rejeitada): zera dataInicioPrazo
-                      // também, não só o prazoFatal — sem dataInicioPrazo,
-                      // calcularPrazoFinalPA (useProcessos) não tem base para
-                      // recalcular um prazo fatal "de reposição" sozinho, então
-                      // o processo some como "sem prazo definido" até alguém
-                      // cadastrar um novo (via Editar/Solicitar Prorrogação).
-                      dataInicioPrazo: null,
-                      prazoFatal: null,
-                      finalPrazo: null,
-                      prazoFatalOverride: null,
-                      descricao: "Chefia/Cmt devolveu a Solução para correção. Prazo da solução zerado — aguardando novo prazo.",
-                    },
-                    "Chefia/Cmt devolveu a Solução para correção. Prazo da solução zerado — aguardando novo prazo.",
-                  )
-                }
-              >
-                Devolver para Correção
-              </button>
-              <button
-                type="button"
-                disabled={salvando}
-                className={`${PRIMARY_BTN} flex-1`}
-                onClick={() =>
-                  void avancarFluxo(
-                    "FINALIZADO",
-                    { finalizado: true, status: "concluido" },
-                    "Processo Administrativo finalizado.",
-                  )
-                }
-              >
-                Finalizar Processo
-              </button>
-            </div>
+
+            {isDevolvendoCorrecao ? (
+              <div className="space-y-3 rounded-lg border border-orange-300 bg-orange-50 p-4">
+                <h5 className="text-sm font-semibold text-orange-900">Devolver para Correção</h5>
+                <div>
+                  <Label className="text-orange-800">Motivo da devolução</Label>
+                  <Textarea
+                    value={motivoDevolucao}
+                    onChange={(e) => setMotivoDevolucao(e.target.value)}
+                    placeholder="Descreva o que precisa ser corrigido"
+                    rows={3}
+                    className="border-orange-200"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={salvando || !motivoDevolucao.trim()}
+                    className={`${PRIMARY_BTN} flex-1`}
+                    onClick={() => {
+                      const motivo = motivoDevolucao.trim();
+                      void avancarFluxo(
+                        "FAZENDO_SOLUCAO",
+                        {
+                          // V9.11 — O prazo da solução devolvida não vale mais
+                          // (era referente à versão rejeitada): zera
+                          // dataInicioPrazo também, não só o prazoFatal — sem
+                          // dataInicioPrazo, calcularPrazoFinalPA
+                          // (useProcessos) não tem base para recalcular um
+                          // prazo fatal "de reposição" sozinho, então o
+                          // processo some como "sem prazo definido" até
+                          // alguém cadastrar um novo.
+                          dataInicioPrazo: null,
+                          prazoFatal: null,
+                          finalPrazo: null,
+                          prazoFatalOverride: null,
+                        },
+                        `Chefia/Cmt devolveu a Solução para correção. Motivo: ${motivo} Prazo da solução zerado — aguardando novo prazo.`,
+                      );
+                      setIsDevolvendoCorrecao(false);
+                      setMotivoDevolucao("");
+                    }}
+                  >
+                    Confirmar Devolução
+                  </button>
+                  <button
+                    type="button"
+                    className={SECONDARY_BTN}
+                    disabled={salvando}
+                    onClick={() => { setIsDevolvendoCorrecao(false); setMotivoDevolucao(""); }}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : isRegistrandoPublicacao ? (
+              <div className="space-y-3 rounded-lg border border-indigo-300 bg-indigo-50 p-4">
+                <h5 className="text-sm font-semibold text-indigo-900">Registrar Publicação (Aditamento)</h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-indigo-800">Nº do Aditamento</Label>
+                    <Input
+                      value={numeroAditamento}
+                      onChange={(e) => setNumeroAditamento(e.target.value)}
+                      placeholder="Ex: Aditamento nº 12/2026"
+                      className="border-indigo-200"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-indigo-800">Data da Publicação</Label>
+                    <Input
+                      type="date"
+                      value={dataAditamento}
+                      onChange={(e) => setDataAditamento(e.target.value)}
+                      className="border-indigo-200"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={salvando || !numeroAditamento.trim() || !dataAditamento}
+                    className={`${PRIMARY_BTN} flex-1`}
+                    onClick={() => {
+                      const numero = numeroAditamento.trim();
+                      void avancarFluxo(
+                        "ASSINANDO_SOLUCAO",
+                        { aditamentoNumero: numero, aditamentoData: dataAditamento },
+                        `Publicação registrada: ${numero}, em ${formatarData(dataAditamento)}.`,
+                      );
+                      setIsRegistrandoPublicacao(false);
+                    }}
+                  >
+                    Salvar Publicação
+                  </button>
+                  <button
+                    type="button"
+                    className={SECONDARY_BTN}
+                    disabled={salvando}
+                    onClick={() => setIsRegistrandoPublicacao(false)}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  className={SECONDARY_BTN}
+                  disabled={salvando}
+                  onClick={() => setIsDevolvendoCorrecao(true)}
+                >
+                  Devolver para Correção
+                </button>
+                <button
+                  type="button"
+                  className={SECONDARY_BTN}
+                  disabled={salvando}
+                  onClick={() => {
+                    setNumeroAditamento("");
+                    setDataAditamento("");
+                    setIsRegistrandoPublicacao(true);
+                  }}
+                >
+                  Registrar Publicação
+                </button>
+                <button
+                  type="button"
+                  disabled={salvando}
+                  className={PRIMARY_BTN}
+                  onClick={() =>
+                    void avancarFluxo(
+                      "FINALIZADO",
+                      { finalizado: true, status: "concluido" },
+                      "Processo Administrativo finalizado.",
+                    )
+                  }
+                >
+                  Finalizar Processo
+                </button>
+              </div>
+            )}
           </div>
         );
 

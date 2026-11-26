@@ -314,7 +314,7 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                   </div>
                   {emPrazoSolucao && (
                     <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
-                      <div className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">Prazo da Solução (Mesa do Assessor)</div>
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">Prazo da Solução/Parecer</div>
                       <div className="text-sm text-indigo-900 mt-1">
                         {diasPrazoSolucao === null
                           ? "Prazo em andamento."
@@ -347,6 +347,21 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                       {item.em && <div className="text-[10px] text-amber-700 mt-1">Registro: {formatarData(item.em)}</div>}
                     </div>
                   ))}
+                </div>
+              </div>
+            </>
+          )}
+
+          {processo.aditamentoNumero && (
+            <>
+              <Separator />
+              <div>
+                <h4 className="text-sm font-bold text-indigo-800 uppercase tracking-wide mb-3">Publicação do Aditamento</h4>
+                <div className="text-sm text-indigo-900 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                  <div className="font-semibold">{processo.aditamentoNumero}</div>
+                  {processo.aditamentoData && (
+                    <div className="text-xs text-indigo-800 mt-1">Publicado em: {formatarData(processo.aditamentoData)}</div>
+                  )}
                 </div>
               </div>
             </>

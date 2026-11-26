@@ -184,6 +184,10 @@ export interface Processo {
   }>;
   decisaoAutNomeante?: string;
   numeroDIExRemessa?: string;
+  // V9.19 — Publicação do aditamento à portaria (registrada ao assinar a
+  // Solução/Parecer, antes de finalizar o PA).
+  aditamentoNumero?: string;
+  aditamentoData?: string;
   resultadoFinalConselho?: string;
   teveRecurso?: boolean;
   membrosConselho?: string;
