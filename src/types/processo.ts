@@ -188,6 +188,11 @@ export interface Processo {
   // Solução/Parecer, antes de finalizar o PA).
   aditamentoNumero?: string;
   aditamentoData?: string;
+  // V9.22 — Data em que a Solução foi despachada para assinatura da
+  // Chefia/Cmt (ASSINANDO_SOLUCAO) — base para o prazo de 5 dias do Cmt.
+  dataDespachoAssinatura?: string;
+  // V9.21 — Documentos registrados no processo PA (igual ao DU: número + data).
+  documentosRegistrados?: Array<{ numero: string; data?: string }>;
   resultadoFinalConselho?: string;
   teveRecurso?: boolean;
   membrosConselho?: string;

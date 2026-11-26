@@ -422,6 +422,8 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                 numeroDIExRemessa: procData.numeroDIExRemessa,
                 aditamentoNumero: procData.aditamentoNumero,
                 aditamentoData: procData.aditamentoData,
+                dataDespachoAssinatura: procData.dataDespachoAssinatura,
+                documentosRegistrados: procData.documentosRegistrados,
                 resultadoFinalConselho: procData.resultadoFinalConselho,
                 teveRecurso: procData.teveRecurso === true,
                 membrosConselho: procData.membrosConselho,

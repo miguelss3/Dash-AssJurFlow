@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
-import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes, nivelUrgenciaPA, foiConcluidoForaDoPrazo } from "@/lib/prazo";
+import { calcularFaixasProrrogacaoPA, calcularPrazoAssinaturaSolucao, formatarData, diasRestantes, nivelUrgenciaPA, foiConcluidoForaDoPrazo } from "@/lib/prazo";
 import { registrarErro } from "@/lib/errorLog";
 import { getBadgeSituacaoPA } from "@/lib/utils";
 import { DetalhesModalPA } from "./DetalhesModalPA";
@@ -280,6 +280,8 @@ const CardPAComponent = ({
       const textoMovimento = `Solução despachada para assinatura da Chefia/Cmt por ${autorMilitar}.`;
       await updateDoc(processoRef, {
         situacaoFluxoPA: "ASSINANDO_SOLUCAO",
+        // V9.22 — marca o início do prazo de 5 dias do Cmt para assinar.
+        dataDespachoAssinatura: new Date().toISOString().slice(0, 10),
         // V9.15 — sem isto, "Último Movimento" no card continua mostrando o
         // texto da transição anterior (ex.: "Sindicância recebida em..."),
         // dando a impressão de que a solução ainda não foi enviada.
@@ -402,6 +404,11 @@ const CardPAComponent = ({
               {sitPA === "FAZENDO_SOLUCAO" && p.prazoFatal && (
                 <Badge variant="outline" className="text-[10px] h-5 border-orange-300 text-orange-800 bg-orange-50">
                   Prazo: {formatarData(p.prazoFatal)}
+                </Badge>
+              )}
+              {sitPA === "ASSINANDO_SOLUCAO" && p.dataDespachoAssinatura && (
+                <Badge variant="outline" className="text-[10px] h-5 border-violet-300 text-violet-800 bg-violet-50">
+                  Prazo Assinatura: {formatarData(calcularPrazoAssinaturaSolucao(p.dataDespachoAssinatura))}
                 </Badge>
               )}
             </div>

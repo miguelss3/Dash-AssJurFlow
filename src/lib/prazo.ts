@@ -464,6 +464,18 @@ export function foiConcluidoForaDoPrazo(prazoFatal: unknown, dataConclusao: unkn
   return differenceInCalendarDays(conclusao, fatal) > 0;
 }
 
+// V9.22 — Prazo para a Chefia/Cmt assinar a Solução já escrita (ASSINANDO_
+// SOLUCAO): regulamentarmente fixo em `dias` (padrão 5) a partir da data em
+// que o assessor despachou. Independente do prazo da solução/parecer, que
+// não se aplica mais nessa fase.
+export function calcularPrazoAssinaturaSolucao(dataDespacho: unknown, dias = 5): string | undefined {
+  const base = toDateLocal(dataDespacho);
+  if (!base) return undefined;
+  const data = new Date(base);
+  data.setDate(data.getDate() + dias);
+  return format(data, "yyyy-MM-dd");
+}
+
 export function statusPrazo(prazo: unknown): StatusPrazo {
   if (!prazo) return "safe"; // Sem prazo = não tem urgência
   const d = diasRestantes(prazo);

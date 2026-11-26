@@ -440,7 +440,8 @@ export function AcoesPAModalV4({
               onClick={() =>
                 void avancarFluxo(
                   "ASSINANDO_SOLUCAO",
-                  {},
+                  // V9.22 — marca o início do prazo de 5 dias do Cmt para assinar.
+                  { dataDespachoAssinatura: new Date().toISOString().slice(0, 10) },
                   "Solução despachada para assinatura da Chefia/Cmt.",
                 )
               }
@@ -542,15 +543,24 @@ export function AcoesPAModalV4({
                     className={`${PRIMARY_BTN} flex-1`}
                     onClick={() => {
                       const numero = numeroAditamento.trim();
+                      // V9.23 — Registrar a publicação do aditamento já
+                      // finaliza o PA: depois de publicado não sobra mais
+                      // ação pendente, então não faz sentido um clique extra
+                      // em "Finalizar Processo" (removido).
                       void avancarFluxo(
-                        "ASSINANDO_SOLUCAO",
-                        { aditamentoNumero: numero, aditamentoData: dataAditamento },
-                        `Publicação registrada: ${numero}, em ${formatarData(dataAditamento)}.`,
+                        "FINALIZADO",
+                        {
+                          aditamentoNumero: numero,
+                          aditamentoData: dataAditamento,
+                          finalizado: true,
+                          status: "concluido",
+                        },
+                        `Publicação registrada: ${numero}, em ${formatarData(dataAditamento)}. Processo Administrativo finalizado.`,
                       );
                       setIsRegistrandoPublicacao(false);
                     }}
                   >
-                    Salvar Publicação
+                    Salvar Publicação e Finalizar
                   </button>
                   <button
                     type="button"
@@ -574,7 +584,7 @@ export function AcoesPAModalV4({
                 </button>
                 <button
                   type="button"
-                  className={SECONDARY_BTN}
+                  className={PRIMARY_BTN}
                   disabled={salvando}
                   onClick={() => {
                     setNumeroAditamento("");
@@ -582,21 +592,7 @@ export function AcoesPAModalV4({
                     setIsRegistrandoPublicacao(true);
                   }}
                 >
-                  Registrar Publicação
-                </button>
-                <button
-                  type="button"
-                  disabled={salvando}
-                  className={PRIMARY_BTN}
-                  onClick={() =>
-                    void avancarFluxo(
-                      "FINALIZADO",
-                      { finalizado: true, status: "concluido" },
-                      "Processo Administrativo finalizado.",
-                    )
-                  }
-                >
-                  Finalizar Processo
+                  Registrar Publicação e Finalizar
                 </button>
               </div>
             )}

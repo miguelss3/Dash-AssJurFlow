@@ -15,12 +15,13 @@ import {
   Pencil,
   Save,
   X,
+  Plus,
   type LucideIcon,
 } from "lucide-react";
 import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
-import { calcularFaixasProrrogacaoPA, diasRestantes, formatarData } from "@/lib/prazo";
+import { calcularFaixasProrrogacaoPA, calcularPrazoAssinaturaSolucao, diasRestantes, formatarData } from "@/lib/prazo";
 import { getBadgeSituacaoPA } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -40,12 +41,24 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
   const [inicioPrazoEdit, setInicioPrazoEdit] = useState("");
   const [prazoFatalEdit, setPrazoFatalEdit] = useState("");
 
+  // V9.21 — Documentos registrados (igual ao DU): lista editável de
+  // número + data, independente das Prorrogações e do Aditamento.
+  const [editandoDocumentos, setEditandoDocumentos] = useState(false);
+  const [savingDocumentos, setSavingDocumentos] = useState(false);
+  const [documentosEdit, setDocumentosEdit] = useState<Array<{ numero: string; data: string }>>([]);
+
   useEffect(() => {
     if (!open || !processo) return;
     setDataEntradaEdit(processo.dataEntrada || "");
     setInicioPrazoEdit(processo.dataInicioPrazo || "");
     setPrazoFatalEdit(processo.prazoFatal || "");
     setEditandoPrazosPA(false);
+    setDocumentosEdit(
+      Array.isArray(processo.documentosRegistrados)
+        ? processo.documentosRegistrados.map((d) => ({ numero: d.numero || "", data: d.data || "" }))
+        : [],
+    );
+    setEditandoDocumentos(false);
   }, [open, processo]);
 
   if (!processo) return null;
@@ -112,6 +125,42 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
     }
   };
 
+  const handleSalvarDocumentos = async () => {
+    try {
+      setSavingDocumentos(true);
+      const documentosLimpos = documentosEdit
+        .map((d) => {
+          const numero = d.numero.trim();
+          const dataTrim = d.data.trim();
+          const item: { numero: string; data?: string } = { numero };
+          if (dataTrim) item.data = dataTrim;
+          return item;
+        })
+        .filter((d) => d.numero.length > 0);
+
+      const processoRef = doc(db, "processos", processo.id);
+      await updateDoc(processoRef, {
+        documentosRegistrados: documentosLimpos.length > 0 ? documentosLimpos : null,
+        atualizadoEm: new Date().toISOString(),
+        atualizadoPorNome: autorMilitar,
+      });
+      setEditandoDocumentos(false);
+      toast.success("Documentos atualizados com sucesso.");
+    } catch (error) {
+      console.error("Erro ao atualizar documentos do PA:", error);
+      toast.error("Não foi possível salvar os documentos.");
+    } finally {
+      setSavingDocumentos(false);
+    }
+  };
+
+  const adicionarDocumento = () =>
+    setDocumentosEdit((atual) => [...atual, { numero: "", data: new Date().toISOString().slice(0, 10) }]);
+  const removerDocumento = (index: number) =>
+    setDocumentosEdit((atual) => atual.filter((_, i) => i !== index));
+  const atualizarDocumento = (index: number, campo: "numero" | "data", valor: string) =>
+    setDocumentosEdit((atual) => atual.map((d, i) => (i === index ? { ...d, [campo]: valor } : d)));
+
   const prorrogacoesPA = calcularFaixasProrrogacaoPA({
     tipoPA: processo.tipoPA,
     dataInicioPrazo: processo.dataInicioPrazo,
@@ -142,8 +191,14 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
       .replace(/^_+|_+$/g, "");
 
   const sitPA = normalizarSituacao(processo.situacaoFluxoPA);
-  const emPrazoSolucao = sitPA === "FAZENDO_SOLUCAO" || sitPA === "ASSINANDO_SOLUCAO";
+  const emFaseSolucao = sitPA === "FAZENDO_SOLUCAO";
+  const emAssinaturaSolucao = sitPA === "ASSINANDO_SOLUCAO";
+  const emPrazoSolucao = emFaseSolucao || emAssinaturaSolucao;
   const diasPrazoSolucao = processo.prazoFatal ? diasRestantes(processo.prazoFatal) : null;
+  // V9.22 — Uma vez despachado para assinatura, o prazo da solução/parecer
+  // não se aplica mais — vira o prazo de 5 dias do Cmt para assinar.
+  const prazoAssinaturaCmt = calcularPrazoAssinaturaSolucao(processo.dataDespachoAssinatura);
+  const diasPrazoAssinatura = prazoAssinaturaCmt ? diasRestantes(prazoAssinaturaCmt) : null;
 
   // Investigação Preliminar e Outros seguem o motor IP (situacaoFluxoIP), que
   // não tem portaria nem prazo regulamentar — dataInicioPrazo/prazoFatal nunca
@@ -222,7 +277,7 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
 
           <Separator />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Informações Gerais</h4>
               <InfoRow icon={User} label="Parte / Cliente" value={processo.cliente} />
@@ -312,7 +367,18 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                       </div>
                     </div>
                   </div>
-                  {emPrazoSolucao && (
+                  {emAssinaturaSolucao ? (
+                    <div className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-violet-700">Prazo para Assinatura (Cmt)</div>
+                      <div className="text-sm text-violet-900 mt-1">
+                        {diasPrazoAssinatura === null
+                          ? "Aguardando registro da data de despacho."
+                          : diasPrazoAssinatura < 0
+                            ? `Prazo vencido há ${Math.abs(diasPrazoAssinatura)} dia(s).`
+                            : `Restam ${diasPrazoAssinatura} dia(s) para o Cmt assinar.`}
+                      </div>
+                    </div>
+                  ) : emFaseSolucao && (
                     <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
                       <div className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">Prazo da Solução/Parecer</div>
                       <div className="text-sm text-indigo-900 mt-1">
@@ -327,19 +393,21 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                 </>
               )}
             </div>
-          </div>
 
-          {prorrogacoesPA.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-bold text-amber-800 uppercase tracking-wide mb-3">
-                  Prorrogações Registradas ({prorrogacoesPA.length})
-                </h4>
-                <div className="space-y-2 bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
+                <Clock className="w-4 h-4 text-amber-500 shrink-0" />
+                <span className="whitespace-nowrap">Prorrogações ({prorrogacoesPA.length})</span>
+              </div>
+              {prorrogacoesPA.length === 0 ? (
+                <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                  Nenhuma prorrogação registrada.
+                </div>
+              ) : (
+                <div className="space-y-2">
                   {prorrogacoesPA.map((item, index) => (
-                    <div key={`${item.doc || "sem-doc"}-${item.em || index}`} className="text-sm text-amber-900 bg-white border border-amber-100 rounded p-3">
-                      <div className="font-semibold">{item.doc || "Documento não informado"}</div>
+                    <div key={`${item.doc || "sem-doc"}-${item.em || index}`} className="rounded-xl border border-amber-200 bg-amber-50 shadow-sm p-3">
+                      <div className="text-sm font-semibold text-amber-900 break-words">{item.doc || "Documento não informado"}</div>
                       <div className="text-xs text-amber-800 mt-1">
                         Início: {formatarData(item.inicio)} | Fim: {formatarData(item.fim)} | +{item.dias ?? "?"} dias
                         {item.por ? ` | Por: ${item.por}` : ""}
@@ -348,24 +416,127 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                     </div>
                   ))}
                 </div>
-              </div>
-            </>
-          )}
+              )}
+            </div>
 
-          {processo.aditamentoNumero && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-bold text-indigo-800 uppercase tracking-wide mb-3">Publicação do Aditamento</h4>
-                <div className="text-sm text-indigo-900 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                  <div className="font-semibold">{processo.aditamentoNumero}</div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
+                <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span className="whitespace-nowrap">Publicação do Aditamento</span>
+              </div>
+              {processo.aditamentoNumero ? (
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50 shadow-sm p-3">
+                  <div className="text-sm font-semibold text-indigo-900 break-words">{processo.aditamentoNumero}</div>
                   {processo.aditamentoData && (
                     <div className="text-xs text-indigo-800 mt-1">Publicado em: {formatarData(processo.aditamentoData)}</div>
                   )}
                 </div>
+              ) : (
+                <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                  Nenhum aditamento registrado.
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2 pt-2 border-t border-slate-100">
+                <FileText className="w-4 h-4 text-sky-500 shrink-0" />
+                <span className="whitespace-nowrap">Documentos</span>
               </div>
-            </>
-          )}
+              <div className="flex items-center gap-1.5 mb-2">
+                {editandoDocumentos ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => {
+                        setEditandoDocumentos(false);
+                        setDocumentosEdit(
+                          Array.isArray(processo.documentosRegistrados)
+                            ? processo.documentosRegistrados.map((d) => ({ numero: d.numero || "", data: d.data || "" }))
+                            : [],
+                        );
+                      }}
+                      disabled={savingDocumentos}
+                    >
+                      <X className="w-3 h-3 mr-1" /> Cancelar
+                    </Button>
+                    <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={handleSalvarDocumentos} disabled={savingDocumentos}>
+                      <Save className="w-3 h-3 mr-1" /> {savingDocumentos ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setEditandoDocumentos(true)}>
+                    <Pencil className="w-3 h-3 mr-1" /> Editar
+                  </Button>
+                )}
+              </div>
+
+              {editandoDocumentos ? (
+                <div className="space-y-3">
+                  {documentosEdit.length === 0 && (
+                    <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                      Nenhum documento cadastrado. Clique em "Adicionar Documento".
+                    </div>
+                  )}
+                  {documentosEdit.map((item, idx) => (
+                    <div key={idx} className="p-3 border border-slate-200 bg-slate-50 rounded-lg relative shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => removerDocumento(idx)}
+                        className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors"
+                        title="Remover documento"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <div className="space-y-2.5 pr-6">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Número</label>
+                          <Input
+                            value={item.numero}
+                            onChange={(e) => atualizarDocumento(idx, "numero", e.target.value)}
+                            placeholder="Ex: DIEx nº 123..."
+                            className="h-8 text-xs mt-0.5"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data</label>
+                          <Input
+                            type="date"
+                            value={item.data}
+                            onChange={(e) => atualizarDocumento(idx, "data", e.target.value)}
+                            className="h-8 text-xs mt-0.5"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={adicionarDocumento}
+                    className="w-full text-xs h-8 border-dashed border-slate-300 text-slate-500 hover:text-slate-800"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Documento
+                  </Button>
+                </div>
+              ) : Array.isArray(processo.documentosRegistrados) && processo.documentosRegistrados.length > 0 ? (
+                <div className="space-y-2">
+                  {processo.documentosRegistrados.map((docItem, idx) => (
+                    <div key={`${docItem.numero}-${idx}`} className="rounded-xl border border-slate-200 bg-white shadow-sm p-3">
+                      <div className="text-sm font-semibold text-slate-800 break-words">{docItem.numero}</div>
+                      {docItem.data && <div className="text-xs text-slate-500 mt-1">Registrado em: {formatarData(docItem.data)}</div>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                  Nenhum documento registrado.
+                </div>
+              )}
+            </div>
+          </div>
 
           {processo.observacoes && (
             <>
