@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import type { Processo, StatusProcesso, TipoProcesso, FiltroPrazo } from "@/types/processo";
 import { AssessorGroup } from "./AssessorGroup";
-import { ChefeGroup } from "./ChefeGroup";
 import {
   DndContext,
   DragOverlay,
@@ -41,9 +40,9 @@ interface Props {
 }
 
 // Coluna "Aguardando Distribuição" — mesmos moldes/características do DU:
-// processos sem responsável e sem pendência de chefia, aguardando a chefia
-// indicar um assessor. Diferente de "MESA DO CHEFE", que fica reservada para
-// pendências genuínas de chefia (assinatura/decisão).
+// processos sem responsável, aguardando a chefia indicar um assessor.
+// V9.9 — também recebe o que antes ia para "Mesa do Chefe" (removida de PA
+// por enquanto): pendências de chefia sem assessor nomeado.
 const PA_COLUNA_AGUARDANDO_DISTRIBUICAO = "📥 Aguardando Distribuicao";
 
 // V5.2 — Classificação universal das abas PA para todos os motores.
@@ -165,12 +164,11 @@ export function MesaPA({
     const responsavelAnterior = processoAtual?.responsavel || "";
 
     if (onRedistribuir) {
-      // Soltar em "Aguardando Distribuição" ou "MESA DO CHEFE" limpa o responsável
-      // (mesmo comportamento do DU) — essas colunas não são nomes de assessor.
+      // Soltar em "Aguardando Distribuição" limpa o responsável (mesmo
+      // comportamento do DU) — essa coluna não é nome de assessor.
       const responsavelFinal =
         novoResponsavel === ""
         || novoResponsavel === PA_COLUNA_AGUARDANDO_DISTRIBUICAO
-        || novoResponsavel === "MESA DO CHEFE"
           ? ""
           : novoResponsavel;
 
@@ -290,6 +288,22 @@ export function MesaPA({
     return { emAndamento, portaria: null, atrasado };
   }, [paColunaLabelPorId]);
 
+  // V9.8 — Coluna de tipo para processos CONCLUÍDOS. Diferente de
+  // `classificarPA` (que só resolve a coluna de processos ativos, e nem
+  // sempre chega a esse ponto para finalizados — ver early-return acima),
+  // esta função classifica pelo tipoPA puro, sem olhar a situação do fluxo,
+  // e inclui Investigação Preliminar/Outros (coluna "outros"), que não tem
+  // coluna de ativos própria mas passa a ter uma aba de Concluídos.
+  const obterColunaConcluidosPorTipo = useCallback((tipoNorm: string): string | null => {
+    if (tipoNorm.includes("conselho")) return paColunaLabelPorId.get("conselho") || "⚖ Conselhos";
+    if (tipoNorm.includes("ipm")) return paColunaLabelPorId.get("ipm") || "📘 IPM";
+    if (tipoNorm.includes("sindic")) return paColunaLabelPorId.get("sindicancia") || "📗 Sindicancias";
+    if (tipoNorm.includes("investigacao preliminar") || tipoNorm === "outros") {
+      return paColunaLabelPorId.get("outros") || "📄 Outros Processos";
+    }
+    return null;
+  }, [paColunaLabelPorId]);
+
   const grupos = useMemo(() => {
     // V6.2 — Blindagem contra documentos legados: usar ambos os campos para
     // classificar ativos/concluídos. `finalizado` pode estar ausente (undefined)
@@ -308,6 +322,7 @@ export function MesaPA({
 
     const colunaPAEmAndamentoPorId = new Map<string, string | null>();
     const colunaPAPortariaAssinadaPorId = new Map<string, string | null>();
+    const colunaConcluidosPorId = new Map<string, string | null>();
     const isPAAtrasadoPorId = new Map<string, boolean>();
 
     for (const p of processosEfetivos) {
@@ -320,6 +335,7 @@ export function MesaPA({
       const { emAndamento, portaria, atrasado } = classificarPA(p, tipoPANorm);
       colunaPAEmAndamentoPorId.set(p.id, emAndamento);
       colunaPAPortariaAssinadaPorId.set(p.id, portaria);
+      colunaConcluidosPorId.set(p.id, obterColunaConcluidosPorTipo(tipoPANorm));
       isPAAtrasadoPorId.set(p.id, atrasado);
     }
 
@@ -348,7 +364,6 @@ export function MesaPA({
     };
 
     paColunaLabels.forEach(garantirChave);
-    garantirChave("MESA DO CHEFE");
     garantirChave(PA_COLUNA_AGUARDANDO_DISTRIBUICAO);
     assessores.forEach((assessor) => {
       const nomeAssessor = String(assessor.nome || "").trim();
@@ -406,31 +421,15 @@ export function MesaPA({
         return;
       }
 
-      // V5.2 — Sem coluna do tipo (ex.: Investigação Preliminar): usa coluna do
-      // assessor mas respeita a aba (Portaria Assinada / Em Atraso).
-      // Sem responsável: pendência genuína de chefia (assinatura/decisão) vai
-      // para MESA DO CHEFE; sem pendência de chefia vai para Aguardando
-      // Distribuição (mesmos moldes do DU — aguardando indicação de assessor).
-      const situacaoIP = normalizarSituacao(p.situacaoFluxoIP);
-      const situacaoPA = normalizarSituacao(p.situacaoFluxoPA);
-      const situacaoConselho = normalizarSituacao(p.situacaoFluxoConselho);
-      const portariaSemColuna =
-        situacaoIP === "NA_CHEFIA"
-        || situacaoPA === "ASSINANDO_PORTARIA"
-        || situacaoPA === "AGUARDANDO_ENTREGA"
-        || situacaoConselho === "ASSINANDO_PORTARIA";
-
+      // V9.9 — Sem coluna do tipo (ex.: Investigação Preliminar) e sem
+      // assessor: tudo (pendência de chefia ou não) vai para "Aguardando
+      // Distribuição" — "Mesa do Chefe" foi removida de PA por enquanto.
       const responsavelBruto = String(p.responsavel || "").trim();
-      const responsavelNormalizado =
-        responsavelBruto || (portariaSemColuna ? "MESA DO CHEFE" : PA_COLUNA_AGUARDANDO_DISTRIBUICAO);
+      const responsavelNormalizado = responsavelBruto || PA_COLUNA_AGUARDANDO_DISTRIBUICAO;
       garantirChave(responsavelNormalizado);
 
-      if (portariaSemColuna) {
-        mapPortariaAssinada.get(responsavelNormalizado)!.push(p);
-        return;
-      }
-      // "Aguardando Distribuição"/"MESA DO CHEFE" só têm a aba "Em Andamento"
-      // (ver AssessorGroup — colunas de transição não exibem aba "Atrasado"),
+      // "Aguardando Distribuição" só tem a aba "Em Andamento" (ver
+      // AssessorGroup — colunas de transição não exibem aba "Atrasado"),
       // então um processo vencido ali precisa permanecer em itensAtivos ou
       // desaparece da tela. O desvio para o bucket de atrasados só faz
       // sentido para colunas de assessor nomeado (que têm aba própria).
@@ -450,10 +449,14 @@ export function MesaPA({
         mapAssessorConcluidos.get(responsavelAssessor)!.push(p);
       }
 
-      const colunaEspecialPA = colunaPAEmAndamentoPorId.get(p.id) || null;
-      if (colunaEspecialPA) {
-        garantirChave(colunaEspecialPA);
-        mapConcluidos.get(colunaEspecialPA)!.push(p);
+      // V9.8 — Redistribui pelo TIPO DE PROCESSO concluído (Sindicância/IPM/
+      // Conselho/Outros), não mais pelo bucket do assessor responsável —
+      // `colunaConcluidosPorId` classifica pelo tipoPA puro (diferente de
+      // `colunaPAEmAndamentoPorId`, que fica null para tudo que é finalizado).
+      const colunaTipoConcluido = colunaConcluidosPorId.get(p.id) || null;
+      if (colunaTipoConcluido) {
+        garantirChave(colunaTipoConcluido);
+        mapConcluidos.get(colunaTipoConcluido)!.push(p);
         return;
       }
 
@@ -485,7 +488,7 @@ export function MesaPA({
         if (paColunaLabelSet.has(nome)) {
           return true;
         }
-        if (nome === "MESA DO CHEFE" || nome === PA_COLUNA_AGUARDANDO_DISTRIBUICAO) {
+        if (nome === PA_COLUNA_AGUARDANDO_DISTRIBUICAO) {
           return true;
         }
         if (nomesAssessoresSet.has(nome)) {
@@ -505,7 +508,7 @@ export function MesaPA({
       });
 
     return assessoresOrdenados;
-  }, [processosEfetivos, paColunaLabels, paColunaLabelSet, assessores, classificarPA]);
+  }, [processosEfetivos, paColunaLabels, paColunaLabelSet, assessores, classificarPA, obterColunaConcluidosPorTipo]);
 
   if (grupos.length === 0) {
     return (
@@ -515,17 +518,15 @@ export function MesaPA({
     );
   }
 
-  // Mesa do Chefe abre a linha (antes das colunas de tipo); Aguardando
-  // Distribuição fecha a linha, exatamente como fica em DU (última coluna
-  // à direita).
-  const colunaPAMesaChefe = grupos.find((a) => a.nome === "MESA DO CHEFE");
+  // V9.9 — "Mesa do Chefe" removida de PA (sem pendência de chefia separada
+  // por enquanto): tudo que caía lá agora vai para "Aguardando Distribuição",
+  // que fecha a linha, exatamente como fica em DU (última coluna à direita).
   const colunaPAAguardandoDistribuicao = grupos.find((a) => a.nome === PA_COLUNA_AGUARDANDO_DISTRIBUICAO);
 
   const colunasPAEmAndamento = grupos.filter((a) => paColunaLabelSet.has(a.nome));
   const colunasPAAssessores = grupos.filter(
     (a) =>
       !paColunaLabelSet.has(a.nome)
-      && a.nome !== "MESA DO CHEFE"
       && a.nome !== PA_COLUNA_AGUARDANDO_DISTRIBUICAO,
   );
 
@@ -547,28 +548,6 @@ export function MesaPA({
         </div>
         <div className="space-y-4">
           <div className="flex gap-4 overflow-x-auto pb-1 -mx-4 px-4 lg:mx-0 lg:px-0 snap-x snap-mandatory lg:snap-none scrollbar-thin">
-            {colunaPAMesaChefe && (
-              <ChefeGroup
-                key={`PA-chefe-${colunaPAMesaChefe.nome}`}
-                responsavel={colunaPAMesaChefe.nome}
-                tipo="PA"
-                processos={[
-                  ...colunaPAMesaChefe.itensAtivos,
-                  ...colunaPAMesaChefe.itensAtrasados,
-                  ...colunaPAMesaChefe.itensConcluidos,
-                  ...colunaPAMesaChefe.itensPortariaAssinada,
-                ]}
-                ehAdmin={ehAdmin}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onMove={onMove}
-                onReativarProcesso={onReativarProcesso}
-                siteSettings={siteSettings}
-                unreadProcessIds={unreadProcessIds}
-                onReadProcess={onReadProcess}
-                mapaCoresAssessores={mapaCoresAssessores}
-              />
-            )}
             {colunasPAEmAndamento.map((a) => (
               <AssessorGroup
                 key={`PA-${a.nome}`}
@@ -578,6 +557,7 @@ export function MesaPA({
                 processosPortariaAssinada={a.itensPortariaAssinada}
                 processosAtrasados={a.itensAtrasados}
                 processosConcluidos={a.itensConcluidos}
+                apenasAbaConcluidos={a.nome === (paColunaLabelPorId.get("outros") || "📄 Outros Processos")}
                 ehAdmin={ehAdmin}
                 onEdit={onEdit}
                 onDelete={onDelete}

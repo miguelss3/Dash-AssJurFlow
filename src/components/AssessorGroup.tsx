@@ -36,11 +36,12 @@ interface Props {
    */
   vistaAssessor?: boolean;
   /**
-   * V9.7 — Quando `false`, oculta a aba "Finalizados" (scope PA). Usado nas
-   * colunas por tipo (Sindicâncias/IPM/Conselhos), onde a aba é redundante:
-   * o processo finalizado já aparece na aba "Concluídos" da Mesa do Assessor.
+   * V9.8 — Quando `true`, a coluna mostra só a aba "Concluídos" (sem "No
+   * Prazo"/"Em Atraso"/"Portaria Assinada"). Usado na coluna PA "Outros
+   * Processos" (Investigação Preliminar/Outros): esses tipos não têm
+   * portaria nem prazo regulamentar, só a lista de concluídos por tipo.
    */
-  mostrarAbaFinalizados?: boolean;
+  apenasAbaConcluidos?: boolean;
   /**
    * V4.2 — Data de retorno (YYYY-MM-DD) quando este assessor está de férias
    * hoje. Bloqueia visualmente a coluna (cadeado + selo âmbar) e desativa o
@@ -50,8 +51,8 @@ interface Props {
   emFeriasAte?: string;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca, mapaCoresAssessores = {}, vistaAssessor = false, mostrarAbaFinalizados = true, emFeriasAte }: Props) {
-  const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">("andamento");
+export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca, mapaCoresAssessores = {}, vistaAssessor = false, apenasAbaConcluidos = false, emFeriasAte }: Props) {
+  const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">(apenasAbaConcluidos ? "concluidos" : "andamento");
   const corColuna = mapaCoresAssessores[(responsavel || "").trim()];
 
   useEffect(() => {
@@ -156,12 +157,18 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
       return [{ id: "andamento", scope: "DU", label: "Em Andamento", order: 1, enabled: true }];
     }
 
+    if (apenasAbaConcluidos) {
+      return [{ id: "concluidos", scope: "PA", label: "Concluídos", order: 1, enabled: true }];
+    }
+
     if (vistaAssessor) {
-      // Mesa do Assessor: "Em Andamento", "Atrasado" e "Concluídos".
+      // V9.9 — Mesa do Assessor PA: só "Em Andamento" e "Atrasado". A aba
+      // "Concluídos" por assessor saiu daqui — concluídos agora aparecem
+      // agrupados por TIPO (Sindicância/IPM/Conselho/Outros), não por quem
+      // tocou o processo.
       return [
         { id: "andamento", scope: "PA", label: "Em Andamento", order: 1, enabled: true },
         { id: "atraso", scope: "PA", label: "Atrasado", order: 2, enabled: true },
-        { id: "concluidos", scope: "PA", label: "Concluídos", order: 3, enabled: true },
       ];
     }
 
@@ -180,7 +187,6 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     const lista = base
       .filter((item) => item.scope === scope)
       .filter((item) => item.id !== "portaria_assinada" || mostrarAbaPortariaAssinada)
-      .filter((item) => item.id !== "concluidos" || mostrarAbaFinalizados)
       .filter((item) => item.enabled !== false)
       .sort((a, b) => a.order - b.order)
       .map((item) => ({
@@ -191,11 +197,10 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     const fallback = DEFAULT_COLUMN_TABS
       .filter((item) => item.scope === scope)
       .filter((item) => item.id !== "portaria_assinada" || mostrarAbaPortariaAssinada)
-      .filter((item) => item.id !== "concluidos" || mostrarAbaFinalizados)
       .sort((a, b) => a.order - b.order);
 
     return lista.length > 0 ? lista : fallback;
-  }, [isAguardandoRespostaDU, mostrarAbaFinalizados, mostrarAbaPortariaAssinada, responsavel, siteSettings?.columnTabs, tipo, vistaAssessor]);
+  }, [apenasAbaConcluidos, isAguardandoRespostaDU, mostrarAbaPortariaAssinada, responsavel, siteSettings?.columnTabs, tipo, vistaAssessor]);
 
   const abaAtiva = useMemo(() => {
     const existe = abasConfiguradas.some((item) => item.id === aba);
@@ -370,7 +375,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
                 ? isAguardandoRespostaDU
                   ? "Sem processos vencidos"
                   : "Sem processos em atraso"
-                : "Sem processos finalizados"}
+                : "Sem processos concluídos"}
           </div>
         ) : (
           processosDaAbaAtiva.map((p) => (

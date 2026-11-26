@@ -15,7 +15,7 @@ export interface ProcessualDeadlineSettings {
   prazoToleranciaConselhoDias: number;
 }
 
-export type PAInProgressColumnId = "sindicancia" | "ipm" | "conselho";
+export type PAInProgressColumnId = "sindicancia" | "ipm" | "conselho" | "outros";
 
 export interface PAInProgressColumnSetting {
   id: PAInProgressColumnId;
@@ -170,6 +170,12 @@ export const DEFAULT_PA_EM_ANDAMENTO_COLUMNS: PAInProgressColumnSetting[] = [
     label: "⚖ Conselhos",
     enabled: true,
     order: 30,
+  },
+  {
+    id: "outros",
+    label: "📄 Outros Processos",
+    enabled: true,
+    order: 40,
   },
 ];
 
@@ -455,7 +461,7 @@ export function normalizarPAEmAndamentoColumns(
   const fallbackPorId = new Map<PAInProgressColumnId, PAInProgressColumnSetting>(
     fallback.map((item) => [item.id, item]),
   );
-  const idsValidos = new Set<PAInProgressColumnId>(["sindicancia", "ipm", "conselho"]);
+  const idsValidos = new Set<PAInProgressColumnId>(["sindicancia", "ipm", "conselho", "outros"]);
 
   if (!Array.isArray(value)) {
     return [...fallback].sort((a, b) => a.order - b.order);
@@ -490,7 +496,7 @@ export function normalizarPAEmAndamentoColumns(
     }
   });
 
-  const idsPadrao: PAInProgressColumnId[] = ["sindicancia", "ipm", "conselho"];
+  const idsPadrao: PAInProgressColumnId[] = ["sindicancia", "ipm", "conselho", "outros"];
   idsPadrao.forEach((id, index) => {
     if (!unicasPorId.has(id)) {
       const base = fallbackPorId.get(id) || fallback[index];
@@ -612,7 +618,12 @@ export function normalizarColumnTabs(
       if (scope === "DU" && (id === "atraso" || id === "portaria_assinada")) return null;
 
       const fallbackItem = fallbackMap.get(`${scope}:${id}`);
-      const label = String(base.label || "").trim() || fallbackItem?.label || id;
+      // V9.8 — "Concluídos" (scope PA) é um nome fixo, não configurável pelo
+      // admin: ignora qualquer label antigo salvo (ex.: "Finalizados") para
+      // evitar que uma configuração legada sobreviva ao rename.
+      const label = scope === "PA" && id === "concluidos"
+        ? "Concluídos"
+        : (String(base.label || "").trim() || fallbackItem?.label || id);
       const enabled = base.enabled !== false;
       const order = Number.isFinite(Number(base.order)) ? Number(base.order) : (index + 1) * 10;
 
