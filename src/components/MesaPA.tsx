@@ -323,6 +323,7 @@ export function MesaPA({
 
     const colunaPAEmAndamentoPorId = new Map<string, string | null>();
     const colunaPAPortariaAssinadaPorId = new Map<string, string | null>();
+    const colunaPAAguardandoAssinaturaSolucaoPorId = new Map<string, string | null>();
     const colunaConcluidosPorId = new Map<string, string | null>();
     const isPAAtrasadoPorId = new Map<string, boolean>();
 
@@ -333,15 +334,17 @@ export function MesaPA({
         .replace(/[\u0300-\u036f]/g, "")
         .toLowerCase();
 
-      const { emAndamento, portaria, atrasado } = classificarPA(p, tipoPANorm);
+      const { emAndamento, portaria, aguardandoAssinaturaSolucao, atrasado } = classificarPA(p, tipoPANorm);
       colunaPAEmAndamentoPorId.set(p.id, emAndamento);
       colunaPAPortariaAssinadaPorId.set(p.id, portaria);
+      colunaPAAguardandoAssinaturaSolucaoPorId.set(p.id, aguardandoAssinaturaSolucao);
       colunaConcluidosPorId.set(p.id, obterColunaConcluidosPorTipo(tipoPANorm));
       isPAAtrasadoPorId.set(p.id, atrasado);
     }
 
     const mapAtivos = new Map<string, Processo[]>();
     const mapPortariaAssinada = new Map<string, Processo[]>();
+    const mapAguardandoAssinaturaSolucao = new Map<string, Processo[]>();
     const mapAtrasados = new Map<string, Processo[]>();
     const mapConcluidos = new Map<string, Processo[]>();
 
@@ -357,6 +360,7 @@ export function MesaPA({
     const garantirChave = (chave: string) => {
       if (!mapAtivos.has(chave)) mapAtivos.set(chave, []);
       if (!mapPortariaAssinada.has(chave)) mapPortariaAssinada.set(chave, []);
+      if (!mapAguardandoAssinaturaSolucao.has(chave)) mapAguardandoAssinaturaSolucao.set(chave, []);
       if (!mapAtrasados.has(chave)) mapAtrasados.set(chave, []);
       if (!mapConcluidos.has(chave)) mapConcluidos.set(chave, []);
       if (!mapAssessorAtivos.has(chave)) mapAssessorAtivos.set(chave, []);
@@ -379,6 +383,7 @@ export function MesaPA({
 
       const colunaPortariaAssinadaPA = colunaPAPortariaAssinadaPorId.get(p.id) || null;
       const colunaEspecialPA = colunaPAEmAndamentoPorId.get(p.id) || null;
+      const colunaAguardandoAssinaturaSolucaoPA = colunaPAAguardandoAssinaturaSolucaoPorId.get(p.id) || null;
       // V6.5 — "Bloquear Mesa do Assessor" (COM_ENCARREGADO etc.) só faz
       // sentido quando existe uma coluna de tipo (Sindicância/IPM/Conselho)
       // para o processo cair em seu lugar. Para Investigação Preliminar/Outros
@@ -386,7 +391,7 @@ export function MesaPA({
       // dashboard: ele era excluído da Mesa do Assessor (bloqueado) e também
       // não aparecia em nenhuma coluna de tipo (não existe), pois a coluna do
       // assessor nomeado só exibe o total vindo de mapAssessorAtivos/Atrasados.
-      const temColunaDeTipo = Boolean(colunaPortariaAssinadaPA || colunaEspecialPA);
+      const temColunaDeTipo = Boolean(colunaPortariaAssinadaPA || colunaEspecialPA || colunaAguardandoAssinaturaSolucaoPA);
 
       const bloquearMesaAssessorPA =
         temColunaDeTipo && (
@@ -394,6 +399,9 @@ export function MesaPA({
           sitPA === "ASSINANDO_PORTARIA" ||
           sitPA === "AGUARDANDO_ENTREGA" ||
           sitPA === "AGUARDANDO_PRAZO" ||
+          // V9.13 — Solução despachada para assinatura: sai da Mesa do
+          // Assessor, fica só na aba "Solução Aguardando Assinatura".
+          sitPA === "ASSINANDO_SOLUCAO" ||
           sitConselho === "COM_CONSELHO" ||
           sitLegado === "EM_CURSO" ||
           sitLegado === "C_EM_CURSO" ||
@@ -410,6 +418,11 @@ export function MesaPA({
 
       if (colunaPortariaAssinadaPA) {
         mapPortariaAssinada.get(colunaPortariaAssinadaPA)!.push(p);
+        return;
+      }
+
+      if (colunaAguardandoAssinaturaSolucaoPA) {
+        mapAguardandoAssinaturaSolucao.get(colunaAguardandoAssinaturaSolucaoPA)!.push(p);
         return;
       }
 
@@ -478,6 +491,7 @@ export function MesaPA({
         nome,
         itensAtivos: mapAtivos.get(nome) || [],
         itensPortariaAssinada: mapPortariaAssinada.get(nome) || [],
+        itensAguardandoAssinaturaSolucao: mapAguardandoAssinaturaSolucao.get(nome) || [],
         itensAtrasados: mapAtrasados.get(nome) || [],
         itensConcluidos: mapConcluidos.get(nome) || [],
         // V6.4 — Conjunto completo por responsável para a Mesa do Assessor.
@@ -556,6 +570,7 @@ export function MesaPA({
                 tipo="PA"
                 processos={a.itensAtivos}
                 processosPortariaAssinada={a.itensPortariaAssinada}
+                processosAguardandoAssinaturaSolucao={a.itensAguardandoAssinaturaSolucao}
                 processosAtrasados={a.itensAtrasados}
                 processosConcluidos={a.itensConcluidos}
                 apenasAbaConcluidos={a.nome === (paColunaLabelPorId.get("outros") || "📄 Outros Processos")}

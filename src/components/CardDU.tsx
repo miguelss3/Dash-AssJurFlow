@@ -63,6 +63,8 @@ interface CardDUProps {
   naoLido?: boolean;
   onMarcarComoLido?: (processoId: string) => void;
   corDestaque?: string;
+  /** V9.15 — não usado em CardDU; aceito só para compat com CardComponente (AssessorGroup). */
+  dentroDaMesaDoAssessor?: boolean;
 }
 
 const CardDUComponent = ({

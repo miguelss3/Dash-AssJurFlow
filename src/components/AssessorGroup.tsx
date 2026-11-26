@@ -14,6 +14,8 @@ interface Props {
   tipo: TipoProcesso;
   processos: Processo[];
   processosPortariaAssinada?: Processo[];
+  /** V9.13 — Soluções de PA despachadas para assinatura (aba própria, 2ª linha). */
+  processosAguardandoAssinaturaSolucao?: Processo[];
   processosAtrasados?: Processo[];
   processosConcluidos?: Processo[];
   ehAdmin?: boolean;
@@ -57,8 +59,8 @@ interface Props {
   emFeriasAte?: string;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca, mapaCoresAssessores = {}, vistaAssessor = false, apenasAbaConcluidos = false, ordenarColunaPorNumero = false, emFeriasAte }: Props) {
-  const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">(apenasAbaConcluidos ? "concluidos" : "andamento");
+export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAguardandoAssinaturaSolucao = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca, mapaCoresAssessores = {}, vistaAssessor = false, apenasAbaConcluidos = false, ordenarColunaPorNumero = false, emFeriasAte }: Props) {
+  const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "solucao_parecer" | "atraso" | "assinando_solucao" | "concluidos">(apenasAbaConcluidos ? "concluidos" : "andamento");
   const corColuna = mapaCoresAssessores[(responsavel || "").trim()];
 
   useEffect(() => {
@@ -162,13 +164,6 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     return ordenarColunaPorNumero ? ordenarPorNumero(processosAtrasados) : ordenarPorPrazo(processosAtrasados);
   }, [processosAtrasados, ordenarColunaPorNumero]);
 
-  const processosDaAba = aba === "portaria_assinada"
-    ? (ordenarColunaPorNumero ? ordenarPorNumero(processosPortariaAssinada) : processosPortariaAssinada)
-    : aba === "andamento"
-      ? processosAtivosOrdenados
-      : aba === "atraso"
-        ? processosAtrasadosOrdenados
-        : (ordenarColunaPorNumero ? ordenarPorNumero(processosConcluidos) : processosConcluidos);
 
   const abasConfiguradas = useMemo(() => {
     const nomeNormalizado = responsavel.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -185,13 +180,19 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     }
 
     if (vistaAssessor) {
-      // V9.9 — Mesa do Assessor PA: só "Em Andamento" e "Atrasado". A aba
-      // "Concluídos" por assessor saiu daqui — concluídos agora aparecem
-      // agrupados por TIPO (Sindicância/IPM/Conselho/Outros), não por quem
-      // tocou o processo.
+      // V9.9 — "Concluídos" por assessor saiu daqui — concluídos agora
+      // aparecem agrupados por TIPO (Sindicância/IPM/Conselho/Outros), não
+      // por quem tocou o processo.
+      // V9.16 — "Em Andamento" virou "Mesa do Assessor": só processos
+      // recém-distribuídos, sem nenhuma ação ainda (tag "Mesa do Assessor").
+      // "Solução/Parecer" é nova: processos com a tag "Fazendo Solução/
+      // Parecer" (já com o encarregado ou mais, agora redigindo o parecer
+      // final) — some daqui e some para "Atrasado" se o prazo da solução
+      // vencer.
       return [
-        { id: "andamento", scope: "PA", label: "Em Andamento", order: 1, enabled: true },
-        { id: "atraso", scope: "PA", label: "Atrasado", order: 2, enabled: true },
+        { id: "andamento", scope: "PA", label: "Mesa do Assessor", order: 1, enabled: true },
+        { id: "solucao_parecer", scope: "PA", label: "Solução/Parecer", order: 2, enabled: true },
+        { id: "atraso", scope: "PA", label: "Atrasado", order: 3, enabled: true },
       ];
     }
 
@@ -290,6 +291,13 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     return isProcessoAtivo;
   };
 
+  // V9.16 — Processo com a tag "Fazendo Solução/Parecer": já passou pelo
+  // encarregado, assessor está redigindo o parecer final. Tem aba própria
+  // ("Solução/Parecer"), separada de "Mesa do Assessor" (recém-distribuído,
+  // nenhuma ação ainda).
+  const isFaseSolucaoPA = (processo: Processo) =>
+    normalizarSituacao(processo.situacaoFluxoPA) === "FAZENDO_SOLUCAO";
+
   const isProcessoAtrasadoPA = (processo: Processo) => {
     const prazoBase = processo.prazoFatal || processo.finalPrazo;
     return !!prazoBase && diasRestantes(prazoBase) < 0;
@@ -297,10 +305,11 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
 
   const getListaParaAba = (tabId: string): Processo[] => {
     if (!vistaAssessor) {
-      if (tabId === "portaria_assinada") return processosPortariaAssinada;
+      if (tabId === "portaria_assinada") return ordenarColunaPorNumero ? ordenarPorNumero(processosPortariaAssinada) : processosPortariaAssinada;
       if (tabId === "andamento") return processosAtivosOrdenados;
       if (tabId === "atraso") return processosAtrasadosOrdenados;
-      if (tabId === "concluidos") return processosConcluidos;
+      if (tabId === "assinando_solucao") return ordenarColunaPorNumero ? ordenarPorNumero(processosAguardandoAssinaturaSolucao) : processosAguardandoAssinaturaSolucao;
+      if (tabId === "concluidos") return ordenarColunaPorNumero ? ordenarPorNumero(processosConcluidos) : processosConcluidos;
       return [];
     }
 
@@ -326,10 +335,17 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     }
 
     if (tabId === "atraso") {
+      // Atrasado agrupa qualquer fase vencida (Mesa do Assessor ou Solução/Parecer).
       return ordenarPorPrazo(lista.filter((p) => isNaMesaDoAssessorPA(p) && isProcessoAtrasadoPA(p)));
     }
 
-    return ordenarPorPrazo(lista.filter((p) => isNaMesaDoAssessorPA(p) && !isProcessoAtrasadoPA(p)));
+    if (tabId === "solucao_parecer") {
+      return ordenarPorPrazo(lista.filter((p) => isNaMesaDoAssessorPA(p) && isFaseSolucaoPA(p) && !isProcessoAtrasadoPA(p)));
+    }
+
+    // "andamento" (Mesa do Assessor): recém-distribuído, nenhuma ação ainda —
+    // exclui quem já está em Solução/Parecer (tem aba própria) e atrasados.
+    return ordenarPorPrazo(lista.filter((p) => isNaMesaDoAssessorPA(p) && !isFaseSolucaoPA(p) && !isProcessoAtrasadoPA(p)));
   };
 
   const processosDaAbaAtiva = getListaParaAba(abaAtiva);
@@ -364,8 +380,16 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
           )}
         </div>
 
-        <div className="rounded-xl bg-muted p-1 gap-1 grid" style={{ gridTemplateColumns: `repeat(${Math.max(1, abasConfiguradas.length)}, minmax(0, 1fr))` }}>
-          {abasConfiguradas.map((tab) => {
+        {(() => {
+          // V9.14 — 2ª linha segue a ordem prática do fluxo: 1ª linha é a
+          // trilha "Portaria Assinada / No Prazo / Em Atraso" (o processo
+          // ainda tramitando); 2ª linha é "Solução para Assinatura /
+          // Concluídos" (já despachado/encerrado).
+          const idsLinha2 = new Set(["assinando_solucao", "concluidos"]);
+          const linha2 = abasConfiguradas.filter((tab) => idsLinha2.has(tab.id));
+          const linha1 = abasConfiguradas.filter((tab) => !idsLinha2.has(tab.id));
+
+          const renderTab = (tab: (typeof abasConfiguradas)[number]) => {
             // Conta exatamente o que será renderizado quando essa aba estiver ativa.
             const count = getListaParaAba(tab.id).length;
 
@@ -373,7 +397,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
               <button
                 key={`${responsavel}-${tab.id}`}
                 type="button"
-                onClick={() => setAba(tab.id as "portaria_assinada" | "andamento" | "atraso" | "concluidos")}
+                onClick={() => setAba(tab.id as "portaria_assinada" | "andamento" | "solucao_parecer" | "atraso" | "assinando_solucao" | "concluidos")}
                 className={`min-h-[52px] px-1.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors leading-tight ${
                   abaAtiva === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -382,8 +406,23 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
                 <span className="block mt-1 text-[11px]">({count})</span>
               </button>
             );
-          })}
-        </div>
+          };
+
+          return (
+            <div className="space-y-1">
+              {linha1.length > 0 && (
+                <div className="rounded-xl bg-muted p-1 gap-1 grid" style={{ gridTemplateColumns: `repeat(${linha1.length}, minmax(0, 1fr))` }}>
+                  {linha1.map(renderTab)}
+                </div>
+              )}
+              {linha2.length > 0 && (
+                <div className="rounded-xl bg-muted p-1 gap-1 grid" style={{ gridTemplateColumns: `repeat(${linha2.length}, minmax(0, 1fr))` }}>
+                  {linha2.map(renderTab)}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Lista */}
@@ -391,9 +430,11 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
         {processosDaAbaAtiva.length === 0 ? (
           <div className="rounded-2xl border-2 border-dashed border-border py-10 text-center text-xs text-muted-foreground/60 font-semibold">
             {abaAtiva === "andamento"
-              ? "Sem processos no prazo"
+              ? (vistaAssessor ? "Nenhum processo na mesa" : "Sem processos no prazo")
               : abaAtiva === "portaria_assinada"
                 ? "Sem portarias assinadas"
+              : abaAtiva === "solucao_parecer"
+                ? "Nenhuma solução/parecer em elaboração"
               : abaAtiva === "atraso"
                 ? isAguardandoRespostaDU
                   ? "Sem processos vencidos"
@@ -415,6 +456,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
               naoLido={!!unreadProcessIds?.has(p.id)}
               onMarcarComoLido={onReadProcess}
               corDestaque={mapaCoresAssessores[(p.responsavel || "").trim()]}
+              dentroDaMesaDoAssessor={vistaAssessor}
             />
           ))
         )}

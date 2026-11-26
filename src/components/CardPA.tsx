@@ -27,9 +27,10 @@ import {
   User,
   Calendar,
   AlertCircle,
+  Send,
 } from "lucide-react";
 import { toast } from "sonner";
-import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Timestamp } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes, nivelUrgenciaPA, foiConcluidoForaDoPrazo } from "@/lib/prazo";
@@ -78,6 +79,14 @@ interface CardPAProps {
   naoLido?: boolean;
   onMarcarComoLido?: (processoId: string) => void;
   corDestaque?: string;
+  /**
+   * V9.15 — Quando `true`, o card está sendo renderizado dentro da Mesa do
+   * Assessor (vistaAssessor). Os atalhos "Enviar Solução para Assinatura" e
+   * "Devolver para o Encarregado" só fazem sentido ali — nas colunas de tipo
+   * (Sindicância/IPM/Conselho), o mesmo processo em FAZENDO_SOLUCAO também
+   * aparece em "No Prazo"/"Em Atraso" (V9.11), mas ali é só leitura.
+   */
+  dentroDaMesaDoAssessor?: boolean;
 }
 
 const CardPAComponent = ({
@@ -94,6 +103,7 @@ const CardPAComponent = ({
   naoLido = false,
   onMarcarComoLido,
   corDestaque,
+  dentroDaMesaDoAssessor = false,
 }: CardPAProps) => {
   const p = processo || pAntigo!;
   const { user } = useAuth();
@@ -149,13 +159,18 @@ const CardPAComponent = ({
 
   const sitPA = normalizarSituacao(p.situacaoFluxoPA);
   const sitIP = normalizarSituacao(p.situacaoFluxoIP);
+  // V9.16 — "Fazendo Solução/Parecer" ganhou aba própria na Mesa do Assessor
+  // ("Solução/Parecer"), separada de "Mesa do Assessor" (onde ficam só os
+  // processos recém-distribuídos, sem nenhuma ação ainda) — a tag no card
+  // agora reflete exatamente em qual aba ele está.
   const badgeExibicaoPA =
-    sitIP === "MESA_ASSESSOR"
-    || sitPA === "FAZENDO_PORTARIA"
-    || sitPA === "FAZENDO_SOLUCAO"
-    || sitPA === "ASSINANDO_SOLUCAO"
-      ? "Mesa do Assessor"
-      : badgeSituacaoPA;
+    sitPA === "FAZENDO_SOLUCAO"
+      ? "Fazendo Solução/Parecer"
+      : sitIP === "MESA_ASSESSOR"
+        || sitPA === "FAZENDO_PORTARIA"
+        || sitPA === "ASSINANDO_SOLUCAO"
+          ? "Mesa do Assessor"
+          : badgeSituacaoPA;
 
   const [modalAcoesPA, setModalAcoesPA] = useState(false);
   const [modalDetalhes, setModalDetalhes] = useState(false);
@@ -166,6 +181,11 @@ const CardPAComponent = ({
   const [novoPrazoFatal, setNovoPrazoFatal] = useState("");
   const [reativando, setReativando] = useState(false);
   const [desfazendo, setDesfazendo] = useState(false);
+  const [enviandoSolucao, setEnviandoSolucao] = useState(false);
+  const [modalDevolverEncarregado, setModalDevolverEncarregado] = useState(false);
+  const [exposicaoMotivos, setExposicaoMotivos] = useState("");
+  const [novoPrazoInterno, setNovoPrazoInterno] = useState("");
+  const [devolvendoEncarregado, setDevolvendoEncarregado] = useState(false);
 
   const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
   const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
@@ -247,6 +267,96 @@ const CardPAComponent = ({
     }
   };
 
+  // V9.13 — Atalho direto no card: evita abrir o modal "Ação" só para
+  // despachar a solução pronta para assinatura da Chefia/Cmt. Mesma
+  // transição que o botão "Despachar Solução para Chefia" do AcoesPAModalV4.
+  const enviarSolucaoParaAssinatura = async () => {
+    try {
+      setEnviandoSolucao(true);
+      const processoRef = doc(db, "processos", p.id);
+      const textoMovimento = `Solução despachada para assinatura da Chefia/Cmt por ${autorMilitar}.`;
+      await updateDoc(processoRef, {
+        situacaoFluxoPA: "ASSINANDO_SOLUCAO",
+        // V9.15 — sem isto, "Último Movimento" no card continua mostrando o
+        // texto da transição anterior (ex.: "Sindicância recebida em..."),
+        // dando a impressão de que a solução ainda não foi enviada.
+        descricao: textoMovimento,
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+      });
+      await addDoc(collection(db, `processos/${p.id}/historico`), {
+        autor: autorMilitar,
+        autorId,
+        texto: textoMovimento,
+        timestamp: new Date().toISOString(),
+      });
+      toast.success("Solução enviada para assinatura.");
+    } catch (error) {
+      console.error("Erro ao enviar solução para assinatura:", error);
+      registrarErro("CardPA.enviarSolucaoParaAssinatura", error, { processoId: p.id });
+      toast.error("Não foi possível enviar a solução para assinatura.");
+    } finally {
+      setEnviandoSolucao(false);
+    }
+  };
+
+  const abrirDevolverEncarregado = () => {
+    setExposicaoMotivos("");
+    setNovoPrazoInterno("");
+    setModalDevolverEncarregado(true);
+  };
+
+  // V9.14 — Devolve o processo ao Encarregado (volta para COM_ENCARREGADO)
+  // quando o assessor, já com a solução em mãos, percebe que os autos
+  // precisam de mais apuração. Diferente de "Devolver para Correção"
+  // (rejeição da Chefia sobre uma solução já escrita): aqui quem devolve é o
+  // próprio assessor, antes de finalizar o parecer.
+  // Zera só o prazo INTERNO/de trabalho (`dataInicioPrazo`, que nesta fase
+  // guardava a data de recebimento dos autos para a solução) e registra o
+  // novo prazo combinado com o Encarregado no campo `prazo` (Interno) — não
+  // mexe em prazoFatal/finalPrazo/prazoFatalOverride ("Prazo Final"), que é
+  // o prazo regulamentar do PA e não deve mudar por causa disso.
+  const devolverParaEncarregado = async () => {
+    const motivo = exposicaoMotivos.trim();
+    if (!motivo) {
+      toast.error("Escreva a exposição de motivos.");
+      return;
+    }
+    if (!novoPrazoInterno) {
+      toast.error("Informe o novo prazo para o Encarregado.");
+      return;
+    }
+    try {
+      setDevolvendoEncarregado(true);
+      const processoRef = doc(db, "processos", p.id);
+      const textoMovimento = `Processo devolvido ao Encarregado por ${autorMilitar}. Exposição de Motivos: ${motivo} Novo prazo combinado: ${formatarData(novoPrazoInterno)}.`;
+      await updateDoc(processoRef, {
+        situacaoFluxoPA: "COM_ENCARREGADO",
+        dataInicioPrazo: null,
+        prazo: novoPrazoInterno,
+        descricao: textoMovimento,
+        atualizadoEm: Timestamp.now(),
+        atualizadoPorNome: autorMilitar,
+      });
+      await addDoc(collection(db, `processos/${p.id}/historico`), {
+        autor: autorMilitar,
+        autorId,
+        texto: textoMovimento,
+        timestamp: new Date().toISOString(),
+      });
+      toast.success("Processo devolvido ao Encarregado.");
+      setModalDevolverEncarregado(false);
+      setExposicaoMotivos("");
+      setNovoPrazoInterno("");
+    } catch (error) {
+      console.error("Erro ao devolver processo ao Encarregado:", error);
+      registrarErro("CardPA.devolverParaEncarregado", error, { processoId: p.id });
+      toast.error("Não foi possível devolver o processo ao Encarregado.");
+    } finally {
+      setDevolvendoEncarregado(false);
+    }
+  };
+
   const confirmarExclusao = () => {
     if (onDelete) {
       onDelete(p.id);
@@ -285,6 +395,11 @@ const CardPAComponent = ({
                 <Badge variant="outline" className="text-[10px] h-5 border-blue-300 text-blue-700 bg-blue-50">Processo reaberto</Badge>
               ) : (
                 <Badge variant="outline" className="text-[10px] h-5 border-amber-300 text-amber-800 bg-amber-50">{badgeExibicaoPA}</Badge>
+              )}
+              {sitPA === "FAZENDO_SOLUCAO" && p.prazoFatal && (
+                <Badge variant="outline" className="text-[10px] h-5 border-orange-300 text-orange-800 bg-orange-50">
+                  Prazo: {formatarData(p.prazoFatal)}
+                </Badge>
               )}
             </div>
           </div>
@@ -344,6 +459,28 @@ const CardPAComponent = ({
                 ))}
               </div>
             </div>
+          )}
+
+          {showActions && dentroDaMesaDoAssessor && p.situacaoFluxoPA === "FAZENDO_SOLUCAO" && (
+            <Button
+              size="sm"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 mt-1"
+              disabled={enviandoSolucao}
+              onClick={(e) => { e.stopPropagation(); marcarComoLido(); void enviarSolucaoParaAssinatura(); }}
+            >
+              <Send className="w-3 h-3 mr-1" /> {enviandoSolucao ? "Enviando..." : "Enviar Solução para Assinatura"}
+            </Button>
+          )}
+
+          {showActions && dentroDaMesaDoAssessor && p.situacaoFluxoPA === "FAZENDO_SOLUCAO" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full border-orange-300 text-orange-700 hover:bg-orange-50 text-xs h-9"
+              onClick={(e) => { e.stopPropagation(); marcarComoLido(); abrirDevolverEncarregado(); }}
+            >
+              <RotateCcw className="w-3 h-3 mr-1" /> Devolver para o Encarregado
+            </Button>
           )}
 
           {showActions && (
@@ -459,6 +596,46 @@ const CardPAComponent = ({
               <Button type="button" variant="outline" onClick={() => setModalReativar(false)} disabled={reativando}>Cancelar</Button>
               <Button type="button" onClick={reativarProcesso} disabled={reativando || !onReativarProcesso}>
                 {reativando ? "Reabrindo..." : "Confirmar Reabertura"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {modalDevolverEncarregado && (
+        <Dialog open={modalDevolverEncarregado} onOpenChange={setModalDevolverEncarregado}>
+          <DialogContent onClick={(e) => e.stopPropagation()}>
+            <DialogHeader>
+              <DialogTitle>Devolver Processo {p.numero} ao Encarregado</DialogTitle>
+              <DialogDescription>
+                Escreva a exposição de motivos e informe o novo prazo combinado com o Encarregado. O prazo final do PA não é alterado.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor={`exposicao-motivos-${p.id}`}>Exposição de Motivos *</Label>
+                <Textarea
+                  id={`exposicao-motivos-${p.id}`}
+                  value={exposicaoMotivos}
+                  onChange={(e) => setExposicaoMotivos(e.target.value)}
+                  placeholder="Descreva o que precisa ser revisto/complementado pelo Encarregado"
+                  rows={4}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`novo-prazo-interno-${p.id}`}>Novo prazo para o Encarregado *</Label>
+                <Input
+                  id={`novo-prazo-interno-${p.id}`}
+                  type="date"
+                  value={novoPrazoInterno}
+                  onChange={(e) => setNovoPrazoInterno(e.target.value)}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setModalDevolverEncarregado(false)} disabled={devolvendoEncarregado}>Cancelar</Button>
+              <Button type="button" onClick={() => void devolverParaEncarregado()} disabled={devolvendoEncarregado}>
+                {devolvendoEncarregado ? "Devolvendo..." : "Confirmar Devolução"}
               </Button>
             </DialogFooter>
           </DialogContent>

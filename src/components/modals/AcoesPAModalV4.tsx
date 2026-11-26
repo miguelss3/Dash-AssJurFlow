@@ -426,7 +426,10 @@ export function AcoesPAModalV4({
               onClick={() =>
                 void avancarFluxo(
                   "ASSINANDO_SOLUCAO",
-                  {},
+                  // V9.15 — grava também em `descricao` (não só no histórico),
+                  // senão "Último Movimento" no card continua preso ao texto
+                  // da transição anterior.
+                  { descricao: `Solução despachada para assinatura da Chefia/Cmt por ${autorMilitar}.` },
                   "Solução despachada para assinatura da Chefia/Cmt.",
                 )
               }
@@ -463,6 +466,7 @@ export function AcoesPAModalV4({
                       prazoFatal: null,
                       finalPrazo: null,
                       prazoFatalOverride: null,
+                      descricao: "Chefia/Cmt devolveu a Solução para correção. Prazo da solução zerado — aguardando novo prazo.",
                     },
                     "Chefia/Cmt devolveu a Solução para correção. Prazo da solução zerado — aguardando novo prazo.",
                   )

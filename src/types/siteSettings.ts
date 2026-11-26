@@ -231,7 +231,7 @@ export const DEFAULT_COLUMN_TABS: ColumnTabSetting[] = [
   },
   {
     id: "assinando_solucao",
-    label: "Solução Aguardando Assinatura",
+    label: "Solução para Assinatura",
     enabled: true,
     order: 25,
     scope: "PA",
