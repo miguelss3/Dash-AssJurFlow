@@ -250,13 +250,21 @@ export function MesaPA({
     }
 
     // 3. Verifica se é portaria assinada E trava (BLINDAGEM CONTRA DUPLA CONTAGEM)
+    // V9.30 — `situacaoFluxo` é o campo LEGADO, de antes da migração para
+    // `situacaoFluxoPA`. Nenhuma transição nova (COM_ENCARREGADO,
+    // FAZENDO_SOLUCAO, ASSINANDO_SOLUCAO...) o atualiza ou limpa — então um
+    // processo migrado que ainda carregue um valor antigo nesse campo
+    // (ex.: "AGUARDANDO_CHEFIA_SOLUCAO") ficava permanentemente preso em
+    // "Portaria Assinada" mesmo já tendo avançado bem além disso. Só confia
+    // nesse fallback legado quando `situacaoFluxoPA` está REALMENTE vazio
+    // (processo nunca migrado) — se há um valor novo, ele é que manda.
     const isPortariaAssinada =
       situacaoPA === "ASSINANDO_PORTARIA" ||
       situacaoPA === "AGUARDANDO_ENTREGA" ||
       situacaoPA === "AGUARDANDO_PRAZO" ||
       situacaoConselho === "ASSINANDO_PORTARIA" ||
       situacaoIP === "NA_CHEFIA" ||
-      PORTARIA_LEGADA.has(situacaoFluxo);
+      (!situacaoPA && PORTARIA_LEGADA.has(situacaoFluxo));
 
     if (isPortariaAssinada && colunaTipo) {
       return { emAndamento: null, portaria: colunaTipo, aguardandoAssinaturaSolucao: null, atrasado: false };
@@ -411,9 +419,12 @@ export function MesaPA({
           // Assessor, fica só na aba "Solução Aguardando Assinatura".
           sitPA === "ASSINANDO_SOLUCAO" ||
           sitConselho === "COM_CONSELHO" ||
-          sitLegado === "EM_CURSO" ||
-          sitLegado === "C_EM_CURSO" ||
-          sitLegado === "AGUARDANDO_PRAZO"
+          // V9.30 — mesmo cuidado do isPortariaAssinada: só confia no campo
+          // legado quando não há situacaoFluxoPA migrado, senão um valor
+          // antigo (ex.: "EM_CURSO" de antes da migração) bloqueia a Mesa do
+          // Assessor para sempre, mesmo o processo já tendo avançado (ex.:
+          // FAZENDO_PORTARIA) via o campo novo.
+          (!sitPA && (sitLegado === "EM_CURSO" || sitLegado === "C_EM_CURSO" || sitLegado === "AGUARDANDO_PRAZO"))
         );
 
       if (responsavelAssessor && !bloquearMesaAssessorPA) {

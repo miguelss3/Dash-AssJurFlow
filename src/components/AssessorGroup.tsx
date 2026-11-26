@@ -251,15 +251,20 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
         sitPA === "FAZENDO_SOLUCAO" ||
         sitPA === "ASSINANDO_SOLUCAO";
 
+      // V9.30 — mesmo cuidado de MesaPA.tsx: `situacaoFluxo` é campo legado,
+      // nunca atualizado pelas transições novas. Só confia nele quando não
+      // há `situacaoFluxoPA` migrado — senão um valor antigo (ex.: "EM_CURSO")
+      // bloqueia o processo da Mesa do Assessor para sempre, mesmo ele já
+      // tendo avançado (ex.: FAZENDO_SOLUCAO) pelo campo novo — foi o que
+      // fez o card sumir de vez (saiu de "Portaria Assinada" mas também não
+      // aparecia mais na Mesa do Assessor).
       const isComEncarregado =
         sitPA === "COM_ENCARREGADO" ||
         sitPA === "ASSINANDO_PORTARIA" ||
         sitPA === "AGUARDANDO_ENTREGA" ||
         sitPA === "AGUARDANDO_PRAZO" ||
         sitConselho === "COM_CONSELHO" ||
-        sitLegado === "EM_CURSO" ||
-        sitLegado === "C_EM_CURSO" ||
-        sitLegado === "AGUARDANDO_PRAZO";
+        (!sitPA && (sitLegado === "EM_CURSO" || sitLegado === "C_EM_CURSO" || sitLegado === "AGUARDANDO_PRAZO"));
 
       // Fallback para bases legadas/inconsistentes:
       // se já existe encarregado e há sinal de prazo correndo (início/prorrogação),
