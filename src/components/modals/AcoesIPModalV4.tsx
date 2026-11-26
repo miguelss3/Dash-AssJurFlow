@@ -32,6 +32,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
+import { formatarData } from "@/lib/prazo";
 import { Plus, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -306,7 +307,7 @@ export function AcoesIPModalV4({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{tipoPA} - {numeroProcesso}</DialogTitle>
           <DialogDescription className="sr-only">
@@ -328,8 +329,9 @@ export function AcoesIPModalV4({
           </div>
         ) : (
           <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Bloco 1 — Registro de Documentos */}
-            <div className={FORM_CONTAINER}>
+            <div className={`${FORM_CONTAINER} mb-0`}>
               <div className="flex items-center justify-between mb-3">
                 <h4 className="text-sm font-semibold text-slate-800">
                   Registro de Documentos
@@ -370,7 +372,7 @@ export function AcoesIPModalV4({
                       <div className="flex-1">
                         <div className="font-medium text-slate-800">{d.descricao}</div>
                         <div className="text-[11px] text-slate-500">
-                          {d.data} · {d.registradoPor}
+                          {d.data ? formatarData(d.data) : "—"} · {d.registradoPor}
                         </div>
                       </div>
                     </li>
@@ -446,7 +448,7 @@ export function AcoesIPModalV4({
             </div>
 
             {/* Bloco 2 — Anotações */}
-            <div className={FORM_CONTAINER}>
+            <div className={`${FORM_CONTAINER} mb-0 flex flex-col`}>
               <h4 className="text-sm font-semibold text-slate-800 mb-1">
                 Anotações
               </h4>
@@ -496,9 +498,10 @@ export function AcoesIPModalV4({
                 </div>
               )}
             </div>
+          </div>
 
             {/* Bloco 3 — Rodapé Ping-Pong */}
-            <div className={FORM_CONTAINER}>
+            <div className={`${FORM_CONTAINER} mt-4`}>
               {situacaoAtual === "MESA_ASSESSOR" && (
                 <div className="flex flex-col sm:flex-row gap-3">
                   <button

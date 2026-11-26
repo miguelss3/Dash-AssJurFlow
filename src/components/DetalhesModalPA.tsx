@@ -145,6 +145,12 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
   const emPrazoSolucao = sitPA === "FAZENDO_SOLUCAO" || sitPA === "ASSINANDO_SOLUCAO";
   const diasPrazoSolucao = processo.prazoFatal ? diasRestantes(processo.prazoFatal) : null;
 
+  // Investigação Preliminar e Outros seguem o motor IP (situacaoFluxoIP), que
+  // não tem portaria nem prazo regulamentar — dataInicioPrazo/prazoFatal nunca
+  // são preenchidos para esses tipos, então os campos de prazo não se aplicam.
+  const tipoPANorm = normalizarSituacao(processo.tipoPA);
+  const ehIPouOutrosPA = tipoPANorm === "INVESTIGACAO_PRELIMINAR" || tipoPANorm === "OUTROS";
+
   const formatarDataHoraSegura = (valor?: string | null) => {
     if (!valor) return "—";
     try {
@@ -177,7 +183,7 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <span className="text-xs font-bold px-2 py-1 rounded bg-purple-100 text-purple-700">PA</span>
@@ -197,13 +203,15 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                   {processo.prioridade === "urgente" ? "URGENTE" : "Normal"}
                 </Badge>
               )}
-              {processo.status && (
-                <Badge variant="outline">
-                  {processo.status === "concluido" && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                  {processo.status}
-                </Badge>
-              )}
-              <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300">
+              <Badge
+                variant="outline"
+                className={
+                  processo.status === "concluido"
+                    ? "bg-green-50 text-green-800 border-green-300"
+                    : "bg-amber-50 text-amber-800 border-amber-300"
+                }
+              >
+                {processo.status === "concluido" && <CheckCircle2 className="w-3 h-3 mr-1" />}
                 {badgeSituacaoPA}
               </Badge>
             </div>
@@ -221,85 +229,99 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Prazos e Datas</h4>
-                <div className="flex items-center gap-2">
-                  {editandoPrazosPA ? (
-                    <>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditandoPrazosPA(false);
-                          setDataEntradaEdit(processo.dataEntrada || "");
-                          setInicioPrazoEdit(processo.dataInicioPrazo || "");
-                          setPrazoFatalEdit(processo.prazoFatal || "");
-                        }}
-                        disabled={savingPrazosPA}
-                      >
-                        <X className="w-3.5 h-3.5 mr-1" /> Cancelar
-                      </Button>
-                      <Button type="button" size="sm" onClick={handleSalvarPrazosPA} disabled={savingPrazosPA}>
-                        <Save className="w-3.5 h-3.5 mr-1" /> {savingPrazosPA ? "Salvando..." : "Salvar"}
-                      </Button>
-                    </>
-                  ) : (
-                    <Button type="button" size="sm" variant="outline" onClick={() => setEditandoPrazosPA(true)}>
-                      <Pencil className="w-3.5 h-3.5 mr-1" /> Editar prazos
-                    </Button>
-                  )}
-                </div>
+              <div className="flex items-center gap-2 text-xs text-slate-500 uppercase tracking-wide font-semibold mb-2">
+                <Calendar className="w-4 h-4 text-sky-500 shrink-0" />
+                <span className="whitespace-nowrap">Prazos e Datas</span>
               </div>
+              {ehIPouOutrosPA ? (
+                <>
+                  <InfoRow icon={Calendar} label="Data de Entrada" value={processo.dataEntrada ? formatarData(processo.dataEntrada) : undefined} />
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500 italic">
+                    Investigação Preliminar / Outros não têm prazo regulamentar fixo — segue o fluxo próprio (Mesa do Assessor → Chefia).
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    {editandoPrazosPA ? (
+                      <>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-[11px]"
+                          onClick={() => {
+                            setEditandoPrazosPA(false);
+                            setDataEntradaEdit(processo.dataEntrada || "");
+                            setInicioPrazoEdit(processo.dataInicioPrazo || "");
+                            setPrazoFatalEdit(processo.prazoFatal || "");
+                          }}
+                          disabled={savingPrazosPA}
+                        >
+                          <X className="w-3 h-3 mr-1" /> Cancelar
+                        </Button>
+                        <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={handleSalvarPrazosPA} disabled={savingPrazosPA}>
+                          <Save className="w-3 h-3 mr-1" /> {savingPrazosPA ? "Salvando..." : "Salvar"}
+                        </Button>
+                      </>
+                    ) : (
+                      <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setEditandoPrazosPA(true)}>
+                        <Pencil className="w-3 h-3 mr-1" /> Editar
+                      </Button>
+                    )}
+                  </div>
 
-              {editandoPrazosPA && (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3 mb-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Data de Entrada</label>
-                      <Input type="date" value={dataEntradaEdit} onChange={(e) => setDataEntradaEdit(e.target.value)} />
+                  {editandoPrazosPA && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-3">
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Data de Entrada</label>
+                          <Input type="date" value={dataEntradaEdit} onChange={(e) => setDataEntradaEdit(e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Início do Prazo</label>
+                          <Input type="date" value={inicioPrazoEdit} onChange={(e) => setInicioPrazoEdit(e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Prazo Fatal / Solução</label>
+                          <Input type="date" value={prazoFatalEdit} onChange={(e) => setPrazoFatalEdit(e.target.value)} />
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Início do Prazo</label>
-                      <Input type="date" value={inicioPrazoEdit} onChange={(e) => setInicioPrazoEdit(e.target.value)} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold text-slate-600 uppercase tracking-wide">Prazo Fatal / Solução</label>
-                      <Input type="date" value={prazoFatalEdit} onChange={(e) => setPrazoFatalEdit(e.target.value)} />
+                  )}
+                  {processo.dataEntrada && <InfoRow icon={Calendar} label="Data de Entrada" value={formatarData(processo.dataEntrada)} />}
+                  <InfoRow icon={Calendar} label={emPrazoSolucao ? "Início do Prazo da Solução" : "Início do Prazo"} value={processo.dataInicioPrazo ? formatarData(processo.dataInicioPrazo) : undefined} />
+                  {/* V9.6 — Prazo Fatal: sempre exibido. */}
+                  <div className="flex items-start gap-3">
+                    <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Prazo Fatal</div>
+                      <div className="text-sm text-slate-800 mt-0.5">{processo.prazoFatal ? formatarData(processo.prazoFatal) : "—"}</div>
                     </div>
                   </div>
-                </div>
-              )}
-              <InfoRow icon={Calendar} label={emPrazoSolucao ? "Início do Prazo da Solução" : "Início do Prazo"} value={processo.dataInicioPrazo ? formatarData(processo.dataInicioPrazo) : undefined} />
-              {/* V9.6 — Prazo Fatal: sempre exibido. */}
-              <div className="flex items-start gap-3">
-                <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
-                <div className="flex-1">
-                  <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Prazo Fatal</div>
-                  <div className="text-sm text-slate-800 mt-0.5">{processo.prazoFatal ? formatarData(processo.prazoFatal) : "—"}</div>
-                </div>
-              </div>
-              {/* V9.6 — Prazo Solução: permanece em "—" até que o encarregado entregue os autos (fase FAZENDO_SOLUCAO/ASSINANDO_SOLUCAO). */}
-              <div className="flex items-start gap-3">
-                <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
-                <div className="flex-1">
-                  <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Prazo Solução</div>
-                  <div className="text-sm text-slate-800 mt-0.5">
-                    {emPrazoSolucao && processo.prazoFatal ? formatarData(processo.prazoFatal) : "—"}
+                  {/* V9.6 — Prazo Solução: permanece em "—" até que o encarregado entregue os autos (fase FAZENDO_SOLUCAO/ASSINANDO_SOLUCAO). */}
+                  <div className="flex items-start gap-3">
+                    <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Prazo Solução</div>
+                      <div className="text-sm text-slate-800 mt-0.5">
+                        {emPrazoSolucao && processo.prazoFatal ? formatarData(processo.prazoFatal) : "—"}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              {emPrazoSolucao && (
-                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
-                  <div className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">Prazo da Solução (Mesa do Assessor)</div>
-                  <div className="text-sm text-indigo-900 mt-1">
-                    {diasPrazoSolucao === null
-                      ? "Prazo em andamento."
-                      : diasPrazoSolucao < 0
-                        ? `Prazo vencido ha ${Math.abs(diasPrazoSolucao)} dia(s).`
-                        : `Restam ${diasPrazoSolucao} dia(s) para confeccao da solucao.`}
-                  </div>
-                </div>
+                  {emPrazoSolucao && (
+                    <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+                      <div className="text-[11px] font-bold uppercase tracking-wide text-indigo-700">Prazo da Solução (Mesa do Assessor)</div>
+                      <div className="text-sm text-indigo-900 mt-1">
+                        {diasPrazoSolucao === null
+                          ? "Prazo em andamento."
+                          : diasPrazoSolucao < 0
+                            ? `Prazo vencido ha ${Math.abs(diasPrazoSolucao)} dia(s).`
+                            : `Restam ${diasPrazoSolucao} dia(s) para confeccao da solucao.`}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

@@ -578,6 +578,7 @@ export function MesaPA({
                 processosPortariaAssinada={a.itensPortariaAssinada}
                 processosAtrasados={a.itensAtrasados}
                 processosConcluidos={a.itensConcluidos}
+                mostrarAbaFinalizados={false}
                 ehAdmin={ehAdmin}
                 onEdit={onEdit}
                 onDelete={onDelete}

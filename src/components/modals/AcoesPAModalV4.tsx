@@ -235,22 +235,38 @@ export function AcoesPAModalV4({
           <div className={FORM_CONTAINER}>
             <h4 className="text-sm font-semibold text-slate-800 mb-1">Assinatura da Portaria</h4>
             <p className="text-xs text-slate-600 mb-4">
-              Aguardando assinatura da Chefia/Cmt. Confirme quando assinada.
+              Aguardando assinatura da Chefia/Cmt. Confirme quando assinada ou devolva para correção.
             </p>
-            <button
-              type="button"
-              disabled={salvando}
-              className={PRIMARY_BTN}
-              onClick={() =>
-                void avancarFluxo(
-                  "AGUARDANDO_ENTREGA",
-                  {},
-                  "Portaria assinada. Aguardando entrega ao Encarregado.",
-                )
-              }
-            >
-              Confirmar Assinatura
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                disabled={salvando}
+                className={`${SECONDARY_BTN} flex-1`}
+                onClick={() =>
+                  void avancarFluxo(
+                    "FAZENDO_PORTARIA",
+                    {},
+                    "Chefia/Cmt devolveu a minuta da Portaria para correção.",
+                  )
+                }
+              >
+                Devolver para Correção
+              </button>
+              <button
+                type="button"
+                disabled={salvando}
+                className={`${PRIMARY_BTN} flex-1`}
+                onClick={() =>
+                  void avancarFluxo(
+                    "AGUARDANDO_ENTREGA",
+                    {},
+                    "Portaria assinada. Aguardando entrega ao Encarregado.",
+                  )
+                }
+              >
+                Confirmar Assinatura
+              </button>
+            </div>
           </div>
         );
 
@@ -425,22 +441,38 @@ export function AcoesPAModalV4({
           <div className={FORM_CONTAINER}>
             <h4 className="text-sm font-semibold text-slate-800 mb-1">Assinatura da Solução</h4>
             <p className="text-xs text-slate-600 mb-4">
-              Aguardando assinatura final da Solução pela Chefia/Cmt.
+              Aguardando assinatura final da Solução pela Chefia/Cmt. Confirme a finalização ou devolva para correção.
             </p>
-            <button
-              type="button"
-              disabled={salvando}
-              className={PRIMARY_BTN}
-              onClick={() =>
-                void avancarFluxo(
-                  "FINALIZADO",
-                  { finalizado: true, status: "concluido" },
-                  "Processo Administrativo finalizado.",
-                )
-              }
-            >
-              Finalizar Processo
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                disabled={salvando}
+                className={`${SECONDARY_BTN} flex-1`}
+                onClick={() =>
+                  void avancarFluxo(
+                    "FAZENDO_SOLUCAO",
+                    {},
+                    "Chefia/Cmt devolveu a Solução para correção.",
+                  )
+                }
+              >
+                Devolver para Correção
+              </button>
+              <button
+                type="button"
+                disabled={salvando}
+                className={`${PRIMARY_BTN} flex-1`}
+                onClick={() =>
+                  void avancarFluxo(
+                    "FINALIZADO",
+                    { finalizado: true, status: "concluido" },
+                    "Processo Administrativo finalizado.",
+                  )
+                }
+              >
+                Finalizar Processo
+              </button>
+            </div>
           </div>
         );
 

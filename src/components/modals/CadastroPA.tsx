@@ -484,7 +484,7 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
         dados.omPresidenteConselho = omPresidenteConselho.trim();
       }
 
-      if (processo?.id) {
+      if (processo?.id && !ehIPouOutros) {
         const dataInicioPAEditada = toDataCivil(dataInicioPrazoPA) || toDataCivil(processo.dataInicioPrazo || "");
         if (dataInicioPAEditada) {
           dados.dataInicioPrazo = dataInicioPAEditada;
@@ -649,6 +649,10 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
   const mostrarEncarregado = aceitaDiligencia(tipoPA);
   const mostrarPresidenteConselho = isConselhoPA(tipoPA);
   const mostrarAssuntoSindicancia = tipoPA === "Sindicância";
+  // Investigação Preliminar/Outros não têm portaria nem prazo regulamentar —
+  // seguem o motor IP (ping-pong), então o painel de prazo/prorrogações não
+  // se aplica a eles (evita calcular um prazo fatal que não existe na prática).
+  const mostrarPrazoEProrrogacoes = usaPortariaPA(tipoPA);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -769,14 +773,14 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
             </div>
           )}
 
-          {processo?.id && (
+          {processo?.id && mostrarPrazoEProrrogacoes && (
             <div className="space-y-2 p-4 border rounded-lg bg-sky-50 border-sky-200">
               <Label htmlFor="dataInicioPrazoPA" className="text-sm font-semibold text-sky-900">Data inicial da contagem do prazo</Label>
               <Input id="dataInicioPrazoPA" type="date" value={dataInicioPrazoPA} onChange={(e) => setDataInicioPrazoPA(e.target.value)} />
             </div>
           )}
 
-          {processo?.id && (
+          {processo?.id && mostrarPrazoEProrrogacoes && (
             <div className="space-y-3 p-4 border rounded-lg bg-amber-50 border-amber-200">
               <div className="flex items-center justify-between">
                 <h4 className="font-semibold text-sm text-amber-900">Prorrogações (editar início e fim)</h4>

@@ -421,7 +421,9 @@ export function DetalhesModalDU({ open, onOpenChange, processo }: DetalhesModalD
                 <Badge variant="outline" className="bg-orange-100 text-orange-900 border-orange-300 font-semibold">{pedido?.reiteracoes}ª Reiteração</Badge>
               )}
               {processo.status === "concluido" && (
-                <Badge variant="outline"><CheckCircle2 className="w-3 h-3 mr-1" />{processo.status}</Badge>
+                <Badge variant="outline" className="bg-green-50 text-green-800 border-green-300">
+                  <CheckCircle2 className="w-3 h-3 mr-1" /> Finalizado
+                </Badge>
               )}
             </div>
           </div>

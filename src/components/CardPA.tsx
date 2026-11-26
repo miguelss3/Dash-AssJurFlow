@@ -169,7 +169,7 @@ const CardPAComponent = ({
   const [reativando, setReativando] = useState(false);
   const [desfazendo, setDesfazendo] = useState(false);
 
-  const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@") || "Sistema";
+  const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
   const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
   const autorId = user?.uid || "sistema";
 
