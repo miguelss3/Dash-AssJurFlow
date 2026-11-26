@@ -216,7 +216,7 @@ export function MesaPA({
       .replace(/[^A-Z0-9]+/g, "_")
       .replace(/^_+|_+$/g, "");
 
-  const classificarPA = useCallback((p: Processo, tipoNorm: string): { emAndamento: string | null; portaria: string | null; atrasado: boolean } => {
+  const classificarPA = useCallback((p: Processo, tipoNorm: string): { emAndamento: string | null; portaria: string | null; aguardandoAssinaturaSolucao: string | null; atrasado: boolean } => {
     const situacaoFluxo = normalizarSituacao(p.situacaoFluxo);
     const situacaoPA = normalizarSituacao(p.situacaoFluxoPA);
     const situacaoConselho = normalizarSituacao(p.situacaoFluxoConselho);
@@ -246,7 +246,7 @@ export function MesaPA({
       stNorm === "concluído";
 
     if (finalizadoNovo) {
-      return { emAndamento: null, portaria: null, atrasado: false };
+      return { emAndamento: null, portaria: null, aguardandoAssinaturaSolucao: null, atrasado: false };
     }
 
     // 3. Verifica se é portaria assinada E trava (BLINDAGEM CONTRA DUPLA CONTAGEM)
@@ -259,14 +259,19 @@ export function MesaPA({
       PORTARIA_LEGADA.has(situacaoFluxo);
 
     if (isPortariaAssinada && colunaTipo) {
-      return { emAndamento: null, portaria: colunaTipo, atrasado: false };
+      return { emAndamento: null, portaria: colunaTipo, aguardandoAssinaturaSolucao: null, atrasado: false };
     }
 
-    // V9.11 — Fase de solução (FAZENDO_SOLUCAO/ASSINANDO_SOLUCAO) passa a
-    // cair também na coluna de tipo (Sindicância/IPM/Conselho), classificada
-    // pelo prazo como qualquer outra fase — antes ficava escondida, só
-    // visível na Mesa do Assessor, o que dificultava achar o processo depois
-    // de uma devolução para correção.
+    // V9.13 — Solução despachada para a Chefia (ASSINANDO_SOLUCAO) sai da
+    // Mesa do Assessor e ganha aba própria na coluna de tipo ("Solução
+    // Aguardando Assinatura") — separado de "No Prazo"/"Em Atraso", que são
+    // só para quem ainda está sendo trabalhado (encarregado ou assessor
+    // redigindo). FAZENDO_SOLUCAO (ainda em elaboração) continua no fluxo
+    // normal abaixo, visível tanto na coluna de tipo quanto na Mesa do
+    // Assessor (V9.11).
+    if (situacaoPA === "ASSINANDO_SOLUCAO" && colunaTipo) {
+      return { emAndamento: null, portaria: null, aguardandoAssinaturaSolucao: colunaTipo, atrasado: false };
+    }
 
     // 4. Se chegou aqui, está na mão do Encarregado (Em Andamento Real) —
     // ou, para tipos sem coluna fixa (Investigação Preliminar/Outros), na
@@ -281,7 +286,7 @@ export function MesaPA({
       emAndamento = colunaTipo;
     }
 
-    return { emAndamento, portaria: null, atrasado };
+    return { emAndamento, portaria: null, aguardandoAssinaturaSolucao: null, atrasado };
   }, [paColunaLabelPorId]);
 
   // V9.8 — Coluna de tipo para processos CONCLUÍDOS. Diferente de
