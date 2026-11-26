@@ -228,7 +228,11 @@ export function MesaDU({
       isAguardandoAssinaturaPorId.set(p.id, aguardandoAssinatura);
 
       const pendenciaChefia =
-        (SITUACOES_PENDENCIA_CHEFIA.has(situacaoFluxoPedido)
+        // V9.28 — PA "Outros" escalado pela Chefia de PA para a Mesa do
+        // Chefe da Assessoria (compartilhada com o DU) — bypassa toda a
+        // classificação específica de DU abaixo, que não se aplica a PA.
+        p.naMesaChefeGeral === true
+        || (SITUACOES_PENDENCIA_CHEFIA.has(situacaoFluxoPedido)
           // CHEFIA_DILIGENCIA/CHEFIA_DEFESA sem responsavel = estado inválido; tratar como distribuição
           && !(
             (situacaoFluxoPedido === "CHEFIA_DILIGENCIA" || situacaoFluxoPedido === "CHEFIA_DEFESA")

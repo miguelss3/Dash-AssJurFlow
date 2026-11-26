@@ -41,7 +41,6 @@ export function ChefeGroup({
   });
 
   const isDU = tipo === "DU";
-  const CardComponente = isDU ? CardDU : CardPA;
   const bgClass = isDU ? "bg-[var(--tipo-du-bg)]" : "bg-[var(--tipo-pa-bg)]";
   const textClass = isDU ? "text-[var(--tipo-du)]" : "text-[var(--tipo-pa)]";
   const borderClass = isDU ? "border-[var(--tipo-du)]/30" : "border-[var(--tipo-pa)]/30";
@@ -78,22 +77,29 @@ export function ChefeGroup({
             Sem processos na mesa
           </div>
         ) : (
-          processos.map((p) => (
-            <CardComponente
-              key={p.id}
-              processo={p}
-              ehAdmin={ehAdmin}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onMove={onMove}
-              onReativarProcesso={onReativarProcesso}
-              siteSettings={siteSettings}
-              showActions
-              naoLido={!!unreadProcessIds?.has(p.id)}
-              onMarcarComoLido={onReadProcess}
-              corDestaque={mapaCoresAssessores[(p.responsavel || "").trim()]}
-            />
-          ))
+          processos.map((p) => {
+            // V9.28 — "Mesa do Chefe" compartilhada entre DU e PA (processos
+            // de PA "Outros" escalados pela Chefia de PA chegam aqui
+            // também): cada card escolhe seu próprio componente pelo setor
+            // real do processo, não mais pelo `tipo` fixo da coluna inteira.
+            const CardItem = (p.setor === "PA" || p.tipo === "PA") ? CardPA : CardDU;
+            return (
+              <CardItem
+                key={p.id}
+                processo={p}
+                ehAdmin={ehAdmin}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onMove={onMove}
+                onReativarProcesso={onReativarProcesso}
+                siteSettings={siteSettings}
+                showActions
+                naoLido={!!unreadProcessIds?.has(p.id)}
+                onMarcarComoLido={onReadProcess}
+                corDestaque={mapaCoresAssessores[(p.responsavel || "").trim()]}
+              />
+            );
+          })
         )}
       </div>
     </div>

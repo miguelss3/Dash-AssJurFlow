@@ -70,8 +70,11 @@ export function MesaTrabalho({ processos, filtroTipo, onEdit, onDelete, onMove, 
   }, [usuario, ehAdmin]);
 
   // Divide processos por setor
-  const processosDU = processos.filter((p) => p.setor === "DU" || p.tipo === "DU");
-  const processosPA = processos.filter((p) => p.setor === "PA" || p.tipo === "PA");
+  // V9.28 — PA "Outros" escalado para a Mesa do Chefe da Assessoria
+  // (`naMesaChefeGeral`) sai do board de PA e passa a fluir junto com o DU,
+  // que já tem a coluna "MESA DO CHEFE" compartilhada (ver MesaDU.tsx).
+  const processosDU = processos.filter((p) => p.setor === "DU" || p.tipo === "DU" || p.naMesaChefeGeral === true);
+  const processosPA = processos.filter((p) => (p.setor === "PA" || p.tipo === "PA") && p.naMesaChefeGeral !== true);
 
   // Divide assessores por setor
   const assessoresDU = assessoresDoSetor.filter((a) => a.setor === "DU");

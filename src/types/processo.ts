@@ -193,6 +193,13 @@ export interface Processo {
   dataDespachoAssinatura?: string;
   // V9.21 — Documentos registrados no processo PA (igual ao DU: número + data).
   documentosRegistrados?: Array<{ numero: string; data?: string }>;
+  // V9.28 — Escalada de Investigação Preliminar/Outros (motor IP) para a
+  // Mesa do Chefe da Assessoria (Chefe Geral) — mesma coluna "MESA DO CHEFE"
+  // já usada pelo DU. Enquanto `naMesaChefeGeral` for true, o processo some
+  // da Mesa do Assessor/Chefia de PA e passa a aparecer ali.
+  naMesaChefeGeral?: boolean;
+  mesaChefeGeralEtapa?: "assinatura" | "encaminhamento";
+  encaminhadoPara?: "CHEM" | "CMT";
   resultadoFinalConselho?: string;
   teveRecurso?: boolean;
   membrosConselho?: string;

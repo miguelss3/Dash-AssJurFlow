@@ -174,6 +174,23 @@ export default function AjustesPA(props: AjustesPAProps) {
                       </div>
                     </div>
                   </div>
+
+                  <div className="space-y-2 rounded-2xl border border-border bg-muted/20 p-4 md:col-span-2">
+                    <p className="text-xs font-bold uppercase tracking-wide text-purple-700">Solução / Parecer</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      Comuns a IPM, Sindicância e Conselho — não variam por tipo.
+                    </p>
+                    <div className="grid gap-4 md:grid-cols-2 mt-3">
+                      <div>
+                        <Label>Prazo para Solução (dias)</Label>
+                        <Input type="number" min={1} value={form.prazoSolucaoDias} onChange={(e) => updateField("prazoSolucaoDias", e.target.valueAsNumber || 0)} />
+                      </div>
+                      <div>
+                        <Label>Prazo para Assinatura da Solução (dias)</Label>
+                        <Input type="number" min={1} value={form.prazoAssinaturaSolucaoDias} onChange={(e) => updateField("prazoAssinaturaSolucaoDias", e.target.valueAsNumber || 0)} />
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </CollapsibleContent>
             </section>

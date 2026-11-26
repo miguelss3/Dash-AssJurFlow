@@ -100,6 +100,13 @@ export function AcoesIPModalV4({
     useState<SituacaoFluxoIP>("MESA_ASSESSOR");
   const [documentos, setDocumentos] = useState<DocumentoIP[]>([]);
 
+  // V9.28 — Escalada para a Mesa do Chefe da Assessoria (Chefe Geral),
+  // compartilhada com o DU. Independente de `situacaoAtual` (que fica
+  // "congelada" em NA_CHEFIA por baixo) — enquanto `naMesaChefeGeral` for
+  // true, o rodapé mostra o fluxo de assinatura/encaminhamento ao CHEM/Cmt.
+  const [naMesaChefeGeral, setNaMesaChefeGeral] = useState<boolean>(false);
+  const [mesaChefeGeralEtapa, setMesaChefeGeralEtapa] = useState<"assinatura" | "encaminhamento">("assinatura");
+
   // Inline-form de novo documento.
   const [showFormDoc, setShowFormDoc] = useState<boolean>(false);
   const [novoTipoDoc, setNovoTipoDoc] = useState<"Expedido" | "Recebido">(
@@ -131,6 +138,8 @@ export function AcoesIPModalV4({
         setSituacaoAtual(sit);
         setParte(((data?.cliente as string | undefined) || "").toString());
         setTipoPA(((data?.tipoPA as string | undefined) || "Investigação Preliminar").toString());
+        setNaMesaChefeGeral(data?.naMesaChefeGeral === true);
+        setMesaChefeGeralEtapa(((data?.mesaChefeGeralEtapa as string | undefined) === "encaminhamento") ? "encaminhamento" : "assinatura");
         const docs = Array.isArray(data?.documentosIP)
           ? (data.documentosIP as DocumentoIP[])
           : [];
@@ -196,6 +205,7 @@ export function AcoesIPModalV4({
     novaSituacao: SituacaoFluxoIP,
     msgHistorico: string,
     isFinalizando = false,
+    extraData: Record<string, unknown> = {},
   ) => {
     if (!processoId || !user) return;
     setSalvando(true);
@@ -208,6 +218,7 @@ export function AcoesIPModalV4({
         descricao: msgHistorico,
         atualizadoEm: Timestamp.now(),
         atualizadoPorNome: autorMilitar,
+        ...extraData,
       };
       if (isFinalizando) {
         payload.finalizado = true;
@@ -221,6 +232,8 @@ export function AcoesIPModalV4({
         timestamp: new Date().toISOString(),
       });
       setSituacaoAtual(novaSituacao);
+      if ("naMesaChefeGeral" in extraData) setNaMesaChefeGeral(extraData.naMesaChefeGeral === true);
+      if (typeof extraData.mesaChefeGeralEtapa === "string") setMesaChefeGeralEtapa(extraData.mesaChefeGeralEtapa as "assinatura" | "encaminhamento");
       toast.success("Fluxo do processo atualizado.");
       if (onSuccess) onSuccess();
       if (isFinalizando) onOpenChange(false);
@@ -320,7 +333,11 @@ export function AcoesIPModalV4({
 
         <div className="bg-white p-3 flex items-center gap-2 rounded-lg border border-slate-200 mb-6 text-sm text-slate-700 shadow-sm">
           <span className="font-semibold text-slate-800">Situação atual:</span>
-          <span>{LABEL_SITUACAO_IP[situacaoAtual]}</span>
+          <span>
+            {naMesaChefeGeral
+              ? `Mesa do Chefe da Assessoria — ${mesaChefeGeralEtapa === "assinatura" ? "Aguardando Assinatura" : "Aguardando Encaminhamento"}`
+              : LABEL_SITUACAO_IP[situacaoAtual]}
+          </span>
           {parte && (
             <span className="ml-auto text-xs text-slate-500">Parte: {parte}</span>
           )}
@@ -505,68 +522,141 @@ export function AcoesIPModalV4({
 
             {/* Bloco 3 — Rodapé Ping-Pong */}
             <div className={`${FORM_CONTAINER} mt-4`}>
-              {situacaoAtual === "MESA_ASSESSOR" && (
-                <div className="flex flex-col sm:flex-row gap-3">
+              {/* V9.28 — Checado ANTES de situacaoAtual: a escalada para a
+                  Mesa do Chefe da Assessoria não muda situacaoFluxoIP (fica
+                  "NA_CHEFIA" por baixo), só o flag naMesaChefeGeral. */}
+              {naMesaChefeGeral ? (
+                mesaChefeGeralEtapa === "assinatura" ? (
                   <button
                     type="button"
                     disabled={salvando}
-                    className={`${PRIMARY_BTN} flex-1`}
+                    className={`${PRIMARY_BTN} w-full`}
                     onClick={() =>
                       void avancarFluxo(
                         "NA_CHEFIA",
-                        "Processo encaminhado para despacho com a Chefia.",
+                        `Solução/parecer assinado pelo Chefe da Assessoria (${autorMilitar}).`,
+                        false,
+                        { mesaChefeGeralEtapa: "encaminhamento" },
                       )
                     }
                   >
-                    Encaminhar à Chefia
+                    Confirmar Assinatura
                   </button>
-                  <button
-                    type="button"
-                    disabled={salvando}
-                    className={`${DANGER_BTN} flex-1`}
-                    onClick={() =>
-                      void avancarFluxo(
-                        "FINALIZADO",
-                        "Processo finalizado.",
-                        true,
-                      )
-                    }
-                  >
-                    Finalizar Processo
-                  </button>
-                </div>
-              )}
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      disabled={salvando}
+                      className={`${PRIMARY_BTN} flex-1`}
+                      onClick={() =>
+                        void avancarFluxo(
+                          "FINALIZADO",
+                          `Processo encaminhado ao CHEM por ${autorMilitar}.`,
+                          true,
+                          { naMesaChefeGeral: false, encaminhadoPara: "CHEM" },
+                        )
+                      }
+                    >
+                      Encaminhar para o CHEM
+                    </button>
+                    <button
+                      type="button"
+                      disabled={salvando}
+                      className={`${PRIMARY_BTN} flex-1`}
+                      onClick={() =>
+                        void avancarFluxo(
+                          "FINALIZADO",
+                          `Processo encaminhado ao Cmt por ${autorMilitar}.`,
+                          true,
+                          { naMesaChefeGeral: false, encaminhadoPara: "CMT" },
+                        )
+                      }
+                    >
+                      Encaminhar para o Cmt
+                    </button>
+                  </div>
+                )
+              ) : (
+                <>
+                  {situacaoAtual === "MESA_ASSESSOR" && (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        type="button"
+                        disabled={salvando}
+                        className={`${PRIMARY_BTN} flex-1`}
+                        onClick={() =>
+                          void avancarFluxo(
+                            "NA_CHEFIA",
+                            "Processo encaminhado para despacho com a Chefia.",
+                          )
+                        }
+                      >
+                        Encaminhar à Chefia
+                      </button>
+                      <button
+                        type="button"
+                        disabled={salvando}
+                        className={`${DANGER_BTN} flex-1`}
+                        onClick={() =>
+                          void avancarFluxo(
+                            "FINALIZADO",
+                            "Processo finalizado.",
+                            true,
+                          )
+                        }
+                      >
+                        Finalizar Processo
+                      </button>
+                    </div>
+                  )}
 
-              {situacaoAtual === "NA_CHEFIA" && (
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    type="button"
-                    disabled={salvando}
-                    className={`${PRIMARY_BTN} flex-1`}
-                    onClick={() =>
-                      void avancarFluxo(
-                        "MESA_ASSESSOR",
-                        "Processo devolvido ao Assessor.",
-                      )
-                    }
-                  >
-                    Devolver para Assessor
-                  </button>
-                  <button
-                    type="button"
-                    disabled={salvando}
-                    className={`${DANGER_BTN} flex-1`}
-                    onClick={() =>
-                      void avancarFluxo(
-                        "FINALIZADO",
-                        "Processo finalizado pela Chefia.",
-                        true,
-                      )
-                    }
-                  >
-                    Finalizar Processo
-                  </button>
-                </div>
+                  {situacaoAtual === "NA_CHEFIA" && (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <button
+                        type="button"
+                        disabled={salvando}
+                        className={`${PRIMARY_BTN} flex-1`}
+                        onClick={() =>
+                          void avancarFluxo(
+                            "MESA_ASSESSOR",
+                            "Processo devolvido ao Assessor.",
+                          )
+                        }
+                      >
+                        Devolver para Assessor
+                      </button>
+                      <button
+                        type="button"
+                        disabled={salvando}
+                        className={`${SECONDARY_BTN} flex-1`}
+                        onClick={() =>
+                          void avancarFluxo(
+                            "NA_CHEFIA",
+                            `Processo enviado para a Mesa do Chefe da Assessoria por ${autorMilitar}.`,
+                            false,
+                            { naMesaChefeGeral: true, mesaChefeGeralEtapa: "assinatura" },
+                          )
+                        }
+                      >
+                        Enviar para a Mesa do Chefe da Assessoria
+                      </button>
+                      <button
+                        type="button"
+                        disabled={salvando}
+                        className={`${DANGER_BTN} flex-1`}
+                        onClick={() =>
+                          void avancarFluxo(
+                            "FINALIZADO",
+                            "Processo finalizado pela Chefia.",
+                            true,
+                          )
+                        }
+                      >
+                        Finalizar Processo
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
 
               {finalizado && (

@@ -71,20 +71,6 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     }
   }, [filtro]);
 
-  // V2.18 — Quando há busca ativa, salta automaticamente para a primeira aba
-  // que possui resultados, evitando que o card encontrado fique escondido.
-  useEffect(() => {
-    if (!busca?.trim()) return;
-    if (processos.length > 0) {
-      setAba("andamento");
-    } else if (processosAtrasados.length > 0) {
-      setAba("atraso");
-    } else if (processosPortariaAssinada.length > 0) {
-      setAba("portaria_assinada");
-    } else if (processosConcluidos.length > 0) {
-      setAba("concluidos");
-    }
-  }, [busca, processos.length, processosAtrasados.length, processosPortariaAssinada.length, processosConcluidos.length]);
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel, // ID único para esta coluna (nome do assessor)
     disabled: !!emFeriasAte,
@@ -347,6 +333,24 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     // exclui quem já está em Solução/Parecer (tem aba própria) e atrasados.
     return ordenarPorPrazo(lista.filter((p) => isNaMesaDoAssessorPA(p) && !isFaseSolucaoPA(p) && !isProcessoAtrasadoPA(p)));
   };
+
+  // V9.25 — Quando há busca ativa, salta automaticamente para a PRIMEIRA aba
+  // (das configuradas para esta coluna) que realmente contém o resultado.
+  // A versão antiga (V2.18) só olhava a contagem bruta das listas originais
+  // (`processos.length`, etc.) — depois que "Solução/Parecer"/"Solução para
+  // Assinatura" ganharam abas próprias (V9.13/V9.16), um card dessas fases
+  // contava para `processos.length > 0` e pulava sempre para "andamento",
+  // mesmo não aparecendo lá (fica filtrado fora pela aba errada) — o card
+  // buscado "sumia" apesar de ter sido encontrado.
+  const contagemAbas = abasConfiguradas.map((tab) => getListaParaAba(tab.id).length).join(",");
+  useEffect(() => {
+    if (!busca?.trim()) return;
+    const primeiraComResultado = abasConfiguradas.find((tab) => getListaParaAba(tab.id).length > 0);
+    if (primeiraComResultado) {
+      setAba(primeiraComResultado.id as typeof aba);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busca, contagemAbas]);
 
   const processosDaAbaAtiva = getListaParaAba(abaAtiva);
 

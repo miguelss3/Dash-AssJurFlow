@@ -408,7 +408,7 @@ const CardPAComponent = ({
               )}
               {sitPA === "ASSINANDO_SOLUCAO" && p.dataDespachoAssinatura && (
                 <Badge variant="outline" className="text-[10px] h-5 border-violet-300 text-violet-800 bg-violet-50">
-                  Prazo Assinatura: {formatarData(calcularPrazoAssinaturaSolucao(p.dataDespachoAssinatura))}
+                  Prazo Assinatura: {formatarData(calcularPrazoAssinaturaSolucao(p.dataDespachoAssinatura, siteSettings?.prazoAssinaturaSolucaoDias))}
                 </Badge>
               )}
             </div>
@@ -493,14 +493,22 @@ const CardPAComponent = ({
             </Button>
           )}
 
-          {showActions && (
+          {showActions && (() => {
+            // V9.18 — "Ação" (modal completo do fluxo) some na Mesa do
+            // Assessor: lá os atalhos dedicados (Enviar Solução/Devolver ao
+            // Encarregado) já cobrem o que é preciso. Continua aparecendo
+            // nas colunas de tipo (Sindicância/IPM/Conselho).
+            // V9.27 — Investigação Preliminar/Outros não têm coluna de tipo
+            // enquanto ativos (só ganham uma ao concluir) — a Mesa do
+            // Assessor é o único lugar onde esse card aparece, então "Ação"
+            // precisa continuar disponível ali, senão o processo fica sem
+            // nenhum jeito de avançar o fluxo.
+            const ehIPouOutros = resolverModalPA(p.tipoPA) === "IP";
+            const mostrarAcao = !dentroDaMesaDoAssessor || ehIPouOutros;
+            return (
             <div className="space-y-2 mt-3 pt-3 border-t border-slate-100">
-              {/* V9.18 — "Ação" (modal completo do fluxo) some na Mesa do
-                  Assessor: lá os atalhos dedicados (Enviar Solução/Devolver
-                  ao Encarregado) já cobrem o que é preciso. Continua
-                  aparecendo nas colunas de tipo (Sindicância/IPM/Conselho). */}
-              <div className={`grid gap-2 ${dentroDaMesaDoAssessor ? (onEdit ? "grid-cols-2" : "grid-cols-1") : "grid-cols-3"}`}>
-                {!dentroDaMesaDoAssessor && (
+              <div className={`grid gap-2 ${mostrarAcao ? "grid-cols-3" : (onEdit ? "grid-cols-2" : "grid-cols-1")}`}>
+                {mostrarAcao && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -562,7 +570,8 @@ const CardPAComponent = ({
                 )}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {p.descricao && (
             <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
@@ -586,7 +595,7 @@ const CardPAComponent = ({
         })()}
       </Suspense>
 
-      {modalDetalhes && <DetalhesModalPA open={modalDetalhes} onOpenChange={setModalDetalhes} processo={p} />}
+      {modalDetalhes && <DetalhesModalPA open={modalDetalhes} onOpenChange={setModalDetalhes} processo={p} siteSettings={siteSettings} />}
       {modalChat && <ChatModal open={modalChat} onOpenChange={setModalChat} processo={p} />}
 
       {modalReativar && (

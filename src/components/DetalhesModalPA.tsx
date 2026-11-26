@@ -21,17 +21,20 @@ import {
 import { doc, updateDoc, addDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "sonner";
-import { calcularFaixasProrrogacaoPA, calcularPrazoAssinaturaSolucao, diasRestantes, formatarData } from "@/lib/prazo";
+import { calcularFaixasProrrogacaoPA, calcularPrazoAssinaturaSolucao, calcularPrazoFinalPA, diasRestantes, formatarData } from "@/lib/prazo";
 import { getBadgeSituacaoPA } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import type { SiteSettings } from "@/types/siteSettings";
 
 interface DetalhesModalPAProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   processo: Processo | null;
+  // V9.29 — Prazo de assinatura da solução (dias) configurável em Ajustes do Site.
+  siteSettings?: SiteSettings;
 }
 
-export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalPAProps) {
+export function DetalhesModalPA({ open, onOpenChange, processo, siteSettings }: DetalhesModalPAProps) {
   const { user } = useAuth();
   const nomeAutorBase = user?.nomeGuerra || user?.nome || user?.email?.split("@")[0] || "Sistema";
   const autorMilitar = user?.posto ? `${user.posto} ${nomeAutorBase}`.trim() : nomeAutorBase;
@@ -47,6 +50,21 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
   const [savingDocumentos, setSavingDocumentos] = useState(false);
   const [documentosEdit, setDocumentosEdit] = useState<Array<{ numero: string; data: string }>>([]);
 
+  // V9.24 — Prorrogações: edição/exclusão direta no card (sem precisar abrir
+  // o CadastroPA completo). Recalcula o prazo fatal ao salvar, igual ao
+  // CadastroPA, para não deixar prazoFatal dessincronizado das prorrogações.
+  const [editandoProrrogacoes, setEditandoProrrogacoes] = useState(false);
+  const [savingProrrogacoes, setSavingProrrogacoes] = useState(false);
+  const [prorrogacoesEdit, setProrrogacoesEdit] = useState<
+    Array<{ doc: string; inicio: string; fim: string; dias: string }>
+  >([]);
+
+  // V9.24 — Publicação do Aditamento: editável/removível, igual ao pedido.
+  const [editandoAditamento, setEditandoAditamento] = useState(false);
+  const [savingAditamento, setSavingAditamento] = useState(false);
+  const [aditamentoNumeroEdit, setAditamentoNumeroEdit] = useState("");
+  const [aditamentoDataEdit, setAditamentoDataEdit] = useState("");
+
   useEffect(() => {
     if (!open || !processo) return;
     setDataEntradaEdit(processo.dataEntrada || "");
@@ -59,6 +77,20 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
         : [],
     );
     setEditandoDocumentos(false);
+    setProrrogacoesEdit(
+      Array.isArray(processo.prorrogacoes)
+        ? processo.prorrogacoes.map((p) => ({
+            doc: p.doc || "",
+            inicio: p.inicio || "",
+            fim: p.fim || "",
+            dias: p.dias != null ? String(p.dias) : "",
+          }))
+        : [],
+    );
+    setEditandoProrrogacoes(false);
+    setAditamentoNumeroEdit(processo.aditamentoNumero || "");
+    setAditamentoDataEdit(processo.aditamentoData || "");
+    setEditandoAditamento(false);
   }, [open, processo]);
 
   if (!processo) return null;
@@ -144,6 +176,15 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
         atualizadoEm: new Date().toISOString(),
         atualizadoPorNome: autorMilitar,
       });
+
+      // V9.24 — Log de auditoria no chat: sempre registra quem mexeu nos documentos.
+      await addDoc(collection(db, `processos/${processo.id}/historico`), {
+        autor: autorMilitar,
+        autorId: user?.uid || "sistema",
+        texto: `Documentos atualizados por ${autorMilitar} (${documentosLimpos.length} registro(s)).`,
+        timestamp: new Date().toISOString(),
+      });
+
       setEditandoDocumentos(false);
       toast.success("Documentos atualizados com sucesso.");
     } catch (error) {
@@ -160,6 +201,101 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
     setDocumentosEdit((atual) => atual.filter((_, i) => i !== index));
   const atualizarDocumento = (index: number, campo: "numero" | "data", valor: string) =>
     setDocumentosEdit((atual) => atual.map((d, i) => (i === index ? { ...d, [campo]: valor } : d)));
+
+  const adicionarProrrogacaoEdit = () =>
+    setProrrogacoesEdit((atual) => [...atual, { doc: "", inicio: "", fim: "", dias: "" }]);
+  const removerProrrogacaoEdit = (index: number) =>
+    setProrrogacoesEdit((atual) => atual.filter((_, i) => i !== index));
+  const atualizarProrrogacaoEdit = (index: number, campo: "doc" | "inicio" | "fim" | "dias", valor: string) =>
+    setProrrogacoesEdit((atual) => atual.map((p, i) => (i === index ? { ...p, [campo]: valor } : p)));
+
+  const handleSalvarProrrogacoes = async () => {
+    try {
+      setSavingProrrogacoes(true);
+      const prorrogacoesLimpas = prorrogacoesEdit
+        .map((p) => ({
+          doc: p.doc.trim(),
+          inicio: p.inicio || undefined,
+          fim: p.fim || undefined,
+          dias: p.dias.trim() ? Math.max(0, Math.trunc(Number(p.dias))) : undefined,
+        }))
+        .filter((p) => p.doc.length > 0);
+
+      // V9.24 — Recalcula o prazo fatal a partir das prorrogações editadas,
+      // igual ao CadastroPA — senão prazoFatal fica dessincronizado do que
+      // está sendo mostrado aqui (editar/excluir uma prorrogação sem
+      // recalcular deixaria o prazo fatal desatualizado).
+      const prazoCalculado = calcularPrazoFinalPA({
+        tipoPA: processo.tipoPA,
+        dataInicioPrazo: processo.dataInicioPrazo,
+        dataAssinatura: processo.dataAssinatura,
+        prorrogacoes: prorrogacoesLimpas,
+      });
+
+      const patch: Record<string, unknown> = {
+        prorrogacoes: prorrogacoesLimpas.length > 0 ? prorrogacoesLimpas : null,
+        atualizadoEm: new Date().toISOString(),
+        atualizadoPorNome: autorMilitar,
+      };
+      if (prazoCalculado) {
+        patch.prazoFatal = prazoCalculado;
+        patch.finalPrazo = prazoCalculado;
+        patch.prazoFatalOverride = prazoCalculado;
+      }
+
+      await updateDoc(doc(db, "processos", processo.id), patch);
+
+      // V9.24 — Log de auditoria no chat: sempre registra quem mexeu nas
+      // prorrogações, para dar pra conferir depois quem alterou o quê.
+      await addDoc(collection(db, `processos/${processo.id}/historico`), {
+        autor: autorMilitar,
+        autorId: user?.uid || "sistema",
+        texto: `Prorrogações atualizadas por ${autorMilitar} (${prorrogacoesLimpas.length} registro(s)).`,
+        timestamp: new Date().toISOString(),
+      });
+
+      setEditandoProrrogacoes(false);
+      toast.success("Prorrogações atualizadas com sucesso.");
+    } catch (error) {
+      console.error("Erro ao atualizar prorrogações:", error);
+      toast.error("Não foi possível salvar as prorrogações.");
+    } finally {
+      setSavingProrrogacoes(false);
+    }
+  };
+
+  const handleSalvarAditamento = async (remover = false) => {
+    try {
+      setSavingAditamento(true);
+      const numero = remover ? "" : aditamentoNumeroEdit.trim();
+      const dataPub = remover ? "" : aditamentoDataEdit;
+
+      await updateDoc(doc(db, "processos", processo.id), {
+        aditamentoNumero: numero || null,
+        aditamentoData: dataPub || null,
+        atualizadoEm: new Date().toISOString(),
+        atualizadoPorNome: autorMilitar,
+      });
+
+      const texto = remover
+        ? `Publicação do Aditamento removida por ${autorMilitar}.`
+        : `Publicação do Aditamento atualizada por ${autorMilitar}: ${numero}${dataPub ? `, em ${formatarData(dataPub)}` : ""}.`;
+      await addDoc(collection(db, `processos/${processo.id}/historico`), {
+        autor: autorMilitar,
+        autorId: user?.uid || "sistema",
+        texto,
+        timestamp: new Date().toISOString(),
+      });
+
+      setEditandoAditamento(false);
+      toast.success(remover ? "Publicação removida." : "Publicação do Aditamento atualizada.");
+    } catch (error) {
+      console.error("Erro ao atualizar publicação do aditamento:", error);
+      toast.error("Não foi possível salvar a publicação do aditamento.");
+    } finally {
+      setSavingAditamento(false);
+    }
+  };
 
   const prorrogacoesPA = calcularFaixasProrrogacaoPA({
     tipoPA: processo.tipoPA,
@@ -197,7 +333,7 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
   const diasPrazoSolucao = processo.prazoFatal ? diasRestantes(processo.prazoFatal) : null;
   // V9.22 — Uma vez despachado para assinatura, o prazo da solução/parecer
   // não se aplica mais — vira o prazo de 5 dias do Cmt para assinar.
-  const prazoAssinaturaCmt = calcularPrazoAssinaturaSolucao(processo.dataDespachoAssinatura);
+  const prazoAssinaturaCmt = calcularPrazoAssinaturaSolucao(processo.dataDespachoAssinatura, siteSettings?.prazoAssinaturaSolucaoDias);
   const diasPrazoAssinatura = prazoAssinaturaCmt ? diasRestantes(prazoAssinaturaCmt) : null;
 
   // Investigação Preliminar e Outros seguem o motor IP (situacaoFluxoIP), que
@@ -349,6 +485,11 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                   )}
                   {processo.dataEntrada && <InfoRow icon={Calendar} label="Data de Entrada" value={formatarData(processo.dataEntrada)} />}
                   <InfoRow icon={Calendar} label={emPrazoSolucao ? "Início do Prazo da Solução" : "Início do Prazo"} value={processo.dataInicioPrazo ? formatarData(processo.dataInicioPrazo) : undefined} />
+                  {/* V9.26 — Prazo interno (ex.: combinado com o Encarregado ao
+                      devolver para nova apuração): visível aqui, separado do
+                      Prazo Fatal — não altera o prazo regulamentar, que só
+                      muda via prorrogação. */}
+                  {processo.prazo && <InfoRow icon={Clock} label="Prazo Interno" value={formatarData(processo.prazo)} />}
                   {/* V9.6 — Prazo Fatal: sempre exibido. */}
                   <div className="flex items-start gap-3">
                     <Clock className="w-4 h-4 text-slate-400 mt-0.5" />
@@ -399,7 +540,97 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                 <Clock className="w-4 h-4 text-amber-500 shrink-0" />
                 <span className="whitespace-nowrap">Prorrogações ({prorrogacoesPA.length})</span>
               </div>
-              {prorrogacoesPA.length === 0 ? (
+              <div className="flex items-center gap-1.5 mb-2">
+                {editandoProrrogacoes ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => {
+                        setEditandoProrrogacoes(false);
+                        setProrrogacoesEdit(
+                          Array.isArray(processo.prorrogacoes)
+                            ? processo.prorrogacoes.map((p) => ({
+                                doc: p.doc || "",
+                                inicio: p.inicio || "",
+                                fim: p.fim || "",
+                                dias: p.dias != null ? String(p.dias) : "",
+                              }))
+                            : [],
+                        );
+                      }}
+                      disabled={savingProrrogacoes}
+                    >
+                      <X className="w-3 h-3 mr-1" /> Cancelar
+                    </Button>
+                    <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={handleSalvarProrrogacoes} disabled={savingProrrogacoes}>
+                      <Save className="w-3 h-3 mr-1" /> {savingProrrogacoes ? "Salvando..." : "Salvar"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setEditandoProrrogacoes(true)}>
+                    <Pencil className="w-3 h-3 mr-1" /> Editar
+                  </Button>
+                )}
+              </div>
+
+              {editandoProrrogacoes ? (
+                <div className="space-y-3">
+                  {prorrogacoesEdit.length === 0 && (
+                    <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
+                      Nenhuma prorrogação cadastrada. Clique em "Adicionar Prorrogação".
+                    </div>
+                  )}
+                  {prorrogacoesEdit.map((item, idx) => (
+                    <div key={idx} className="p-3 border border-amber-200 bg-amber-50/60 rounded-lg relative shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() => removerProrrogacaoEdit(idx)}
+                        className="absolute top-2 right-2 text-slate-400 hover:text-red-500 transition-colors"
+                        title="Remover prorrogação"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                      <div className="space-y-2.5 pr-6">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Documento</label>
+                          <Input
+                            value={item.doc}
+                            onChange={(e) => atualizarProrrogacaoEdit(idx, "doc", e.target.value)}
+                            placeholder="Ex: BAR nº 36, de 13 AGO 26"
+                            className="h-8 text-xs mt-0.5"
+                          />
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Início</label>
+                            <Input type="date" value={item.inicio} onChange={(e) => atualizarProrrogacaoEdit(idx, "inicio", e.target.value)} className="h-8 text-xs mt-0.5" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fim</label>
+                            <Input type="date" value={item.fim} onChange={(e) => atualizarProrrogacaoEdit(idx, "fim", e.target.value)} className="h-8 text-xs mt-0.5" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Dias</label>
+                            <Input type="number" min={0} value={item.dias} onChange={(e) => atualizarProrrogacaoEdit(idx, "dias", e.target.value)} className="h-8 text-xs mt-0.5" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={adicionarProrrogacaoEdit}
+                    className="w-full text-xs h-8 border-dashed border-slate-300 text-slate-500 hover:text-slate-800"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Prorrogação
+                  </Button>
+                </div>
+              ) : prorrogacoesPA.length === 0 ? (
                 <div className="p-3 border border-dashed border-slate-200 rounded-lg text-center text-xs text-slate-400 italic">
                   Nenhuma prorrogação registrada.
                 </div>
@@ -424,7 +655,63 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
                 <FileText className="w-4 h-4 text-indigo-500 shrink-0" />
                 <span className="whitespace-nowrap">Publicação do Aditamento</span>
               </div>
-              {processo.aditamentoNumero ? (
+              <div className="flex items-center gap-1.5 mb-2">
+                {editandoAditamento ? (
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => {
+                        setEditandoAditamento(false);
+                        setAditamentoNumeroEdit(processo.aditamentoNumero || "");
+                        setAditamentoDataEdit(processo.aditamentoData || "");
+                      }}
+                      disabled={savingAditamento}
+                    >
+                      <X className="w-3 h-3 mr-1" /> Cancelar
+                    </Button>
+                    <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={() => void handleSalvarAditamento(false)} disabled={savingAditamento}>
+                      <Save className="w-3 h-3 mr-1" /> {savingAditamento ? "Salvando..." : "Salvar"}
+                    </Button>
+                    {processo.aditamentoNumero && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-[11px] border-red-300 text-red-700 hover:bg-red-50"
+                        onClick={() => void handleSalvarAditamento(true)}
+                        disabled={savingAditamento}
+                      >
+                        <X className="w-3 h-3 mr-1" /> Excluir
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[11px]" onClick={() => setEditandoAditamento(true)}>
+                    <Pencil className="w-3 h-3 mr-1" /> Editar
+                  </Button>
+                )}
+              </div>
+
+              {editandoAditamento ? (
+                <div className="p-3 border border-indigo-200 bg-indigo-50/60 rounded-lg space-y-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Nº do Aditamento</label>
+                    <Input
+                      value={aditamentoNumeroEdit}
+                      onChange={(e) => setAditamentoNumeroEdit(e.target.value)}
+                      placeholder="Ex: Aditamento nº 12/2026"
+                      className="h-8 text-xs mt-0.5"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data da Publicação</label>
+                    <Input type="date" value={aditamentoDataEdit} onChange={(e) => setAditamentoDataEdit(e.target.value)} className="h-8 text-xs mt-0.5" />
+                  </div>
+                </div>
+              ) : processo.aditamentoNumero ? (
                 <div className="rounded-xl border border-indigo-200 bg-indigo-50 shadow-sm p-3">
                   <div className="text-sm font-semibold text-indigo-900 break-words">{processo.aditamentoNumero}</div>
                   {processo.aditamentoData && (

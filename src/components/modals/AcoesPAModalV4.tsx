@@ -73,8 +73,8 @@ interface AcoesPAModalV4Props {
   onOpenChange: (open: boolean) => void;
   processoId: string;
   numeroProcesso: string;
-  // Mantidos por compatibilidade com a assinatura padrão dos modais de ação.
-  // V4 ignora `siteSettings` (não utiliza configurações dinâmicas de fluxo).
+  // V9.29 — Usado para os prazos de Solução/Parecer e Assinatura da Solução
+  // configuráveis em Ajustes do Site (antes hardcoded em 10 e 5 dias).
   siteSettings?: SiteSettings;
   onSuccess?: () => void;
   // V9.5 — Solicitação de prorrogação delega 100% ao modal de edição (CadastroPA).
@@ -88,6 +88,7 @@ export function AcoesPAModalV4({
   onOpenChange,
   processoId,
   numeroProcesso,
+  siteSettings,
   onSuccess,
   onSolicitarEdicao,
 }: AcoesPAModalV4Props) {
@@ -314,7 +315,18 @@ export function AcoesPAModalV4({
                   }
                   void avancarFluxo(
                     "COM_ENCARREGADO",
-                    { dataInicioPrazo: dataCiente },
+                    {
+                      dataInicioPrazo: dataCiente,
+                      // V9.27 — Zera qualquer prazoFatalOverride antigo (de um
+                      // ciclo anterior — devolução, prorrogação manual etc.):
+                      // sem isto, o cálculo automático a partir do novo
+                      // dataInicioPrazo é ignorado (override sempre vence em
+                      // useProcessos), e o card fica "travado" na aba antiga
+                      // mesmo com a data de início do prazo atualizada.
+                      prazoFatal: null,
+                      finalPrazo: null,
+                      prazoFatalOverride: null,
+                    },
                     "Portaria entregue ao encarregado. Prazo iniciado.",
                   );
                 }}
@@ -414,8 +426,9 @@ export function AcoesPAModalV4({
                   onClick={() => {
                     const hoje = new Date().toISOString().slice(0, 10);
                     setDataRecebimento(hoje);
-                    // Sugestão inicial de 10 dias — o assessor pode alterar livremente antes de confirmar.
-                    setDataFatal(somarDiasISO(hoje, 10));
+                    // V9.29 — Sugestão configurável em Ajustes do Site (padrão
+                    // 10 dias) — o assessor pode alterar livremente antes de confirmar.
+                    setDataFatal(somarDiasISO(hoje, siteSettings?.prazoSolucaoDias ?? 10));
                     setIsRecebendoAutos(true);
                   }}
                 >
@@ -505,7 +518,7 @@ export function AcoesPAModalV4({
                   </button>
                   <button
                     type="button"
-                    className={SECONDARY_BTN}
+                    className={`${SECONDARY_BTN} flex-1`}
                     disabled={salvando}
                     onClick={() => { setIsDevolvendoCorrecao(false); setMotivoDevolucao(""); }}
                   >
@@ -564,7 +577,7 @@ export function AcoesPAModalV4({
                   </button>
                   <button
                     type="button"
-                    className={SECONDARY_BTN}
+                    className={`${SECONDARY_BTN} flex-1`}
                     disabled={salvando}
                     onClick={() => setIsRegistrandoPublicacao(false)}
                   >

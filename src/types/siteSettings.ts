@@ -13,6 +13,12 @@ export interface ProcessualDeadlineSettings {
   prazoToleranciaIPMDias: number;
   prazoToleranciaSindicanciaDias: number;
   prazoToleranciaConselhoDias: number;
+  // V9.29 — Prazos da fase de Solução/Parecer (comuns a IPM/Sindicância/
+  // Conselho, não específicos por tipo): dias sugeridos ao "Receber Autos
+  // Concluídos" (COM_ENCARREGADO → FAZENDO_SOLUCAO) e dias do Cmt para
+  // assinar depois de despachado (FAZENDO_SOLUCAO → ASSINANDO_SOLUCAO).
+  prazoSolucaoDias: number;
+  prazoAssinaturaSolucaoDias: number;
 }
 
 export type PAInProgressColumnId = "sindicancia" | "ipm" | "conselho" | "outros";
@@ -114,6 +120,8 @@ export const DEFAULT_PROCESSUAL_DEADLINES: ProcessualDeadlineSettings = {
   prazoToleranciaIPMDias: 2,
   prazoToleranciaSindicanciaDias: 2,
   prazoToleranciaConselhoDias: 2,
+  prazoSolucaoDias: 10,
+  prazoAssinaturaSolucaoDias: 5,
 };
 
 export const DEFAULT_ASSUNTOS_DU_PRINCIPAIS = [
