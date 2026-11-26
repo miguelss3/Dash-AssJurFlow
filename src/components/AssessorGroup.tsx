@@ -43,6 +43,12 @@ interface Props {
    */
   apenasAbaConcluidos?: boolean;
   /**
+   * V9.10 — Quando `true`, as abas "Em Andamento"/"Atrasado" ordenam pelo
+   * número do processo (crescente) em vez de pelo prazo. Usado nas colunas
+   * de tipo (Sindicância/IPM/Conselho).
+   */
+  ordenarColunaPorNumero?: boolean;
+  /**
    * V4.2 — Data de retorno (YYYY-MM-DD) quando este assessor está de férias
    * hoje. Bloqueia visualmente a coluna (cadeado + selo âmbar) e desativa o
    * drop — reforça na tela o mesmo bloqueio que o backend já aplica em
@@ -51,7 +57,7 @@ interface Props {
   emFeriasAte?: string;
 }
 
-export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca, mapaCoresAssessores = {}, vistaAssessor = false, apenasAbaConcluidos = false, emFeriasAte }: Props) {
+export function AssessorGroup({ responsavel, tipo, processos, processosPortariaAssinada = [], processosAtrasados = [], processosConcluidos = [], ehAdmin, onEdit, onDelete, onMove, onReativarProcesso, siteSettings, unreadProcessIds, onReadProcess, isWide = false, filtro, busca, mapaCoresAssessores = {}, vistaAssessor = false, apenasAbaConcluidos = false, ordenarColunaPorNumero = false, emFeriasAte }: Props) {
   const [aba, setAba] = useState<"portaria_assinada" | "andamento" | "atraso" | "concluidos">(apenasAbaConcluidos ? "concluidos" : "andamento");
   const corColuna = mapaCoresAssessores[(responsavel || "").trim()];
 
@@ -131,21 +137,38 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     });
   };
 
+  // V9.10 — Colunas de tipo (Sindicância/IPM/Conselho) ordenam por número do
+  // processo (crescente), não por prazo — extrai o primeiro grupo de dígitos
+  // de `numero` (ex.: "Portaria Nr 06/2026" -> 6) para a comparação.
+  const ordenarPorNumero = (lista: Processo[]): Processo[] => {
+    const numeroSequencial = (valor?: string) => {
+      const match = String(valor || "").match(/(\d+)/);
+      return match ? parseInt(match[1], 10) : Number.POSITIVE_INFINITY;
+    };
+
+    return [...lista].sort((a, b) => {
+      const numA = numeroSequencial(a.numero);
+      const numB = numeroSequencial(b.numero);
+      if (numA !== numB) return numA - numB;
+      return (a.numero || "").localeCompare(b.numero || "");
+    });
+  };
+
   const processosAtivosOrdenados = useMemo(() => {
-    return ordenarPorPrazo(processos);
-  }, [processos]);
+    return ordenarColunaPorNumero ? ordenarPorNumero(processos) : ordenarPorPrazo(processos);
+  }, [processos, ordenarColunaPorNumero]);
 
   const processosAtrasadosOrdenados = useMemo(() => {
-    return ordenarPorPrazo(processosAtrasados);
-  }, [processosAtrasados]);
+    return ordenarColunaPorNumero ? ordenarPorNumero(processosAtrasados) : ordenarPorPrazo(processosAtrasados);
+  }, [processosAtrasados, ordenarColunaPorNumero]);
 
   const processosDaAba = aba === "portaria_assinada"
-    ? processosPortariaAssinada
+    ? (ordenarColunaPorNumero ? ordenarPorNumero(processosPortariaAssinada) : processosPortariaAssinada)
     : aba === "andamento"
       ? processosAtivosOrdenados
       : aba === "atraso"
         ? processosAtrasadosOrdenados
-        : processosConcluidos;
+        : (ordenarColunaPorNumero ? ordenarPorNumero(processosConcluidos) : processosConcluidos);
 
   const abasConfiguradas = useMemo(() => {
     const nomeNormalizado = responsavel.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -317,7 +340,7 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
     <div
       ref={setNodeRef}
       style={corColuna && !emFeriasAte ? { borderTopColor: corColuna, borderTopWidth: "4px" } : undefined}
-      className={`shrink-0 w-[88vw] ${isWide ? "sm:w-[450px]" : "sm:w-[340px]"} snap-start flex flex-col rounded-3xl bg-card border shadow-card overflow-hidden transition-all ${
+      className={`shrink-0 w-[88vw] ${isWide ? "sm:w-[400px]" : "sm:w-[340px]"} snap-start flex flex-col rounded-3xl bg-card border shadow-card overflow-hidden transition-all ${
         emFeriasAte
           ? "border-amber-400 border-2 bg-amber-50/40"
           : isOver
@@ -351,11 +374,11 @@ export function AssessorGroup({ responsavel, tipo, processos, processosPortariaA
                 key={`${responsavel}-${tab.id}`}
                 type="button"
                 onClick={() => setAba(tab.id as "portaria_assinada" | "andamento" | "atraso" | "concluidos")}
-                className={`min-h-[52px] px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors leading-tight ${
+                className={`min-h-[52px] px-1.5 py-1 rounded-lg text-[10px] font-bold uppercase transition-colors leading-tight ${
                   abaAtiva === tab.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <span className="block">{tab.label}</span>
+                <span className="block whitespace-nowrap overflow-hidden text-ellipsis">{tab.label}</span>
                 <span className="block mt-1 text-[11px]">({count})</span>
               </button>
             );

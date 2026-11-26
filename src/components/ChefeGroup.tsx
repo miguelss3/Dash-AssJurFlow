@@ -17,6 +17,8 @@ interface Props {
   unreadProcessIds?: Set<string>;
   onReadProcess?: (processoId: string) => void;
   mapaCoresAssessores?: Record<string, string>;
+  /** Quando `true`, a coluna usa largura ampliada (400px) em telas ≥sm. */
+  isWide?: boolean;
 }
 
 export function ChefeGroup({
@@ -32,6 +34,7 @@ export function ChefeGroup({
   unreadProcessIds,
   onReadProcess,
   mapaCoresAssessores = {},
+  isWide = false,
 }: Props) {
   const { setNodeRef, isOver } = useDroppable({
     id: responsavel,
@@ -46,7 +49,7 @@ export function ChefeGroup({
   return (
     <div
       ref={setNodeRef}
-      className={`shrink-0 w-[88vw] sm:w-[340px] snap-start flex flex-col rounded-3xl bg-card border shadow-card overflow-hidden transition-all ${
+      className={`shrink-0 w-[88vw] ${isWide ? "sm:w-[400px]" : "sm:w-[340px]"} snap-start flex flex-col rounded-3xl bg-card border shadow-card overflow-hidden transition-all ${
         isOver ? "border-amber-500 border-2 ring-2 ring-amber-200 scale-[1.02]" : "border-border"
       }`}
     >

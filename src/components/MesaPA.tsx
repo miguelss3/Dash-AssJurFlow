@@ -222,10 +222,6 @@ export function MesaPA({
     const situacaoConselho = normalizarSituacao(p.situacaoFluxoConselho);
     const situacaoIP = normalizarSituacao(p.situacaoFluxoIP);
 
-    const isFaseAssessorSolucao =
-      situacaoPA === "FAZENDO_SOLUCAO" ||
-      situacaoPA === "ASSINANDO_SOLUCAO";
-
     // 1. Identifica a coluna
     let colunaTipo: string | null = null;
     if (tipoNorm.includes("conselho")) colunaTipo = paColunaLabelPorId.get("conselho") || "📕 Conselhos";
@@ -266,11 +262,11 @@ export function MesaPA({
       return { emAndamento: null, portaria: colunaTipo, atrasado: false };
     }
 
-    // Fase de solução é de atuação direta do assessor responsável.
-    // Não deve cair na coluna geral (Sindicâncias/IPM/Conselhos).
-    if (isFaseAssessorSolucao) {
-      return { emAndamento: null, portaria: null, atrasado: false };
-    }
+    // V9.11 — Fase de solução (FAZENDO_SOLUCAO/ASSINANDO_SOLUCAO) passa a
+    // cair também na coluna de tipo (Sindicância/IPM/Conselho), classificada
+    // pelo prazo como qualquer outra fase — antes ficava escondida, só
+    // visível na Mesa do Assessor, o que dificultava achar o processo depois
+    // de uma devolução para correção.
 
     // 4. Se chegou aqui, está na mão do Encarregado (Em Andamento Real) —
     // ou, para tipos sem coluna fixa (Investigação Preliminar/Outros), na
@@ -558,6 +554,8 @@ export function MesaPA({
                 processosAtrasados={a.itensAtrasados}
                 processosConcluidos={a.itensConcluidos}
                 apenasAbaConcluidos={a.nome === (paColunaLabelPorId.get("outros") || "📄 Outros Processos")}
+                ordenarColunaPorNumero={a.nome !== (paColunaLabelPorId.get("outros") || "📄 Outros Processos")}
+                isWide
                 ehAdmin={ehAdmin}
                 onEdit={onEdit}
                 onDelete={onDelete}
@@ -605,6 +603,7 @@ export function MesaPA({
                 processosAtrasados={a.itensAssessorAtrasadosTotal}
                 processosConcluidos={a.itensAssessorConcluidosTotal}
                 vistaAssessor
+                isWide
                 ehAdmin={ehAdmin}
                 onEdit={onEdit}
                 onDelete={onDelete}

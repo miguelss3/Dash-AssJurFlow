@@ -27,16 +27,14 @@ import {
   User,
   Calendar,
   AlertCircle,
-  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
-import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes, nivelUrgenciaPA } from "@/lib/prazo";
+import { calcularFaixasProrrogacaoPA, formatarData, diasRestantes, nivelUrgenciaPA, foiConcluidoForaDoPrazo } from "@/lib/prazo";
 import { registrarErro } from "@/lib/errorLog";
 import { getBadgeSituacaoPA } from "@/lib/utils";
-import { gerarResumoPA } from "@/lib/resumoProcesso";
 import { DetalhesModalPA } from "./DetalhesModalPA";
 import { ChatModal } from "./ChatModal";
 import { useDraggable } from "@dnd-kit/core";
@@ -280,7 +278,9 @@ const CardPAComponent = ({
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-300">{p.tipoPA}</span>
               )}
               {p.status === "concluido" ? (
-                <Badge variant="outline" className="text-[10px] h-5 border-green-400 text-green-800 bg-green-50">Finalizado</Badge>
+                <Badge variant="outline" className="text-[10px] h-5 border-green-400 text-green-800 bg-green-50">
+                  Finalizado{p.atualizadoEm ? ` em ${formatarData(p.atualizadoEm)}` : ""}
+                </Badge>
               ) : p.processoReaberto ? (
                 <Badge variant="outline" className="text-[10px] h-5 border-blue-300 text-blue-700 bg-blue-50">Processo reaberto</Badge>
               ) : (
@@ -297,16 +297,16 @@ const CardPAComponent = ({
                 <Clock className="w-3 h-3" /> <span className="font-semibold">Interno:</span> <span>{formatarData(p.prazo)}</span>
               </div>
             )}
-            {p.prazoFatal && (
-              <div className={`flex items-center gap-1 ${diasRestantes(p.prazoFatal) <= 5 ? "text-red-600 font-bold" : "text-orange-600"}`}>
-                <AlertCircle className="w-3 h-3" /> <span className="font-semibold">Final:</span> <span>{formatarData(p.prazoFatal)}</span>
-              </div>
-            )}
           </div>
 
-          {nivelPA === "vencido_critico" && (
-            <span className="inline-flex items-center gap-1 self-start rounded-full bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide animate-pulse">
-              <AlertCircle className="w-3 h-3" /> Vencido
+          {(p.status === "concluido"
+            ? foiConcluidoForaDoPrazo(p.prazoFatal || p.finalPrazo, p.atualizadoEm)
+            : nivelPA === "vencido_critico") && (
+            <span className={`inline-flex items-center gap-1 self-start rounded-full bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide ${p.status === "concluido" ? "" : "animate-pulse"}`}>
+              <AlertCircle className="w-3 h-3" />
+              {p.status === "concluido"
+                ? `Concluído Fora do Prazo${p.atualizadoEm ? ` em ${formatarData(p.atualizadoEm)}` : ""}`
+                : "Vencido"}
             </span>
           )}
 
@@ -318,19 +318,17 @@ const CardPAComponent = ({
             {p.dataInicioPrazo && (
               <p className="flex items-center gap-1 text-purple-700 font-medium"><Calendar className="w-3 h-3" /> <strong>Início do Prazo:</strong> {formatarData(p.dataInicioPrazo)}</p>
             )}
+            {p.prazoFatal && (
+              <p className={`flex items-center gap-1 font-semibold ${diasRestantes(p.prazoFatal) <= 5 ? "text-red-600" : "text-orange-600"}`}>
+                <AlertCircle className="w-3 h-3" /> <strong>Prazo Final:</strong> {formatarData(p.prazoFatal)}
+              </p>
+            )}
             {p.responsavel && (
               <p className="flex items-center gap-1 text-purple-700 font-semibold"><User className="w-3 h-3" /> Assessor: {p.responsavel}</p>
             )}
             {p.encarregado && (
               <p className="flex items-center gap-1 text-purple-700 font-medium"><User className="w-3 h-3" /> <strong>Encarregado:</strong> {p.encarregado}</p>
             )}
-          </div>
-
-          <div className="rounded-lg border border-purple-100 bg-purple-50/60 px-3 py-2">
-            <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-purple-700 mb-1">
-              <Sparkles className="w-3 h-3" /> Resumo
-            </div>
-            <div className="text-[11px] text-slate-600 leading-snug">{gerarResumoPA(p)}</div>
           </div>
 
           {prorrogacoesPA.length > 0 && (

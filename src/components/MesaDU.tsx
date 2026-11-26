@@ -464,6 +464,7 @@ export function MesaDU({
                   unreadProcessIds={unreadProcessIds}
                   onReadProcess={onReadProcess}
                   mapaCoresAssessores={mapaCoresAssessores}
+                  isWide
                 />
               ) : (
                 <AssessorGroup
@@ -486,6 +487,7 @@ export function MesaDU({
                   busca={busca}
                   mapaCoresAssessores={mapaCoresAssessores}
                   emFeriasAte={bloqueiosFerias?.[a.nome]}
+                  isWide
                 />
               )
             )}
@@ -512,6 +514,7 @@ export function MesaDU({
                   unreadProcessIds={unreadProcessIds}
                   onReadProcess={onReadProcess}
                   mapaCoresAssessores={mapaCoresAssessores}
+                  isWide
                 />
               ) : (
                 <AssessorGroup
@@ -534,6 +537,7 @@ export function MesaDU({
                   busca={busca}
                   mapaCoresAssessores={mapaCoresAssessores}
                   emFeriasAte={bloqueiosFerias?.[a.nome]}
+                  isWide
                 />
               )
             )}

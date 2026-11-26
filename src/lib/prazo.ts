@@ -450,6 +450,20 @@ export function diasRestantes(prazo: unknown): number {
   return differenceInCalendarDays(d, new Date());
 }
 
+// V9.12 — "Concluído Fora do Prazo" deve comparar o prazo fatal com a DATA DE
+// CONCLUSÃO do processo, não com hoje. Sem isso, qualquer processo concluído
+// dentro do prazo continua marcado como "fora do prazo" para sempre, assim
+// que a data de hoje ultrapassa aquele prazo fatal antigo (diasRestantes
+// sempre usa "hoje" como referência, o que é certo para processos ativos,
+// mas errado para avaliar se ALGO JÁ CONCLUÍDO atrasou ou não).
+export function foiConcluidoForaDoPrazo(prazoFatal: unknown, dataConclusao: unknown): boolean {
+  if (!prazoFatal || !dataConclusao) return false;
+  const fatal = toDateLocal(prazoFatal);
+  const conclusao = toDateLocal(dataConclusao);
+  if (!fatal || !conclusao) return false;
+  return differenceInCalendarDays(conclusao, fatal) > 0;
+}
+
 export function statusPrazo(prazo: unknown): StatusPrazo {
   if (!prazo) return "safe"; // Sem prazo = não tem urgência
   const d = diasRestantes(prazo);

@@ -451,8 +451,20 @@ export function AcoesPAModalV4({
                 onClick={() =>
                   void avancarFluxo(
                     "FAZENDO_SOLUCAO",
-                    {},
-                    "Chefia/Cmt devolveu a Solução para correção.",
+                    {
+                      // V9.11 — O prazo da solução devolvida não vale mais (era
+                      // referente à versão rejeitada): zera dataInicioPrazo
+                      // também, não só o prazoFatal — sem dataInicioPrazo,
+                      // calcularPrazoFinalPA (useProcessos) não tem base para
+                      // recalcular um prazo fatal "de reposição" sozinho, então
+                      // o processo some como "sem prazo definido" até alguém
+                      // cadastrar um novo (via Editar/Solicitar Prorrogação).
+                      dataInicioPrazo: null,
+                      prazoFatal: null,
+                      finalPrazo: null,
+                      prazoFatalOverride: null,
+                    },
+                    "Chefia/Cmt devolveu a Solução para correção. Prazo da solução zerado — aguardando novo prazo.",
                   )
                 }
               >

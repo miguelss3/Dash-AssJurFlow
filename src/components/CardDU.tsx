@@ -35,7 +35,7 @@ import { toast } from "sonner";
 import { addDoc, collection, doc, getDoc, setDoc, setDoc as setMensagemDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
-import { formatarData, diasRestantes, nivelUrgenciaDU } from "@/lib/prazo";
+import { formatarData, diasRestantes, nivelUrgenciaDU, foiConcluidoForaDoPrazo } from "@/lib/prazo";
 import { registrarErro } from "@/lib/errorLog";
 import { getBadgeSituacaoDUContextual } from "@/lib/utils";
 import { gerarResumoDU } from "@/lib/resumoProcesso";
@@ -245,7 +245,9 @@ const CardDUComponent = ({
                 <Badge variant="outline" className="text-[10px] h-5">Normal</Badge>
               )}
               {p.status === "concluido" ? (
-                <Badge variant="outline" className="text-[10px] h-5 border-green-400 text-green-800 bg-green-50">Finalizado</Badge>
+                <Badge variant="outline" className="text-[10px] h-5 border-green-400 text-green-800 bg-green-50">
+                  Finalizado{p.atualizadoEm ? ` em ${formatarData(p.atualizadoEm)}` : ""}
+                </Badge>
               ) : p.processoReaberto ? (
                 <Badge variant="outline" className="text-[10px] h-5 border-blue-300 text-blue-700 bg-blue-50">Processo reaberto</Badge>
               ) : badgeAcaoChefia ? (
@@ -272,9 +274,14 @@ const CardDUComponent = ({
             )}
           </div>
 
-          {nivelDU === "vencido_critico" && (
-            <span className="inline-flex items-center gap-1 self-start rounded-full bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide animate-pulse">
-              <AlertCircle className="w-3 h-3" /> Vencido
+          {(p.status === "concluido"
+            ? foiConcluidoForaDoPrazo(p.prazoFatal || p.finalPrazo, p.atualizadoEm)
+            : nivelDU === "vencido_critico") && (
+            <span className={`inline-flex items-center gap-1 self-start rounded-full bg-red-600 text-white text-[10px] font-bold px-2 py-0.5 uppercase tracking-wide ${p.status === "concluido" ? "" : "animate-pulse"}`}>
+              <AlertCircle className="w-3 h-3" />
+              {p.status === "concluido"
+                ? `Concluído Fora do Prazo${p.atualizadoEm ? ` em ${formatarData(p.atualizadoEm)}` : ""}`
+                : "Vencido"}
             </span>
           )}
 
