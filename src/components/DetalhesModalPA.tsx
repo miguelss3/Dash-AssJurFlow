@@ -198,9 +198,12 @@ export function DetalhesModalPA({ open, onOpenChange, processo }: DetalhesModalP
           <div>
             <h3 className="text-xl font-bold text-slate-800 mb-2">{processo.tipoAcao}</h3>
             <div className="flex items-center gap-2 flex-wrap">
-              {processo.prioridade && (
-                <Badge variant={processo.prioridade === "urgente" ? "destructive" : "secondary"}>
-                  {processo.prioridade === "urgente" ? "URGENTE" : "Normal"}
+              {processo.prioridade === "urgente" && (
+                <Badge variant="destructive">URGENTE</Badge>
+              )}
+              {processo.tipoPA && (
+                <Badge variant="outline" className="bg-purple-50 text-purple-800 border-purple-300">
+                  {processo.tipoPA}
                 </Badge>
               )}
               <Badge
