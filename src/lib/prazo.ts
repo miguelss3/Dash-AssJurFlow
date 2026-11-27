@@ -238,6 +238,16 @@ export function obterRegraPrazoPA(
     };
   }
 
+  // V9.x — Requerimento Administrativo: prazo geral fixo de 30 dias, corrido
+  // a partir da data de entrada (sem portaria nem prorrogações, diferente dos
+  // demais tipos do motor PA padrão).
+  if (tipoPA === "Requerimento Administrativo") {
+    return {
+      diasIniciais: 30,
+      diasProrrogacao: 0,
+    };
+  }
+
   return {
     diasIniciais: regras.prazoConselhoInicialDias,
     diasProrrogacao: regras.prazoConselhoProrrogacaoDias,

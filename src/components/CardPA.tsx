@@ -60,6 +60,7 @@ const resolverModalPA = (tipoPA?: string): ModalAcaoPA => {
     t === "investigação preliminar"
     || t === "investigacao preliminar"
     || t === "outros"
+    || t === "requerimento administrativo"
   ) return "IP";
   if (t === "conselho de disciplina" || t === "conselho de justificação" || t === "conselho de justificacao") return "CONSELHO";
   return "PA";

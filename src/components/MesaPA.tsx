@@ -181,7 +181,8 @@ export function MesaPA({
         tipoPANorm.includes("investigacao preliminar")
         || tipoPANorm.includes("investigacao")
         || tipoPANorm.includes("ipm")
-        || tipoPANorm === "outros";
+        || tipoPANorm === "outros"
+        || tipoPANorm === "requerimento administrativo";
 
       const opcoesRedistribuicao = ehIP
         ? {
@@ -315,7 +316,11 @@ export function MesaPA({
     if (tipoNorm.includes("conselho")) return paColunaLabelPorId.get("conselho") || "⚖ Conselhos";
     if (tipoNorm.includes("ipm")) return paColunaLabelPorId.get("ipm") || "📘 IPM";
     if (tipoNorm.includes("sindic")) return paColunaLabelPorId.get("sindicancia") || "📗 Sindicancias";
-    if (tipoNorm.includes("investigacao preliminar") || tipoNorm === "outros") {
+    if (
+      tipoNorm.includes("investigacao preliminar")
+      || tipoNorm === "outros"
+      || tipoNorm === "requerimento administrativo"
+    ) {
       return paColunaLabelPorId.get("outros") || "📄 Outros Processos";
     }
     return null;

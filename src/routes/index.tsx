@@ -93,6 +93,7 @@ const resolverModalPARoute = (tipoPA?: string): "PA" | "CONSELHO" | "IP" | "OUTR
   if (
     t === "investigação preliminar"
     || t === "investigacao preliminar"
+    || t === "requerimento administrativo"
   ) return "IP";
   if (t === "conselho de disciplina" || t === "conselho de justificação" || t === "conselho de justificacao") return "CONSELHO";
   return "PA";
@@ -888,6 +889,7 @@ function Index() {
             || tipoPANorm.includes("investigacao")
             || tipoPANorm.includes("ipm")
             || tipoPANorm === "outros"
+            || tipoPANorm === "requerimento administrativo"
           );
 
         if (ehIPPA) {

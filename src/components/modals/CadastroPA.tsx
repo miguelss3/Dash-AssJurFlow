@@ -37,7 +37,7 @@ type ProrrogacaoEditavel = {
   por?: string;
 };
 
-const TIPOS_PA = ["IPM", "Sindicância", "Conselho de Disciplina", "Conselho de Justificação", "Investigação Preliminar", "Outros"];
+const TIPOS_PA = ["IPM", "Sindicância", "Conselho de Disciplina", "Conselho de Justificação", "Investigação Preliminar", "Requerimento Administrativo", "Outros"];
 const POSTOS_CONSELHO = ["Cap", "Maj", "TC", "Cel"];
 const POSTOS_ENCARREGADO = ["Sgt", "Ten", "Cap", "Maj", "TC", "Cel"];
 
@@ -453,14 +453,16 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
       };
 
       // V5.2 — payload inicial conforme o motor do tipoPA.
-      //   • Investigação Preliminar / Outros → motor IP (ping-pong).
+      //   • Investigação Preliminar / Requerimento Administrativo / Outros → motor IP (ping-pong).
       //   • Conselho de Disciplina/Justificação → motor Conselho.
       //   • Demais (IPM, Sindicância) → motor PA padrão.
       const tNorm = tipoPA.trim().toLowerCase();
+      const ehRequerimentoAdministrativo = tNorm === "requerimento administrativo";
       const ehIPouOutros =
         tNorm === "investigação preliminar"
         || tNorm === "investigacao preliminar"
-        || tNorm === "outros";
+        || tNorm === "outros"
+        || ehRequerimentoAdministrativo;
 
       if (!processo?.id) {
         if (ehIPouOutros) {
@@ -471,6 +473,17 @@ export function CadastroPA({ open, onOpenChange, processo, onSuccess, siteSettin
           dados.situacaoFluxoPA = "FAZENDO_PORTARIA";
         }
         dados.finalizado = false;
+      }
+
+      // V9.x — Requerimento Administrativo tem prazo geral fixo (30 dias),
+      // corrido desde a entrada — diferente de IP/Outros, que não têm prazo
+      // automático. dataInicioPrazo é o que calcularPrazoFinalPA usa como
+      // base do cálculo (ver obterRegraPrazoPA em lib/prazo.ts).
+      if (ehRequerimentoAdministrativo) {
+        const dataInicioPrazoRA = toDataCivil(dataEntrada);
+        if (dataInicioPrazoRA) {
+          dados.dataInicioPrazo = dataInicioPrazoRA;
+        }
       }
 
       if (isSindicanciaPA) {

@@ -370,7 +370,10 @@ export function useProcessos(siteSettings?: SiteSettings, authUser?: AuthUser | 
                 .replace(/[̀-ͯ]/g, "")
                 .toLowerCase()
                 .trim();
-              const ehIPouOutrosPA = tipoPANorm === "investigacao preliminar" || tipoPANorm === "outros";
+              const ehIPouOutrosPA =
+                tipoPANorm === "investigacao preliminar"
+                || tipoPANorm === "outros"
+                || tipoPANorm === "requerimento administrativo";
 
               const processoMapeado: Processo = {
                 id: procData.id,
